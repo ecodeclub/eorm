@@ -1,2 +1,2 @@
-# eql
-A easy-use SQL builder.
+# EQL
+An easy-use SQL builder.
