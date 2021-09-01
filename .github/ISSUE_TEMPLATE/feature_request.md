@@ -2,19 +2,30 @@
 name: Feature request
 about: Suggest an idea for this project
 title: ''
-labels: ''
+labels: feature
 assignees: ''
 
 ---
 
-**Is your feature request related to a problem? Please describe.**
-A clear and concise description of what the problem is. Ex. I'm always frustrated when [...]
+#### English Only
 
-**Describe the solution you'd like**
-A clear and concise description of what you want to happen.
+Please check [existing issues](https://github.com/gotomicro/eql/issues) first to avoid duplication and answer the questions below before submitting your issue.
 
-**Describe alternatives you've considered**
-A clear and concise description of any alternative solutions or features you've considered.
+### Use case(s) 
 
-**Additional context**
-Add any other context or screenshots about the feature request here.
+(Please state use cases, what problem will this feature solve?)
+
+### Proposed Solution
+
+(Please describe your proposed design/solution, if any)
+
+### Alternatives Considered
+
+(Other possible options for solving the problem?)
+
+### Additional Context
+
+(Paste any relevant logs - please use code blocks (```) to format console output,
+logs, and code as it's very hard to read otherwise.)
+
+(If you can, link to the line of code that might be helpful to explain the context)
