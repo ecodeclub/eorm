@@ -12,28 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-name: Go
-
+name: Check License Lines
 on:
-  push:
-    branches: [ main ]
   pull_request:
-    branches: [ main ]
-
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+    branches:
+      - develop
+      - main
 jobs:
-
-  build:
+  check-license-lines:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-
-      - name: Set up Go
-        uses: actions/setup-go@v2
-        with:
-          go-version: 1.17
-
-      - name: Build
-        run: go build -v ./...
-
-      - name: Test
-        run: go test -v ./...
+      - uses: actions/checkout@master
+      - name: Check License Lines
+        uses: kt3k/license_checker@v1.0.6
