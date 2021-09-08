@@ -24,11 +24,6 @@ func (s *Selector) Build() (*Query, error) {
 	panic("implement me")
 }
 
-// Select starts a select query. If columns are empty, all columns will be fetched
-func (*DB) Select(columns...Selectable) *Selector {
-	panic("implement me")
-}
-
 // From specifies the table
 func (*Selector) From(table interface{}) *Selector {
 	panic("implement me")
