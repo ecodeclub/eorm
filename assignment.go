@@ -14,38 +14,11 @@
 
 package eql
 
-// Expr is the top interface. It represents everything.
-type Expr interface {
-	expr() (string, error)
+type Assignment struct {
+	Column string
+	Value ValueExpr
 }
 
-type funcCall struct {
-	fn string
-	args []Expr
+type ValueExpr interface {
+	value()
 }
-
-func (*funcCall) expr() (string, error) {
-	panic("implement me")
-}
-
-// RawExpr uses string as Expr
-type RawExpr string
-
-// Raw just take expr as Expr
-func Raw(expr string) RawExpr {
-	return RawExpr(expr)
-}
-
-func (r RawExpr) expr() (string, error) {
-	return string(r), nil
-}
-
-func (r RawExpr) selected() {}
-
-type binaryExpr struct {
-	left Expr
-	op op
-	right Expr
-}
-
-type MathExpr binaryExpr

@@ -27,7 +27,15 @@ func C(c string) Column {
 }
 
 // As means alias
-func (Column) As(alias string) Column {
+func (Column) As(alias string) Selectable {
+	panic("implement me")
+}
+
+func (Column) Inc(val interface{}) MathExpr {
+	panic("implement me")
+}
+
+func (Column) Times(val interface{}) MathExpr {
 	panic("implement me")
 }
 
