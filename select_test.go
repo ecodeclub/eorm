@@ -15,34 +15,35 @@
 package eql
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestSelectable(t *testing.T) {
 	testCases := []CommonTestCase{
 		{
-			name: "simple",
+			name:    "simple",
 			builder: New().Select().From(&TestModel{}),
 			wantSql: "SELECT `id`, `first_name`, `age`, `last_name` FROM `test_model`;",
 		},
 		{
-			name: "columns",
+			name:    "columns",
 			builder: New().Select(Columns("Id", "FirstName")).From(&TestModel{}),
 			wantSql: "SELECT `id`, `first_name` FROM `test_model`;",
 		},
 		{
-			name: "alias",
+			name:    "alias",
 			builder: New().Select(Columns("Id"), C("FirstName").As("name")).From(&TestModel{}),
 			wantSql: "SELECT `id`, `first_name` as `name` FROM `test_model`;",
 		},
 		{
-			name: "aggregate",
+			name:    "aggregate",
 			builder: New().Select(Columns("Id"), Avg("Age").As("avg_age")).From(&TestModel{}),
 			wantSql: "SELECT `id`, AVG(`age`) as `avg_age` FROM `test_model`;",
 		},
 		{
-			name: "raw",
+			name:    "raw",
 			builder: New().Select(Columns("Id"), Raw("AVG(DISTINCT `age`)")).From(&TestModel{}),
 			wantSql: "SELECT `id`, AVG(DISTINCT `age`) FROM `test_model`;",
 		},
