@@ -15,6 +15,7 @@
 package eql
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -60,6 +61,7 @@ func TestDeleter_Build(t *testing.T) {
 		c := tc
 		t.Run(c.name, func(t *testing.T) {
 			query, err := c.builder.Build()
+			fmt.Println(query.SQL)
 			assert.Equal(t, c.wantErr, err)
 			assert.Equal(t, c.wantSql, query.SQL)
 			assert.Equal(t, c.wantArgs, query.Args)

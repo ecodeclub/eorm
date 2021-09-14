@@ -15,6 +15,7 @@
 package eql
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -23,21 +24,35 @@ import (
 
 // Deleter builds DELETE query
 type Deleter struct {
-	SQL  string
-	Args []interface{}
+	SQL          string
+	Args         []interface{}
+	DeleteSqlMap map[string]string
 }
 
 // Build returns DELETE query
 func (d *Deleter) Build() (*Query, error) {
-	return &Query{SQL: d.SQL + ";", Args: d.Args}, nil
+	buildSql := d.DeleteSqlMap["scheme"]
+	if _, ok := d.DeleteSqlMap["from"]; !ok {
+		return &Query{}, fmt.Errorf(" no found from")
+	}
+	buildSql += d.DeleteSqlMap["from"]
+	if _, ok := d.DeleteSqlMap["orderby"]; ok {
+		buildSql += d.DeleteSqlMap["orderby"]
+	}
+	if _, ok := d.DeleteSqlMap["limit"]; ok {
+		buildSql += d.DeleteSqlMap["limit"]
+	}
+	buildSql += ";"
+	return &Query{SQL: buildSql, Args: d.Args}, nil
 }
 
 // From accepts model definition
 func (d *Deleter) From(table interface{}) *Deleter {
 	tableName, args := internal.TableName(table)
-	d.SQL += " FROM `" + tableName + "`"
+	sql := " FROM `" + tableName + "`"
+	d.DeleteSqlMap["from"] = sql
 	d.Args = args
-	return &Deleter{SQL: d.SQL, Args: d.Args}
+	return &Deleter{Args: d.Args, DeleteSqlMap: d.DeleteSqlMap}
 }
 
 // Where accepts predicates
@@ -58,11 +73,13 @@ func (d *Deleter) OrderBy(orderBy ...OrderBy) *Deleter {
 		}
 	}
 	order_by = d.SQL + " ORDER by " + strings.Trim(order_by, ",")
-	return &Deleter{SQL: order_by}
+	d.DeleteSqlMap["orderby"] = order_by
+	return &Deleter{DeleteSqlMap: d.DeleteSqlMap}
 }
 
 // Limit limits the number of deleted rows
 func (d *Deleter) Limit(limit int) *Deleter {
-	d.SQL += " LIMIT " + strconv.Itoa(limit)
-	return &Deleter{SQL: d.SQL}
+	sql := " LIMIT " + strconv.Itoa(limit)
+	d.DeleteSqlMap["limit"] = sql
+	return &Deleter{DeleteSqlMap: d.DeleteSqlMap}
 }

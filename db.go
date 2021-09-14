@@ -33,5 +33,15 @@ func (*DB) Select(columns ...Selectable) *Selector {
 
 // Delete starts a "delete" query.
 func (*DB) Delete() *Deleter {
-	return &Deleter{SQL: "DELETE", Args: []interface{}{}}
+	return &Deleter{
+		SQL:          "",
+		Args:         []interface{}{},
+		DeleteSqlMap: DeleteSqlMap(),
+	}
+}
+
+func DeleteSqlMap() map[string]string {
+	SqlMap := make(map[string]string, 0)
+	SqlMap["scheme"] = "DELETE"
+	return SqlMap
 }

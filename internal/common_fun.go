@@ -11,9 +11,10 @@ func TableName(table interface{}) (string, []interface{}) {
 		t = t.Elem()
 	}
 	args := []interface{}{}
-	num := reflect.ValueOf(table).NumField()
+
+	num := reflect.ValueOf(table).Elem().NumField()
 	for i := 0; i < num; i++ {
-		val := reflect.ValueOf(table).Field(i).Interface()
+		val := reflect.ValueOf(table).Elem().Field(i).Interface()
 		args = append(args, val)
 	}
 	tableName := ""
