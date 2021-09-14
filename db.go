@@ -22,17 +22,16 @@ type DB struct {
 }
 
 // New returns DB. It's the entry of EQL
-func New(opts...Option) *DB {
-	panic("implement me")
+func New(opts ...Option) *DB {
+	return &DB{}
 }
 
 // Select starts a select query. If columns are empty, all columns will be fetched
-func (*DB) Select(columns...Selectable) *Selector {
+func (*DB) Select(columns ...Selectable) *Selector {
 	panic("implement me")
 }
 
 // Delete starts a "delete" query.
 func (*DB) Delete() *Deleter {
-	panic("implement me")
+	return &Deleter{SQL: "Delete", Args: []interface{}{}}
 }
-

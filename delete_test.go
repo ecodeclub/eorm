@@ -15,42 +15,44 @@
 package eql
 
 import (
-	"github.com/stretchr/testify/assert"
+	"fmt"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestDeleter_Build(t *testing.T) {
-	testCases := []CommonTestCase {
+	testCases := []CommonTestCase{
 		{
-			name: "no where",
+			name:    "no where",
 			builder: New().Delete().From(&TestModel{}),
 			wantSql: "DELETE FROM `test_model`;",
 		},
 		{
-			name: "where",
-			builder: New().Delete().From(&TestModel{Id: 14}).Where(P("Id")),
-			wantSql: "DELETE FROM `test_model` WHERE `id`=?;",
+			name:     "where",
+			builder:  New().Delete().From(&TestModel{Id: 14}).Where(P("Id")),
+			wantSql:  "DELETE FROM `test_model` WHERE `id`=?;",
 			wantArgs: []interface{}{int64(14)},
 		},
 		{
 			name: "order",
 			builder: New().Delete().From(&TestModel{Id: 14}).Where(P("Id")).
 				OrderBy(ASC("Id"), DESC("Name")),
-			wantSql: "DELETE FROM `test_model` WHERE `id`=? ORDER BY `id` ASC, `name` DESC;",
+			wantSql:  "DELETE FROM `test_model` WHERE `id`=? ORDER BY `id` ASC, `name` DESC;",
 			wantArgs: []interface{}{int64(14)},
 		},
 		{
 			name: "order and limit",
 			builder: New().Delete().From(&TestModel{Id: 14}).Where(P("Id")).
 				OrderBy(ASC("Id"), DESC("Name")).Limit(3),
-			wantSql: "DELETE FROM `test_model` WHERE `id`=? ORDER BY `id` ASC, `name` DESC LIMIT ?;",
+			wantSql:  "DELETE FROM `test_model` WHERE `id`=? ORDER BY `id` ASC, `name` DESC LIMIT ?;",
 			wantArgs: []interface{}{int64(14), 3},
 		},
 
 		{
-			name: "limit",
-			builder: New().Delete().From(&TestModel{Id: 14}).Where(P("Id")).Limit(3),
-			wantSql: "DELETE FROM `test_model` WHERE `id`=? LIMIT ?;",
+			name:     "limit",
+			builder:  New().Delete().From(&TestModel{Id: 14}).Where(P("Id")).Limit(3),
+			wantSql:  "DELETE FROM `test_model` WHERE `id`=? LIMIT ?;",
 			wantArgs: []interface{}{int64(14), 3},
 		},
 	}
@@ -59,6 +61,7 @@ func TestDeleter_Build(t *testing.T) {
 		c := tc
 		t.Run(c.name, func(t *testing.T) {
 			query, err := c.builder.Build()
+			fmt.Println(query.SQL)
 			assert.Equal(t, c.wantErr, err)
 			assert.Equal(t, c.wantSql, query.SQL)
 			assert.Equal(t, c.wantArgs, query.Args)

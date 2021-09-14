@@ -14,28 +14,48 @@
 
 package eql
 
+import (
+	"fmt"
+	"reflect"
+)
+
 // Deleter builds DELETE query
 type Deleter struct {
-
+	SQL  string
+	Args []interface{}
 }
 
 // Build returns DELETE query
 func (d *Deleter) Build() (*Query, error) {
-	panic("implement me")
+	return &Query{SQL: d.SQL, Args: d.Args}, nil
 }
 
 // From accepts model definition
 func (d *Deleter) From(table interface{}) *Deleter {
-	panic("implement me")
+	t := reflect.TypeOf(table)
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+	tableName := ""
+	if _, ok := t.FieldByName("tableName"); ok {
+		paramList := []reflect.Value{}
+		resu := reflect.New(t).Method(0).Call(paramList)
+		tableName = resu[0].String()
+		fmt.Println(tableName)
+	} else {
+		fmt.Println(t.Name())
+	}
+	d.SQL += " From " + tableName
+	return &Deleter{SQL: d.SQL}
 }
 
 // Where accepts predicates
-func (d *Deleter) Where(predicates...Predicate) *Deleter {
+func (d *Deleter) Where(predicates ...Predicate) *Deleter {
 	panic("implement me")
 }
 
 // OrderBy means "ORDER BY"
-func (d *Deleter) OrderBy(orderBy... OrderBy) *Deleter {
+func (d *Deleter) OrderBy(orderBy ...OrderBy) *Deleter {
 	panic("implement me")
 }
 
