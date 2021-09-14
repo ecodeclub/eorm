@@ -33,8 +33,9 @@ func (d *Deleter) Build() (*Query, error) {
 
 // From accepts model definition
 func (d *Deleter) From(table interface{}) *Deleter {
-	tableName := internal.TableName(table)
+	tableName, args := internal.TableName(table)
 	d.SQL += " FROM `" + tableName + "`"
+	d.Args = args
 	return &Deleter{SQL: d.SQL}
 }
 
