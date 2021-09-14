@@ -14,25 +14,11 @@
 
 package eql
 
-// DBOption configure DB
-type DBOption func(db *DB)
-
-// DB represents a database
-type DB struct {
+type Assignment struct {
+	Column string
+	Value ValueExpr
 }
 
-// New returns DB. It's the entry of EQL
-func New(opts...Option) *DB {
-	panic("implement me")
+type ValueExpr interface {
+	value()
 }
-
-// Select starts a select query. If columns are empty, all columns will be fetched
-func (*DB) Select(columns...Selectable) *Selector {
-	panic("implement me")
-}
-
-// Delete starts a "delete" query.
-func (*DB) Delete() *Deleter {
-	panic("implement me")
-}
-

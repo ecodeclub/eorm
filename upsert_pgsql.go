@@ -14,25 +14,10 @@
 
 package eql
 
-// DBOption configure DB
-type DBOption func(db *DB)
-
-// DB represents a database
-type DB struct {
+type PgSQLUpserter struct {
+	*Inserter
 }
 
-// New returns DB. It's the entry of EQL
-func New(opts...Option) *DB {
+func (p *PgSQLUpserter) Build() (*Query, error) {
 	panic("implement me")
 }
-
-// Select starts a select query. If columns are empty, all columns will be fetched
-func (*DB) Select(columns...Selectable) *Selector {
-	panic("implement me")
-}
-
-// Delete starts a "delete" query.
-func (*DB) Delete() *Deleter {
-	panic("implement me")
-}
-

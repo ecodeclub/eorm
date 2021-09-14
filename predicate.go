@@ -19,11 +19,7 @@ type op struct {
 }
 
 // Predicate will be used in Where Or Having
-type Predicate struct {
-	left Expr
-	op op
-	right Expr
-}
+type Predicate binaryExpr
 
 // P creates a Predicate
 // left could be string or Expr

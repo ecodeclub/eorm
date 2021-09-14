@@ -41,3 +41,11 @@ func (r RawExpr) expr() (string, error) {
 }
 
 func (r RawExpr) selected() {}
+
+type binaryExpr struct {
+	left Expr
+	op op
+	right Expr
+}
+
+type MathExpr binaryExpr

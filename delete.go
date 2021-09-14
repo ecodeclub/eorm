@@ -14,25 +14,32 @@
 
 package eql
 
-// DBOption configure DB
-type DBOption func(db *DB)
+// Deleter builds DELETE query
+type Deleter struct {
 
-// DB represents a database
-type DB struct {
 }
 
-// New returns DB. It's the entry of EQL
-func New(opts...Option) *DB {
+// Build returns DELETE query
+func (d *Deleter) Build() (*Query, error) {
 	panic("implement me")
 }
 
-// Select starts a select query. If columns are empty, all columns will be fetched
-func (*DB) Select(columns...Selectable) *Selector {
+// From accepts model definition
+func (d *Deleter) From(table interface{}) *Deleter {
 	panic("implement me")
 }
 
-// Delete starts a "delete" query.
-func (*DB) Delete() *Deleter {
+// Where accepts predicates
+func (d *Deleter) Where(predicates...Predicate) *Deleter {
 	panic("implement me")
 }
 
+// OrderBy means "ORDER BY"
+func (d *Deleter) OrderBy(orderBy... OrderBy) *Deleter {
+	panic("implement me")
+}
+
+// Limit limits the number of deleted rows
+func (d *Deleter) Limit(limit int) *Deleter {
+	panic("implement me")
+}

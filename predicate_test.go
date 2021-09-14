@@ -68,6 +68,27 @@ func TestPredicate_P(t *testing.T) {
 			wantSql: "SELECT id FROM test_model WHERE (`id`<? OR `id`>?) AND `first_name`>?",
 			wantArgs: []interface{}{13, 4, "tom"},
 		},
+		{
+			name: "cross columns",
+			builder: New().Select(Columns("Id")).From(&TestModel{Id: 10}).
+				Where(P("Id").LT(13).Or(P("Age").GT(C("Id")))),
+			wantSql: "SELECT `id` FROM test_model WHERE `age`>`id`",
+			wantArgs: []interface{}{13, 4, "tom"},
+		},
+		{
+			name: "cross columns mathematical",
+			builder: New().Select(Columns("Id")).From(&TestModel{Id: 10}).
+				Where(P("Age").GT(C("Id").Inc(40))),
+			wantSql: "SELECT `id` FROM test_model WHERE `age`>`id`+?",
+			wantArgs: []interface{}{40},
+		},
+		{
+			name: "cross columns mathematical",
+			builder: New().Select(Columns("Id")).From(&TestModel{Id: 10}).
+				Where(P("Age").GT(C("Id").Times(C("Age").Inc(66)))),
+			wantSql: "SELECT `id` FROM test_model WHERE `age`>`id`*(`age`+?)",
+			wantArgs: []interface{}{66},
+		},
 	}
 
 	for _, tc := range testCases {
