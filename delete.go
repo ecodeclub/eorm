@@ -36,7 +36,7 @@ func (d *Deleter) From(table interface{}) *Deleter {
 	tableName, args := internal.TableName(table)
 	d.SQL += " FROM `" + tableName + "`"
 	d.Args = args
-	return &Deleter{SQL: d.SQL}
+	return &Deleter{SQL: d.SQL, Args: d.Args}
 }
 
 // Where accepts predicates
