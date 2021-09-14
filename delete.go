@@ -16,6 +16,7 @@ package eql
 
 import (
 	"strconv"
+	"strings"
 
 	"github.com/gotomicro/eql/internal"
 )
@@ -46,7 +47,18 @@ func (d *Deleter) Where(predicates ...Predicate) *Deleter {
 
 // OrderBy means "ORDER BY"
 func (d *Deleter) OrderBy(orderBy ...OrderBy) *Deleter {
-	return &Deleter{}
+	order_by := ""
+	for _, val := range orderBy {
+		for _, field := range val.fields {
+			if val.asc {
+				order_by += field + " ASC, "
+			} else {
+				order_by += field + " DESC, "
+			}
+		}
+	}
+	order_by = d.SQL + " ORDER by " + strings.Trim(order_by, ",")
+	return &Deleter{SQL: order_by}
 }
 
 // Limit limits the number of deleted rows
