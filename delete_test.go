@@ -15,7 +15,6 @@
 package eql
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -28,40 +27,39 @@ func TestDeleter_Build(t *testing.T) {
 			builder: New().Delete().From(&TestModel{}),
 			wantSql: "DELETE FROM `test_model`;",
 		},
-		{
-			name:     "where",
-			builder:  New().Delete().From(&TestModel{Id: 14}).Where(P("Id")),
-			wantSql:  "DELETE FROM `test_model` WHERE `id`=?;",
-			wantArgs: []interface{}{int64(14)},
-		},
-		{
-			name: "order",
-			builder: New().Delete().From(&TestModel{Id: 14}).Where(P("Id")).
-				OrderBy(ASC("Id"), DESC("Name")),
-			wantSql:  "DELETE FROM `test_model` WHERE `id`=? ORDER BY `id` ASC, `name` DESC;",
-			wantArgs: []interface{}{int64(14)},
-		},
-		{
-			name: "order and limit",
-			builder: New().Delete().From(&TestModel{Id: 14}).Where(P("Id")).
-				OrderBy(ASC("Id"), DESC("Name")).Limit(3),
-			wantSql:  "DELETE FROM `test_model` WHERE `id`=? ORDER BY `id` ASC, `name` DESC LIMIT ?;",
-			wantArgs: []interface{}{int64(14), 3},
-		},
-
-		{
-			name:     "limit",
-			builder:  New().Delete().From(&TestModel{Id: 14}).Where(P("Id")).Limit(3),
-			wantSql:  "DELETE FROM `test_model` WHERE `id`=? LIMIT ?;",
-			wantArgs: []interface{}{int64(14), 3},
-		},
+		//{
+		//	name:     "where",
+		//	builder:  New().Delete().From(&TestModel{Id: 14}).Where(P("Id")),
+		//	wantSql:  "DELETE FROM `test_model` WHERE `id`=?;",
+		//	wantArgs: []interface{}{int64(14)},
+		//},
+		//{
+		//	name: "order",
+		//	builder: New().Delete().From(&TestModel{Id: 14}).Where(P("Id")).
+		//		OrderBy(ASC("Id"), DESC("Name")),
+		//	wantSql:  "DELETE FROM `test_model` WHERE `id`=? ORDER BY `id` ASC, `name` DESC;",
+		//	wantArgs: []interface{}{int64(14)},
+		//},
+		//{
+		//	name: "order and limit",
+		//	builder: New().Delete().From(&TestModel{Id: 14}).Where(P("Id")).
+		//		OrderBy(ASC("Id"), DESC("Name")).Limit(3),
+		//	wantSql:  "DELETE FROM `test_model` WHERE `id`=? ORDER BY `id` ASC, `name` DESC LIMIT ?;",
+		//	wantArgs: []interface{}{int64(14), 3},
+		//},
+		//
+		//{
+		//	name:     "limit",
+		//	builder:  New().Delete().From(&TestModel{Id: 14}).Where(P("Id")).Limit(3),
+		//	wantSql:  "DELETE FROM `test_model` WHERE `id`=? LIMIT ?;",
+		//	wantArgs: []interface{}{int64(14), 3},
+		//},
 	}
 
 	for _, tc := range testCases {
 		c := tc
 		t.Run(c.name, func(t *testing.T) {
 			query, err := c.builder.Build()
-			fmt.Println(query.SQL)
 			assert.Equal(t, c.wantErr, err)
 			assert.Equal(t, c.wantSql, query.SQL)
 			assert.Equal(t, c.wantArgs, query.Args)

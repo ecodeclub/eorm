@@ -33,5 +33,5 @@ func (*DB) Select(columns ...Selectable) *Selector {
 
 // Delete starts a "delete" query.
 func (*DB) Delete() *Deleter {
-	return &Deleter{SQL: "Delete", Args: []interface{}{}}
+	return &Deleter{SQL: "DELETE", Args: []interface{}{}}
 }

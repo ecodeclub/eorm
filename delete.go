@@ -15,8 +15,9 @@
 package eql
 
 import (
-	"fmt"
-	"reflect"
+	"strconv"
+
+	"github.com/gotomicro/eql/internal"
 )
 
 // Deleter builds DELETE query
@@ -27,39 +28,28 @@ type Deleter struct {
 
 // Build returns DELETE query
 func (d *Deleter) Build() (*Query, error) {
-	return &Query{SQL: d.SQL, Args: d.Args}, nil
+	return &Query{SQL: d.SQL + ";", Args: d.Args}, nil
 }
 
 // From accepts model definition
 func (d *Deleter) From(table interface{}) *Deleter {
-	t := reflect.TypeOf(table)
-	if t.Kind() == reflect.Ptr {
-		t = t.Elem()
-	}
-	tableName := ""
-	if _, ok := t.FieldByName("tableName"); ok {
-		paramList := []reflect.Value{}
-		resu := reflect.New(t).Method(0).Call(paramList)
-		tableName = resu[0].String()
-		fmt.Println(tableName)
-	} else {
-		fmt.Println(t.Name())
-	}
-	d.SQL += " From " + tableName
+	tableName := internal.TableName(table)
+	d.SQL += " FROM `" + tableName + "`"
 	return &Deleter{SQL: d.SQL}
 }
 
 // Where accepts predicates
 func (d *Deleter) Where(predicates ...Predicate) *Deleter {
-	panic("implement me")
+	return &Deleter{}
 }
 
 // OrderBy means "ORDER BY"
 func (d *Deleter) OrderBy(orderBy ...OrderBy) *Deleter {
-	panic("implement me")
+	return &Deleter{}
 }
 
 // Limit limits the number of deleted rows
 func (d *Deleter) Limit(limit int) *Deleter {
-	panic("implement me")
+	d.SQL += " LIMIT " + strconv.Itoa(limit)
+	return &Deleter{SQL: d.SQL}
 }
