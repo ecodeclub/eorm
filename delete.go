@@ -66,9 +66,9 @@ func (d *Deleter) OrderBy(orderBy ...OrderBy) *Deleter {
 	for _, val := range orderBy {
 		for _, field := range val.fields {
 			if val.asc {
-				order_by += field + " ASC, "
+				order_by += field + " ASC,"
 			} else {
-				order_by += field + " DESC, "
+				order_by += field + " DESC,"
 			}
 		}
 	}

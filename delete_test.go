@@ -24,8 +24,8 @@ func TestDeleter_Build(t *testing.T) {
 	testCases := []CommonTestCase{
 		{
 			name:    "no where",
-			builder: New().Delete().From(&TestModel{}),
-			wantSql: "DELETE FROM `test_model`;",
+			builder: New().Delete().OrderBy(OrderBy{fields: []string{"a", "b"}, asc: true}).From(&TestModel{}),
+			wantSql: "DELETE FROM `test_model` ORDER by a ASC,b ASC;",
 		},
 		//{
 		//	name:     "where",
