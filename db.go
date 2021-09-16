@@ -33,11 +33,7 @@ func (*DB) Select(columns ...Selectable) *Selector {
 
 // Delete starts a "delete" query.
 func (*DB) Delete() *Deleter {
-	return &Deleter{
-		SQL:          "",
-		Args:         []interface{}{},
-		DeleteSqlMap: DeleteSqlMap(),
-	}
+	return &Deleter{}
 }
 
 func DeleteSqlMap() map[string]string {

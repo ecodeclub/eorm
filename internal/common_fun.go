@@ -5,17 +5,10 @@ import (
 	"unicode"
 )
 
-func TableName(table interface{}) (string, []interface{}) {
+func TableName(table interface{}) string {
 	t := reflect.TypeOf(table)
 	if t.Kind() == reflect.Ptr {
 		t = t.Elem()
-	}
-	args := []interface{}{}
-
-	num := reflect.ValueOf(table).Elem().NumField()
-	for i := 0; i < num; i++ {
-		val := reflect.ValueOf(table).Elem().Field(i).Interface()
-		args = append(args, val)
 	}
 	tableName := ""
 	if _, ok := t.FieldByName("tableName"); ok {
@@ -25,7 +18,7 @@ func TableName(table interface{}) (string, []interface{}) {
 	} else {
 		tableName = underscoreName(t.Name())
 	}
-	return tableName, args
+	return tableName
 }
 
 func underscoreName(tableName string) string {

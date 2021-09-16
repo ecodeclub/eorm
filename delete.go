@@ -16,7 +16,6 @@ package eql
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/gotomicro/eql/internal"
@@ -24,62 +23,51 @@ import (
 
 // Deleter builds DELETE query
 type Deleter struct {
-	SQL          string
-	Args         []interface{}
-	DeleteSqlMap map[string]string
+	from    string
+	where   []Predicate
+	orderby string
+	limit   int
 }
 
 // Build returns DELETE query
 func (d *Deleter) Build() (*Query, error) {
-	buildSql := d.DeleteSqlMap["scheme"]
-	if _, ok := d.DeleteSqlMap["from"]; !ok {
-		return &Query{}, fmt.Errorf(" no found from")
+	builder := strings.Builder{}
+	builder.WriteString("DELETE FROM ")
+	builder.WriteString("`" + d.from + "`")
+	if d.orderby != "" {
+		builder.WriteString(" ORDER bY " + d.orderby)
 	}
-	buildSql += d.DeleteSqlMap["from"]
-	if _, ok := d.DeleteSqlMap["orderby"]; ok {
-		buildSql += d.DeleteSqlMap["orderby"]
+	if d.limit != 0 {
+		builder.WriteString(" limit " + fmt.Sprintf("%d", d.limit))
 	}
-	if _, ok := d.DeleteSqlMap["limit"]; ok {
-		buildSql += d.DeleteSqlMap["limit"]
-	}
-	buildSql += ";"
-	return &Query{SQL: buildSql, Args: d.Args}, nil
+	builder.WriteString(";")
+	return &Query{SQL: builder.String()}, nil
 }
 
 // From accepts model definition
 func (d *Deleter) From(table interface{}) *Deleter {
-	tableName, args := internal.TableName(table)
-	sql := " FROM `" + tableName + "`"
-	d.DeleteSqlMap["from"] = sql
-	d.Args = args
-	return &Deleter{Args: d.Args, DeleteSqlMap: d.DeleteSqlMap}
+	d.from = internal.TableName(table)
+	return d
 }
 
 // Where accepts predicates
 func (d *Deleter) Where(predicates ...Predicate) *Deleter {
-	return &Deleter{}
+	return d
 }
 
 // OrderBy means "ORDER BY"
 func (d *Deleter) OrderBy(orderBy ...OrderBy) *Deleter {
-	order_by := ""
-	for _, val := range orderBy {
-		for _, field := range val.fields {
-			if val.asc {
-				order_by += field + " ASC,"
-			} else {
-				order_by += field + " DESC,"
-			}
-		}
+	orderBuild := strings.Builder{}
+	for _, v := range orderBy {
+		orderBuild.WriteString(strings.Join(v.fields, ","))
+		orderBuild.WriteString(" " + v.order + ",")
 	}
-	order_by = d.SQL + " ORDER by " + strings.Trim(order_by, ",")
-	d.DeleteSqlMap["orderby"] = order_by
-	return &Deleter{DeleteSqlMap: d.DeleteSqlMap}
+	d.orderby = strings.Trim(orderBuild.String(), ",")
+	return d
 }
 
 // Limit limits the number of deleted rows
 func (d *Deleter) Limit(limit int) *Deleter {
-	sql := " LIMIT " + strconv.Itoa(limit)
-	d.DeleteSqlMap["limit"] = sql
-	return &Deleter{DeleteSqlMap: d.DeleteSqlMap}
+	d.limit = limit
+	return d
 }

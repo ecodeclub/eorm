@@ -16,7 +16,6 @@ package eql
 
 // Selector represents a select query
 type Selector struct {
-
 }
 
 // Build returns Select Query
@@ -30,7 +29,7 @@ func (*Selector) From(table interface{}) *Selector {
 }
 
 // Where accepts predicates
-func (*Selector) Where(predicates...Predicate) *Selector {
+func (*Selector) Where(predicates ...Predicate) *Selector {
 	panic("implement me")
 }
 
@@ -40,17 +39,17 @@ func (*Selector) Distinct() *Selector {
 }
 
 // Having accepts predicates
-func (*Selector) Having(predicates...Predicate) *Selector {
+func (*Selector) Having(predicates ...Predicate) *Selector {
 	panic("implement me")
 }
 
 // GroupBy means "GROUP BY"
-func (*Selector) GroupBy(columns...string) *Selector {
+func (*Selector) GroupBy(columns ...string) *Selector {
 	panic("implement me")
 }
 
 // OrderBy means "ORDER BY"
-func (*Selector) OrderBy(orderBys...OrderBy) *Selector {
+func (*Selector) OrderBy(orderBys ...OrderBy) *Selector {
 	panic("implement")
 }
 
@@ -67,16 +66,16 @@ func (*Selector) Offset(offset int) *Selector {
 // OrderBy specify fields and ASC
 type OrderBy struct {
 	fields []string
-	asc bool
+	order  string
 }
 
 // ASC means ORDER BY fields ASC
-func ASC(fields...string) OrderBy {
+func ASC(fields ...string) OrderBy {
 	panic("implement me")
 }
 
 // DESC means ORDER BY fields DESC
-func DESC(fields...string) OrderBy {
+func DESC(fields ...string) OrderBy {
 	panic("implement me")
 }
 
