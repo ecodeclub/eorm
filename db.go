@@ -35,9 +35,3 @@ func (*DB) Select(columns ...Selectable) *Selector {
 func (*DB) Delete() *Deleter {
 	return &Deleter{}
 }
-
-func DeleteSqlMap() map[string]string {
-	SqlMap := make(map[string]string, 0)
-	SqlMap["scheme"] = "DELETE"
-	return SqlMap
-}

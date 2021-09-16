@@ -17,6 +17,7 @@ package eql
 type config struct {
 	dialect Dialect
 }
+
 var (
 	defaultConfig *config
 )
@@ -26,7 +27,7 @@ var (
 type Option func(cfg *config)
 
 // Init the EQL
-func Init(opts...Option) {
+func Init(opts ...Option) {
 	defaultConfig = &config{
 		dialect: mysql,
 	}
@@ -34,5 +35,7 @@ func Init(opts...Option) {
 
 // WithDefaultDialect init the default dialect. Or SQL builder will use this dialect if not specified
 func WithDefaultDialect(dialect Dialect) Option {
-	panic("implement me")
+	return func(cfg *config) {
+		cfg = defaultConfig
+	}
 }

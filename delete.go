@@ -25,7 +25,7 @@ import (
 type Deleter struct {
 	from    string
 	where   []Predicate
-	orderby string
+	orderby []OrderBy
 	limit   int
 }
 
@@ -33,12 +33,19 @@ type Deleter struct {
 func (d *Deleter) Build() (*Query, error) {
 	builder := strings.Builder{}
 	builder.WriteString("DELETE FROM ")
-	builder.WriteString("`" + d.from + "`")
-	if d.orderby != "" {
-		builder.WriteString(" ORDER bY " + d.orderby)
+	builder.WriteString(" `" + d.from + "` ")
+	if len(d.orderby) > 0 {
+		builder.WriteString(" ORDER by ")
+	}
+	for key, v := range d.orderby {
+		builder.WriteString(strings.Join(v.fields, ","))
+		builder.WriteString(" " + v.order)
+		if key != len(d.orderby)-1 {
+			builder.WriteString(",")
+		}
 	}
 	if d.limit != 0 {
-		builder.WriteString(" limit " + fmt.Sprintf("%d", d.limit))
+		builder.WriteString(" LIMIT " + fmt.Sprintf("%d", d.limit))
 	}
 	builder.WriteString(";")
 	return &Query{SQL: builder.String()}, nil
@@ -57,12 +64,7 @@ func (d *Deleter) Where(predicates ...Predicate) *Deleter {
 
 // OrderBy means "ORDER BY"
 func (d *Deleter) OrderBy(orderBy ...OrderBy) *Deleter {
-	orderBuild := strings.Builder{}
-	for _, v := range orderBy {
-		orderBuild.WriteString(strings.Join(v.fields, ","))
-		orderBuild.WriteString(" " + v.order + ",")
-	}
-	d.orderby = strings.Trim(orderBuild.String(), ",")
+	d.orderby = orderBy
 	return d
 }
 

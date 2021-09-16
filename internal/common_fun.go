@@ -7,14 +7,9 @@ import (
 
 func TableName(table interface{}) string {
 	t := reflect.TypeOf(table)
-	if t.Kind() == reflect.Ptr {
-		t = t.Elem()
-	}
 	tableName := ""
-	if _, ok := t.FieldByName("tableName"); ok {
-		paramList := []reflect.Value{}
-		resu := reflect.New(t).Method(0).Call(paramList)
-		tableName = resu[0].String()
+	if _, ok := t.MethodByName("TableName"); ok {
+		tableName = reflect.ValueOf(table).MethodByName("TableName").Call(nil)[0].String()
 	} else {
 		tableName = underscoreName(t.Name())
 	}
