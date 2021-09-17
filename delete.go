@@ -23,7 +23,7 @@ import (
 
 // Deleter builds DELETE query
 type Deleter struct {
-	from    string
+	from    interface{}
 	where   []Predicate
 	orderby []OrderBy
 	limit   int
@@ -33,7 +33,8 @@ type Deleter struct {
 func (d *Deleter) Build() (*Query, error) {
 	builder := strings.Builder{}
 	builder.WriteString("DELETE FROM ")
-	builder.WriteString(" `" + d.from + "` ")
+	talbe := internal.TableName(d.from)
+	builder.WriteString(" `" + talbe + "` ")
 	if len(d.orderby) > 0 {
 		builder.WriteString(" ORDER by ")
 	}
@@ -53,7 +54,7 @@ func (d *Deleter) Build() (*Query, error) {
 
 // From accepts model definition
 func (d *Deleter) From(table interface{}) *Deleter {
-	d.from = internal.TableName(table)
+	d.from = table
 	return d
 }
 
