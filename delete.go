@@ -47,7 +47,7 @@ func (d *Deleter) Build() (*Query, error) {
 		}
 	}
 	if d.limit != 0 {
-		builder.WriteString(" LIMIT " + fmt.Sprintf("%d", d.limit))
+		builder.WriteString(fmt.Sprintf(" limit %d", d.limit))
 	}
 	builder.WriteString(";")
 	return &Query{SQL: builder.String()}, nil
