@@ -17,15 +17,15 @@ func TableName(table interface{}) string {
 }
 
 func underscoreName(tableName string) string {
-	buf := []rune{}
+	buf := []byte{}
 	for i, v := range tableName {
 		if unicode.IsUpper(v) {
 			if i != 0 {
 				buf = append(buf, '_')
 			}
-			buf = append(buf, unicode.ToLower(v))
+			buf = append(buf, byte(unicode.ToLower(v)))
 		} else {
-			buf = append(buf, v)
+			buf = append(buf, byte(v))
 		}
 
 	}
