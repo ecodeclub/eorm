@@ -11,7 +11,7 @@ func TableName(table interface{}) string {
 	if _, ok := t.MethodByName("TableName"); ok {
 		tableName = reflect.ValueOf(table).MethodByName("TableName").Call(nil)[0].String()
 	} else {
-		tableName = underscoreName(t.Name())
+		tableName = underscoreName(t.Elem().Name())
 	}
 	return tableName
 }

@@ -110,10 +110,6 @@ type TestModel struct {
 	LastName string
 }
 
-func (test *TestModel) TableName() string {
-	return "a"
-}
-
 type CommonTestCase struct {
 	name     string
 	builder  QueryBuilder
