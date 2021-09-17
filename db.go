@@ -19,6 +19,7 @@ type DBOption func(db *DB)
 
 // DB represents a database
 type DB struct {
+	config *config
 }
 
 // New returns DB. It's the entry of EQL
