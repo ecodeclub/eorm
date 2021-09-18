@@ -24,7 +24,7 @@ func (m *MysqlUpserter) Build() (*Query, error) {
 	panic("implement me")
 }
 
-func (m *MysqlUpserter) Update(assignments...interface{}) *MysqlUpserter {
+func (m *MysqlUpserter) Update(assignments...Assignable) *MysqlUpserter {
 	panic("implement me")
 }
 
