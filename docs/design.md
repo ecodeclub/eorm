@@ -275,6 +275,80 @@ type dialect struct {
 }
 ```
 
+## 类型安全
+
+`EQL`设计的一个很重要的考量是类型安全。有一些`ORM`框架的`API`充斥着`interface{}`作为类型参数，然后在使用的时候，因为`interface{}`可以接收任意的值，有时候就会陷入一种困惑中，即它会怎么处理我传入的值？
+
+因此这一次`EQL`会加强这一方面的检查。这带来的后果是限制了用户的自由度，另外一方面就是可以在编译期及时发现问题。最为典型的例子是`Order By`。在`EQL`处理`Order By`上并不是让用户传入一个片段：`Id DESC`或者`Id ASC`，而是：
+```go
+// ASC means ORDER BY fields ASC
+func ASC(fields...string) OrderBy {
+	panic("implement me")
+}
+
+// DESC means ORDER BY fields DESC
+func DESC(fields...string) OrderBy {
+	panic("implement me")
+}
+```
+
+另外一个典型的例子是`Select`的方法：
+```go
+// Select starts a select query. If columns are empty, all columns will be fetched
+func (*DB) Select(columns...Selectable) *Selector {
+	panic("implement me")
+}
+```
+这个方法里面，接收一个`Selectable`参数。一般情况下，`SELECT`后面可以跟两种：列名和聚合函数。大多数`ORM`的框架，对此的处理是由用户保证自己输入的正确性，例如说它们的设计可能是要求用户输入字符串，`Select("Avg(age) as avg_age")`，这并非不可以。但是这里面有一个隐患，就是用户必须要知道列名是什么——大多数时候这并不是一个问题。另外一个就是，我认为这种写法对用户实在不太友好。
+
+因此在`EQL`这种设计之下，实现这个类似的写法，实际上是`eql.Avg("Age").As("avg_age")`。在这种写法之下，`EQL`可以帮助检测`Age`这个究竟是否存在，并且将`Age`这个字段名，映射为准确的列名。
+
+前面的`方法命名、参数以及构造SQL`里面说到，所有的方法，接收的参数都应该是列名或者结构体名，而不是表名和列名。这是因为，我认为在模型和表之间是存在映射的。`EQL`作为一个`ORM`的一部分，那么应该操作的是模型，所以应该用模型的名字而不是表的名字。
+
+也正因为这一个要求，`EQL`可以帮助用户避免很多低级错误，比如说手抖写错的问题。
+
+### 标记接口
+要想实现类型安全，就需要大量采用，我称之为标记接口的设计思路。从实践上来说，也难说好与不好，只能算是我个人比较偏好这种方案。
+
+所谓的标记接口，就是定义了接口，但是它内部的方法没有任何效果。例如：
+```go
+type Assignable interface {
+	assign()
+}
+
+type Expr interface {
+	expr() (string, error)
+}
+```
+目前来看，`EQL`并不会使用到里面的`assign`或者`expr`方法。所以这两个接口存在的意思就是标记一下，然后用于别的接口。
+
+在使用标记接口的情况下，`EQL`可以给很多的结构体实现这种接口，从而可以被用于各种场合，而且不会引起别的问题。例如说典型的两个`columns`和`Column`结构体：
+```go
+func (Column) assign() {
+	panic("implement me")
+}
+
+func (Column) expr() (string, error) {
+	panic("implement me")
+}
+
+func (Column) selected() {
+	panic("implement me")
+}
+```
+
+## Raw SQL 兜底
+
+所有的`ORM`都面临一个问题，就是在自身`API`无法覆盖所有的场景的时候，不得不提供一个所谓的`Raw SQL`的方法，也就是直接执行用户手写的`SQL`。`EQL`也面临类似的问题。不管如何设计，`EQL`都会遇到无法支持的场景。在这种时候，提供`Raw SQL`就是一种不得已的举动了。
+
+但是，`EQL`的定位本身就是提供给用户写`SQL`。如果`EQL`也提供了`Raw SQL`的话，那么用户为什么不直接自己手写`SQL`呢？
+
+答案就是，`EQL`只提供某些片段的`Raw SQL`的支持。例如一个典型的场景`SELECT COUNT(DISTINCT ID)`，`COUNT (DISTINCT ID)`是一个聚合函数，一个复杂的聚合函数。那么问题来了，`EQL`为了维系自身的简单，所以没有特别强大的动力去支持这么一种场景，毕竟可能一万个用户里面也没有一个用户会使用这个东西。因此在这种场景下，应该允许用户传入自己的这个复杂片段。
+
+用户应该意识到，当他决定使用`EQL`的这个特性的时候，他对正确性负有全部责任。也就是说，`EQL`完全没法子提供任何有效的验证——实际上，大多数时候，`EQL`是把这个作为字符串直接进行拼接。也因此，如果用户不小心写错了列名，那么`EQL`是发现不了的，只能在执行阶段才能知道。而通常来说，使用`Raw SQL`的特性，意味着用户必须要对`EQL`的内部工作机制有一定的了解，否则的话，他输入的`SQL`片段，很可能在拼接之后导致整个`SQL`出错。
+
+整体来说，`EQL`提供`Raw SQL`是一个不得已的行为，并且也是不鼓励用户使用。
+
 ## 启用泛型
 
 这一次，因为恰好`GO`的泛型方案也快要出来了，所以这一次会直接启用`Go1.17`之后的版本，在有必要的时候启用泛型。所谓有必要，是指在`EQL`这里暂时还看不到必要性。不过目测在`EMP`里面就要启用泛型了。
