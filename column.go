@@ -39,6 +39,10 @@ func (Column) Times(val interface{}) MathExpr {
 	panic("implement me")
 }
 
+func (Column) assign() {
+	panic("implement me")
+}
+
 func (Column) expr() (string, error) {
 	panic("implement me")
 }
@@ -55,8 +59,12 @@ func (c columns) selected() {
 	panic("implement me")
 }
 
+func (c columns) assign() {
+	panic("implement me")
+}
+
 // Columns specify columns
-func Columns(cs...string) Selectable {
+func Columns(cs...string) columns {
 	return columns{
 		cs: cs,
 	}

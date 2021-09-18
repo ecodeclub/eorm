@@ -49,3 +49,5 @@ type binaryExpr struct {
 }
 
 type MathExpr binaryExpr
+
+func (MathExpr) assign() {}

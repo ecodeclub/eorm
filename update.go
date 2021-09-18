@@ -14,28 +14,22 @@
 
 package eql
 
-// DBOption configure DB
-type DBOption func(db *DB)
+type Updater struct {
 
-// DB represents a database
-type DB struct {
 }
 
-// New returns DB. It's the entry of EQL
-func New(opts...Option) *DB {
+func (u *Updater) Build() (*Query, error) {
 	panic("implement me")
 }
 
-// Select starts a select query. If columns are empty, all columns will be fetched
-func (*DB) Select(columns...Selectable) *Selector {
+// Set:
+// 1. 更新字段，值从 entity 里面读，也就是从 db.Update(table) 的 table 里面读
+// 2. 有特定的指 Set("id", "123")
+// 更新多个字段，都是从entity里面读数据，那么我需要 Set(Assign("id", fromEntity), Assign("id", fromEntity))
+func (u *Updater) Set(assigns...Assignable) *Updater {
 	panic("implement me")
 }
 
-// Delete starts a "delete" query.
-func (*DB) Delete() *Deleter {
-	panic("implement me")
-}
-
-func (*DB) Update(table interface{}) *Updater {
+func (u *Updater) Where(predicates...Predicate) *Updater {
 	panic("implement me")
 }
