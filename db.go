@@ -19,11 +19,14 @@ type DBOption func(db *DB)
 
 // DB represents a database
 type DB struct {
+	metaRegistry MetaRegistry
 }
 
 // New returns DB. It's the entry of EQL
-func New(opts...Option) *DB {
-	panic("implement me")
+func New(opts...DBOption) *DB {
+	return &DB{
+		metaRegistry: defaultMetaRegistry,
+	}
 }
 
 // Select starts a select query. If columns are empty, all columns will be fetched
