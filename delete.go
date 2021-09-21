@@ -23,7 +23,7 @@ import (
 
 // Deleter builds DELETE query
 type Deleter struct {
-	option  Option
+	db      *DB
 	from    interface{}
 	where   []Predicate
 	orderby []OrderBy

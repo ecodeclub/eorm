@@ -19,12 +19,20 @@ type DBOption func(db *DB)
 
 // DB represents a database
 type DB struct {
-	config *config
+	config           *config
+	metaTableFactory MetaTableFactory
 }
 
 // New returns DB. It's the entry of EQL
-func New(opts ...Option) *DB {
-	return &DB{}
+func New(opts ...DBOption) *DB {
+	db := &DB{
+		config:           nil,
+		metaTableFactory: &NewMetaTable{},
+	}
+	for _, o := range opts {
+		o(db)
+	}
+	return db
 }
 
 // Select starts a select query. If columns are empty, all columns will be fetched

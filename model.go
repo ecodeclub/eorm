@@ -14,12 +14,53 @@
 
 package eql
 
+import (
+	"reflect"
+	"sync"
+)
+
 // TableMeta represents data model, or a table
 type TableMeta struct {
-	columns[] ColumnMeta
+	tableName string
+	columns   []ColumnMeta
 }
 
 // ColumnMeta represents model's field, or column
 type ColumnMeta struct {
+	columnName      string
+	isPrimaryKey    bool
+	isAutoIncrement bool
+	notNull         bool
+	re              reflect.Type
+}
 
+type MetaTableFactory interface {
+	Get(tableName interface{}) (*ColumnMeta, error)
+	Set(tableName interface{}, column *ColumnMeta) (*ColumnMeta, error)
+}
+
+type NewMetaTable struct {
+	syMap   sync.Map
+	syMutex sync.Mutex
+}
+
+func (meta *NewMetaTable) Get(tableName interface{}) (*ColumnMeta, error) {
+	if v, ok := meta.syMap.Load(tableName); ok {
+		return v.(*ColumnMeta), nil
+	}
+	return nil, nil
+}
+
+func (meta *NewMetaTable) Set(tableName interface{}, column *ColumnMeta) (*ColumnMeta, error) {
+	metaData, err := meta.Get(tableName)
+	if err != nil {
+		return nil, err
+	}
+	if metaData != nil {
+		return metaData, nil
+	}
+	meta.syMutex.Lock()
+	defer meta.syMutex.Unlock()
+	meta.syMap.Store(tableName, column)
+	return column, nil
 }
