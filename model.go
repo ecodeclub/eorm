@@ -89,6 +89,7 @@ func (t *tagMetaRegistry) Register(table interface{}, opts ...tableMetaOption) (
 	TableMeta.tableName = internal.TableName(table)
 	TableMeta.typ = reflect.TypeOf(table)
 	TableMeta.fieldMap[ColumnMeta.fieldName] = ColumnMeta
+	t.metas.Store(reflect.TypeOf(table), TableMeta)
 	return TableMeta, nil
 
 }
