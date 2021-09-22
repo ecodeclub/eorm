@@ -11,12 +11,12 @@ func TableName(table interface{}) string {
 	if _, ok := t.MethodByName("TableName"); ok {
 		tableName = reflect.ValueOf(table).MethodByName("TableName").Call(nil)[0].String()
 	} else {
-		tableName = underscoreName(t.Elem().Name())
+		tableName = UnderscoreName(t.Elem().Name())
 	}
 	return tableName
 }
 
-func underscoreName(tableName string) string {
+func UnderscoreName(tableName string) string {
 	buf := []byte{}
 	for i, v := range tableName {
 		if unicode.IsUpper(v) {

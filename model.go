@@ -61,31 +61,32 @@ func (t *tagMetaRegistry) Register(table interface{}, opts ...tableMetaOption) (
 	// 塞到 map 里面
 	t.metasMutex.Lock()
 	defer t.metasMutex.Unlock()
-	ColumnMeta := &ColumnMeta{}
+	columnMeta := &ColumnMeta{}
 	v := reflect.ValueOf(table).Elem()
 	for i := 0; i < v.NumField(); i++ {
 		structField := v.Type().Field(i)
 		tag := structField.Tag.Get("eql")
 		isAuto := strings.Contains(tag, "auto_increment")
 		isKey := strings.Contains(tag, "primary_key")
-		ColumnMeta.columnName = structField.Name
-		ColumnMeta.fieldName = internal.UnderscoreName(structField.Name)
-		ColumnMeta.typ = structField.Type
+		columnMeta.columnName = structField.Name
+		columnMeta.fieldName = internal.UnderscoreName(structField.Name)
+		columnMeta.typ = structField.Type
 		if isAuto {
-			ColumnMeta.isAutoIncrement = true
+			columnMeta.isAutoIncrement = true
 		}
 		if isKey {
-			ColumnMeta.isPrimaryKey = true
+			columnMeta.isPrimaryKey = true
 		}
 	}
 	TableMeta := &TableMeta{}
 	for _, o := range opts {
 		o(TableMeta)
 	}
-	TableMeta.columns = append(TableMeta.columns, ColumnMeta)
+	TableMeta.columns = append(TableMeta.columns, columnMeta)
 	TableMeta.tableName = internal.TableName(table)
 	TableMeta.typ = reflect.TypeOf(table)
-	TableMeta.fieldMap[ColumnMeta.fieldName] = ColumnMeta
+	TableMeta.fieldMap = make(map[string]*ColumnMeta, 0)
+	TableMeta.fieldMap[columnMeta.fieldName] = columnMeta
 	t.metas.Store(reflect.TypeOf(table), TableMeta)
 	return TableMeta, nil
 
