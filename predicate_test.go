@@ -104,7 +104,7 @@ func TestPredicate_P(t *testing.T) {
 }
 
 type TestModel struct {
-	Id       int64
+	Id       int64 `eql:"auto_increment,primary_key"`
 	FistName string
 	Age      int8
 	LastName string

@@ -27,7 +27,7 @@ func TestTagMetaRegistry(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.NotNil(t, err)
+	assert.Nil(t, err)
 	assert.Equal(t, 4, len(meta.columns))
 	assert.Equal(t, 4, len(meta.fieldMap))
 	assert.Equal(t, reflect.TypeOf(tm), meta.typ)
