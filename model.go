@@ -49,12 +49,7 @@ func (t *tagMetaRegistry) Get(table interface{}) (*TableMeta, error) {
 	if v, ok := t.metas.Load(reflect.TypeOf(table)); ok {
 		return v.(*TableMeta), nil
 	}
-	t.metasMutex.Lock()
-	defer t.metasMutex.Unlock()
-	tableMeta, err := t.Register(table, func(meta *TableMeta) {
-		meta.tableName = internal.TableName(table)
-		meta.typ = reflect.TypeOf(table)
-	})
+	tableMeta, err := t.Register(table)
 	return tableMeta, err
 }
 
@@ -64,6 +59,8 @@ func (t *tagMetaRegistry) Register(table interface{}, opts ...tableMetaOption) (
 	// 对每一个字段检查 tag eql, 如果 eql 里面有 auto_increment, primary_key，就相应设置 ColumnMeta的值
 	// 最后处理所有的 opts
 	// 塞到 map 里面
+	t.metasMutex.Lock()
+	defer t.metasMutex.Unlock()
 	ColumnMeta := &ColumnMeta{}
 	v := reflect.ValueOf(table).Elem()
 	for i := 0; i < v.NumField(); i++ {
