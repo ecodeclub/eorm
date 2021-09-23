@@ -15,9 +15,10 @@
 package eql
 
 import (
-	"github.com/stretchr/testify/assert"
 	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestTagMetaRegistry(t *testing.T) {
@@ -26,7 +27,6 @@ func TestTagMetaRegistry(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.NotNil(t, err)
 	assert.Equal(t, 4, len(meta.columns))
 	assert.Equal(t, 4, len(meta.fieldMap))
 	assert.Equal(t, reflect.TypeOf(tm), meta.typ)
@@ -36,8 +36,22 @@ func TestTagMetaRegistry(t *testing.T) {
 	assert.Equal(t, "id", idMeta.columnName)
 	assert.Equal(t, "Id", idMeta.fieldName)
 	assert.Equal(t, reflect.TypeOf(int64(0)), idMeta.typ)
-	assert.True(t, idMeta.isAutoIncrement)
-	assert.True(t, idMeta.isPrimaryKey)
+	assert.False(t, idMeta.isAutoIncrement)
+	assert.False(t, idMeta.isPrimaryKey)
 
-	// 把剩下的三个字段都断言一遍，注意它们的类型，而且它们也不是主键，也不是自增
+	idMetaFistName := meta.fieldMap["FistName"]
+	assert.Equal(t, "fist_name", idMetaFistName.columnName)
+	assert.Equal(t, "FistName", idMetaFistName.fieldName)
+	assert.Equal(t, reflect.TypeOf(string("")), idMetaFistName.typ)
+
+	idMetaLastName := meta.fieldMap["LastName"]
+	assert.Equal(t, "last_name", idMetaLastName.columnName)
+	assert.Equal(t, "LastName", idMetaLastName.fieldName)
+	assert.Equal(t, reflect.TypeOf(string("")), idMetaLastName.typ)
+
+	idMetaLastAge := meta.fieldMap["Age"]
+	assert.Equal(t, "age", idMetaLastAge.columnName)
+	assert.Equal(t, "Age", idMetaLastAge.fieldName)
+	assert.Equal(t, reflect.TypeOf(int8(0)), idMetaLastAge.typ)
+
 }
