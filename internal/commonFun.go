@@ -22,12 +22,12 @@ func TableName(table interface{}) (string, []interface{}) {
 		resu := reflect.New(t).Method(0).Call(paramList)
 		tableName = resu[0].String()
 	} else {
-		tableName = underscoreName(t.Name())
+		tableName = UnderscoreName(t.Name())
 	}
 	return tableName, args
 }
 
-func underscoreName(tableName string) string {
+func UnderscoreName(tableName string) string {
 	buf := []rune{}
 	for i, v := range tableName {
 		if unicode.IsUpper(v) {
