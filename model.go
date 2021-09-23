@@ -28,7 +28,7 @@ type ColumnMeta struct {
 type tableMetaOption func(meta *TableMeta)
 
 type MetaRegistry interface {
-	Get(table interface{}, opts ...tableMetaOption) (*TableMeta, error)
+	Get(table interface{}) (*TableMeta, error)
 	Register(table interface{}, opts ...tableMetaOption) (*TableMeta, error)
 }
 
