@@ -49,27 +49,30 @@ func (t *tagMetaRegistry) Get(table interface{}) (*TableMeta, error) {
 func (t *tagMetaRegistry) Register(table interface{}, opts ...tableMetaOption) (*TableMeta, error) {
 	rtype := reflect.TypeOf(table)
 	v := rtype.Elem()
-	columnMeta := []*ColumnMeta{}
-	fieldMap := make(map[string]*ColumnMeta)
-	for i := 0; i < v.NumField(); i++ {
-		dataMeta := &ColumnMeta{}
+	columnMetas := []*ColumnMeta{}
+	lens := v.NumField()
+	fieldMap := make(map[string]*ColumnMeta, lens)
+	for i := 0; i < lens; i++ {
 		structField := v.Field(i)
 		tag := structField.Tag.Get("eql")
 		isAuto := strings.Contains(tag, "auto_increment")
 		isKey := strings.Contains(tag, "primary_key")
-		dataMeta.columnName = internal.UnderscoreName(structField.Name)
-		dataMeta.fieldName = structField.Name
-		dataMeta.typ = structField.Type
-		dataMeta.isAutoIncrement = isAuto
-		dataMeta.isPrimaryKey = isKey
-		columnMeta = append(columnMeta, dataMeta)
-		fieldMap[dataMeta.fieldName] = dataMeta
+		columnMeta := &ColumnMeta{
+			columnName:      internal.UnderscoreName(structField.Name),
+			fieldName:       structField.Name,
+			typ:             structField.Type,
+			isAutoIncrement: isAuto,
+			isPrimaryKey:    isKey,
+		}
+		columnMetas = append(columnMetas, columnMeta)
+		fieldMap[columnMeta.fieldName] = columnMeta
 	}
-	TableMeta := &TableMeta{}
-	TableMeta.columns = columnMeta
-	TableMeta.tableName = internal.UnderscoreName(v.Name())
-	TableMeta.typ = rtype
-	TableMeta.fieldMap = fieldMap
+	TableMeta := &TableMeta{
+		columns:   columnMetas,
+		tableName: internal.UnderscoreName(v.Name()),
+		typ:       rtype,
+		fieldMap:  fieldMap,
+	}
 	for _, o := range opts {
 		o(TableMeta)
 	}
