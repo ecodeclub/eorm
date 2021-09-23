@@ -76,7 +76,7 @@ func (t *tagMetaRegistry) Register(table interface{}, opts ...tableMetaOption) (
 	for _, o := range opts {
 		o(TableMeta)
 	}
-	t.metas.Store(reflect.TypeOf(table), TableMeta)
+	t.metas.Store(rtype, TableMeta)
 	return TableMeta, nil
 
 }
