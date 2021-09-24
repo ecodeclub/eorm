@@ -11,59 +11,91 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
 package eql
 
 import (
 	"reflect"
+	"strings"
+	"sync"
+
+	"github.com/gotomicro/eql/internal"
 )
 
 // TableMeta represents data model, or a table
 type TableMeta struct {
 	tableName string
-	columns[] *ColumnMeta
-	// key 是字段名
-	fieldMap map[string]*ColumnMeta
-	typ reflect.Type
+	columns   []*ColumnMeta
+	fieldMap  map[string]*ColumnMeta
+	typ       reflect.Type
 }
 
 // ColumnMeta represents model's field, or column
 type ColumnMeta struct {
-	columnName string
-	fieldName string
-	typ reflect.Type
-	isPrimaryKey bool
+	columnName      string
+	fieldName       string
+	typ             reflect.Type
+	isPrimaryKey    bool
 	isAutoIncrement bool
 }
 
 type tableMetaOption func(meta *TableMeta)
 
+// MetadaRegistry stores table metadata
 type MetaRegistry interface {
-	// 这里传过来的 table 应该是结构体指针，例如 *User
 	Get(table interface{}) (*TableMeta, error)
-	Register(table interface{}, opts...tableMetaOption) (*TableMeta, error)
+	Register(table interface{}, opts ...tableMetaOption) (*TableMeta, error)
 }
 
 var defaultMetaRegistry = &tagMetaRegistry{}
 
-// 我们的默认实现，它使用如下的规则
-// 1. 结构体名字转表名，按照驼峰转下划线的方式
-// 2. 字段名转列名，也是按照驼峰转下划线的方式
+// tagMetaRegistry is the default implementation based on tag eql
 type tagMetaRegistry struct {
-	metas map[reflect.Type]*TableMeta
+	metas sync.Map
 }
 
+// Get the metadata for each column of the data table,
+// If there is none, it will register one and return the metadata for each column
 func (t *tagMetaRegistry) Get(table interface{}) (*TableMeta, error) {
-	// 从 metas 里面去取，没有的话就调用 Register 新注册一个
-	panic("implement me")
+
+	if v, ok := t.metas.Load(reflect.TypeOf(table)); ok {
+		return v.(*TableMeta), nil
+	}
+	return t.Register(table)
 }
 
+// Register function generates a metadata for each column and places it in a thread-safe mapping to facilitate direct access to the metadata.
+// And the metadata can be modified by user-defined methods opts
 func (t *tagMetaRegistry) Register(table interface{}, opts ...tableMetaOption) (*TableMeta, error) {
-	// 拿到 table 的反射
-	// 遍历 table 的所有字段
-	// 对每一个字段检查 tag eql, 如果 eql 里面有 auto_increment, primary_key，就相应设置 ColumnMeta的值
-	// 最后处理所有的 opts
-	// 塞到 map 里面
-	panic("implement me")
-}
+	rtype := reflect.TypeOf(table)
+	v := rtype.Elem()
+	columnMetas := []*ColumnMeta{}
+	lens := v.NumField()
+	fieldMap := make(map[string]*ColumnMeta, lens)
+	for i := 0; i < lens; i++ {
+		structField := v.Field(i)
+		tag := structField.Tag.Get("eql")
+		isAuto := strings.Contains(tag, "auto_increment")
+		isKey := strings.Contains(tag, "primary_key")
+		columnMeta := &ColumnMeta{
+			columnName:      internal.UnderscoreName(structField.Name),
+			fieldName:       structField.Name,
+			typ:             structField.Type,
+			isAutoIncrement: isAuto,
+			isPrimaryKey:    isKey,
+		}
+		columnMetas = append(columnMetas, columnMeta)
+		fieldMap[columnMeta.fieldName] = columnMeta
+	}
+	tableMeta := &TableMeta{
+		columns:   columnMetas,
+		tableName: internal.UnderscoreName(v.Name()),
+		typ:       rtype,
+		fieldMap:  fieldMap,
+	}
+	for _, o := range opts {
+		o(tableMeta)
+	}
+	t.metas.Store(rtype, tableMeta)
+	return tableMeta, nil
 
+}
