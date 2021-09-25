@@ -23,14 +23,19 @@ type DB struct {
 }
 
 // New returns DB. It's the entry of EQL
-func New(opts...DBOption) *DB {
+func New(opts ...DBOption) *DB {
 	return &DB{
 		metaRegistry: defaultMetaRegistry,
 	}
 }
 
+// Insert generate Inserter to builder insert query
+func (db *DB) Insert() *Inserter {
+	return &Inserter{}
+}
+
 // Select starts a select query. If columns are empty, all columns will be fetched
-func (*DB) Select(columns...Selectable) *Selector {
+func (*DB) Select(columns ...Selectable) *Selector {
 	panic("implement me")
 }
 
