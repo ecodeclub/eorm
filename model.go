@@ -14,6 +14,7 @@
 package eql
 
 import (
+	"errors"
 	"reflect"
 	"strings"
 	"sync"
@@ -58,7 +59,11 @@ type tagMetaRegistry struct {
 func (t *tagMetaRegistry) Get(table interface{}) (*TableMeta, error) {
 
 	if v, ok := t.metas.Load(reflect.TypeOf(table)); ok {
-		return v.(*TableMeta), nil
+		value, ok := v.(*TableMeta)
+		if !ok {
+			return nil, errors.New("invalid table meta")
+		}
+		return value, nil
 	}
 	return t.Register(table)
 }
@@ -69,9 +74,9 @@ func (t *tagMetaRegistry) Register(table interface{}, opts ...tableMetaOption) (
 	rtype := reflect.TypeOf(table)
 	v := rtype.Elem()
 	columnMetas := []*ColumnMeta{}
-	lens := v.NumField()
-	fieldMap := make(map[string]*ColumnMeta, lens)
-	for i := 0; i < lens; i++ {
+	numFile := v.NumField()
+	fieldMap := make(map[string]*ColumnMeta, numFile)
+	for i := 0; i < numFile; i++ {
 		structField := v.Field(i)
 		tag := structField.Tag.Get("eql")
 		isAuto := strings.Contains(tag, "auto_increment")
