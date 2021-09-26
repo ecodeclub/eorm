@@ -16,27 +16,21 @@ package eql
 
 // Inserter is used to construct an insert query
 type Inserter struct {
-
 }
 
 func (i *Inserter) Build() (*Query, error) {
 	panic("implement me")
 }
 
-// Insert generate Inserter to builder insert query
-func (db *DB) Insert() *Inserter {
-	return &Inserter{}
-}
-
 // Columns specifies the columns that need to be inserted
 // if cs is empty, all columns will be inserted except auto increment columns
-func (db *DB) Columns(cs...string) *Inserter {
+func (db *DB) Columns(cs ...string) *Inserter {
 	panic("implements me")
 }
 
 // Values specify the rows
 // all the elements must be the same structure
-func (i *Inserter) Values(values...interface{}) *Inserter {
+func (i *Inserter) Values(values ...interface{}) *Inserter {
 	panic("implement me")
 }
 
@@ -51,4 +45,3 @@ func (i *Inserter) OnDuplicateKey() *MysqlUpserter {
 func (i *Inserter) OnConflict(cs ...string) *PgSQLUpserter {
 	panic("implement me")
 }
-
