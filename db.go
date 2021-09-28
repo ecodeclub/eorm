@@ -14,24 +14,39 @@
 
 package eql
 
+import "strings"
+
 // DBOption configure DB
 type DBOption func(db *DB)
 
 // DB represents a database
 type DB struct {
 	metaRegistry MetaRegistry
+	dialect Dialect
 }
 
 // New returns DB. It's the entry of EQL
 func New(opts ...DBOption) *DB {
-	return &DB{
+	db := &DB{
 		metaRegistry: defaultMetaRegistry,
+		dialect: mysql,
 	}
+	for _, o := range opts {
+		o(db)
+	}
+	return db
 }
 
 // Select starts a select query. If columns are empty, all columns will be fetched
-func (*DB) Select(columns ...Selectable) *Selector {
-	panic("implement me")
+func (db *DB) Select(columns ...Selectable) *Selector {
+	return &Selector{
+		builder: builder{
+			registry: db.metaRegistry,
+			dialect: db.dialect,
+			buffer: &strings.Builder{},
+		},
+		columns: columns,
+	}
 }
 
 // Delete starts a "delete" query.

@@ -15,20 +15,23 @@
 package eql
 
 type Column struct {
-	c string
+	name  string
 	alias string
 }
 
 // C specify column
 func C(c string) Column {
 	return Column{
-		c: c,
+		name: c,
 	}
 }
 
 // As means alias
-func (Column) As(alias string) Selectable {
-	panic("implement me")
+func (c Column) As(alias string) Selectable {
+	return Column{
+		name: c.name,
+		alias: alias,
+	}
 }
 
 func (Column) Inc(val interface{}) MathExpr {

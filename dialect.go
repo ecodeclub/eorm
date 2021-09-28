@@ -17,11 +17,11 @@ package eql
 // Dialect specify config or behavior of special SQL dialects
 type Dialect struct {
 	// in MYSQL, it's "`"
-	fieldQuotes string
+	quote byte
 }
 
 var (
 	mysql = Dialect{
-		fieldQuotes: "`",
+		quote: '`',
 	}
 )

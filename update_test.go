@@ -21,10 +21,10 @@ import (
 
 func TestUpdater_Set(t *testing.T) {
 	tm := &TestModel{
-		Id:       12,
-		FistName: "Tom",
-		Age:      18,
-		LastName: "Jerry",
+		Id:        12,
+		FirstName: "Tom",
+		Age:       18,
+		LastName:  "Jerry",
 	}
 	testCases := []CommonTestCase {
 		{
@@ -41,32 +41,32 @@ func TestUpdater_Set(t *testing.T) {
 		},
 		{
 			name: "set c2",
-			builder: New().Update(tm).Set(C("FistName"), C("Age")),
+			builder: New().Update(tm).Set(C("FirstName"), C("Age")),
 			wantSql: "UPDATE `test_model` SET first_name`=?, `age`=?;",
 			wantArgs: []interface{}{"Tom", int8(18)},
 		},
 
 		{
 			name: "set c2",
-			builder: New().Update(tm).Set(C("FistName"), Assign("Age", 30)),
+			builder: New().Update(tm).Set(C("FirstName"), Assign("Age", 30)),
 			wantSql: "UPDATE `test_model` SET first_name`=?, `age`=?;",
 			wantArgs: []interface{}{"Tom", 30},
 		},
 		{
 			name: "set age+1",
-			builder: New().Update(tm).Set(C("FistName"), Assign("Age", C("Age").Inc(1))),
+			builder: New().Update(tm).Set(C("FirstName"), Assign("Age", C("Age").Inc(1))),
 			wantSql: "UPDATE `test_model` SET first_name`=?, `age`=`age`+?;",
 			wantArgs: []interface{}{"Tom", 1},
 		},
 		{
 			name: "set age=id+1",
-			builder: New().Update(tm).Set(C("FistName"), Assign("Age", C("Id").Inc(10))),
+			builder: New().Update(tm).Set(C("FirstName"), Assign("Age", C("Id").Inc(10))),
 			wantSql: "UPDATE `test_model` SET first_name`=?, `age`=`id`+?;",
 			wantArgs: []interface{}{"Tom", 10},
 		},
 		{
 			name: "set age=id+(age*100)",
-			builder: New().Update(tm).Set(C("FistName"), Assign("Age", C("Id").Inc(C("Age").Times(100)))),
+			builder: New().Update(tm).Set(C("FirstName"), Assign("Age", C("Id").Inc(C("Age").Times(100)))),
 			wantSql: "UPDATE `test_model` SET first_name`=?, `age`=`id`+(`age`*?);",
 			wantArgs: []interface{}{"Tom", 100},
 		},

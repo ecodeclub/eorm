@@ -12,30 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package eql
+package internal
 
-// Aggregate represents aggregate expression, including AVG, MAX, MIN...
-type Aggregate struct {
-	fn string
-	arg string
-	alias string
+import "fmt"
+
+// NewInvalidColumnError returns an error represents invalid field name
+// TODO(do we need errors pkg?)
+func NewInvalidColumnError(field string) error {
+	return fmt.Errorf("eql: invalid column name %s, " +
+		"it must be a valid field name of structure", field)
 }
-
-// As specifies the alias
-func (a Aggregate) As(alias string) Selectable {
-	return Aggregate{
-		fn: a.fn,
-		arg: a.arg,
-		alias: alias,
-	}
-}
-
-// Avg represents AVG
-func Avg(c string) Aggregate {
-	return Aggregate{
-		fn: "AVG",
-		arg: c,
-	}
-}
-
-func (a Aggregate) selected() {}
