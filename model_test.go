@@ -39,9 +39,9 @@ func TestTagMetaRegistry(t *testing.T) {
 	assert.False(t, idMeta.isAutoIncrement)
 	assert.False(t, idMeta.isPrimaryKey)
 
-	idMetaFistName := meta.fieldMap["FistName"]
+	idMetaFistName := meta.fieldMap["FirstName"]
 	assert.Equal(t, "fist_name", idMetaFistName.columnName)
-	assert.Equal(t, "FistName", idMetaFistName.fieldName)
+	assert.Equal(t, "FirstName", idMetaFistName.fieldName)
 	assert.Equal(t, reflect.TypeOf(string("")), idMetaFistName.typ)
 
 	idMetaLastName := meta.fieldMap["LastName"]
