@@ -14,6 +14,8 @@
 
 package eql
 
+import "strings"
+
 // QueryBuilder is used to build a query
 type QueryBuilder interface {
 	Build() (*Query, error)
@@ -23,4 +25,40 @@ type QueryBuilder interface {
 type Query struct {
 	SQL string
 	Args []interface{}
+}
+
+type builder struct {
+	registry MetaRegistry
+	dialect Dialect
+	// TODO using buffer cache
+	buffer *strings.Builder
+	meta *TableMeta
+	args []interface{}
+}
+
+func (b builder) quote(val string) {
+	b.buffer.WriteByte(b.dialect.quote)
+	b.buffer.WriteString(val)
+	b.buffer.WriteByte(b.dialect.quote)
+}
+
+func (b builder) space() {
+	b.buffer.WriteByte(' ')
+}
+
+func (b builder) end() {
+	b.buffer.WriteByte(';')
+}
+
+func (b builder) comma() {
+	b.buffer.WriteByte(',')
+}
+
+func (b *builder) parameter(arg interface{}) {
+	if b.args == nil {
+		// TODO 4 may be not a good number
+		b.args = make([]interface{}, 0, 4)
+	}
+	b.buffer.WriteByte('?')
+	b.args = append(b.args, arg)
 }
