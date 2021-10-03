@@ -14,9 +14,20 @@
 
 package eql
 
-type op struct {
+type op string
 
-}
+const (
+	opLT = op("<")
+	opLTEQ = op("<=")
+	opGT = op(">")
+	opGTEQ= op(">=")
+	opEQ = op("=")
+	opNEQ = op("!=")
+	opAdd = op("+")
+	opMinus = op("-")
+	opMulti = op("*")
+	opDiv = op("/")
+)
 
 // Predicate will be used in Where Or Having
 type Predicate binaryExpr

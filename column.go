@@ -34,12 +34,20 @@ func (c Column) As(alias string) Selectable {
 	}
 }
 
-func (Column) Inc(val interface{}) MathExpr {
-	panic("implement me")
+func (c Column) Add(val interface{}) MathExpr {
+	return MathExpr{
+		left: c,
+		op: opAdd,
+		right: valueOf(val),
+	}
 }
 
-func (Column) Times(val interface{}) MathExpr {
-	panic("implement me")
+func (c Column) Multi(val interface{}) MathExpr {
+	return MathExpr{
+		left: c,
+		op: opMulti,
+		right: valueOf(val),
+	}
 }
 
 func (Column) assign() {
@@ -70,6 +78,15 @@ func (c columns) assign() {
 func Columns(cs...string) columns {
 	return columns{
 		cs: cs,
+	}
+}
+
+func valueOf(val interface{}) Expr {
+	switch v := val.(type) {
+	case Expr:
+		return v
+	default:
+		return valueExpr{val: val}
 	}
 }
 

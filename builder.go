@@ -14,7 +14,11 @@
 
 package eql
 
-import "strings"
+import (
+	"errors"
+	"github.com/gotomicro/eql/internal"
+	"strings"
+)
 
 // QueryBuilder is used to build a query
 type QueryBuilder interface {
@@ -61,4 +65,61 @@ func (b *builder) parameter(arg interface{}) {
 	}
 	b.buffer.WriteByte('?')
 	b.args = append(b.args, arg)
+}
+
+func (b *builder) buildExpr(expr Expr) error {
+	switch e := expr.(type) {
+	case RawExpr:
+		b.buffer.WriteString(string(e))
+	case Column:
+		cm, ok := b.meta.fieldMap[e.name]
+		if !ok {
+			return internal.NewInvalidColumnError(e.name)
+		}
+		b.quote(cm.columnName)
+	case valueExpr:
+		b.parameter(e.val)
+	case MathExpr:
+		if err := b.buildBinaryExpr(binaryExpr(e)); err != nil {
+			return err
+		}
+	case binaryExpr:
+		if err := b.buildBinaryExpr(e); err != nil {
+			return err
+		}
+	default:
+		return errors.New("unsupported expr")
+	}
+	return nil
+}
+
+func (b *builder) buildBinaryExpr(e binaryExpr) error {
+	err := b.buildBinarySubExpr(e.left)
+	if err != nil {
+		return err
+	}
+	b.buffer.WriteString(string(e.op))
+	return b.buildBinarySubExpr(e.right)
+}
+
+func (b *builder) buildBinarySubExpr(subExpr Expr) error {
+	switch r := subExpr.(type) {
+	case MathExpr:
+		b.buffer.WriteByte('(')
+		if err := b.buildBinaryExpr(binaryExpr(r)); err != nil {
+			return err
+		}
+		b.buffer.WriteByte(')')
+	case binaryExpr:
+		b.buffer.WriteByte('(')
+		if err := b.buildBinaryExpr(r); err != nil {
+			return err
+		}
+		b.buffer.WriteByte(')')
+	default:
+		if err := b.buildExpr(r); err != nil {
+			return err
+		}
+	}
+	return nil
 }
