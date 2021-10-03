@@ -109,6 +109,7 @@ func (i *Inserter) Build() (*Query, error) {
 // Columns specifies the columns that need to be inserted
 // if cs is empty, all columns will be inserted except auto increment columns
 func (i *Inserter) Columns(cs ...string) *Inserter {
+
 	i.fieldsParam = cs
 	return i
 }
@@ -116,6 +117,7 @@ func (i *Inserter) Columns(cs ...string) *Inserter {
 // Values specify the rows
 // all the elements must be the same structure
 func (i *Inserter) Values(values ...interface{}) *Inserter {
+
 	i.valuesParam = values
 	return i
 }
