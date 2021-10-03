@@ -19,15 +19,6 @@ type Expr interface {
 	expr() (string, error)
 }
 
-type funcCall struct {
-	fn string
-	args []Expr
-}
-
-func (*funcCall) expr() (string, error) {
-	panic("implement me")
-}
-
 // RawExpr uses string as Expr
 type RawExpr string
 
@@ -36,11 +27,12 @@ func Raw(expr string) RawExpr {
 	return RawExpr(expr)
 }
 
+
 func (r RawExpr) expr() (string, error) {
 	return string(r), nil
 }
 
-func (r RawExpr) selected() {}
+func (RawExpr) selected() {}
 
 type binaryExpr struct {
 	left Expr
@@ -48,6 +40,28 @@ type binaryExpr struct {
 	right Expr
 }
 
+func (binaryExpr) expr() (string, error) {
+	return "", nil
+}
+
 type MathExpr binaryExpr
 
-func (MathExpr) assign() {}
+func (m MathExpr) Add(val interface{}) Expr {
+	return MathExpr{
+		left: m,
+		op: opAdd,
+		right: valueOf(val),
+	}
+}
+
+func (m MathExpr) Multi(val interface{}) MathExpr {
+	return MathExpr{
+		left: m,
+		op: opMulti,
+		right: valueOf(val),
+	}
+}
+
+func (MathExpr) expr() (string, error) {
+	return "", nil
+}

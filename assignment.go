@@ -18,22 +18,27 @@ type Assignable interface {
 	assign()
 }
 
-type Assignment struct {
-	Column string
-	Value ValueExpr
+type Assignment binaryExpr
+
+func Assign(column string, value interface{}) Assignment {
+	var expr Expr
+	switch v := value.(type) {
+	case Expr:
+		expr = v
+	default:
+		expr = valueExpr{val: v}
+	}
+	return Assignment{left: C(column), op: opEQ, right: expr}
 }
 
-// 实现注意：
-// 1. value 是 ValueExpr
-// 2. value 不是 ValueExpr，这时候看做是一个普通的值
-func Assign(column string, value interface{}) *Assignment {
+func (a Assignment) assign() {
 	panic("implement me")
 }
 
-func (a *Assignment) assign() {
-	panic("implement me")
+type valueExpr struct {
+	val interface{}
 }
 
-type ValueExpr interface {
-	value()
+func (valueExpr) expr() (string, error){
+	return "", nil
 }

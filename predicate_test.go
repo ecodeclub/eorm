@@ -78,14 +78,14 @@ func TestPredicate_P(t *testing.T) {
 		{
 			name: "cross columns mathematical",
 			builder: New().Select(Columns("Id")).From(&TestModel{Id: 10}).
-				Where(P("Age").GT(C("Id").Inc(40))),
+				Where(P("Age").GT(C("Id").Add(40))),
 			wantSql: "SELECT `id` FROM test_model WHERE `age`>`id`+?",
 			wantArgs: []interface{}{40},
 		},
 		{
 			name: "cross columns mathematical",
 			builder: New().Select(Columns("Id")).From(&TestModel{Id: 10}).
-				Where(P("Age").GT(C("Id").Times(C("Age").Inc(66)))),
+				Where(P("Age").GT(C("Id").Multi(C("Age").Add(66)))),
 			wantSql: "SELECT `id` FROM test_model WHERE `age`>`id`*(`age`+?)",
 			wantArgs: []interface{}{66},
 		},
