@@ -95,6 +95,7 @@ func TestInserter_Values(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
+
 		c := tc
 		t.Run(tc.name, func(t *testing.T) {
 			q, err := c.builder.Build()
