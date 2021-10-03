@@ -61,6 +61,7 @@ func TestInserter_Values(t *testing.T) {
 			wantSql:  "INSERT INTO `user`(`id`,`first_name`,`ctime`) VALUES(?,?,?);",
 			wantArgs: []interface{}{int64(12), "Tom", n},
 		},
+
 		{
 			name:    "multiple values",
 			builder: New().Insert().Values(u, u1),
@@ -68,11 +69,23 @@ func TestInserter_Values(t *testing.T) {
 			wantSql:  "INSERT INTO `user`(`id`,`first_name`,`ctime`) VALUES(?,?,?),(?,?,?);",
 			wantArgs: []interface{}{int64(12), "Tom", n, int64(13), "Jerry", n},
 		},
+
 		{
-			name:     "no whole columns",
-			builder:  New().Insert().Columns("id", "first_name").Values(u),
+			name:     "no whole columns", //字段名
+			builder:  New().Insert().Columns("Id", "FirstName").Values(u),
 			wantSql:  "INSERT INTO `user`(`id`,`first_name`) VALUES(?,?);",
 			wantArgs: []interface{}{int64(12), "Tom"},
+		},
+		{
+			name:    "error columns",
+			builder: New().Insert().Columns("id", "FirstName").Values(u),
+			wantErr: errors.New("error columns"),
+		},
+		{
+			name:     "no whole columns but multiple values",
+			builder:  New().Insert().Columns("Id", "FirstName").Values(u, u1),
+			wantSql:  "INSERT INTO `user`(`id`,`first_name`) VALUES(?,?),(?,?);",
+			wantArgs: []interface{}{int64(12), "Tom", int64(13), "Jerry"},
 		},
 		{
 			name:    "multiple values of different type",
@@ -80,8 +93,6 @@ func TestInserter_Values(t *testing.T) {
 			wantErr: errors.New("multiple values of different type"),
 		},
 	}
-	// 假如说，我有 User, 也有 Order, New().Insert().Values(u, o1) 要报错
-	//New().Insert().Columns("Id", "FirstName").Values(u, u1)
 
 	for _, tc := range testCases {
 		c := tc
