@@ -24,7 +24,7 @@ type DBOption func(db *DB)
 
 // DB represents a database
 type DB struct {
-	metaRegistry MetaRegistry
+	metaRegistry   MetaRegistry
 	dialect        Dialect
 	nullAssertFunc NullAssertFunc
 }
@@ -65,14 +65,16 @@ func (db *DB) Update(table interface{}) *Updater {
 
 // Insert generate Inserter to builder insert query
 func (db *DB) Insert() *Inserter {
-	return &Inserter{}
+	return &Inserter{
+		builder: db.builder(),
+	}
 }
 
 func (db *DB) builder() builder {
 	return builder{
 		registry: db.metaRegistry,
-		dialect: db.dialect,
-		buffer: &strings.Builder{},
+		dialect:  db.dialect,
+		buffer:   &strings.Builder{},
 	}
 }
 
@@ -97,7 +99,7 @@ func NilAsNullFunc(val interface{}) bool {
 
 // ZeroAsNullFunc means "zero value = null"
 func ZeroAsNullFunc(val interface{}) bool {
-	if val == nil{
+	if val == nil {
 		return true
 	}
 	switch v := val.(type) {

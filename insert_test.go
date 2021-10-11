@@ -55,23 +55,21 @@ func TestInserter_Values(t *testing.T) {
 			wantErr: errors.New("no values"),
 		},
 		{
-			name:    "single value",
-			builder: New().Insert().Values(u),
-			// 这个列的顺序不重要，但是列和 Args 的位置要对应得上
+			name:     "single value",
+			builder:  New().Insert().Values(u),
 			wantSql:  "INSERT INTO `user`(`id`,`first_name`,`ctime`) VALUES(?,?,?);",
 			wantArgs: []interface{}{int64(12), "Tom", n},
 		},
 
 		{
-			name:    "multiple values",
-			builder: New().Insert().Values(u, u1),
-			// 这个列的顺序不重要，但是列和 Args 的位置要对应得上
+			name:     "multiple values of same type",
+			builder:  New().Insert().Values(u, u1),
 			wantSql:  "INSERT INTO `user`(`id`,`first_name`,`ctime`) VALUES(?,?,?),(?,?,?);",
 			wantArgs: []interface{}{int64(12), "Tom", n, int64(13), "Jerry", n},
 		},
 
 		{
-			name:     "no whole columns", //字段名
+			name:     "no whole columns",
 			builder:  New().Insert().Columns("Id", "FirstName").Values(u),
 			wantSql:  "INSERT INTO `user`(`id`,`first_name`) VALUES(?,?);",
 			wantArgs: []interface{}{int64(12), "Tom"},
@@ -82,7 +80,7 @@ func TestInserter_Values(t *testing.T) {
 			wantErr: errors.New("error columns"),
 		},
 		{
-			name:     "no whole columns but multiple values",
+			name:     "no whole columns and multiple values of same type",
 			builder:  New().Insert().Columns("Id", "FirstName").Values(u, u1),
 			wantSql:  "INSERT INTO `user`(`id`,`first_name`) VALUES(?,?),(?,?);",
 			wantArgs: []interface{}{int64(12), "Tom", int64(13), "Jerry"},
@@ -95,7 +93,6 @@ func TestInserter_Values(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-
 		c := tc
 		t.Run(tc.name, func(t *testing.T) {
 			q, err := c.builder.Build()

@@ -17,108 +17,67 @@ package eql
 import (
 	"errors"
 	"reflect"
-	"strings"
 )
 
 // Inserter is used to construct an insert query
 type Inserter struct {
-	tableName   string
-	fields      []string
-	fieldMap    map[string]*ColumnMeta
-	fieldsParam []string
-	valuesParam []interface{}
+	builder
+	columns []string
+	values  []interface{}
 }
 
 func (i *Inserter) Build() (*Query, error) {
-
-	if len(i.valuesParam) == 0 {
+	var err error
+	if len(i.values) == 0 {
 		return &Query{}, errors.New("no values")
 	}
-	builder := strings.Builder{}
-	builder.WriteString("INSERT INTO")
-	meta, _ := defaultMetaRegistry.Get(i.valuesParam[0])
-	i.tableName = meta.tableName
-	builder.WriteString(" `" + i.tableName + "`")
-	builder.WriteString("(")
-	if i.fieldsParam != nil {
-		for index, v := range i.fieldsParam {
-			builder.WriteString("`")
-			builder.WriteString(v)
-			builder.WriteString("`")
-			if index != len(i.fieldsParam)-1 {
-				builder.WriteString(",")
+	i.buffer.WriteString("INSERT INTO ")
+	i.meta, err = i.registry.Get(i.values[0])
+	if err != nil {
+		return &Query{}, err
+	}
+	i.quote(i.meta.tableName)
+	i.buffer.WriteString("(")
+	fields, err := i.buildColumns()
+	if err != nil {
+		return &Query{}, errors.New("error columns")
+	}
+	i.buffer.WriteString(")")
+	i.buffer.WriteString(" VALUES")
+	for index, value := range i.values {
+		i.buffer.WriteString("(")
+		refVal := reflect.ValueOf(value).Elem()
+		for j, v := range fields {
+			field := refVal.FieldByName(v.fieldName)
+			if !field.IsValid() {
+				return &Query{}, errors.New("multiple values of different type")
+			}
+			val := field.Interface()
+			i.parameter(val)
+			if j != len(fields)-1 {
+				i.comma()
 			}
 		}
-	} else {
-		for index, v := range meta.columns {
-			builder.WriteString("`")
-			builder.WriteString(v.columnName)
-			builder.WriteString("`")
-			if index != len(meta.columns)-1 {
-				builder.WriteString(",")
-			}
+		i.buffer.WriteString(")")
+		if index != len(i.values)-1 {
+			i.comma()
 		}
 	}
-	builder.WriteString(")")
-	builder.WriteString(" VALUES")
-	builder.WriteString("(")
-	args := make([]interface{}, 0, len(meta.columns))
-	for index, value := range i.valuesParam {
-		meta, _ := defaultMetaRegistry.Get(value)
-		if i.tableName != meta.tableName {
-			return &Query{}, errors.New("multiple values of different type")
-		}
-		if i.fieldsParam != nil {
-			refVal := reflect.ValueOf(value).Elem()
-			for index, value := range i.fieldsParam {
-				for _, v := range meta.columns {
-					if value == v.columnName {
-						field := refVal.FieldByName(v.fieldName)
-						val := field.Interface()
-						args = append(args, val)
-						builder.WriteString("?")
-						if index != len(i.fieldsParam)-1 {
-							builder.WriteString(",")
-						}
-					}
-				}
-			}
-			if index != len(i.valuesParam)-1 {
-				builder.WriteString("),(")
-			}
-		} else {
-			refVal := reflect.ValueOf(value).Elem()
-			for index, c := range meta.columns {
-				field := refVal.FieldByName(c.fieldName)
-				val := field.Interface()
-				args = append(args, val)
-				builder.WriteString("?")
-				if index != len(meta.columns)-1 {
-					builder.WriteString(",")
-				}
-			}
-			if index != len(i.valuesParam)-1 {
-				builder.WriteString("),(")
-			}
-		}
-	}
-	builder.WriteString(");")
-	return &Query{SQL: builder.String(), Args: args}, nil
+	i.end()
+	return &Query{SQL: i.buffer.String(), Args: i.args}, nil
 }
 
 // Columns specifies the columns that need to be inserted
 // if cs is empty, all columns will be inserted except auto increment columns
 func (i *Inserter) Columns(cs ...string) *Inserter {
-
-	i.fieldsParam = cs
+	i.columns = cs
 	return i
 }
 
 // Values specify the rows
 // all the elements must be the same structure
 func (i *Inserter) Values(values ...interface{}) *Inserter {
-
-	i.valuesParam = values
+	i.values = values
 	return i
 }
 
@@ -134,4 +93,31 @@ func (i *Inserter) OnDuplicateKey() *MysqlUpserter {
 func (i *Inserter) OnConflict(cs ...string) *PgSQLUpserter {
 
 	panic("implement me")
+}
+
+func (i *Inserter) buildColumns() ([]*ColumnMeta, error) {
+	cs := i.meta.columns
+	if len(i.columns) != 0 {
+		cs = make([]*ColumnMeta, 0, len(i.columns))
+		for index, value := range i.columns {
+			v, isOk := i.meta.fieldMap[value]
+			if !isOk {
+				return cs, errors.New("error columns")
+			}
+			i.quote(v.columnName)
+			if index != len(i.columns)-1 {
+				i.comma()
+			}
+			cs = append(cs, v)
+		}
+	} else {
+		for index, value := range i.meta.columns {
+			i.quote(value.columnName)
+			if index != len(cs)-1 {
+				i.comma()
+			}
+		}
+	}
+	return cs, nil
+
 }
