@@ -38,4 +38,32 @@ func Avg(c string) Aggregate {
 	}
 }
 
+func Max(c string) Aggregate {
+	return Aggregate{
+		fn: "MAX",
+		arg: c,
+	}
+}
+
+func Min(c string) Aggregate {
+	return Aggregate{
+		fn: "MIN",
+		arg: c,
+	}
+}
+
+func Count(c string) Aggregate {
+	return Aggregate{
+		fn: "COUNT",
+		arg: c,
+	}
+}
+
+func Sum(c string) Aggregate {
+	return Aggregate{
+		fn: "SUM",
+		arg: c,
+	}
+}
+
 func (a Aggregate) selected() {}
