@@ -50,12 +50,12 @@ func TestInserter_Values(t *testing.T) {
 	}
 	testCases := []CommonTestCase{
 		{
-			name:    "no values",
+			name:    "no examples of values",
 			builder: New().Insert().Values(),
 			wantErr: errors.New("no values"),
 		},
 		{
-			name:     "single value",
+			name:     "single example of values",
 			builder:  New().Insert().Values(u),
 			wantSql:  "INSERT INTO `user`(`id`,`first_name`,`ctime`) VALUES(?,?,?);",
 			wantArgs: []interface{}{int64(12), "Tom", n},
@@ -69,13 +69,13 @@ func TestInserter_Values(t *testing.T) {
 		},
 
 		{
-			name:     "no whole columns",
+			name:     "no example of a whole columns",
 			builder:  New().Insert().Columns("Id", "FirstName").Values(u),
 			wantSql:  "INSERT INTO `user`(`id`,`first_name`) VALUES(?,?);",
 			wantArgs: []interface{}{int64(12), "Tom"},
 		},
 		{
-			name:    "error columns",
+			name:    "an example with error columns",
 			builder: New().Insert().Columns("id", "FirstName").Values(u),
 			wantErr: errors.New("error columns"),
 		},
