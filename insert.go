@@ -14,34 +14,111 @@
 
 package eql
 
+import (
+	"errors"
+	"fmt"
+	"reflect"
+)
+
 // Inserter is used to construct an insert query
 type Inserter struct {
+	builder
+	columns []string
+	values  []interface{}
 }
 
 func (i *Inserter) Build() (*Query, error) {
-	panic("implement me")
+	var err error
+	if len(i.values) == 0 {
+		return &Query{}, errors.New("no values")
+	}
+	i.buffer.WriteString("INSERT INTO ")
+	i.meta, err = i.registry.Get(i.values[0])
+	if err != nil {
+		return &Query{}, err
+	}
+	i.quote(i.meta.tableName)
+	i.buffer.WriteString("(")
+	fields, err := i.buildColumns()
+	if err != nil {
+		return &Query{}, err
+	}
+	i.buffer.WriteString(")")
+	i.buffer.WriteString(" VALUES")
+	for index, value := range i.values {
+		i.buffer.WriteString("(")
+		refVal := reflect.ValueOf(value).Elem()
+		for j, v := range fields {
+			field := refVal.FieldByName(v.fieldName)
+			if !field.IsValid() {
+				return &Query{}, fmt.Errorf("invalid column %s", v.fieldName)
+			}
+			val := field.Interface()
+			i.parameter(val)
+			if j != len(fields)-1 {
+				i.comma()
+			}
+		}
+		i.buffer.WriteString(")")
+		if index != len(i.values)-1 {
+			i.comma()
+		}
+	}
+	i.end()
+	return &Query{SQL: i.buffer.String(), Args: i.args}, nil
 }
 
 // Columns specifies the columns that need to be inserted
 // if cs is empty, all columns will be inserted except auto increment columns
-func (db *DB) Columns(cs ...string) *Inserter {
-	panic("implements me")
+func (i *Inserter) Columns(cs ...string) *Inserter {
+	i.columns = cs
+	return i
 }
 
 // Values specify the rows
 // all the elements must be the same structure
 func (i *Inserter) Values(values ...interface{}) *Inserter {
-	panic("implement me")
+	i.values = values
+	return i
 }
 
 // OnDuplicateKey generate MysqlUpserter
 // if the dialect is not MySQL, it will panic
 func (i *Inserter) OnDuplicateKey() *MysqlUpserter {
+
 	panic("implement me")
 }
 
 // OnConflict generate PgSQLUpserter
 // if the dialect is not PgSQL, it will panic
 func (i *Inserter) OnConflict(cs ...string) *PgSQLUpserter {
+
 	panic("implement me")
+}
+
+func (i *Inserter) buildColumns() ([]*ColumnMeta, error) {
+	cs := i.meta.columns
+	if len(i.columns) != 0 {
+		cs = make([]*ColumnMeta, 0, len(i.columns))
+		for index, value := range i.columns {
+			v, isOk := i.meta.fieldMap[value]
+			if !isOk {
+				return cs, fmt.Errorf("invalid column %s", value)
+			}
+			i.quote(v.columnName)
+			if index != len(i.columns)-1 {
+				i.comma()
+			}
+			cs = append(cs, v)
+		}
+	} else {
+		for index, value := range i.meta.columns {
+			i.quote(value.columnName)
+			if index != len(cs)-1 {
+				i.comma()
+			}
+		}
+	}
+	return cs, nil
+
 }
