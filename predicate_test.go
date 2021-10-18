@@ -19,74 +19,68 @@ import (
 	"testing"
 )
 
-func TestPredicate_P(t *testing.T) {
+func TestPredicate_C(t *testing.T) {
 	testCases := []CommonTestCase {
-		{
-			name: "default",
-			builder: New().Select(Columns("Id")).From(&TestModel{Id: 10}).Where(P("Id")),
-			wantSql: "SELECT id FROM test_model WHERE id=?;",
-			wantArgs: []interface{}{int64(10)},
-		},
 		{
 			name: "empty",
 			builder: New().Select(Columns("Id")).From(&TestModel{Id: 10}).Where(),
-			wantSql: "SELECT id FROM test_model;",
-			wantArgs: []interface{}{int64(10)},
-		},
-		{
-			name: "override",
-			builder: New().Select(Columns("Id")).From(&TestModel{Id: 10}).Where(P("Id").EQ(13)),
-			wantSql: "SELECT id FROM test_model WHERE `id`=?",
-			wantArgs: []interface{}{13},
+			wantSql: "SELECT `id` FROM `test_model`;",
 		},
 		{
 			name: "multiples",
 			// 在传入多个 Predicate 的时候，我们认为它们是用 and 连接起来的
 			builder: New().Select(Columns("Id")).From(&TestModel{Id: 10}).
-				Where(P("Id").LT(13), P("Id").GT(4)),
-			wantSql: "SELECT id FROM test_model WHERE `id`<? AND `id`>?",
+				Where(C("Id").LT(13), C("Id").GT(4)),
+			wantSql: "SELECT `id` FROM `test_model` WHERE (`id`<?) AND (`id`>?);",
 			wantArgs: []interface{}{13, 4},
 		},
 		{
 			name: "and",
 			builder: New().Select(Columns("Id")).From(&TestModel{Id: 10}).
-				Where(P("Id").LT(13).And(P("Id").GT(4))),
-			wantSql: "SELECT id FROM test_model WHERE `id`<? AND `id`>?",
+				Where(C("Id").LT(13).And(C("Id").GT(4))),
+			wantSql: "SELECT `id` FROM `test_model` WHERE (`id`<?) AND (`id`>?);",
 			wantArgs: []interface{}{13, 4},
 		},
 		{
 			name: "or",
 			builder: New().Select(Columns("Id")).From(&TestModel{Id: 10}).
-				Where(P("Id").LT(13).Or(P("Id").GT(4))),
-			wantSql: "SELECT id FROM test_model WHERE `id`<? OR `id`>?",
+				Where(C("Id").LT(13).Or(C("Id").GT(4))),
+			wantSql: "SELECT `id` FROM `test_model` WHERE (`id`<?) OR (`id`>?);",
+			wantArgs: []interface{}{13, 4},
+		},
+		{
+			name: "mot",
+			builder: New().Select(Columns("Id")).From(&TestModel{Id: 10}).
+				Where(Not(C("Id").LT(13).Or(C("Id").GT(4)))),
+			wantSql: "SELECT `id` FROM `test_model` WHERE NOT ((`id`<?) OR (`id`>?));",
 			wantArgs: []interface{}{13, 4},
 		},
 		{
 			name: "and or",
 			builder: New().Select(Columns("Id")).From(&TestModel{Id: 10}).
-				Where(P("Id").LT(13).Or(P("Id").GT(4)).And(P("FirstName").GT("tom"))),
-			wantSql: "SELECT id FROM test_model WHERE (`id`<? OR `id`>?) AND `first_name`>?",
+				Where(C("Id").LT(13).Or(C("Id").GT(4)).And(C("FirstName").GT("tom"))),
+			wantSql: "SELECT `id` FROM `test_model` WHERE ((`id`<?) OR (`id`>?)) AND (`first_name`>?);",
 			wantArgs: []interface{}{13, 4, "tom"},
 		},
 		{
 			name: "cross columns",
 			builder: New().Select(Columns("Id")).From(&TestModel{Id: 10}).
-				Where(P("Id").LT(13).Or(P("Age").GT(C("Id")))),
-			wantSql: "SELECT `id` FROM test_model WHERE `age`>`id`",
-			wantArgs: []interface{}{13, 4, "tom"},
+				Where(C("Id").LT(13).Or(C("Age").GT(C("Id")))),
+			wantSql: "SELECT `id` FROM `test_model` WHERE (`id`<?) OR (`age`>`id`);",
+			wantArgs: []interface{}{13},
 		},
 		{
 			name: "cross columns mathematical",
 			builder: New().Select(Columns("Id")).From(&TestModel{Id: 10}).
-				Where(P("Age").GT(C("Id").Add(40))),
-			wantSql: "SELECT `id` FROM test_model WHERE `age`>`id`+?",
+				Where(C("Age").GT(C("Id").Add(40))),
+			wantSql: "SELECT `id` FROM `test_model` WHERE `age`>(`id`+?);",
 			wantArgs: []interface{}{40},
 		},
 		{
 			name: "cross columns mathematical",
 			builder: New().Select(Columns("Id")).From(&TestModel{Id: 10}).
-				Where(P("Age").GT(C("Id").Multi(C("Age").Add(66)))),
-			wantSql: "SELECT `id` FROM test_model WHERE `age`>`id`*(`age`+?)",
+				Where(C("Age").GT(C("Id").Multi(C("Age").Add(66)))),
+			wantSql: "SELECT `id` FROM `test_model` WHERE `age`>(`id`*(`age`+?));",
 			wantArgs: []interface{}{66},
 		},
 	}
@@ -96,8 +90,11 @@ func TestPredicate_P(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			query, err := tc.builder.Build()
 			assert.Equal(t, err, c.wantErr)
-			assert.Equal(t, query.SQL, c.wantSql)
-			assert.Equal(t, query.Args, c.wantArgs)
+			if err != nil {
+				return
+			}
+			assert.Equal(t, c.wantSql, query.SQL)
+			assert.Equal(t, c.wantArgs, query.Args)
 		})
 	}
 }

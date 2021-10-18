@@ -26,26 +26,80 @@ func C(c string) Column {
 	}
 }
 
+// EQ =
+func (c Column) EQ(val interface{}) Predicate {
+	return Predicate{
+		left:  c,
+		op:    opEQ,
+		right: valueOf(val),
+	}
+}
+
+// NEQ !=
+func (c Column) NEQ(val interface{}) Predicate {
+	return Predicate{
+		left:  c,
+		op:    opNEQ,
+		right: valueOf(val),
+	}
+}
+
+// LT <
+func (c Column) LT(val interface{}) Predicate {
+	return Predicate{
+		left:  c,
+		op:    opLT,
+		right: valueOf(val),
+	}
+}
+
+// LTEQ <=
+func (c Column) LTEQ(val interface{}) Predicate {
+	return Predicate{
+		left:  c,
+		op:    opLTEQ,
+		right: valueOf(val),
+	}
+}
+
+// GT >
+func (c Column) GT(val interface{}) Predicate {
+	return Predicate{
+		left:  c,
+		op:    opGT,
+		right: valueOf(val),
+	}
+}
+
+// GTEQ >=
+func (c Column) GTEQ(val interface{}) Predicate {
+	return Predicate{
+		left:  c,
+		op:    opGTEQ,
+		right: valueOf(val),
+	}
+}
+
 // As means alias
 func (c Column) As(alias string) Selectable {
 	return Column{
-		name: c.name,
+		name:  c.name,
 		alias: alias,
 	}
 }
 
 func (c Column) Add(val interface{}) MathExpr {
 	return MathExpr{
-		left: c,
-		op: opAdd,
+		left:  c,
+		op:    opAdd,
 		right: valueOf(val),
 	}
 }
 
 func (c Column) Multi(val interface{}) MathExpr {
 	return MathExpr{
-		left: c,
-		op: opMulti,
+		left:  c,
+		op:    opMulti,
 		right: valueOf(val),
 	}
 }

@@ -90,22 +90,35 @@ func (b *builder) buildExpr(expr Expr) error {
 		if err := b.buildBinaryExpr(e); err != nil {
 			return err
 		}
+	case Predicate:
+		if err := b.buildBinaryExpr(binaryExpr(e)); err != nil {
+			return err
+		}
 	default:
 		return errors.New("unsupported expr")
 	}
 	return nil
 }
 
+func (b *builder) buildPredicates(predicates []Predicate) error {
+	p := predicates[0]
+	for i := 1; i < len(predicates); i++ {
+		p = p.And(predicates[i])
+	}
+	return b.buildExpr(p)
+}
+
+
 func (b *builder) buildBinaryExpr(e binaryExpr) error {
-	err := b.buildBinarySubExpr(e.left)
+	err := b.buildSubExpr(e.left)
 	if err != nil {
 		return err
 	}
-	b.buffer.WriteString(string(e.op))
-	return b.buildBinarySubExpr(e.right)
+	b.buffer.WriteString(e.op.text)
+	return b.buildSubExpr(e.right)
 }
 
-func (b *builder) buildBinarySubExpr(subExpr Expr) error {
+func (b *builder) buildSubExpr(subExpr Expr) error {
 	switch r := subExpr.(type) {
 	case MathExpr:
 		b.buffer.WriteByte('(')
@@ -116,6 +129,12 @@ func (b *builder) buildBinarySubExpr(subExpr Expr) error {
 	case binaryExpr:
 		b.buffer.WriteByte('(')
 		if err := b.buildBinaryExpr(r); err != nil {
+			return err
+		}
+		b.buffer.WriteByte(')')
+	case Predicate:
+		b.buffer.WriteByte('(')
+		if err := b.buildBinaryExpr(binaryExpr(r)); err != nil {
 			return err
 		}
 		b.buffer.WriteByte(')')
