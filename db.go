@@ -16,7 +16,8 @@ package eql
 
 import (
 	"reflect"
-	"strings"
+
+	"github.com/valyala/bytebufferpool"
 )
 
 // DBOption configure DB
@@ -74,7 +75,7 @@ func (db *DB) builder() builder {
 	return builder{
 		registry: db.metaRegistry,
 		dialect:  db.dialect,
-		buffer:   &strings.Builder{},
+		buffer:   bytebufferpool.Get(),
 	}
 }
 
