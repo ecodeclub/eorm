@@ -41,7 +41,7 @@ func (s *Selector) Build() (*Query, error) {
 	if err != nil {
 		return nil, err
 	}
-	s.buffer.WriteString("SELECT ")
+	_, _ = s.buffer.WriteString("SELECT ")
 
 	if len(s.columns) == 0 {
 		s.buildAllColumns()
@@ -52,10 +52,16 @@ func (s *Selector) Build() (*Query, error) {
 		}
 	}
 
-	s.buffer.WriteString(" FROM ")
+	_, _ = s.buffer.WriteString(" FROM ")
 	s.quote(s.meta.tableName)
 
-	// TODO where and having
+	if len(s.where) > 0 {
+		_, _ = s.buffer.WriteString(" WHERE ")
+		err = s.buildPredicates(s.where)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	// group by
 	if len(s.groupBy) > 0 {
@@ -74,12 +80,12 @@ func (s *Selector) Build() (*Query, error) {
 	}
 
 	if s.offset > 0 {
-		s.buffer.WriteString(" OFFSET ")
+		_, _ = s.buffer.WriteString(" OFFSET ")
 		s.parameter(s.offset)
 	}
 
 	if s.limit > 0 {
-		s.buffer.WriteString(" LIMIT ")
+		_, _ = s.buffer.WriteString(" LIMIT ")
 		s.parameter(s.limit)
 	}
 	s.end()
@@ -87,7 +93,7 @@ func (s *Selector) Build() (*Query, error) {
 }
 
 func (s *Selector) buildOrderBy() error {
-	s.buffer.WriteString(" ORDER BY ")
+	_, _ = s.buffer.WriteString(" ORDER BY ")
 	for i, ob := range s.orderBy {
 		if i > 0 {
 			s.comma()
@@ -100,13 +106,13 @@ func (s *Selector) buildOrderBy() error {
 			s.quote(cMeta.columnName)
 		}
 		s.space()
-		s.buffer.WriteString(ob.order)
+		_, _ = s.buffer.WriteString(ob.order)
 	}
 	return nil
 }
 
 func (s *Selector) buildGroupBy() error {
-	s.buffer.WriteString(" GROUP BY ")
+	_, _ = s.buffer.WriteString(" GROUP BY ")
 	for i, gb := range s.groupBy {
 		cMeta, ok := s.meta.fieldMap[gb]
 		if !ok {
@@ -153,20 +159,20 @@ func (s *Selector) buildSelectedList() error {
 				}
 			}
 		case Aggregate:
-			s.buffer.WriteString(expr.fn)
-			s.buffer.WriteByte('(')
+			_, _ = s.buffer.WriteString(expr.fn)
+			_ = s.buffer.WriteByte('(')
 			cMeta, ok := s.meta.fieldMap[expr.arg]
 			if !ok {
 				return internal.NewInvalidColumnError(expr.arg)
 			}
 			s.quote(cMeta.columnName)
-			s.buffer.WriteByte(')')
+			_ = s.buffer.WriteByte(')')
 			if expr.alias != "" {
-				s.buffer.WriteString(" AS ")
+				_, _ = s.buffer.WriteString(" AS ")
 				s.quote(expr.alias)
 			}
 		case RawExpr:
-			s.buffer.WriteString(string(expr))
+			_, _ = s.buffer.WriteString(string(expr))
 		}
 	}
 	return nil
@@ -179,7 +185,7 @@ func (s *Selector) buildColumn(field, alias string) error {
 	}
 	s.quote(cMeta.columnName)
 	if alias != "" {
-		s.buffer.WriteString(" AS ")
+		_, _ = s.buffer.WriteString(" AS ")
 		s.quote(alias)
 	}
 	return nil

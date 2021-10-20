@@ -28,30 +28,30 @@ func TestDeleter_Build(t *testing.T) {
 		},
 		{
 			name: "where",
-			builder: New().Delete().From(&TestModel{Id: 14}).Where(P("Id")),
+			builder: New().Delete().From(&TestModel{}).Where(C("Id").EQ(16)),
 			wantSql: "DELETE FROM `test_model` WHERE `id`=?;",
-			wantArgs: []interface{}{int64(14)},
+			wantArgs: []interface{}{16},
 		},
 		{
 			name: "order",
-			builder: New().Delete().From(&TestModel{Id: 14}).Where(P("Id")).
+			builder: New().Delete().From(&TestModel{}).Where(C("Id").EQ(14)).
 				OrderBy(ASC("Id"), DESC("Name")),
 			wantSql: "DELETE FROM `test_model` WHERE `id`=? ORDER BY `id` ASC, `name` DESC;",
-			wantArgs: []interface{}{int64(14)},
+			wantArgs: []interface{}{14},
 		},
 		{
 			name: "order and limit",
-			builder: New().Delete().From(&TestModel{Id: 14}).Where(P("Id")).
+			builder: New().Delete().From(&TestModel{}).Where(C("Id").EQ(14)).
 				OrderBy(ASC("Id"), DESC("Name")).Limit(3),
 			wantSql: "DELETE FROM `test_model` WHERE `id`=? ORDER BY `id` ASC, `name` DESC LIMIT ?;",
-			wantArgs: []interface{}{int64(14), 3},
+			wantArgs: []interface{}{14, 3},
 		},
 
 		{
 			name: "limit",
-			builder: New().Delete().From(&TestModel{Id: 14}).Where(P("Id")).Limit(3),
+			builder: New().Delete().From(&TestModel{}).Where(C("Id").EQ(14)).Limit(3),
 			wantSql: "DELETE FROM `test_model` WHERE `id`=? LIMIT ?;",
-			wantArgs: []interface{}{int64(14), 3},
+			wantArgs: []interface{}{14, 3},
 		},
 	}
 

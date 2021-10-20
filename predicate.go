@@ -14,56 +14,58 @@
 
 package eql
 
-type op string
+type op struct {
+	symbol string
+	text string
+}
 
-const (
-	opLT = op("<")
-	opLTEQ = op("<=")
-	opGT = op(">")
-	opGTEQ= op(">=")
-	opEQ = op("=")
-	opNEQ = op("!=")
-	opAdd = op("+")
-	opMinus = op("-")
-	opMulti = op("*")
-	opDiv = op("/")
+var (
+	opLT = op{symbol: "<", text: "<"}
+	opLTEQ = op{symbol:"<=", text: "<="}
+	opGT = op{symbol:">", text: ">"}
+	opGTEQ= op{symbol:">=", text: ">="}
+	opEQ = op{symbol:"=", text: "="}
+	opNEQ = op{symbol:"!=", text: "!="}
+	opAdd = op{symbol:"+", text: "+"}
+	//opMinus = op{symbol:"-", text: "-"}
+	opMulti = op{symbol:"*", text: "*"}
+	//opDiv = op{symbol:"/", text: "/"}
+	opAnd = op{symbol:"AND", text: " AND "}
+	opOr = op{symbol:"OR", text: " OR "}
+	opNot = op{symbol:"NOT", text: "NOT "}
 )
+
 
 // Predicate will be used in Where Or Having
 type Predicate binaryExpr
 
-// P creates a Predicate
-// left could be string or Expr
-func P(left interface{}) Predicate {
-	panic("implement me")
+func (Predicate) expr() (string, error) {
+	return "", nil
 }
 
 // Not indicates "NOT"
 func Not(p Predicate) Predicate {
-	panic("implement me")
+	return Predicate{
+		left: RawExpr(""),
+		op: opNot,
+		right: p,
+	}
 }
 
 // And indicates "AND"
 func (p Predicate) And(pred Predicate) Predicate {
-	panic("implement me")
+	return Predicate{
+		left: p,
+		op: opAnd,
+		right: pred,
+	}
 }
 
 // Or indicates "OR"
 func (p Predicate) Or(pred Predicate) Predicate {
-	panic("implement me")
-}
-
-// EQ =
-func (p Predicate) EQ(val interface{}) Predicate {
-	panic("implement")
-}
-
-// LT <
-func (p Predicate) LT(val interface{}) Predicate {
-	panic("implement me")
-}
-
-// GT >
-func (p Predicate) GT(val interface{}) Predicate {
-	panic("implement me")
+	return Predicate{
+		left: p,
+		op: opOr,
+		right: pred,
+	}
 }

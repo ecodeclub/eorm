@@ -84,6 +84,17 @@ func TestSelectable(t *testing.T) {
 			wantSql: "SELECT `id`,`first_name`,`age`,`last_name` FROM `test_model` ORDER BY `age` ASC,`id` DESC OFFSET ? LIMIT ?;",
 			wantArgs: []interface{}{10, 100},
 		},
+		{
+			name: "where",
+			builder:  New().Select().From(&TestModel{}).Where(C("Id").EQ(10)),
+			wantSql: "SELECT `id`,`first_name`,`age`,`last_name` FROM `test_model` WHERE `id`=?;",
+			wantArgs: []interface{}{10},
+		},
+		{
+			name: "no where",
+			builder:  New().Select().From(&TestModel{}).Where(),
+			wantSql: "SELECT `id`,`first_name`,`age`,`last_name` FROM `test_model`;",
+		},
 	}
 
 	for _, tc := range testCases {
