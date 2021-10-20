@@ -17,22 +17,25 @@ package eql
 import (
 	"errors"
 	"fmt"
-	"github.com/gotomicro/eql/internal"
 	"reflect"
+
+	"github.com/gotomicro/eql/internal"
+	"github.com/valyala/bytebufferpool"
 )
 
 // Updater is the builder responsible for building UPDATE query
 type Updater struct {
 	builder
-	table interface{}
-	tableEle reflect.Value
-	where []Predicate
+	table          interface{}
+	tableEle       reflect.Value
+	where          []Predicate
 	assigns        []Assignable
 	nullAssertFunc NullAssertFunc
 }
 
 // Build returns UPDATE query
 func (u *Updater) Build() (*Query, error) {
+	defer bytebufferpool.Put(u.buffer)
 	var err error
 	u.meta, err = u.registry.Get(u.table)
 	if err != nil {
@@ -58,7 +61,7 @@ func (u *Updater) Build() (*Query, error) {
 
 	u.end()
 	return &Query{
-		SQL: u.buffer.String(),
+		SQL:  u.buffer.String(),
 		Args: u.args,
 	}, nil
 }
@@ -144,13 +147,13 @@ func (u *Updater) buildDefaultColumns() error {
 }
 
 // Set represents SET clause
-func (u *Updater) Set(assigns...Assignable) *Updater {
+func (u *Updater) Set(assigns ...Assignable) *Updater {
 	u.assigns = assigns
 	return u
 }
 
 // Where represents WHERE clause
-func (u *Updater) Where(predicates...Predicate) *Updater {
+func (u *Updater) Where(predicates ...Predicate) *Updater {
 	u.where = predicates
 	return u
 }

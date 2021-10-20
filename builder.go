@@ -16,8 +16,9 @@ package eql
 
 import (
 	"errors"
+
 	"github.com/gotomicro/eql/internal"
-	"strings"
+	"github.com/valyala/bytebufferpool"
 )
 
 // QueryBuilder is used to build a query
@@ -27,17 +28,19 @@ type QueryBuilder interface {
 
 // Query represents a query
 type Query struct {
-	SQL string
+	SQL  string
 	Args []interface{}
 }
 
 type builder struct {
 	registry MetaRegistry
-	dialect Dialect
-	// TODO using buffer cache
-	buffer *strings.Builder
-	meta *TableMeta
-	args []interface{}
+	dialect  Dialect
+	// Use bytebufferpool to reduce memory allocation.
+	// After using buffer, it must be put back in bytebufferpool.
+	// Call bytebufferpool.Get() to get a buffer, call bytebufferpool.Put() to put buffer back to bytebufferpool.
+	buffer *bytebufferpool.ByteBuffer
+	meta   *TableMeta
+	args   []interface{}
 }
 
 func (b builder) quote(val string) {

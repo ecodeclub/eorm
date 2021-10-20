@@ -16,24 +16,26 @@ package eql
 
 import (
 	"github.com/gotomicro/eql/internal"
+	"github.com/valyala/bytebufferpool"
 )
 
 // Selector represents a select query
 type Selector struct {
 	builder
-	columns []Selectable
-	table interface{}
-	where []Predicate
+	columns  []Selectable
+	table    interface{}
+	where    []Predicate
 	distinct bool
-	having []Predicate
-	groupBy []string
-	orderBy []OrderBy
-	offset int
-	limit int
+	having   []Predicate
+	groupBy  []string
+	orderBy  []OrderBy
+	offset   int
+	limit    int
 }
 
 // Build returns Select Query
 func (s *Selector) Build() (*Query, error) {
+	defer bytebufferpool.Put(s.buffer)
 	var err error
 	s.meta, err = s.registry.Get(s.table)
 	if err != nil {
@@ -41,7 +43,7 @@ func (s *Selector) Build() (*Query, error) {
 	}
 	s.buffer.WriteString("SELECT ")
 
-	if len(s.columns) == 0{
+	if len(s.columns) == 0 {
 		s.buildAllColumns()
 	} else {
 		err = s.buildSelectedList()
@@ -190,7 +192,7 @@ func (s *Selector) From(table interface{}) *Selector {
 }
 
 // Where accepts predicates
-func (s *Selector) Where(predicates...Predicate) *Selector {
+func (s *Selector) Where(predicates ...Predicate) *Selector {
 	s.where = predicates
 	return s
 }
@@ -202,19 +204,19 @@ func (s *Selector) Distinct() *Selector {
 }
 
 // Having accepts predicates
-func (s *Selector) Having(predicates...Predicate) *Selector {
+func (s *Selector) Having(predicates ...Predicate) *Selector {
 	s.having = predicates
 	return s
 }
 
 // GroupBy means "GROUP BY"
-func (s *Selector) GroupBy(columns...string) *Selector {
+func (s *Selector) GroupBy(columns ...string) *Selector {
 	s.groupBy = columns
 	return s
 }
 
 // OrderBy means "ORDER BY"
-func (s *Selector) OrderBy(orderBys...OrderBy) *Selector {
+func (s *Selector) OrderBy(orderBys ...OrderBy) *Selector {
 	s.orderBy = orderBys
 	return s
 }
@@ -234,22 +236,22 @@ func (s *Selector) Offset(offset int) *Selector {
 // OrderBy specify fields and ASC
 type OrderBy struct {
 	fields []string
-	order string
+	order  string
 }
 
 // ASC means ORDER BY fields ASC
-func ASC(fields...string) OrderBy {
+func ASC(fields ...string) OrderBy {
 	return OrderBy{
 		fields: fields,
-		order: "ASC",
+		order:  "ASC",
 	}
 }
 
 // DESC means ORDER BY fields DESC
-func DESC(fields...string) OrderBy {
+func DESC(fields ...string) OrderBy {
 	return OrderBy{
 		fields: fields,
-		order: "DESC",
+		order:  "DESC",
 	}
 }
 
