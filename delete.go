@@ -16,30 +16,45 @@ package eql
 
 // Deleter builds DELETE query
 type Deleter struct {
-
+	builder
+	table interface{}
+	where []Predicate
 }
 
 // Build returns DELETE query
 func (d *Deleter) Build() (*Query, error) {
-	panic("implement me")
+	_, err := d.buffer.WriteString("DELETE FROM ")
+	if err != nil {
+		return nil, err
+	}
+	d.meta, err = d.registry.Get(d.table)
+	if err != nil {
+		return nil, err
+	}
+
+	d.quote(d.meta.tableName)
+	if len(d.where) > 0 {
+		_, err = d.buffer.WriteString(" WHERE ")
+		if err != nil {
+			return nil, err
+		}
+		err = d.buildPredicates(d.where)
+		if err != nil {
+			return nil, err
+		}
+	}
+	d.end()
+	return &Query{SQL: d.buffer.String(), Args: d.args}, nil
 }
 
 // From accepts model definition
 func (d *Deleter) From(table interface{}) *Deleter {
-	panic("implement me")
+	d.table = table
+	return d
 }
 
 // Where accepts predicates
 func (d *Deleter) Where(predicates...Predicate) *Deleter {
-	panic("implement me")
-}
-
-// OrderBy means "ORDER BY"
-func (d *Deleter) OrderBy(orderBy... OrderBy) *Deleter {
-	panic("implement me")
-}
-
-// Limit limits the number of deleted rows
-func (d *Deleter) Limit(limit int) *Deleter {
-	panic("implement me")
+	d.where = predicates
+	return d
 }
