@@ -52,8 +52,10 @@ func (db *DB) Select(columns ...Selectable) *Selector {
 }
 
 // Delete starts a "delete" query.
-func (*DB) Delete() *Deleter {
-	panic("implement me")
+func (db *DB) Delete() *Deleter {
+	return &Deleter{
+		builder: db.builder(),
+	}
 }
 
 func (db *DB) Update(table interface{}) *Updater {
