@@ -35,9 +35,6 @@ jobs:
 
       - name: Test
         run: go test -coverprofile=cover.out -v ./...
-#      - name: Deepsource Cli
-#        run: curl https://deepsource.io/cli | sh
-#      - name: Report Code Coverage
-#        run: ./bin/deepsource report --analyzer test-coverage --key go --value-file ./cover.out
-#        env:
-#          DEEPSOURCE_DSN: ${{ secrets.DEEPSOURCE_DSN }}
+
+      - name: Post Coverage
+        uses: codecov/codecov-action@v2
