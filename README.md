@@ -1,4 +1,7 @@
 # EQL
+
+[![codecov](https://codecov.io/gh/gotomicro/eql/branch/main/graph/badge.svg?token=vc0BDor3Lk)](https://codecov.io/gh/gotomicro/eql)
+
 An easy-use SQL builder.
 
 ## Design
