@@ -103,7 +103,7 @@ type TestModel struct {
 	Id        int64 `eql:"auto_increment,primary_key"`
 	FirstName string
 	Age       int8
-	LastName string
+	LastName *string
 }
 
 type CommonTestCase struct {
@@ -112,4 +112,8 @@ type CommonTestCase struct {
 	wantArgs []interface{}
 	wantSql string
 	wantErr error
+}
+
+func stringPtr(val string) *string {
+	return &val
 }

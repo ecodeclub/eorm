@@ -14,11 +14,20 @@
 
 package internal
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+)
+
+var errValueNotSet = errors.New("value unset")
 
 // NewInvalidColumnError returns an error represents invalid field name
 // TODO(do we need errors pkg?)
 func NewInvalidColumnError(field string) error {
 	return fmt.Errorf("eql: invalid column name %s, " +
 		"it must be a valid field name of structure", field)
+}
+
+func NewValueNotSetError() error {
+	return errValueNotSet
 }

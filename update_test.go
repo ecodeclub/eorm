@@ -25,14 +25,14 @@ func TestUpdater_Set(t *testing.T) {
 		Id:        12,
 		FirstName: "Tom",
 		Age:       18,
-		LastName:  "Jerry",
+		LastName:  stringPtr("Jerry"),
 	}
 	testCases := []CommonTestCase {
 		{
 			name: "no set",
 			builder: New().Update(tm),
 			wantSql: "UPDATE `test_model` SET `id`=?,`first_name`=?,`age`=?,`last_name`=?;",
-			wantArgs: []interface{}{int64(12), "Tom", int8(18), "Jerry"},
+			wantArgs: []interface{}{int64(12), "Tom", int8(18), stringPtr("Jerry")},
 		},
 		{
 			name: "set columns",
@@ -92,6 +92,47 @@ func TestUpdater_Set(t *testing.T) {
 			builder: New().Update(tm).Set(C("FirstName"), Assign("Age", C("Id").Add(C("Age").Multi(100)).Multi(110))),
 			wantSql: "UPDATE `test_model` SET `first_name`=?,`age`=((`id`+(`age`*?))*?);",
 			wantArgs: []interface{}{"Tom", 100, 110},
+		},
+		{
+			name: "without zero no value",
+			builder: New().Update(&TestModel{Id: 13}).Set(C("FirstName")),
+			wantErr: internal.NewValueNotSetError(),
+		},
+		{
+			name: "without zero",
+			builder: New().Update(&TestModel{Id: 13, FirstName: "Tom"}).Set(C("FirstName")),
+			wantSql: "UPDATE `test_model` SET `first_name`=?;",
+			wantArgs: []interface{}{"Tom"},
+		},
+		{
+			name: "with zero",
+			builder: New().Update(&TestModel{Id: 13, FirstName: "Tom"}).WithZero(),
+			wantSql: "UPDATE `test_model` SET `id`=?,`first_name`=?,`age`=?;",
+			wantArgs: []interface{}{int64(13), "Tom", int8(0)},
+		},
+		{
+			name: "with nil",
+			builder: New().Update(&TestModel{Id: 13, FirstName: "Tom"}).WithNil(),
+			wantSql: "UPDATE `test_model` SET `id`=?,`first_name`=?,`last_name`=?;",
+			wantArgs: []interface{}{int64(13), "Tom", (*string)(nil)},
+		},
+		{
+			name: "with nil, with zero",
+			builder: New().Update(&TestModel{Id: 13, FirstName: "Tom"}).WithNil().WithZero(),
+			wantSql: "UPDATE `test_model` SET `id`=?,`first_name`=?,`age`=?,`last_name`=?;",
+			wantArgs: []interface{}{int64(13), "Tom", int8(0), (*string)(nil)},
+		},
+		{
+			name: "no where",
+			builder: New().Update(&TestModel{Id: 13, FirstName: "Tom"}).WithNil().WithZero().Where(),
+			wantSql: "UPDATE `test_model` SET `id`=?,`first_name`=?,`age`=?,`last_name`=?;",
+			wantArgs: []interface{}{int64(13), "Tom", int8(0), (*string)(nil)},
+		},
+		{
+			name: "where",
+			builder: New().Update(&TestModel{Id: 13, FirstName: "Tom"}).WithNil().WithZero().Where(C("Id").EQ(14)),
+			wantSql: "UPDATE `test_model` SET `id`=?,`first_name`=?,`age`=?,`last_name`=? WHERE `id`=?;",
+			wantArgs: []interface{}{int64(13), "Tom", int8(0), (*string)(nil), 14},
 		},
 	}
 
