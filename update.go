@@ -15,7 +15,6 @@
 package eql
 
 import (
-	"errors"
 	"fmt"
 	"reflect"
 
@@ -30,7 +29,8 @@ type Updater struct {
 	tableEle       reflect.Value
 	where          []Predicate
 	assigns        []Assignable
-	nullAssertFunc NullAssertFunc
+	withNil bool
+	withZero bool
 }
 
 // Build returns UPDATE query
@@ -45,9 +45,9 @@ func (u *Updater) Build() (*Query, error) {
 	u.tableEle = reflect.ValueOf(u.table).Elem()
 	u.args = make([]interface{}, 0, len(u.meta.columns))
 
-	u.buffer.WriteString("UPDATE ")
+	_, _ = u.buffer.WriteString("UPDATE ")
 	u.quote(u.meta.tableName)
-	u.buffer.WriteString(" SET ")
+	_, _ = u.buffer.WriteString(" SET ")
 	if len(u.assigns) == 0 {
 		err = u.buildDefaultColumns()
 	} else {
@@ -57,7 +57,13 @@ func (u *Updater) Build() (*Query, error) {
 		return nil, err
 	}
 
-	// TODO WHERE
+	if len(u.where) > 0 {
+		_, _ = u.buffer.WriteString(" WHERE ")
+		err = u.buildPredicates(u.where)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	u.end()
 	return &Query{
@@ -74,21 +80,35 @@ func (u *Updater) buildAssigns() error {
 		}
 		switch a := assign.(type) {
 		case Column:
-			set, err := u.buildColumn(a.name)
-			if err != nil {
-				return err
+			c, ok := u.meta.fieldMap[a.name]
+			if !ok {
+				return internal.NewInvalidColumnError(a.name)
 			}
-			has = has || set
+			val, ok := u.getValue(a.name)
+			if !ok {
+				continue
+			}
+			u.quote(c.columnName)
+			_ = u.buffer.WriteByte('=')
+			u.parameter(val)
+			has = true
 		case columns:
-			for _, c := range a.cs {
+			for _, name := range a.cs {
+				c, ok := u.meta.fieldMap[name]
+				if !ok {
+					return internal.NewInvalidColumnError(name)
+				}
+				val, ok := u.getValue(name)
+				if !ok {
+					continue
+				}
 				if has {
 					u.comma()
 				}
-				set, err := u.buildColumn(c)
-				if err != nil {
-					return err
-				}
-				has = has || set
+				u.quote(c.columnName)
+				_ = u.buffer.WriteByte('=')
+				u.parameter(val)
+				has = true
 			}
 		case Assignment:
 			if err := u.buildExpr(binaryExpr(a)); err != nil {
@@ -100,50 +120,43 @@ func (u *Updater) buildAssigns() error {
 		}
 	}
 	if !has {
-		return errors.New("eql: value unset")
+		return internal.NewValueNotSetError()
 	}
 	return nil
-}
-
-func (u *Updater) buildColumn(field string) (bool, error) {
-	c, ok := u.meta.fieldMap[field]
-	if !ok {
-		return false, internal.NewInvalidColumnError(field)
-	}
-	return u.setColumn(c), nil
-}
-
-func (u *Updater) setColumn(c *ColumnMeta) bool {
-	val := u.tableEle.FieldByName(c.fieldName).Interface()
-	isNull := u.nullAssertFunc(val)
-	if !isNull {
-		u.quote(c.columnName)
-		u.buffer.WriteByte('=')
-		u.parameter(val)
-		return true
-	}
-	return false
 }
 
 func (u *Updater) buildDefaultColumns() error {
 	has := false
 	for _, c := range u.meta.columns {
+		val, ok := u.getValue(c.fieldName)
+		if !ok {
+			continue
+		}
 		if has {
-			u.buffer.WriteByte(',')
+			_ = u.buffer.WriteByte(',')
 		}
-		val := u.tableEle.FieldByName(c.fieldName).Interface()
-		isNull := u.nullAssertFunc(val)
-		if !isNull {
-			u.quote(c.columnName)
-			u.buffer.WriteByte('=')
-			u.parameter(val)
-			has = true
-		}
+		u.quote(c.columnName)
+		_ = u.buffer.WriteByte('=')
+		u.parameter(val)
+		has = true
 	}
 	if !has {
-		return errors.New("value unset")
+		return internal.NewValueNotSetError()
 	}
 	return nil
+}
+
+func (u *Updater) getValue(fieldName string) (interface{}, bool) {
+	val := u.tableEle.FieldByName(fieldName)
+	res := val.Interface()
+
+	if !u.withNil && val.Kind() == reflect.Ptr && val.IsNil() {
+		return nil, false
+	}
+	if !u.withZero && val.Kind() != reflect.Ptr && val.IsZero() {
+		return nil, false
+	}
+	return res, true
 }
 
 // Set represents SET clause
@@ -155,5 +168,19 @@ func (u *Updater) Set(assigns ...Assignable) *Updater {
 // Where represents WHERE clause
 func (u *Updater) Where(predicates ...Predicate) *Updater {
 	u.where = predicates
+	return u
+}
+
+// WithNil use nil to update database
+func (u *Updater) WithNil() *Updater {
+	u.withNil = true
+	return u
+}
+
+// WithZero specific use zero value to update databases.
+// but "zero value" here is different from reflect.IsZero, it doesn't contain nil value
+// for example if the int value is 0, it will be used to update database, but if the pointer is nil, it won't
+func (u *Updater) WithZero() *Updater {
+	u.withZero = true
 	return u
 }

@@ -48,7 +48,7 @@ func TestTagMetaRegistry(t *testing.T) {
 	idMetaLastName := meta.fieldMap["LastName"]
 	assert.Equal(t, "last_name", idMetaLastName.columnName)
 	assert.Equal(t, "LastName", idMetaLastName.fieldName)
-	assert.Equal(t, reflect.TypeOf(string("")), idMetaLastName.typ)
+	assert.Equal(t, reflect.TypeOf((*string)(nil)), idMetaLastName.typ)
 
 	idMetaLastAge := meta.fieldMap["Age"]
 	assert.Equal(t, "age", idMetaLastAge.columnName)

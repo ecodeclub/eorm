@@ -11,6 +11,7 @@ We are not English native speaker, so we use Chinese to write the design documen
 Here is a good one: https://www.deepl.com/en/translator
 
 [设计思路](./docs/design.md)
+
 [B站视频](https://space.bilibili.com/324486985)
 
 ## Contribution
@@ -21,3 +22,10 @@ You must follow these rules:
 - You must add license header to every new files
 
 [style guide](https://github.com/uber-go/guide/blob/master/style.md)
+
+### Setup Develop Environment
+
+#### install golangci-lint
+Please refer [Install golangci-lint](https://golangci-lint.run/usage/install/)
+#### setup pre-push github hook
+Please move the `.github/pre-push` to your `.git` directory
