@@ -33,7 +33,7 @@ type DB struct {
 // New returns DB. It's the entry of EQL
 func New(opts ...DBOption) *DB {
 	db := &DB{
-		metaRegistry:   defaultMetaRegistry,
+		metaRegistry:   &tagMetaRegistry{},
 		dialect:        mysql,
 		nullAssertFunc: NilAsNullFunc,
 	}

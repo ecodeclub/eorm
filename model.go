@@ -40,13 +40,11 @@ type ColumnMeta struct {
 
 type tableMetaOption func(meta *TableMeta)
 
-// MetadaRegistry stores table metadata
+// MetaRegistry stores table metadata
 type MetaRegistry interface {
 	Get(table interface{}) (*TableMeta, error)
 	Register(table interface{}, opts ...tableMetaOption) (*TableMeta, error)
 }
-
-var defaultMetaRegistry = &tagMetaRegistry{}
 
 // tagMetaRegistry is the default implementation based on tag eql
 type tagMetaRegistry struct {

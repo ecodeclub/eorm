@@ -23,7 +23,8 @@ import (
 
 func TestTagMetaRegistry(t *testing.T) {
 	tm := &TestModel{}
-	meta, err := defaultMetaRegistry.Register(tm)
+	registry := &tagMetaRegistry{}
+	meta, err := registry.Register(tm)
 	if err != nil {
 		t.Fatal(err)
 	}
