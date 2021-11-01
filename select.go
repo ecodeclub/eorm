@@ -79,6 +79,15 @@ func (s *Selector) Build() (*Query, error) {
 		}
 	}
 
+	//having
+	if len(s.having) > 0 {
+		_, _ = s.buffer.WriteString(" HAVING ")
+		err = s.buildPredicates(s.having)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	if s.offset > 0 {
 		_, _ = s.buffer.WriteString(" OFFSET ")
 		s.parameter(s.offset)
@@ -159,21 +168,28 @@ func (s *Selector) buildSelectedList() error {
 				}
 			}
 		case Aggregate:
-			_, _ = s.buffer.WriteString(expr.fn)
-			_ = s.buffer.WriteByte('(')
-			cMeta, ok := s.meta.fieldMap[expr.arg]
-			if !ok {
-				return internal.NewInvalidColumnError(expr.arg)
-			}
-			s.quote(cMeta.columnName)
-			_ = s.buffer.WriteByte(')')
-			if expr.alias != "" {
-				_, _ = s.buffer.WriteString(" AS ")
-				s.quote(expr.alias)
+			if err := s.buildAggregate(expr); err != nil {
+				return err
 			}
 		case RawExpr:
 			_, _ = s.buffer.WriteString(string(expr))
 		}
+	}
+	return nil
+
+}
+func (b *builder) buildAggregate(aggregate Aggregate) error {
+	_, _ = b.buffer.WriteString(aggregate.fn)
+	_ = b.buffer.WriteByte('(')
+	cMeta, ok := b.meta.fieldMap[aggregate.arg]
+	if !ok {
+		return internal.NewInvalidColumnError(aggregate.arg)
+	}
+	b.quote(cMeta.columnName)
+	_ = b.buffer.WriteByte(')')
+	if aggregate.alias != "" {
+		_, _ = b.buffer.WriteString(" AS ")
+		b.quote(aggregate.alias)
 	}
 	return nil
 }

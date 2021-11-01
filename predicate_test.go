@@ -83,6 +83,48 @@ func TestPredicate_C(t *testing.T) {
 			wantSql: "SELECT `id` FROM `test_model` WHERE `age`>(`id`*(`age`+?));",
 			wantArgs: []interface{}{66},
 		},
+		{
+			name:     "Avg with EQ",
+			builder:  New().Select().From(&TestModel{}).GroupBy("FirstName").Having(Avg("Age").EQ(18)),
+			wantSql:  "SELECT `id`,`first_name`,`age`,`last_name` FROM `test_model` GROUP BY `first_name` HAVING AVG(`age`)=?;",
+			wantArgs: []interface{}{18},
+		},
+		{
+			name:     "Max with NEQ",
+			builder:  New().Select().From(&TestModel{}).GroupBy("FirstName").Having(Max("Age").NEQ(18)),
+			wantSql:  "SELECT `id`,`first_name`,`age`,`last_name` FROM `test_model` GROUP BY `first_name` HAVING MAX(`age`)!=?;",
+			wantArgs: []interface{}{18},
+		},
+		{
+			name:     "Min with LT",
+			builder:  New().Select().From(&TestModel{}).GroupBy("FirstName").Having(Min("Age").LT(18)),
+			wantSql:  "SELECT `id`,`first_name`,`age`,`last_name` FROM `test_model` GROUP BY `first_name` HAVING MIN(`age`)<?;",
+			wantArgs: []interface{}{18},
+		},
+		{
+			name:     "Sum with LTEQ",
+			builder:  New().Select().From(&TestModel{}).GroupBy("FirstName").Having(Sum("Age").LTEQ(18)),
+			wantSql:  "SELECT `id`,`first_name`,`age`,`last_name` FROM `test_model` GROUP BY `first_name` HAVING SUM(`age`)<=?;",
+			wantArgs: []interface{}{18},
+		},
+		{
+			name:     "Count with GT",
+			builder:  New().Select().From(&TestModel{}).GroupBy("FirstName").Having(Count("Age").GT(18)),
+			wantSql:  "SELECT `id`,`first_name`,`age`,`last_name` FROM `test_model` GROUP BY `first_name` HAVING COUNT(`age`)>?;",
+			wantArgs: []interface{}{18},
+		},
+		{
+			name:     "Avg with GTEQ",
+			builder:  New().Select().From(&TestModel{}).GroupBy("FirstName").Having(Avg("Age").GTEQ(18)),
+			wantSql:  "SELECT `id`,`first_name`,`age`,`last_name` FROM `test_model` GROUP BY `first_name` HAVING AVG(`age`)>=?;",
+			wantArgs: []interface{}{18},
+		},
+		{
+			name:     "multiples aggregate functions",
+			builder:  New().Select().From(&TestModel{}).GroupBy("FirstName").Having(Avg("Age").GTEQ(18).And(Sum("Age").LTEQ(30))),
+			wantSql:  "SELECT `id`,`first_name`,`age`,`last_name` FROM `test_model` GROUP BY `first_name` HAVING (AVG(`age`)>=?) AND (SUM(`age`)<=?);",
+			wantArgs: []interface{}{18, 30},
+		},
 	}
 
 	for _, tc := range testCases {
