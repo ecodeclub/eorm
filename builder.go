@@ -80,6 +80,10 @@ func (b *builder) buildExpr(expr Expr) error {
 			return internal.NewInvalidColumnError(e.name)
 		}
 		b.quote(cm.columnName)
+	case Aggregate:
+		if err := b.buildAggregate(e); err != nil {
+			return err
+		}
 	case valueExpr:
 		b.parameter(e.val)
 	case MathExpr:
@@ -107,7 +111,6 @@ func (b *builder) buildPredicates(predicates []Predicate) error {
 	}
 	return b.buildExpr(p)
 }
-
 
 func (b *builder) buildBinaryExpr(e binaryExpr) error {
 	err := b.buildSubExpr(e.left)
