@@ -15,34 +15,36 @@
 package eql
 
 import (
-	"github.com/stretchr/testify/assert"
+	"fmt"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestAggregate(t *testing.T) {
 	testCases := []CommonTestCase{
 		{
-			name: "avg",
+			name:    "avg",
 			builder: New().Select(Avg("Age")).From(&TestModel{}),
 			wantSql: "SELECT AVG(`age`) FROM `test_model`;",
 		},
 		{
-			name: "max",
+			name:    "max",
 			builder: New().Select(Max("Age")).From(&TestModel{}),
 			wantSql: "SELECT MAX(`age`) FROM `test_model`;",
 		},
 		{
-			name: "min",
+			name:    "min",
 			builder: New().Select(Min("Age").As("min_age")).From(&TestModel{}),
 			wantSql: "SELECT MIN(`age`) AS `min_age` FROM `test_model`;",
 		},
 		{
-			name: "sum",
+			name:    "sum",
 			builder: New().Select(Sum("Age")).From(&TestModel{}),
 			wantSql: "SELECT SUM(`age`) FROM `test_model`;",
 		},
 		{
-			name: "count",
+			name:    "count",
 			builder: New().Select(Count("Age")).From(&TestModel{}),
 			wantSql: "SELECT COUNT(`age`) FROM `test_model`;",
 		},
@@ -60,4 +62,40 @@ func TestAggregate(t *testing.T) {
 			assert.Equal(t, c.wantArgs, query.Args)
 		})
 	}
+}
+
+func ExampleAggregate_As() {
+	query, _ := New().Select(Avg("Age").As("avg_age")).From(&TestModel{}).Build()
+	fmt.Println(query.SQL)
+	// Output: SELECT AVG(`age`) AS `avg_age` FROM `test_model`;
+}
+
+func ExampleAvg() {
+	query, _ := New().Select(Avg("Age").As("avg_age")).From(&TestModel{}).Build()
+	fmt.Println(query.SQL)
+	// Output: SELECT AVG(`age`) AS `avg_age` FROM `test_model`;
+}
+
+func ExampleCount() {
+	query, _ := New().Select(Count("Age")).From(&TestModel{}).Build()
+	fmt.Println(query.SQL)
+	// Output: SELECT COUNT(`age`) FROM `test_model`;
+}
+
+func ExampleMax() {
+	query, _ := New().Select(Max("Age")).From(&TestModel{}).Build()
+	fmt.Println(query.SQL)
+	// Output: SELECT MAX(`age`) FROM `test_model`;
+}
+
+func ExampleMin() {
+	query, _ := New().Select(Min("Age")).From(&TestModel{}).Build()
+	fmt.Println(query.SQL)
+	// Output: SELECT MIN(`age`) FROM `test_model`;
+}
+
+func ExampleSum() {
+	query, _ := New().Select(Sum("Age")).From(&TestModel{}).Build()
+	fmt.Println(query.SQL)
+	// Output: SELECT SUM(`age`) FROM `test_model`;
 }

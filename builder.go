@@ -44,21 +44,21 @@ type builder struct {
 }
 
 func (b builder) quote(val string) {
-	b.buffer.WriteByte(b.dialect.quote)
-	b.buffer.WriteString(val)
-	b.buffer.WriteByte(b.dialect.quote)
+	_ = b.buffer.WriteByte(b.dialect.quote)
+	_, _ = b.buffer.WriteString(val)
+	_ = b.buffer.WriteByte(b.dialect.quote)
 }
 
 func (b builder) space() {
-	b.buffer.WriteByte(' ')
+	_ = b.buffer.WriteByte(' ')
 }
 
 func (b builder) end() {
-	b.buffer.WriteByte(';')
+	_ = b.buffer.WriteByte(';')
 }
 
 func (b builder) comma() {
-	b.buffer.WriteByte(',')
+	_ = b.buffer.WriteByte(',')
 }
 
 func (b *builder) parameter(arg interface{}) {
@@ -66,14 +66,14 @@ func (b *builder) parameter(arg interface{}) {
 		// TODO 4 may be not a good number
 		b.args = make([]interface{}, 0, 4)
 	}
-	b.buffer.WriteByte('?')
+	_ = b.buffer.WriteByte('?')
 	b.args = append(b.args, arg)
 }
 
 func (b *builder) buildExpr(expr Expr) error {
 	switch e := expr.(type) {
 	case RawExpr:
-		b.buffer.WriteString(string(e))
+		_, _ = b.buffer.WriteString(string(e))
 	case Column:
 		cm, ok := b.meta.fieldMap[e.name]
 		if !ok {
@@ -117,30 +117,30 @@ func (b *builder) buildBinaryExpr(e binaryExpr) error {
 	if err != nil {
 		return err
 	}
-	b.buffer.WriteString(e.op.text)
+	_, _ = b.buffer.WriteString(e.op.text)
 	return b.buildSubExpr(e.right)
 }
 
 func (b *builder) buildSubExpr(subExpr Expr) error {
 	switch r := subExpr.(type) {
 	case MathExpr:
-		b.buffer.WriteByte('(')
+		_ = b.buffer.WriteByte('(')
 		if err := b.buildBinaryExpr(binaryExpr(r)); err != nil {
 			return err
 		}
-		b.buffer.WriteByte(')')
+		_ = b.buffer.WriteByte(')')
 	case binaryExpr:
-		b.buffer.WriteByte('(')
+		_ = b.buffer.WriteByte('(')
 		if err := b.buildBinaryExpr(r); err != nil {
 			return err
 		}
-		b.buffer.WriteByte(')')
+		_ = b.buffer.WriteByte(')')
 	case Predicate:
-		b.buffer.WriteByte('(')
+		_ = b.buffer.WriteByte('(')
 		if err := b.buildBinaryExpr(binaryExpr(r)); err != nil {
 			return err
 		}
-		b.buffer.WriteByte(')')
+		_ = b.buffer.WriteByte(')')
 	default:
 		if err := b.buildExpr(r); err != nil {
 			return err

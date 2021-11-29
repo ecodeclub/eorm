@@ -14,10 +14,12 @@
 
 package eql
 
+// Assignable represents that something could be used as "assignment" statement
 type Assignable interface {
 	assign()
 }
 
+// Assignment represents assignment statement
 type Assignment binaryExpr
 
 func Assign(column string, value interface{}) Assignment {
@@ -39,6 +41,6 @@ type valueExpr struct {
 	val interface{}
 }
 
-func (valueExpr) expr() (string, error){
+func (valueExpr) expr() (string, error) {
 	return "", nil
 }
