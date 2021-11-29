@@ -38,6 +38,7 @@ func Avg(c string) Aggregate {
 	}
 }
 
+// Max represents MAX
 func Max(c string) Aggregate {
 	return Aggregate{
 		fn:  "MAX",
@@ -45,6 +46,7 @@ func Max(c string) Aggregate {
 	}
 }
 
+// Min represents MIN
 func Min(c string) Aggregate {
 	return Aggregate{
 		fn:  "MIN",
@@ -52,6 +54,7 @@ func Min(c string) Aggregate {
 	}
 }
 
+// Count represents COUNT
 func Count(c string) Aggregate {
 	return Aggregate{
 		fn:  "COUNT",
@@ -59,6 +62,7 @@ func Count(c string) Aggregate {
 	}
 }
 
+// Sum represents SUM
 func Sum(c string) Aggregate {
 	return Aggregate{
 		fn:  "SUM",

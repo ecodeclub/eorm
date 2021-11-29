@@ -14,6 +14,11 @@
 
 package eql
 
+// Column represents column
+// it could have alias
+// in general, we use it in two ways
+// 1. specify the column in query
+// 2. it's the start point of building complex expression
 type Column struct {
 	name  string
 	alias string
@@ -88,6 +93,7 @@ func (c Column) As(alias string) Selectable {
 	}
 }
 
+// Add generate an additive expression
 func (c Column) Add(val interface{}) MathExpr {
 	return MathExpr{
 		left:  c,
@@ -96,6 +102,7 @@ func (c Column) Add(val interface{}) MathExpr {
 	}
 }
 
+// Multi generate a multiplication expression
 func (c Column) Multi(val interface{}) MathExpr {
 	return MathExpr{
 		left:  c,
@@ -129,18 +136,8 @@ func (c columns) assign() {
 }
 
 // Columns specify columns
-func Columns(cs...string) columns {
+func Columns(cs ...string) columns {
 	return columns{
 		cs: cs,
 	}
 }
-
-func valueOf(val interface{}) Expr {
-	switch v := val.(type) {
-	case Expr:
-		return v
-	default:
-		return valueExpr{val: val}
-	}
-}
-

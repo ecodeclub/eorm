@@ -27,7 +27,6 @@ func Raw(expr string) RawExpr {
 	return RawExpr(expr)
 }
 
-
 func (r RawExpr) expr() (string, error) {
 	return string(r), nil
 }
@@ -35,8 +34,8 @@ func (r RawExpr) expr() (string, error) {
 func (RawExpr) selected() {}
 
 type binaryExpr struct {
-	left Expr
-	op op
+	left  Expr
+	op    op
 	right Expr
 }
 
@@ -48,20 +47,29 @@ type MathExpr binaryExpr
 
 func (m MathExpr) Add(val interface{}) Expr {
 	return MathExpr{
-		left: m,
-		op: opAdd,
+		left:  m,
+		op:    opAdd,
 		right: valueOf(val),
 	}
 }
 
 func (m MathExpr) Multi(val interface{}) MathExpr {
 	return MathExpr{
-		left: m,
-		op: opMulti,
+		left:  m,
+		op:    opMulti,
 		right: valueOf(val),
 	}
 }
 
 func (MathExpr) expr() (string, error) {
 	return "", nil
+}
+
+func valueOf(val interface{}) Expr {
+	switch v := val.(type) {
+	case Expr:
+		return v
+	default:
+		return valueExpr{val: val}
+	}
 }
