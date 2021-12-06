@@ -14,7 +14,7 @@
 
 package eql
 
-// MysqlUpserter is used to generated mysql upsert query
+// MysqlUpserter is used to generated MySQL upsert query
 type MysqlUpserter struct {
 	*Inserter
 	// other fields
@@ -24,7 +24,6 @@ func (m *MysqlUpserter) Build() (*Query, error) {
 	panic("implement me")
 }
 
-func (m *MysqlUpserter) Update(assignments...Assignable) *MysqlUpserter {
+func (m *MysqlUpserter) Update(assignments ...Assignable) *MysqlUpserter {
 	panic("implement me")
 }
-

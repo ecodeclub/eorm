@@ -16,12 +16,18 @@ package eql
 
 // Dialect specify config or behavior of special SQL dialects
 type Dialect struct {
+	name string
 	// in MYSQL, it's "`"
 	quote byte
 }
 
 var (
-	mysql = Dialect{
+	MySQL = Dialect{
+		name:  "MySQL",
+		quote: '`',
+	}
+	SQLite = Dialect{
+		name:  "SQLite",
 		quote: '`',
 	}
 )

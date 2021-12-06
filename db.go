@@ -23,20 +23,35 @@ type DBOption func(db *DB)
 
 // DB represents a database
 type DB struct {
-	metaRegistry   MetaRegistry
-	dialect        Dialect
+	metaRegistry MetaRegistry
+	dialect      Dialect
 }
 
-// New returns DB. It's the entry of EQL
+// New returns DB.
+// By default, it will create an instance of MetaRegistry and use MySQL as the dialect
 func New(opts ...DBOption) *DB {
 	db := &DB{
-		metaRegistry:   &tagMetaRegistry{},
-		dialect:        mysql,
+		metaRegistry: &tagMetaRegistry{},
+		dialect:      MySQL,
 	}
 	for _, o := range opts {
 		o(db)
 	}
 	return db
+}
+
+// DBWithMetaRegistry specify the MetaRegistry
+func DBWithMetaRegistry(registry MetaRegistry) DBOption {
+	return func(db *DB) {
+		db.metaRegistry = registry
+	}
+}
+
+// DBWithDialect specify dialect
+func DBWithDialect(dialect Dialect) DBOption {
+	return func(db *DB) {
+		db.dialect = dialect
+	}
 }
 
 // Select starts a select query. If columns are empty, all columns will be fetched
@@ -56,8 +71,8 @@ func (db *DB) Delete() *Deleter {
 
 func (db *DB) Update(table interface{}) *Updater {
 	return &Updater{
-		builder:        db.builder(),
-		table:          table,
+		builder: db.builder(),
+		table:   table,
 	}
 }
 
