@@ -56,3 +56,35 @@ func TestTagMetaRegistry(t *testing.T) {
 	assert.Equal(t, reflect.TypeOf(int8(0)), idMetaLastAge.typ)
 
 }
+
+func TestIgnoreFieldsOption(t *testing.T) {
+	tm := &TestIgnoreModel{}
+	registry := &tagMetaRegistry{}
+	meta, err := registry.Register(tm, IgnoreFieldsOption("Id", "FirstName"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, 1, len(meta.columns))
+	assert.Equal(t, 1, len(meta.fieldMap))
+	assert.Equal(t, reflect.TypeOf(tm), meta.typ)
+	assert.Equal(t, "test_ignore_model", meta.tableName)
+
+	_, hasId := meta.fieldMap["Id"]
+	assert.False(t, hasId)
+
+	_, hasFirstName := meta.fieldMap["FirstName"]
+	assert.False(t, hasFirstName)
+
+	_, hasAge := meta.fieldMap["Age"]
+	assert.False(t, hasAge)
+
+	_, hasLastName := meta.fieldMap["LastName"]
+	assert.True(t, hasLastName)
+}
+
+type TestIgnoreModel struct {
+	Id        int64 `eql:"auto_increment,primary_key,-"`
+	FirstName string
+	Age       int8 `eql:"-"`
+	LastName  string
+}

@@ -38,12 +38,13 @@ type ColumnMeta struct {
 	isAutoIncrement bool
 }
 
-type tableMetaOption func(meta *TableMeta)
+// TableMetaOption represents options of TableMeta, this options will cover default cover.
+type TableMetaOption func(meta *TableMeta)
 
 // MetaRegistry stores table metadata
 type MetaRegistry interface {
 	Get(table interface{}) (*TableMeta, error)
-	Register(table interface{}, opts ...tableMetaOption) (*TableMeta, error)
+	Register(table interface{}, opts ...TableMetaOption) (*TableMeta, error)
 }
 
 // tagMetaRegistry is the default implementation based on tag eql
@@ -63,7 +64,7 @@ func (t *tagMetaRegistry) Get(table interface{}) (*TableMeta, error) {
 
 // Register function generates a metadata for each column and places it in a thread-safe mapping to facilitate direct access to the metadata.
 // And the metadata can be modified by user-defined methods opts
-func (t *tagMetaRegistry) Register(table interface{}, opts ...tableMetaOption) (*TableMeta, error) {
+func (t *tagMetaRegistry) Register(table interface{}, opts ...TableMetaOption) (*TableMeta, error) {
 	rtype := reflect.TypeOf(table)
 	v := rtype.Elem()
 	columnMetas := []*ColumnMeta{}
@@ -72,8 +73,21 @@ func (t *tagMetaRegistry) Register(table interface{}, opts ...tableMetaOption) (
 	for i := 0; i < lens; i++ {
 		structField := v.Field(i)
 		tag := structField.Tag.Get("eql")
-		isAuto := strings.Contains(tag, "auto_increment")
-		isKey := strings.Contains(tag, "primary_key")
+		var isKey, isAuto, isIgnore bool
+		for _, t := range strings.Split(tag, ",") {
+			switch t {
+			case "primary_key":
+				isKey = true
+			case "auto_increment":
+				isAuto = true
+			case "-":
+				isIgnore = true
+			}
+		}
+		if isIgnore {
+			// skip the field.
+			continue
+		}
 		columnMeta := &ColumnMeta{
 			columnName:      internal.UnderscoreName(structField.Name),
 			fieldName:       structField.Name,
@@ -95,5 +109,24 @@ func (t *tagMetaRegistry) Register(table interface{}, opts ...tableMetaOption) (
 	}
 	t.metas.Store(rtype, tableMeta)
 	return tableMeta, nil
+}
 
+// IgnoreFieldsOption function provide an option to ignore some fields when register table.
+func IgnoreFieldsOption(fieldNames ...string) TableMetaOption {
+	return func(meta *TableMeta) {
+		for _, field := range fieldNames {
+			//has field in the TableMeta
+			if _, ok := meta.fieldMap[field]; ok {
+				// delete field in columns slice
+				for index, column := range meta.columns {
+					if column.fieldName == field {
+						meta.columns = append(meta.columns[:index], meta.columns[index+1:]...)
+						break
+					}
+				}
+				// delete field in fieldMap
+				delete(meta.fieldMap, field)
+			}
+		}
+	}
 }
