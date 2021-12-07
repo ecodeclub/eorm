@@ -11,6 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
 package eql
 
 import (
@@ -50,6 +51,10 @@ type MetaRegistry interface {
 // tagMetaRegistry is the default implementation based on tag eql
 type tagMetaRegistry struct {
 	metas sync.Map
+}
+
+func NewTagMetaRegistry() MetaRegistry {
+	return &tagMetaRegistry{}
 }
 
 // Get the metadata for each column of the data table,
@@ -115,7 +120,7 @@ func (t *tagMetaRegistry) Register(table interface{}, opts ...TableMetaOption) (
 func IgnoreFieldsOption(fieldNames ...string) TableMetaOption {
 	return func(meta *TableMeta) {
 		for _, field := range fieldNames {
-			//has field in the TableMeta
+			// has field in the TableMeta
 			if _, ok := meta.fieldMap[field]; ok {
 				// delete field in columns slice
 				for index, column := range meta.columns {

@@ -16,25 +16,24 @@ package eql
 
 type op struct {
 	symbol string
-	text string
+	text   string
 }
 
 var (
-	opLT = op{symbol: "<", text: "<"}
-	opLTEQ = op{symbol:"<=", text: "<="}
-	opGT = op{symbol:">", text: ">"}
-	opGTEQ= op{symbol:">=", text: ">="}
-	opEQ = op{symbol:"=", text: "="}
-	opNEQ = op{symbol:"!=", text: "!="}
-	opAdd = op{symbol:"+", text: "+"}
-	//opMinus = op{symbol:"-", text: "-"}
-	opMulti = op{symbol:"*", text: "*"}
-	//opDiv = op{symbol:"/", text: "/"}
-	opAnd = op{symbol:"AND", text: " AND "}
-	opOr = op{symbol:"OR", text: " OR "}
-	opNot = op{symbol:"NOT", text: "NOT "}
+	opLT   = op{symbol: "<", text: "<"}
+	opLTEQ = op{symbol: "<=", text: "<="}
+	opGT   = op{symbol: ">", text: ">"}
+	opGTEQ = op{symbol: ">=", text: ">="}
+	opEQ   = op{symbol: "=", text: "="}
+	opNEQ  = op{symbol: "!=", text: "!="}
+	opAdd  = op{symbol: "+", text: "+"}
+	// opMinus = op{symbol:"-", text: "-"}
+	opMulti = op{symbol: "*", text: "*"}
+	// opDiv = op{symbol:"/", text: "/"}
+	opAnd = op{symbol: "AND", text: " AND "}
+	opOr  = op{symbol: "OR", text: " OR "}
+	opNot = op{symbol: "NOT", text: "NOT "}
 )
-
 
 // Predicate will be used in Where Or Having
 type Predicate binaryExpr
@@ -46,8 +45,8 @@ func (Predicate) expr() (string, error) {
 // Not indicates "NOT"
 func Not(p Predicate) Predicate {
 	return Predicate{
-		left: RawExpr(""),
-		op: opNot,
+		left:  RawExpr(""),
+		op:    opNot,
 		right: p,
 	}
 }
@@ -55,8 +54,8 @@ func Not(p Predicate) Predicate {
 // And indicates "AND"
 func (p Predicate) And(pred Predicate) Predicate {
 	return Predicate{
-		left: p,
-		op: opAnd,
+		left:  p,
+		op:    opAnd,
 		right: pred,
 	}
 }
@@ -64,8 +63,8 @@ func (p Predicate) And(pred Predicate) Predicate {
 // Or indicates "OR"
 func (p Predicate) Or(pred Predicate) Predicate {
 	return Predicate{
-		left: p,
-		op: opOr,
+		left:  p,
+		op:    opOr,
 		right: pred,
 	}
 }

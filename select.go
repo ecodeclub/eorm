@@ -79,7 +79,7 @@ func (s *Selector) Build() (*Query, error) {
 		}
 	}
 
-	//having
+	// having
 	if len(s.having) > 0 {
 		_, _ = s.buffer.WriteString(" HAVING ")
 		err = s.buildPredicates(s.having)
@@ -207,7 +207,7 @@ func (s *Selector) buildColumn(field, alias string) error {
 	return nil
 }
 
-// From specifies the table
+// From specifies the table which must be pointer of structure
 func (s *Selector) From(table interface{}) *Selector {
 	s.table = table
 	return s

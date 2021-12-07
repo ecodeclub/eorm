@@ -15,21 +15,22 @@
 package eql
 
 import (
+	"fmt"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestDeleter_Build(t *testing.T) {
-	testCases := []CommonTestCase {
+	testCases := []CommonTestCase{
 		{
-			name: "no where",
+			name:    "no where",
 			builder: New().Delete().From(&TestModel{}),
 			wantSql: "DELETE FROM `test_model`;",
 		},
 		{
-			name: "where",
-			builder: New().Delete().From(&TestModel{}).Where(C("Id").EQ(16)),
-			wantSql: "DELETE FROM `test_model` WHERE `id`=?;",
+			name:     "where",
+			builder:  New().Delete().From(&TestModel{}).Where(C("Id").EQ(16)),
+			wantSql:  "DELETE FROM `test_model` WHERE `id`=?;",
 			wantArgs: []interface{}{16},
 		},
 	}
@@ -43,4 +44,26 @@ func TestDeleter_Build(t *testing.T) {
 			assert.Equal(t, c.wantArgs, query.Args)
 		})
 	}
+}
+
+func ExampleDeleter_Build() {
+	query, _ := New().Delete().From(&TestModel{}).Build()
+	fmt.Printf("SQL: %s", query.SQL)
+	// Output:
+	// SQL: DELETE FROM `test_model`;
+}
+
+func ExampleDeleter_From() {
+	query, _ := New().Delete().From(&TestModel{}).Build()
+	fmt.Printf("SQL: %s", query.SQL)
+	// Output:
+	// SQL: DELETE FROM `test_model`;
+}
+
+func ExampleDeleter_Where() {
+	query, _ := New().Delete().From(&TestModel{}).Where(C("Id").EQ(12)).Build()
+	fmt.Printf("SQL: %s\nArgs: %v", query.SQL, query.Args)
+	// Output:
+	// SQL: DELETE FROM `test_model` WHERE `id`=?;
+	// Args: [12]
 }
