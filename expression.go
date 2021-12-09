@@ -20,15 +20,21 @@ type Expr interface {
 }
 
 // RawExpr uses string as Expr
-type RawExpr string
+type RawExpr struct {
+	raw  string
+	args []interface{}
+}
 
 // Raw just take expr as Expr
-func Raw(expr string) RawExpr {
-	return RawExpr(expr)
+func Raw(expr string, args ...interface{}) RawExpr {
+	return RawExpr{
+		raw:  expr,
+		args: args,
+	}
 }
 
 func (r RawExpr) expr() (string, error) {
-	return string(r), nil
+	return r.raw, nil
 }
 
 func (RawExpr) selected() {}

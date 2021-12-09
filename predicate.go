@@ -45,7 +45,7 @@ func (Predicate) expr() (string, error) {
 // Not indicates "NOT"
 func Not(p Predicate) Predicate {
 	return Predicate{
-		left:  RawExpr(""),
+		left:  Raw(""),
 		op:    opNot,
 		right: p,
 	}
