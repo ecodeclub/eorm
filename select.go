@@ -172,7 +172,7 @@ func (s *Selector) buildSelectedList() error {
 				return err
 			}
 		case RawExpr:
-			_, _ = s.buffer.WriteString(string(expr))
+			s.buildRawExpr(expr)
 		}
 	}
 	return nil

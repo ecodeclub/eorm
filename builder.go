@@ -73,7 +73,7 @@ func (b *builder) parameter(arg interface{}) {
 func (b *builder) buildExpr(expr Expr) error {
 	switch e := expr.(type) {
 	case RawExpr:
-		_, _ = b.buffer.WriteString(string(e))
+		b.buildRawExpr(e)
 	case Column:
 		cm, ok := b.meta.fieldMap[e.name]
 		if !ok {
@@ -119,6 +119,11 @@ func (b *builder) buildBinaryExpr(e binaryExpr) error {
 	}
 	_, _ = b.buffer.WriteString(e.op.text)
 	return b.buildSubExpr(e.right)
+}
+
+func (b *builder) buildRawExpr(e RawExpr) {
+	_, _ = b.buffer.WriteString(e.raw)
+	b.args = append(b.args, e.args...)
 }
 
 func (b *builder) buildSubExpr(subExpr Expr) error {

@@ -60,10 +60,39 @@ func ExampleDB_Insert() {
 func ExampleDB_Select() {
 	db := New()
 	tm := &TestModel{}
-	query, _ := db.Select().From(tm).Build()
-	fmt.Printf("SQL: %s", query.SQL)
+	cases := []*Selector{
+		// case0: all columns are included
+		db.Select().From(tm),
+		// case1: only query specific columns
+		db.Select(Columns("Id", "Age")).From(tm),
+		// case2: using alias
+		db.Select(C("Id").As("my_id")).From(tm),
+		// case3: using aggregation function and alias
+		db.Select(Avg("Age").As("avg_age")).From(tm),
+		// case4: using raw expression
+		db.Select(Raw("COUNT(DISTINCT `age`) AS `age_cnt`")).From(tm),
+	}
+
+	for index, tc := range cases {
+		query, _ := tc.Build()
+		fmt.Printf("case%d:\n%s", index, query.string())
+	}
 	// Output:
+	// case0:
 	// SQL: SELECT `id`,`first_name`,`age`,`last_name` FROM `test_model`;
+	// Args: []interface {}(nil)
+	// case1:
+	// SQL: SELECT `id`,`age` FROM `test_model`;
+	// Args: []interface {}(nil)
+	// case2:
+	// SQL: SELECT `id` AS `my_id` FROM `test_model`;
+	// Args: []interface {}(nil)
+	// case3:
+	// SQL: SELECT AVG(`age`) AS `avg_age` FROM `test_model`;
+	// Args: []interface {}(nil)
+	// case4:
+	// SQL: SELECT COUNT(DISTINCT `age`) AS `age_cnt` FROM `test_model`;
+	// Args: []interface {}(nil)
 }
 
 func ExampleDB_Update() {
