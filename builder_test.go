@@ -14,20 +14,8 @@
 
 package eql
 
-// Dialect specify config or behavior of special SQL dialects
-type Dialect struct {
-	name string
-	// in MYSQL, it's "`"
-	quote byte
-}
+import "fmt"
 
-var (
-	MySQL = Dialect{
-		name:  "MySQL",
-		quote: '`',
-	}
-	SQLite = Dialect{
-		name:  "SQLite",
-		quote: '`',
-	}
-)
+func (q Query) string() string {
+	return fmt.Sprintf("SQL: %s\nArgs: %#v\n", q.SQL, q.Args)
+}

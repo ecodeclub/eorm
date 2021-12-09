@@ -15,6 +15,7 @@ package eql
 
 import (
 	"errors"
+	"fmt"
 	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
@@ -102,4 +103,57 @@ func TestInserter_Values(t *testing.T) {
 			assert.Equal(t, c.wantArgs, q.Args)
 		})
 	}
+}
+
+func ExampleInserter_Build() {
+	query, _ := New().Insert().Values(&TestModel{
+		Id:  1,
+		Age: 18,
+	}).Build()
+	fmt.Printf("case1\n%s", query.string())
+
+	query, _ = New().Insert().Values(&TestModel{}).Build()
+	fmt.Printf("case2\n%s", query.string())
+
+	// Output:
+	// case1
+	// SQL: INSERT INTO `test_model`(`id`,`first_name`,`age`,`last_name`) VALUES(?,?,?,?);
+	// Args: []interface {}{1, "", 18, (*string)(nil)}
+	// case2
+	// SQL: INSERT INTO `test_model`(`id`,`first_name`,`age`,`last_name`) VALUES(?,?,?,?);
+	// Args: []interface {}{0, "", 0, (*string)(nil)}
+}
+
+func ExampleInserter_Columns() {
+	query, _ := New().Insert().Values(&TestModel{
+		Id:  1,
+		Age: 18,
+	}).Columns("Id", "Age").Build()
+	fmt.Printf("case1\n%s", query.string())
+
+	query, _ = New().Insert().Values(&TestModel{
+		Id:  1,
+		Age: 18,
+	}, &TestModel{}, &TestModel{FirstName: "Tom"}).Columns("Id", "Age").Build()
+	fmt.Printf("case2\n%s", query.string())
+
+	// Output:
+	// case1
+	// SQL: INSERT INTO `test_model`(`id`,`age`) VALUES(?,?);
+	// Args: []interface {}{1, 18}
+	// case2
+	// SQL: INSERT INTO `test_model`(`id`,`age`) VALUES(?,?),(?,?),(?,?);
+	// Args: []interface {}{1, 18, 0, 0, 0, 0}
+
+}
+
+func ExampleInserter_Values() {
+	query, _ := New().Insert().Values(&TestModel{
+		Id:  1,
+		Age: 18,
+	}, &TestModel{}).Build()
+	fmt.Println(query.string())
+	// Output:
+	// SQL: INSERT INTO `test_model`(`id`,`first_name`,`age`,`last_name`) VALUES(?,?,?,?),(?,?,?,?);
+	// Args: []interface {}{1, "", 18, (*string)(nil), 0, "", 0, (*string)(nil)}
 }

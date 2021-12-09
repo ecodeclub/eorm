@@ -15,6 +15,7 @@
 package eql
 
 import (
+	"fmt"
 	"github.com/gotomicro/eql/internal"
 	"github.com/stretchr/testify/assert"
 	"testing"
@@ -120,4 +121,28 @@ func TestSelectable(t *testing.T) {
 			assert.Equal(t, c.wantArgs, query.Args)
 		})
 	}
+}
+
+func ExampleSelector_OrderBy() {
+	query, _ := New().Select().From(&TestModel{}).OrderBy(ASC("Age")).Build()
+	fmt.Printf("case1\n%s", query.string())
+	query, _ = New().Select().From(&TestModel{}).OrderBy(ASC("Age", "Id")).Build()
+	fmt.Printf("case2\n%s", query.string())
+	query, _ = New().Select().From(&TestModel{}).OrderBy(ASC("Age"), ASC("Id")).Build()
+	fmt.Printf("case3\n%s", query.string())
+	query, _ = New().Select().From(&TestModel{}).OrderBy(ASC("Age"), DESC("Id")).Build()
+	fmt.Printf("case4\n%s", query.string())
+	// Output:
+	// case1
+	// SQL: SELECT `id`,`first_name`,`age`,`last_name` FROM `test_model` ORDER BY `age` ASC;
+	// Args: []interface {}(nil)
+	// case2
+	// SQL: SELECT `id`,`first_name`,`age`,`last_name` FROM `test_model` ORDER BY `age``id` ASC;
+	// Args: []interface {}(nil)
+	// case3
+	// SQL: SELECT `id`,`first_name`,`age`,`last_name` FROM `test_model` ORDER BY `age` ASC,`id` ASC;
+	// Args: []interface {}(nil)
+	// case4
+	// SQL: SELECT `id`,`first_name`,`age`,`last_name` FROM `test_model` ORDER BY `age` ASC,`id` DESC;
+	// Args: []interface {}(nil)
 }

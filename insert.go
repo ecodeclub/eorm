@@ -21,12 +21,17 @@ import (
 )
 
 // Inserter is used to construct an insert query
+// More details check Build function
 type Inserter struct {
 	builder
 	columns []string
 	values  []interface{}
 }
 
+// Build function build the query
+// notes:
+// - All the values from function Values should have the same type.
+// - It will insert all columns including auto-increment primary key
 func (i *Inserter) Build() (*Query, error) {
 	var err error
 	if len(i.values) == 0 {
@@ -69,14 +74,16 @@ func (i *Inserter) Build() (*Query, error) {
 }
 
 // Columns specifies the columns that need to be inserted
-// if cs is empty, all columns will be inserted except auto increment columns
+// if cs is empty, all columns will be inserted
+// cs must be the same with the field name in model
 func (i *Inserter) Columns(cs ...string) *Inserter {
 	i.columns = cs
 	return i
 }
 
 // Values specify the rows
-// all the elements must be the same structure
+// all the elements must be the same type
+// and users are supposed to passing at least one element
 func (i *Inserter) Values(values ...interface{}) *Inserter {
 	i.values = values
 	return i
@@ -85,14 +92,12 @@ func (i *Inserter) Values(values ...interface{}) *Inserter {
 // OnDuplicateKey generate MysqlUpserter
 // if the dialect is not MySQL, it will panic
 func (i *Inserter) OnDuplicateKey() *MysqlUpserter {
-
 	panic("implement me")
 }
 
 // OnConflict generate PgSQLUpserter
 // if the dialect is not PgSQL, it will panic
 func (i *Inserter) OnConflict(cs ...string) *PgSQLUpserter {
-
 	panic("implement me")
 }
 
