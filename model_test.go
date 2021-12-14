@@ -15,6 +15,7 @@
 package eql
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -87,4 +88,59 @@ type TestIgnoreModel struct {
 	FirstName string
 	Age       int8 `eql:"-"`
 	LastName  string
+}
+
+func ExampleMetaRegistry_Get() {
+	tm := &TestModel{}
+	registry := &tagMetaRegistry{}
+	meta, _ := registry.Get(tm)
+	fmt.Printf("table name: %v\n", meta.tableName)
+
+	// Output:
+	// table name: test_model
+}
+
+func ExampleMetaRegistry_Register() {
+	// case1 without TableMetaOption
+	tm := &TestModel{}
+	registry := &tagMetaRegistry{}
+	meta, _ := registry.Register(tm)
+	fmt.Printf(`
+case1：
+	table name：%s
+	column names：%s,%s,%s,%s
+`, meta.tableName, meta.columns[0].columnName, meta.columns[1].columnName, meta.columns[2].columnName, meta.columns[3].columnName)
+
+	// case2 use Tag to ignore field
+	tim := &TestIgnoreModel{}
+	registry = &tagMetaRegistry{}
+	meta, _ = registry.Register(tim)
+	fmt.Printf(`
+case2：
+	table name：%s
+	column names：%s,%s
+`, meta.tableName, meta.columns[0].columnName, meta.columns[1].columnName)
+
+	// case3 use IgnoreFieldOption to ignore field
+	tim = &TestIgnoreModel{}
+	registry = &tagMetaRegistry{}
+	meta, _ = registry.Register(tim, IgnoreFieldsOption("FirstName"))
+	fmt.Printf(`
+case3：
+	table name：%s
+	column names：%s
+`, meta.tableName, meta.columns[0].columnName)
+
+	// Output:
+	// case1：
+	// 	table name：test_model
+	// 	column names：id,first_name,age,last_name
+	//
+	// case2：
+	// 	table name：test_ignore_model
+	// 	column names：first_name,last_name
+	//
+	// case3：
+	// 	table name：test_ignore_model
+	// 	column names：last_name
 }
