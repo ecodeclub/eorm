@@ -48,7 +48,6 @@ func (s *Selector) Build() (*Query, error) {
 		return nil, err
 	}
 	_, _ = s.buffer.WriteString("SELECT ")
-
 	if len(s.columns) == 0 {
 		s.buildAllColumns()
 	} else {
@@ -57,10 +56,8 @@ func (s *Selector) Build() (*Query, error) {
 			return nil, err
 		}
 	}
-
 	_, _ = s.buffer.WriteString(" FROM ")
 	s.quote(s.meta.tableName)
-
 	if len(s.where) > 0 {
 		_, _ = s.buffer.WriteString(" WHERE ")
 		err = s.buildPredicates(s.where)
@@ -153,6 +150,7 @@ func (s *Selector) buildAllColumns() {
 
 // buildSelectedList users specify columns
 func (s *Selector) buildSelectedList() error {
+	s.aliases = make(map[string]struct{})
 	for i, selectable := range s.columns {
 		if i > 0 {
 			s.comma()
@@ -174,7 +172,7 @@ func (s *Selector) buildSelectedList() error {
 				}
 			}
 		case Aggregate:
-			if err := s.buildAggregate(expr); err != nil {
+			if err := s.selectAggregate(expr); err != nil {
 				return err
 			}
 		case RawExpr:
@@ -184,18 +182,21 @@ func (s *Selector) buildSelectedList() error {
 	return nil
 
 }
-func (b *builder) buildAggregate(aggregate Aggregate) error {
-	_, _ = b.buffer.WriteString(aggregate.fn)
-	_ = b.buffer.WriteByte('(')
-	cMeta, ok := b.meta.fieldMap[aggregate.arg]
+func (s *Selector) selectAggregate(aggregate Aggregate) error {
+	_, _ = s.buffer.WriteString(aggregate.fn)
+	_ = s.buffer.WriteByte('(')
+	cMeta, ok := s.meta.fieldMap[aggregate.arg]
+	s.aliases[aggregate.alias] = struct{}{}
 	if !ok {
 		return internal.NewInvalidColumnError(aggregate.arg)
 	}
-	b.quote(cMeta.columnName)
-	_ = b.buffer.WriteByte(')')
+	s.quote(cMeta.columnName)
+	_ = s.buffer.WriteByte(')')
 	if aggregate.alias != "" {
-		_, _ = b.buffer.WriteString(" AS ")
-		b.quote(aggregate.alias)
+		if  _,ok :=s.aliases[aggregate.alias]; ok{
+			_, _ = s.buffer.WriteString(" AS ")
+			s.quote(aggregate.alias)
+		}
 	}
 	return nil
 }
@@ -207,6 +208,7 @@ func (s *Selector) buildColumn(field, alias string) error {
 	}
 	s.quote(cMeta.columnName)
 	if alias != "" {
+		s.aliases[alias] = struct{}{}
 		_, _ = s.buffer.WriteString(" AS ")
 		s.quote(alias)
 	}
