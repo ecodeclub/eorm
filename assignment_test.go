@@ -17,7 +17,7 @@ package eql
 import "fmt"
 
 func ExampleAssign() {
-	db := New()
+	db := NewDB()
 	tm := &TestModel{}
 	examples := []struct {
 		assign    Assignment

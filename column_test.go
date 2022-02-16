@@ -17,9 +17,9 @@ package eql
 import "fmt"
 
 func ExampleC() {
-	db := New()
+	db := NewDB()
 	tm := &TestModel{}
-	query, _ := db.Select(C("Id")).From(tm).Where(C("Id").EQ(18)).Build()
+	query, _ := NewSelector(db).Select(C("Id")).From(tm).Where(C("Id").EQ(18)).Build()
 	fmt.Printf(`
 SQL: %s
 Args: %v
@@ -30,9 +30,9 @@ Args: %v
 }
 
 func ExampleColumn_EQ() {
-	db := New()
+	db := NewDB()
 	tm := &TestModel{}
-	query, _ := db.Select(C("Id")).From(tm).Where(C("Id").EQ(18)).Build()
+	query, _ := NewSelector(db).Select(C("Id")).From(tm).Where(C("Id").EQ(18)).Build()
 	fmt.Printf(`
 SQL: %s
 Args: %v
@@ -43,7 +43,7 @@ Args: %v
 }
 
 func ExampleColumn_Add() {
-	db := New()
+	db := NewDB()
 	tm := &TestModel{}
 	query, _ := db.Update(tm).Set(Assign("Age", C("Age").Add(1))).Build()
 	fmt.Printf(`
@@ -56,9 +56,9 @@ Args: %v
 }
 
 func ExampleColumn_As() {
-	db := New()
+	db := NewDB()
 	tm := &TestModel{}
-	query, _ := db.Select(C("Id").As("my_id")).From(tm).Build()
+	query, _ := NewSelector(db).Select(C("Id").As("my_id")).From(tm).Build()
 	fmt.Printf(`
 SQL: %s
 Args: %v
@@ -69,9 +69,9 @@ Args: %v
 }
 
 func ExampleColumn_GT() {
-	db := New()
+	db := NewDB()
 	tm := &TestModel{}
-	query, _ := db.Select(C("Id")).From(tm).Where(C("Id").GT(18)).Build()
+	query, _ := NewSelector(db).Select(C("Id")).From(tm).Where(C("Id").GT(18)).Build()
 	fmt.Printf(`
 SQL: %s
 Args: %v
@@ -82,9 +82,9 @@ Args: %v
 }
 
 func ExampleColumn_GTEQ() {
-	db := New()
+	db := NewDB()
 	tm := &TestModel{}
-	query, _ := db.Select(C("Id")).From(tm).Where(C("Id").GTEQ(18)).Build()
+	query, _ := NewSelector(db).Select(C("Id")).From(tm).Where(C("Id").GTEQ(18)).Build()
 	fmt.Printf(`
 SQL: %s
 Args: %v
@@ -95,9 +95,9 @@ Args: %v
 }
 
 func ExampleColumn_LT() {
-	db := New()
+	db := NewDB()
 	tm := &TestModel{}
-	query, _ := db.Select(C("Id")).From(tm).Where(C("Id").LT(18)).Build()
+	query, _ := NewSelector(db).Select(C("Id")).From(tm).Where(C("Id").LT(18)).Build()
 	fmt.Printf(`
 SQL: %s
 Args: %v
@@ -108,9 +108,9 @@ Args: %v
 }
 
 func ExampleColumn_LTEQ() {
-	db := New()
+	db := NewDB()
 	tm := &TestModel{}
-	query, _ := db.Select(C("Id")).From(tm).Where(C("Id").LTEQ(18)).Build()
+	query, _ := NewSelector(db).Select(C("Id")).From(tm).Where(C("Id").LTEQ(18)).Build()
 	fmt.Printf(`
 SQL: %s
 Args: %v
@@ -121,7 +121,7 @@ Args: %v
 }
 
 func ExampleColumn_Multi() {
-	db := New()
+	db := NewDB()
 	tm := &TestModel{}
 	query, _ := db.Update(tm).Set(Assign("Age", C("Age").Multi(2))).Build()
 	fmt.Printf(`
@@ -134,9 +134,9 @@ Args: %v
 }
 
 func ExampleColumn_NEQ() {
-	db := New()
+	db := NewDB()
 	tm := &TestModel{}
-	query, _ := db.Select(C("Id")).From(tm).Where(C("Id").NEQ(18)).Build()
+	query, _ := NewSelector(db).Select(C("Id")).From(tm).Where(C("Id").NEQ(18)).Build()
 	fmt.Printf(`
 SQL: %s
 Args: %v
@@ -147,9 +147,9 @@ Args: %v
 }
 
 func ExampleColumns() {
-	db := New()
+	db := NewDB()
 	tm := &TestModel{}
-	query, _ := db.Select(Columns("Id", "Age")).From(tm).Build()
+	query, _ := NewSelector(db).Select(Columns("Id", "Age")).From(tm).Build()
 	fmt.Printf(`
 SQL: %s
 Args: %v

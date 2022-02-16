@@ -33,6 +33,12 @@ type Selector struct {
 	limit    int
 }
 
+func NewSelector(db *DB) *Selector {
+	return &Selector{
+		builder: db.builder(),
+	}
+}
+
 // Build returns Select Query
 func (s *Selector) Build() (*Query, error) {
 	defer bytebufferpool.Put(s.buffer)
@@ -205,6 +211,12 @@ func (s *Selector) buildColumn(field, alias string) error {
 		s.quote(alias)
 	}
 	return nil
+}
+
+// Columns specifies the table which must be pointer of structure
+func (s *Selector) Select(columns ...Selectable) *Selector {
+	s.columns = columns
+	return s
 }
 
 // From specifies the table which must be pointer of structure

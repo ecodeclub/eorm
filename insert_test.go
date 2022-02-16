@@ -52,43 +52,43 @@ func TestInserter_Values(t *testing.T) {
 	testCases := []CommonTestCase{
 		{
 			name:    "no examples of values",
-			builder: New().Insert().Values(),
+			builder: NewDB().Insert().Values(),
 			wantErr: errors.New("no values"),
 		},
 		{
 			name:     "single example of values",
-			builder:  New().Insert().Values(u),
+			builder:  NewDB().Insert().Values(u),
 			wantSql:  "INSERT INTO `user`(`id`,`first_name`,`ctime`) VALUES(?,?,?);",
 			wantArgs: []interface{}{int64(12), "Tom", n},
 		},
 
 		{
 			name:     "multiple values of same type",
-			builder:  New().Insert().Values(u, u1),
+			builder:  NewDB().Insert().Values(u, u1),
 			wantSql:  "INSERT INTO `user`(`id`,`first_name`,`ctime`) VALUES(?,?,?),(?,?,?);",
 			wantArgs: []interface{}{int64(12), "Tom", n, int64(13), "Jerry", n},
 		},
 
 		{
 			name:     "no example of a whole columns",
-			builder:  New().Insert().Columns("Id", "FirstName").Values(u),
+			builder:  NewDB().Insert().Columns("Id", "FirstName").Values(u),
 			wantSql:  "INSERT INTO `user`(`id`,`first_name`) VALUES(?,?);",
 			wantArgs: []interface{}{int64(12), "Tom"},
 		},
 		{
 			name:    "an example with invalid columns",
-			builder: New().Insert().Columns("id", "FirstName").Values(u),
+			builder: NewDB().Insert().Columns("id", "FirstName").Values(u),
 			wantErr: errors.New("invalid column id"),
 		},
 		{
 			name:     "no whole columns and multiple values of same type",
-			builder:  New().Insert().Columns("Id", "FirstName").Values(u, u1),
+			builder:  NewDB().Insert().Columns("Id", "FirstName").Values(u, u1),
 			wantSql:  "INSERT INTO `user`(`id`,`first_name`) VALUES(?,?),(?,?);",
 			wantArgs: []interface{}{int64(12), "Tom", int64(13), "Jerry"},
 		},
 		{
 			name:    "multiple values of invalid column",
-			builder: New().Insert().Values(u, o1),
+			builder: NewDB().Insert().Values(u, o1),
 			wantErr: errors.New("invalid column FirstName"),
 		},
 	}
@@ -106,13 +106,13 @@ func TestInserter_Values(t *testing.T) {
 }
 
 func ExampleInserter_Build() {
-	query, _ := New().Insert().Values(&TestModel{
+	query, _ := NewDB().Insert().Values(&TestModel{
 		Id:  1,
 		Age: 18,
 	}).Build()
 	fmt.Printf("case1\n%s", query.string())
 
-	query, _ = New().Insert().Values(&TestModel{}).Build()
+	query, _ = NewDB().Insert().Values(&TestModel{}).Build()
 	fmt.Printf("case2\n%s", query.string())
 
 	// Output:
@@ -125,13 +125,13 @@ func ExampleInserter_Build() {
 }
 
 func ExampleInserter_Columns() {
-	query, _ := New().Insert().Values(&TestModel{
+	query, _ := NewDB().Insert().Values(&TestModel{
 		Id:  1,
 		Age: 18,
 	}).Columns("Id", "Age").Build()
 	fmt.Printf("case1\n%s", query.string())
 
-	query, _ = New().Insert().Values(&TestModel{
+	query, _ = NewDB().Insert().Values(&TestModel{
 		Id:  1,
 		Age: 18,
 	}, &TestModel{}, &TestModel{FirstName: "Tom"}).Columns("Id", "Age").Build()
@@ -148,7 +148,7 @@ func ExampleInserter_Columns() {
 }
 
 func ExampleInserter_Values() {
-	query, _ := New().Insert().Values(&TestModel{
+	query, _ := NewDB().Insert().Values(&TestModel{
 		Id:  1,
 		Age: 18,
 	}, &TestModel{}).Build()

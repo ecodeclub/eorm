@@ -27,6 +27,7 @@ var (
 	opEQ   = op{symbol: "=", text: "="}
 	opNEQ  = op{symbol: "!=", text: "!="}
 	opAdd  = op{symbol: "+", text: "+"}
+	opIn   = op{symbol: "IN", text: " IN "}
 	// opMinus = op{symbol:"-", text: "-"}
 	opMulti = op{symbol: "*", text: "*"}
 	// opDiv = op{symbol:"/", text: "/"}
