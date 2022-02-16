@@ -27,9 +27,9 @@ type DB struct {
 	dialect      Dialect
 }
 
-// New returns DB.
+// NewDB returns DB.
 // By default, it will create an instance of MetaRegistry and use MySQL as the dialect
-func New(opts ...DBOption) *DB {
+func NewDB(opts ...DBOption) *DB {
 	db := &DB{
 		metaRegistry: &tagMetaRegistry{},
 		dialect:      MySQL,
@@ -51,14 +51,6 @@ func DBWithMetaRegistry(registry MetaRegistry) DBOption {
 func DBWithDialect(dialect Dialect) DBOption {
 	return func(db *DB) {
 		db.dialect = dialect
-	}
-}
-
-// Select starts a select query. If columns are empty, all columns will be fetched
-func (db *DB) Select(columns ...Selectable) *Selector {
-	return &Selector{
-		builder: db.builder(),
-		columns: columns,
 	}
 }
 

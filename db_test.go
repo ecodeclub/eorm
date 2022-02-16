@@ -20,17 +20,17 @@ import (
 
 func ExampleNew() {
 	// case1 without DBOption
-	db := New()
+	db := NewDB()
 	fmt.Printf("case1 dialect: %s\n", db.dialect.name)
 
 	// case2 use DBOption
-	db = New(DBWithDialect(SQLite))
+	db = NewDB(DBWithDialect(SQLite))
 	fmt.Printf("case2 dialect: %s\n", db.dialect.name)
 
 	// case3 share registry among DB
 	registry := NewTagMetaRegistry()
-	db1 := New(DBWithMetaRegistry(registry))
-	db2 := New(DBWithMetaRegistry(registry))
+	db1 := NewDB(DBWithMetaRegistry(registry))
+	db2 := NewDB(DBWithMetaRegistry(registry))
 	fmt.Printf("case3 same registry: %v", db1.metaRegistry == db2.metaRegistry)
 
 	// Output:
@@ -40,7 +40,7 @@ func ExampleNew() {
 }
 
 func ExampleDB_Delete() {
-	db := New()
+	db := NewDB()
 	tm := &TestModel{}
 	query, _ := db.Delete().From(tm).Build()
 	fmt.Printf("SQL: %s", query.SQL)
@@ -49,7 +49,7 @@ func ExampleDB_Delete() {
 }
 
 func ExampleDB_Insert() {
-	db := New()
+	db := NewDB()
 	tm := &TestModel{}
 	query, _ := db.Insert().Values(tm).Build()
 	fmt.Printf("SQL: %s", query.SQL)
@@ -57,20 +57,20 @@ func ExampleDB_Insert() {
 	// SQL: INSERT INTO `test_model`(`id`,`first_name`,`age`,`last_name`) VALUES(?,?,?,?);
 }
 
-func ExampleDB_Select() {
-	db := New()
+func ExampleSelector_Select() {
+	db := NewDB()
 	tm := &TestModel{}
 	cases := []*Selector{
 		// case0: all columns are included
-		db.Select().From(tm),
+		NewSelector(db).From(tm),
 		// case1: only query specific columns
-		db.Select(Columns("Id", "Age")).From(tm),
+		NewSelector(db).Select(Columns("Id", "Age")).From(tm),
 		// case2: using alias
-		db.Select(C("Id").As("my_id")).From(tm),
+		NewSelector(db).Select(C("Id").As("my_id")).From(tm),
 		// case3: using aggregation function and alias
-		db.Select(Avg("Age").As("avg_age")).From(tm),
+		NewSelector(db).Select(Avg("Age").As("avg_age")).From(tm),
 		// case4: using raw expression
-		db.Select(Raw("COUNT(DISTINCT `age`) AS `age_cnt`")).From(tm),
+		NewSelector(db).Select(Raw("COUNT(DISTINCT `age`) AS `age_cnt`")).From(tm),
 	}
 
 	for index, tc := range cases {
@@ -96,7 +96,7 @@ func ExampleDB_Select() {
 }
 
 func ExampleDB_Update() {
-	db := New()
+	db := NewDB()
 	tm := &TestModel{
 		Age: 18,
 	}
