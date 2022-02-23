@@ -37,6 +37,14 @@ func (r RawExpr) expr() (string, error) {
 	return r.raw, nil
 }
 
+// AsPredicate return the Predicate represented by this RawExpr
+// EQL has no validation for Predicate
+func (r RawExpr) AsPredicate() Predicate {
+	return Predicate{
+		left: r,
+	}
+}
+
 func (RawExpr) selected() {}
 
 type binaryExpr struct {
