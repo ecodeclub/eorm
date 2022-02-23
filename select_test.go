@@ -108,6 +108,17 @@ func TestSelectable(t *testing.T) {
 			builder: NewSelector(db).From(&TestModel{}).GroupBy("FirstName").Having(),
 			wantSql: "SELECT `id`,`first_name`,`age`,`last_name` FROM `test_model` GROUP BY `first_name`;",
 		},
+		{
+			name:    "alias in having",
+			builder: NewSelector(db).Select(Columns("Id"), Columns("FirstName"),Avg("Age").As("avg_age")).From(&TestModel{}).GroupBy("FirstName").Having(C("avg_age").LT(20)),
+			wantSql: "SELECT `id`,`first_name`,AVG(`age`) AS `avg_age` FROM `test_model` GROUP BY `first_name` HAVING `avg_age`<?;",
+			wantArgs: []interface{}{20},
+		},
+		{
+			name:    "invalid alias in having",
+			builder: NewSelector(db).Select(Columns("Id"), Columns("FirstName"),Avg("Age").As("avg_age")).From(&TestModel{}).GroupBy("FirstName").Having(C("Invalid").LT(20)),
+			wantErr: internal.NewInvalidColumnError("Invalid"),
+		},
 	}
 
 	for _, tc := range testCases {
@@ -119,6 +130,7 @@ func TestSelectable(t *testing.T) {
 				return
 			}
 			assert.Equal(t, c.wantSql, query.SQL)
+			fmt.Println(c.wantArgs,query.Args)
 			assert.Equal(t, c.wantArgs, query.Args)
 		})
 	}
@@ -147,4 +159,19 @@ func ExampleSelector_OrderBy() {
 	// case4
 	// SQL: SELECT `id`,`first_name`,`age`,`last_name` FROM `test_model` ORDER BY `age` ASC,`id` DESC;
 	// Args: []interface {}(nil)
+}
+
+func ExampleSelector_Having(){
+	db := NewDB()
+	query, _ := NewSelector(db).Select(Columns("Id"), Columns("FirstName"),Avg("Age").As("avg_age")).From(&TestModel{}).GroupBy("FirstName").Having(C("avg_age").LT(20)).Build()
+	fmt.Printf("case1\n%s",query.string())
+	query, err := NewSelector(db).Select(Columns("Id"), Columns("FirstName"),Avg("Age").As("avg_age")).From(&TestModel{}).GroupBy("FirstName").Having(C("Invalid").LT(20)).Build()
+	fmt.Printf("case2\n%s",err)
+	// Output:
+	// case1
+	// SQL: SELECT `id`,`first_name`,AVG(`age`) AS `avg_age` FROM `test_model` GROUP BY `first_name` HAVING `avg_age`<?;
+	// Args: []interface {}{20}
+	// case2
+	// eql: invalid column name Invalid, it must be a valid field name of structure
+
 }

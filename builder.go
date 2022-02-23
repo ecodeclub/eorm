@@ -16,7 +16,6 @@ package eql
 
 import (
 	"errors"
-
 	"github.com/gotomicro/eql/internal"
 	"github.com/valyala/bytebufferpool"
 )
@@ -41,6 +40,7 @@ type builder struct {
 	buffer *bytebufferpool.ByteBuffer
 	meta   *TableMeta
 	args   []interface{}
+	aliases  map[string]struct{}
 }
 
 func (b builder) quote(val string) {
@@ -75,13 +75,20 @@ func (b *builder) buildExpr(expr Expr) error {
 	case RawExpr:
 		b.buildRawExpr(e)
 	case Column:
-		cm, ok := b.meta.fieldMap[e.name]
-		if !ok {
-			return internal.NewInvalidColumnError(e.name)
+		if e.name != ""  {
+			_, ok := b.aliases[e.name]
+			if ok {
+				b.quote(e.name)
+				return nil
+			}
+			cm, ok := b.meta.fieldMap[e.name]
+			if !ok {
+				return internal.NewInvalidColumnError(e.name)
+			}
+			b.quote(cm.columnName)
 		}
-		b.quote(cm.columnName)
 	case Aggregate:
-		if err := b.buildAggregate(e); err != nil {
+		if err := b.buildHavingAggregate(e); err != nil {
 			return err
 		}
 	case valueExpr:
@@ -110,6 +117,18 @@ func (b *builder) buildPredicates(predicates []Predicate) error {
 		p = p.And(predicates[i])
 	}
 	return b.buildExpr(p)
+}
+
+func (b *builder) buildHavingAggregate(aggregate Aggregate) error {
+	_, _ = b.buffer.WriteString(aggregate.fn)
+	_ = b.buffer.WriteByte('(')
+	cMeta, ok := b.meta.fieldMap[aggregate.arg]
+	if !ok {
+		return internal.NewInvalidColumnError(aggregate.arg)
+	}
+	b.quote(cMeta.columnName)
+	_ = b.buffer.WriteByte(')')
+	return nil
 }
 
 func (b *builder) buildBinaryExpr(e binaryExpr) error {
