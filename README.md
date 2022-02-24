@@ -4,6 +4,9 @@
 
 An easy-use SQL builder.
 
+## SQL 2003 Standard
+In theory, we try to support the [SQL 2003 standard](https://ronsavage.github.io/SQL/sql-2003-2.bnf.html#query%20specification). But as we know, some databases do not follow the standard. These databases have its own feature, and we will support these grammers in the future. 
+
 ## Design
 
 We are not English native speaker, so we use Chinese to write the design documents. We plan to translate them to English. Or you can use some software to translate it. 

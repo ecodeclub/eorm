@@ -37,10 +37,10 @@ type builder struct {
 	// Use bytebufferpool to reduce memory allocation.
 	// After using buffer, it must be put back in bytebufferpool.
 	// Call bytebufferpool.Get() to get a buffer, call bytebufferpool.Put() to put buffer back to bytebufferpool.
-	buffer *bytebufferpool.ByteBuffer
-	meta   *TableMeta
-	args   []interface{}
-	aliases  map[string]struct{}
+	buffer  *bytebufferpool.ByteBuffer
+	meta    *TableMeta
+	args    []interface{}
+	aliases map[string]struct{}
 }
 
 func (b builder) quote(val string) {
@@ -75,7 +75,7 @@ func (b *builder) buildExpr(expr Expr) error {
 	case RawExpr:
 		b.buildRawExpr(e)
 	case Column:
-		if e.name != ""  {
+		if e.name != "" {
 			_, ok := b.aliases[e.name]
 			if ok {
 				b.quote(e.name)
@@ -105,6 +105,7 @@ func (b *builder) buildExpr(expr Expr) error {
 		if err := b.buildBinaryExpr(binaryExpr(e)); err != nil {
 			return err
 		}
+	case nil:
 	default:
 		return errors.New("unsupported expr")
 	}
