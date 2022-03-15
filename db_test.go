@@ -103,5 +103,5 @@ func ExampleDB_Update() {
 	query, _ := db.Update(tm).Build()
 	fmt.Printf("SQL: %s", query.SQL)
 	// Output:
-	// SQL: UPDATE `test_model` SET `age`=?;
+	// SQL: UPDATE `test_model` SET `id`=?,`first_name`=?,`age`=?,`last_name`=?;
 }

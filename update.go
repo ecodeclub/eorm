@@ -25,12 +25,10 @@ import (
 // Updater is the builder responsible for building UPDATE query
 type Updater struct {
 	builder
-	table          interface{}
-	tableEle       reflect.Value
-	where          []Predicate
-	assigns        []Assignable
-	withNil bool
-	withZero bool
+	table    interface{}
+	tableEle reflect.Value
+	where    []Predicate
+	assigns  []Assignable
 }
 
 // Build returns UPDATE query
@@ -84,10 +82,7 @@ func (u *Updater) buildAssigns() error {
 			if !ok {
 				return internal.NewInvalidColumnError(a.name)
 			}
-			val, ok := u.getValue(a.name)
-			if !ok {
-				continue
-			}
+			val := u.getValue(a.name)
 			u.quote(c.columnName)
 			_ = u.buffer.WriteByte('=')
 			u.parameter(val)
@@ -98,10 +93,7 @@ func (u *Updater) buildAssigns() error {
 				if !ok {
 					return internal.NewInvalidColumnError(name)
 				}
-				val, ok := u.getValue(name)
-				if !ok {
-					continue
-				}
+				val := u.getValue(name)
 				if has {
 					u.comma()
 				}
@@ -128,10 +120,7 @@ func (u *Updater) buildAssigns() error {
 func (u *Updater) buildDefaultColumns() error {
 	has := false
 	for _, c := range u.meta.columns {
-		val, ok := u.getValue(c.fieldName)
-		if !ok {
-			continue
-		}
+		val := u.getValue(c.fieldName)
 		if has {
 			_ = u.buffer.WriteByte(',')
 		}
@@ -146,17 +135,9 @@ func (u *Updater) buildDefaultColumns() error {
 	return nil
 }
 
-func (u *Updater) getValue(fieldName string) (interface{}, bool) {
+func (u *Updater) getValue(fieldName string) interface{} {
 	val := u.tableEle.FieldByName(fieldName)
-	res := val.Interface()
-
-	if !u.withNil && val.Kind() == reflect.Ptr && val.IsNil() {
-		return nil, false
-	}
-	if !u.withZero && val.Kind() != reflect.Ptr && val.IsZero() {
-		return nil, false
-	}
-	return res, true
+	return val.Interface()
 }
 
 // Set represents SET clause
@@ -171,16 +152,37 @@ func (u *Updater) Where(predicates ...Predicate) *Updater {
 	return u
 }
 
-// WithNil use nil to update database
-func (u *Updater) WithNil() *Updater {
-	u.withNil = true
-	return u
+// AssignNotNilColumns uses the non-nil value to construct the Assignable instances.
+func AssignNotNilColumns(entity interface{}) []Assignable {
+	return AssignColumns(entity, func(typ reflect.StructField, val reflect.Value) bool {
+		switch val.Kind() {
+		case reflect.Chan, reflect.Func, reflect.Map, reflect.Ptr, reflect.UnsafePointer, reflect.Interface, reflect.Slice:
+			return !val.IsNil()
+		}
+		return true
+	})
 }
 
-// WithZero specific use zero value to update databases.
-// but "zero value" here is different from reflect.IsZero, it doesn't contain nil value
-// for example if the int value is 0, it will be used to update database, but if the pointer is nil, it won't
-func (u *Updater) WithZero() *Updater {
-	u.withZero = true
-	return u
+// AssignNotZeroColumns uses the non-zero value to construct the Assignable instances.
+func AssignNotZeroColumns(entity interface{}) []Assignable {
+	return AssignColumns(entity, func(typ reflect.StructField, val reflect.Value) bool {
+		return !val.IsZero()
+	})
+}
+
+// AssignColumns will check all columns and then apply the filter function.
+// If the returned value is true, this column will be updated.
+func AssignColumns(entity interface{}, filter func(typ reflect.StructField, val reflect.Value) bool) []Assignable {
+	val := reflect.ValueOf(entity).Elem()
+	typ := reflect.TypeOf(entity).Elem()
+	numField := val.NumField()
+	res := make([]Assignable, 0, numField)
+	for i := 0; i < numField; i++ {
+		fieldVal := val.Field(i)
+		fieldTyp := typ.Field(i)
+		if filter(fieldTyp, fieldVal) {
+			res = append(res, Assign(fieldTyp.Name, fieldVal.Interface()))
+		}
+	}
+	return res
 }
