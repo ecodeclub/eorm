@@ -15,6 +15,7 @@
 package eql
 
 import (
+	"fmt"
 	"github.com/gotomicro/eql/internal"
 	"github.com/stretchr/testify/assert"
 	"testing"
@@ -94,45 +95,16 @@ func TestUpdater_Set(t *testing.T) {
 			wantArgs: []interface{}{"Tom", 100, 110},
 		},
 		{
-			name:    "without zero no value",
-			builder: NewDB().Update(&TestModel{Id: 13}).Set(C("FirstName")),
-			wantErr: internal.NewValueNotSetError(),
-		},
-		{
-			name:     "without zero",
-			builder:  NewDB().Update(&TestModel{Id: 13, FirstName: "Tom"}).Set(C("FirstName")),
-			wantSql:  "UPDATE `test_model` SET `first_name`=?;",
-			wantArgs: []interface{}{"Tom"},
-		},
-		{
-			name:     "with zero",
-			builder:  NewDB().Update(&TestModel{Id: 13, FirstName: "Tom"}).WithZero(),
+			name:     "not nil columns",
+			builder:  NewDB().Update(&TestModel{}).Set(AssignNotNilColumns(&TestModel{Id: 13})...),
 			wantSql:  "UPDATE `test_model` SET `id`=?,`first_name`=?,`age`=?;",
-			wantArgs: []interface{}{int64(13), "Tom", int8(0)},
+			wantArgs: []interface{}{int64(13), "", int8(0)},
 		},
 		{
-			name:     "with nil",
-			builder:  NewDB().Update(&TestModel{Id: 13, FirstName: "Tom"}).WithNil(),
-			wantSql:  "UPDATE `test_model` SET `id`=?,`first_name`=?,`last_name`=?;",
-			wantArgs: []interface{}{int64(13), "Tom", (*string)(nil)},
-		},
-		{
-			name:     "with nil, with zero",
-			builder:  NewDB().Update(&TestModel{Id: 13, FirstName: "Tom"}).WithNil().WithZero(),
-			wantSql:  "UPDATE `test_model` SET `id`=?,`first_name`=?,`age`=?,`last_name`=?;",
-			wantArgs: []interface{}{int64(13), "Tom", int8(0), (*string)(nil)},
-		},
-		{
-			name:     "no where",
-			builder:  NewDB().Update(&TestModel{Id: 13, FirstName: "Tom"}).WithNil().WithZero().Where(),
-			wantSql:  "UPDATE `test_model` SET `id`=?,`first_name`=?,`age`=?,`last_name`=?;",
-			wantArgs: []interface{}{int64(13), "Tom", int8(0), (*string)(nil)},
-		},
-		{
-			name:     "where",
-			builder:  NewDB().Update(&TestModel{Id: 13, FirstName: "Tom"}).WithNil().WithZero().Where(C("Id").EQ(14)),
-			wantSql:  "UPDATE `test_model` SET `id`=?,`first_name`=?,`age`=?,`last_name`=? WHERE `id`=?;",
-			wantArgs: []interface{}{int64(13), "Tom", int8(0), (*string)(nil), 14},
+			name:     "not zero columns",
+			builder:  NewDB().Update(&TestModel{}).Set(AssignNotZeroColumns(&TestModel{Id: 13})...),
+			wantSql:  "UPDATE `test_model` SET `id`=?;",
+			wantArgs: []interface{}{int64(13)},
 		},
 	}
 
@@ -148,4 +120,22 @@ func TestUpdater_Set(t *testing.T) {
 			assert.Equal(t, c.wantArgs, query.Args)
 		})
 	}
+}
+
+func ExampleAssignNotNilColumns() {
+	db := NewDB()
+	query, _ := db.Update(&TestModel{}).Set(AssignNotNilColumns(&TestModel{Id: 13})...).Build()
+	fmt.Println(query.string())
+	// Output:
+	// SQL: UPDATE `test_model` SET `id`=?,`first_name`=?,`age`=?;
+	// Args: []interface {}{13, "", 0}
+}
+
+func ExampleAssignNotZeroColumns() {
+	db := NewDB()
+	query, _ := db.Update(&TestModel{}).Set(AssignNotZeroColumns(&TestModel{Id: 13})...).Build()
+	fmt.Println(query.string())
+	// Output:
+	// SQL: UPDATE `test_model` SET `id`=?;
+	// Args: []interface {}{13}
 }
