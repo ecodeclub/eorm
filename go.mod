@@ -1,4 +1,4 @@
-module github.com/gotomicro/eql
+module github.com/gotomicro/eorm
 
 go 1.17
 

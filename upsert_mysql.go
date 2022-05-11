@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package eql
+package eorm
 
 // MysqlUpserter is used to generated MySQL upsert query
 type MysqlUpserter struct {

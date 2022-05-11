@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package eql
+package eorm
 
 // Deleter builds DELETE query
 type Deleter struct {
@@ -54,7 +54,7 @@ func (d *Deleter) From(table interface{}) *Deleter {
 }
 
 // Where accepts predicates
-func (d *Deleter) Where(predicates...Predicate) *Deleter {
+func (d *Deleter) Where(predicates ...Predicate) *Deleter {
 	d.where = predicates
 	return d
 }

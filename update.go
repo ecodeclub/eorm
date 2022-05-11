@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package eql
+package eorm
 
 import (
 	"fmt"
 	"reflect"
 
-	"github.com/gotomicro/eql/internal"
+	"github.com/gotomicro/eorm/internal"
 	"github.com/valyala/bytebufferpool"
 )
 

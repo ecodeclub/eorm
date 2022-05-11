@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package eql
+package eorm
 
 import (
 	"errors"
-	"github.com/gotomicro/eql/internal"
+	"github.com/gotomicro/eorm/internal"
 	"github.com/valyala/bytebufferpool"
 )
 
@@ -43,21 +43,21 @@ type builder struct {
 	aliases map[string]struct{}
 }
 
-func (b builder) quote(val string) {
+func (b *builder) quote(val string) {
 	_ = b.buffer.WriteByte(b.dialect.quote)
 	_, _ = b.buffer.WriteString(val)
 	_ = b.buffer.WriteByte(b.dialect.quote)
 }
 
-func (b builder) space() {
+func (b *builder) space() {
 	_ = b.buffer.WriteByte(' ')
 }
 
-func (b builder) end() {
+func (b *builder) end() {
 	_ = b.buffer.WriteByte(';')
 }
 
-func (b builder) comma() {
+func (b *builder) comma() {
 	_ = b.buffer.WriteByte(',')
 }
 

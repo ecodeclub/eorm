@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package eql
+package eorm
 
 // Expr is the top interface. It represents everything.
 type Expr interface {
