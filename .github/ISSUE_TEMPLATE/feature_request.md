@@ -9,7 +9,7 @@ assignees: ''
 
 #### English Only
 
-Please check [existing issues](https://github.com/gotomicro/eql/issues) first to avoid duplication and answer the questions below before submitting your issue.
+Please check [existing issues](https://github.com/gotomicro/eorm/issues) first to avoid duplication and answer the questions below before submitting your issue.
 
 ### Use case(s) 
 

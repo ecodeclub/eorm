@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package eql
+package eorm
 
 import (
 	"fmt"
-	"github.com/gotomicro/eql/internal"
+	"github.com/gotomicro/eorm/internal"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
@@ -109,14 +109,14 @@ func TestSelectable(t *testing.T) {
 			wantSql: "SELECT `id`,`first_name`,`age`,`last_name` FROM `test_model` GROUP BY `first_name`;",
 		},
 		{
-			name:    "alias in having",
-			builder: NewSelector(db).Select(Columns("Id"), Columns("FirstName"),Avg("Age").As("avg_age")).From(&TestModel{}).GroupBy("FirstName").Having(C("avg_age").LT(20)),
-			wantSql: "SELECT `id`,`first_name`,AVG(`age`) AS `avg_age` FROM `test_model` GROUP BY `first_name` HAVING `avg_age`<?;",
+			name:     "alias in having",
+			builder:  NewSelector(db).Select(Columns("Id"), Columns("FirstName"), Avg("Age").As("avg_age")).From(&TestModel{}).GroupBy("FirstName").Having(C("avg_age").LT(20)),
+			wantSql:  "SELECT `id`,`first_name`,AVG(`age`) AS `avg_age` FROM `test_model` GROUP BY `first_name` HAVING `avg_age`<?;",
 			wantArgs: []interface{}{20},
 		},
 		{
 			name:    "invalid alias in having",
-			builder: NewSelector(db).Select(Columns("Id"), Columns("FirstName"),Avg("Age").As("avg_age")).From(&TestModel{}).GroupBy("FirstName").Having(C("Invalid").LT(20)),
+			builder: NewSelector(db).Select(Columns("Id"), Columns("FirstName"), Avg("Age").As("avg_age")).From(&TestModel{}).GroupBy("FirstName").Having(C("Invalid").LT(20)),
 			wantErr: internal.NewInvalidColumnError("Invalid"),
 		},
 	}
@@ -130,7 +130,7 @@ func TestSelectable(t *testing.T) {
 				return
 			}
 			assert.Equal(t, c.wantSql, query.SQL)
-			fmt.Println(c.wantArgs,query.Args)
+			fmt.Println(c.wantArgs, query.Args)
 			assert.Equal(t, c.wantArgs, query.Args)
 		})
 	}
@@ -161,12 +161,12 @@ func ExampleSelector_OrderBy() {
 	// Args: []interface {}(nil)
 }
 
-func ExampleSelector_Having(){
+func ExampleSelector_Having() {
 	db := NewDB()
-	query, _ := NewSelector(db).Select(Columns("Id"), Columns("FirstName"),Avg("Age").As("avg_age")).From(&TestModel{}).GroupBy("FirstName").Having(C("avg_age").LT(20)).Build()
-	fmt.Printf("case1\n%s",query.string())
-	query, err := NewSelector(db).Select(Columns("Id"), Columns("FirstName"),Avg("Age").As("avg_age")).From(&TestModel{}).GroupBy("FirstName").Having(C("Invalid").LT(20)).Build()
-	fmt.Printf("case2\n%s",err)
+	query, _ := NewSelector(db).Select(Columns("Id"), Columns("FirstName"), Avg("Age").As("avg_age")).From(&TestModel{}).GroupBy("FirstName").Having(C("avg_age").LT(20)).Build()
+	fmt.Printf("case1\n%s", query.string())
+	query, err := NewSelector(db).Select(Columns("Id"), Columns("FirstName"), Avg("Age").As("avg_age")).From(&TestModel{}).GroupBy("FirstName").Having(C("Invalid").LT(20)).Build()
+	fmt.Printf("case2\n%s", err)
 	// Output:
 	// case1
 	// SQL: SELECT `id`,`first_name`,AVG(`age`) AS `avg_age` FROM `test_model` GROUP BY `first_name` HAVING `avg_age`<?;

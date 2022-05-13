@@ -19,7 +19,7 @@ name = "go"
 enabled = true
 
   [analyzers.meta]
-  import_root = "github.com/gotomicro/eql"
+  import_root = "github.com/gotomicro/eorm"
   dependencies_vendored = false
 
 [[analyzers]]

@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package eql
+package eorm
 
 import (
-	"github.com/gotomicro/eql/internal"
+	"github.com/gotomicro/eorm/internal"
 	"github.com/valyala/bytebufferpool"
 )
 
@@ -193,7 +193,7 @@ func (s *Selector) selectAggregate(aggregate Aggregate) error {
 	s.quote(cMeta.columnName)
 	_ = s.buffer.WriteByte(')')
 	if aggregate.alias != "" {
-		if  _,ok :=s.aliases[aggregate.alias]; ok{
+		if _, ok := s.aliases[aggregate.alias]; ok {
 			_, _ = s.buffer.WriteString(" AS ")
 			s.quote(aggregate.alias)
 		}

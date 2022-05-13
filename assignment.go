@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package eql
+package eorm
 
 // Assignable represents that something could be used as "assignment" statement
 type Assignable interface {

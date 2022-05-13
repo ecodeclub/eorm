@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package eql
+package eorm
 
 // Aggregate represents aggregate expression, including AVG, MAX, MIN...
 type Aggregate struct {
