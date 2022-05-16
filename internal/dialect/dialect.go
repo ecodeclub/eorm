@@ -12,22 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package internal
+package dialect
 
-import (
-	"errors"
-	"fmt"
+// Dialect specify config or behavior of special SQL dialects
+type Dialect struct {
+	Name string
+	// in MYSQL, it's "`"
+	Quote byte
+}
+
+var (
+	MySQL = Dialect{
+		Name:  "MySQL",
+		Quote: '`',
+	}
+	SQLite = Dialect{
+		Name:  "SQLite",
+		Quote: '`',
+	}
 )
-
-var errValueNotSet = errors.New("value unset")
-
-// NewInvalidColumnError returns an error represents invalid field name
-// TODO(do we need errors pkg?)
-func NewInvalidColumnError(field string) error {
-	return fmt.Errorf("eql: invalid column name %s, " +
-		"it must be a valid field name of structure", field)
-}
-
-func NewValueNotSetError() error {
-	return errValueNotSet
-}

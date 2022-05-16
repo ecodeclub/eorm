@@ -16,9 +16,9 @@ package eorm
 
 import (
 	"fmt"
+	error2 "github.com/gotomicro/eorm/internal/error"
 	"reflect"
 
-	"github.com/gotomicro/eorm/internal"
 	"github.com/valyala/bytebufferpool"
 )
 
@@ -41,10 +41,10 @@ func (u *Updater) Build() (*Query, error) {
 	}
 
 	u.tableEle = reflect.ValueOf(u.table).Elem()
-	u.args = make([]interface{}, 0, len(u.meta.columns))
+	u.args = make([]interface{}, 0, len(u.meta.Columns))
 
 	_, _ = u.buffer.WriteString("UPDATE ")
-	u.quote(u.meta.tableName)
+	u.quote(u.meta.TableName)
 	_, _ = u.buffer.WriteString(" SET ")
 	if len(u.assigns) == 0 {
 		err = u.buildDefaultColumns()
@@ -78,26 +78,26 @@ func (u *Updater) buildAssigns() error {
 		}
 		switch a := assign.(type) {
 		case Column:
-			c, ok := u.meta.fieldMap[a.name]
+			c, ok := u.meta.FieldMap[a.name]
 			if !ok {
-				return internal.NewInvalidColumnError(a.name)
+				return error2.NewInvalidColumnError(a.name)
 			}
 			val := u.getValue(a.name)
-			u.quote(c.columnName)
+			u.quote(c.ColumnName)
 			_ = u.buffer.WriteByte('=')
 			u.parameter(val)
 			has = true
 		case columns:
 			for _, name := range a.cs {
-				c, ok := u.meta.fieldMap[name]
+				c, ok := u.meta.FieldMap[name]
 				if !ok {
-					return internal.NewInvalidColumnError(name)
+					return error2.NewInvalidColumnError(name)
 				}
 				val := u.getValue(name)
 				if has {
 					u.comma()
 				}
-				u.quote(c.columnName)
+				u.quote(c.ColumnName)
 				_ = u.buffer.WriteByte('=')
 				u.parameter(val)
 				has = true
@@ -112,25 +112,25 @@ func (u *Updater) buildAssigns() error {
 		}
 	}
 	if !has {
-		return internal.NewValueNotSetError()
+		return error2.NewValueNotSetError()
 	}
 	return nil
 }
 
 func (u *Updater) buildDefaultColumns() error {
 	has := false
-	for _, c := range u.meta.columns {
-		val := u.getValue(c.fieldName)
+	for _, c := range u.meta.Columns {
+		val := u.getValue(c.FieldName)
 		if has {
 			_ = u.buffer.WriteByte(',')
 		}
-		u.quote(c.columnName)
+		u.quote(c.ColumnName)
 		_ = u.buffer.WriteByte('=')
 		u.parameter(val)
 		has = true
 	}
 	if !has {
-		return internal.NewValueNotSetError()
+		return error2.NewValueNotSetError()
 	}
 	return nil
 }

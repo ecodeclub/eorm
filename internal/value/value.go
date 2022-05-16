@@ -12,25 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package internal
+package value
 
-import (
-	"unicode"
-)
-
-// UnderscoreName function mainly converts upper case to lower case and adds an underscore in between
-func UnderscoreName(tableName string) string {
-	buf := []byte{}
-	for i, v := range tableName {
-		if unicode.IsUpper(v) {
-			if i != 0 {
-				buf = append(buf, '_')
-			}
-			buf = append(buf, byte(unicode.ToLower(v)))
-		} else {
-			buf = append(buf, byte(v))
-		}
-
-	}
-	return string(buf)
+// Value 是对结构体实例的内部抽象
+type Value interface {
+	// Field 访问结构体字段
+	Field(name string) (interface{}, error)
 }
+
+
+
+

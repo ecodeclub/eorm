@@ -16,7 +16,9 @@ package eorm
 
 import (
 	"errors"
-	"github.com/gotomicro/eorm/internal"
+	dialect2 "github.com/gotomicro/eorm/internal/dialect"
+	error2 "github.com/gotomicro/eorm/internal/error"
+	"github.com/gotomicro/eorm/internal/model"
 	"github.com/valyala/bytebufferpool"
 )
 
@@ -32,21 +34,21 @@ type Query struct {
 }
 
 type builder struct {
-	registry MetaRegistry
-	dialect  Dialect
+	registry model.MetaRegistry
+	dialect  dialect2.Dialect
 	// Use bytebufferpool to reduce memory allocation.
 	// After using buffer, it must be put back in bytebufferpool.
 	// Call bytebufferpool.Get() to get a buffer, call bytebufferpool.Put() to put buffer back to bytebufferpool.
 	buffer  *bytebufferpool.ByteBuffer
-	meta    *TableMeta
+	meta    *model.TableMeta
 	args    []interface{}
 	aliases map[string]struct{}
 }
 
 func (b *builder) quote(val string) {
-	_ = b.buffer.WriteByte(b.dialect.quote)
+	_ = b.buffer.WriteByte(b.dialect.Quote)
 	_, _ = b.buffer.WriteString(val)
-	_ = b.buffer.WriteByte(b.dialect.quote)
+	_ = b.buffer.WriteByte(b.dialect.Quote)
 }
 
 func (b *builder) space() {
@@ -81,11 +83,11 @@ func (b *builder) buildExpr(expr Expr) error {
 				b.quote(e.name)
 				return nil
 			}
-			cm, ok := b.meta.fieldMap[e.name]
+			cm, ok := b.meta.FieldMap[e.name]
 			if !ok {
-				return internal.NewInvalidColumnError(e.name)
+				return error2.NewInvalidColumnError(e.name)
 			}
-			b.quote(cm.columnName)
+			b.quote(cm.ColumnName)
 		}
 	case Aggregate:
 		if err := b.buildHavingAggregate(e); err != nil {
@@ -123,11 +125,11 @@ func (b *builder) buildPredicates(predicates []Predicate) error {
 func (b *builder) buildHavingAggregate(aggregate Aggregate) error {
 	_, _ = b.buffer.WriteString(aggregate.fn)
 	_ = b.buffer.WriteByte('(')
-	cMeta, ok := b.meta.fieldMap[aggregate.arg]
+	cMeta, ok := b.meta.FieldMap[aggregate.arg]
 	if !ok {
-		return internal.NewInvalidColumnError(aggregate.arg)
+		return error2.NewInvalidColumnError(aggregate.arg)
 	}
-	b.quote(cMeta.columnName)
+	b.quote(cMeta.ColumnName)
 	_ = b.buffer.WriteByte(')')
 	return nil
 }

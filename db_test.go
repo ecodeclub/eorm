@@ -16,19 +16,21 @@ package eorm
 
 import (
 	"fmt"
+	"github.com/gotomicro/eorm/internal/dialect"
+	"github.com/gotomicro/eorm/internal/model"
 )
 
 func ExampleNew() {
 	// case1 without DBOption
 	db := NewDB()
-	fmt.Printf("case1 dialect: %s\n", db.dialect.name)
+	fmt.Printf("case1 dialect: %s\n", db.dialect.Name)
 
 	// case2 use DBOption
-	db = NewDB(DBWithDialect(SQLite))
-	fmt.Printf("case2 dialect: %s\n", db.dialect.name)
+	db = NewDB(DBWithDialect(dialect.SQLite))
+	fmt.Printf("case2 dialect: %s\n", db.dialect.Name)
 
 	// case3 share registry among DB
-	registry := NewTagMetaRegistry()
+	registry := model.NewTagMetaRegistry()
 	db1 := NewDB(DBWithMetaRegistry(registry))
 	db2 := NewDB(DBWithMetaRegistry(registry))
 	fmt.Printf("case3 same registry: %v", db1.metaRegistry == db2.metaRegistry)

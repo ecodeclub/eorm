@@ -12,22 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package eorm
+package error
 
-// Dialect specify config or behavior of special SQL dialects
-type Dialect struct {
-	name string
-	// in MYSQL, it's "`"
-	quote byte
-}
+import (
+	"errors"
+	"fmt"
+)
 
 var (
-	MySQL = Dialect{
-		name:  "MySQL",
-		quote: '`',
-	}
-	SQLite = Dialect{
-		name:  "SQLite",
-		quote: '`',
-	}
+	errValueNotSet = errors.New("value unset")
 )
+
+
+// NewInvalidColumnError returns an error represents invalid field name
+// TODO(do we need errors pkg?)
+func NewInvalidColumnError(field string) error {
+	return fmt.Errorf("eorm: invalid column name %s, " +
+		"it must be a valid field name of structure", field)
+}
+
+func NewValueNotSetError() error {
+	return errValueNotSet
+}

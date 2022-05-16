@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package eorm
+package model
 
 import (
 	"fmt"
@@ -29,32 +29,32 @@ func TestTagMetaRegistry(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(t, 4, len(meta.columns))
-	assert.Equal(t, 4, len(meta.fieldMap))
-	assert.Equal(t, reflect.TypeOf(tm), meta.typ)
-	assert.Equal(t, "test_model", meta.tableName)
+	assert.Equal(t, 4, len(meta.Columns))
+	assert.Equal(t, 4, len(meta.FieldMap))
+	assert.Equal(t, reflect.TypeOf(tm), meta.Typ)
+	assert.Equal(t, "test_model", meta.TableName)
 
-	idMeta := meta.fieldMap["Id"]
-	assert.Equal(t, "id", idMeta.columnName)
-	assert.Equal(t, "Id", idMeta.fieldName)
-	assert.Equal(t, reflect.TypeOf(int64(0)), idMeta.typ)
-	assert.True(t, idMeta.isAutoIncrement)
-	assert.True(t, idMeta.isPrimaryKey)
+	idMeta := meta.FieldMap["Id"]
+	assert.Equal(t, "id", idMeta.ColumnName)
+	assert.Equal(t, "Id", idMeta.FieldName)
+	assert.Equal(t, reflect.TypeOf(int64(0)), idMeta.Typ)
+	assert.True(t, idMeta.IsAutoIncrement)
+	assert.True(t, idMeta.IsPrimaryKey)
 
-	idMetaFistName := meta.fieldMap["FirstName"]
-	assert.Equal(t, "first_name", idMetaFistName.columnName)
-	assert.Equal(t, "FirstName", idMetaFistName.fieldName)
-	assert.Equal(t, reflect.TypeOf(string("")), idMetaFistName.typ)
+	idMetaFistName := meta.FieldMap["FirstName"]
+	assert.Equal(t, "first_name", idMetaFistName.ColumnName)
+	assert.Equal(t, "FirstName", idMetaFistName.FieldName)
+	assert.Equal(t, reflect.TypeOf(string("")), idMetaFistName.Typ)
 
-	idMetaLastName := meta.fieldMap["LastName"]
-	assert.Equal(t, "last_name", idMetaLastName.columnName)
-	assert.Equal(t, "LastName", idMetaLastName.fieldName)
-	assert.Equal(t, reflect.TypeOf((*string)(nil)), idMetaLastName.typ)
+	idMetaLastName := meta.FieldMap["LastName"]
+	assert.Equal(t, "last_name", idMetaLastName.ColumnName)
+	assert.Equal(t, "LastName", idMetaLastName.FieldName)
+	assert.Equal(t, reflect.TypeOf((*string)(nil)), idMetaLastName.Typ)
 
-	idMetaLastAge := meta.fieldMap["Age"]
-	assert.Equal(t, "age", idMetaLastAge.columnName)
-	assert.Equal(t, "Age", idMetaLastAge.fieldName)
-	assert.Equal(t, reflect.TypeOf(int8(0)), idMetaLastAge.typ)
+	idMetaLastAge := meta.FieldMap["Age"]
+	assert.Equal(t, "age", idMetaLastAge.ColumnName)
+	assert.Equal(t, "Age", idMetaLastAge.FieldName)
+	assert.Equal(t, reflect.TypeOf(int8(0)), idMetaLastAge.Typ)
 
 }
 
@@ -65,21 +65,21 @@ func TestIgnoreFieldsOption(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(t, 1, len(meta.columns))
-	assert.Equal(t, 1, len(meta.fieldMap))
-	assert.Equal(t, reflect.TypeOf(tm), meta.typ)
-	assert.Equal(t, "test_ignore_model", meta.tableName)
+	assert.Equal(t, 1, len(meta.Columns))
+	assert.Equal(t, 1, len(meta.FieldMap))
+	assert.Equal(t, reflect.TypeOf(tm), meta.Typ)
+	assert.Equal(t, "test_ignore_model", meta.TableName)
 
-	_, hasId := meta.fieldMap["Id"]
+	_, hasId := meta.FieldMap["Id"]
 	assert.False(t, hasId)
 
-	_, hasFirstName := meta.fieldMap["FirstName"]
+	_, hasFirstName := meta.FieldMap["FirstName"]
 	assert.False(t, hasFirstName)
 
-	_, hasAge := meta.fieldMap["Age"]
+	_, hasAge := meta.FieldMap["Age"]
 	assert.False(t, hasAge)
 
-	_, hasLastName := meta.fieldMap["LastName"]
+	_, hasLastName := meta.FieldMap["LastName"]
 	assert.True(t, hasLastName)
 }
 
@@ -94,7 +94,7 @@ func ExampleMetaRegistry_Get() {
 	tm := &TestModel{}
 	registry := &tagMetaRegistry{}
 	meta, _ := registry.Get(tm)
-	fmt.Printf("table name: %v\n", meta.tableName)
+	fmt.Printf("table name: %v\n", meta.TableName)
 
 	// Output:
 	// table name: test_model
@@ -109,7 +109,7 @@ func ExampleMetaRegistry_Register() {
 case1：
 	table name：%s
 	column names：%s,%s,%s,%s
-`, meta.tableName, meta.columns[0].columnName, meta.columns[1].columnName, meta.columns[2].columnName, meta.columns[3].columnName)
+`, meta.TableName, meta.Columns[0].ColumnName, meta.Columns[1].ColumnName, meta.Columns[2].ColumnName, meta.Columns[3].ColumnName)
 
 	// case2 use Tag to ignore field
 	tim := &TestIgnoreModel{}
@@ -119,7 +119,7 @@ case1：
 case2：
 	table name：%s
 	column names：%s,%s
-`, meta.tableName, meta.columns[0].columnName, meta.columns[1].columnName)
+`, meta.TableName, meta.Columns[0].ColumnName, meta.Columns[1].ColumnName)
 
 	// case3 use IgnoreFieldOption to ignore field
 	tim = &TestIgnoreModel{}
@@ -129,7 +129,7 @@ case2：
 case3：
 	table name：%s
 	column names：%s
-`, meta.tableName, meta.columns[0].columnName)
+`, meta.TableName, meta.Columns[0].ColumnName)
 
 	// Output:
 	// case1：
@@ -143,4 +143,11 @@ case3：
 	// case3：
 	// 	table name：test_ignore_model
 	// 	column names：last_name
+}
+
+type TestModel struct {
+	Id        int64 `eql:"auto_increment,primary_key"`
+	FirstName string
+	Age       int8
+	LastName  *string
 }
