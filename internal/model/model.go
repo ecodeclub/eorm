@@ -12,31 +12,30 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package eorm
+package model
 
 import (
 	"reflect"
 	"strings"
 	"sync"
-
-	"github.com/gotomicro/eorm/internal"
+	"unicode"
 )
 
 // TableMeta represents data model, or a table
 type TableMeta struct {
-	tableName string
-	columns   []*ColumnMeta
-	fieldMap  map[string]*ColumnMeta
-	typ       reflect.Type
+	TableName string
+	Columns  []*ColumnMeta
+	FieldMap map[string]*ColumnMeta
+	Typ      reflect.Type
 }
 
 // ColumnMeta represents model's field, or column
 type ColumnMeta struct {
-	columnName      string
-	fieldName       string
-	typ             reflect.Type
-	isPrimaryKey    bool
-	isAutoIncrement bool
+	ColumnName string
+	FieldName    string
+	Typ             reflect.Type
+	IsPrimaryKey    bool
+	IsAutoIncrement bool
 }
 
 // TableMetaOption represents options of TableMeta, this options will cover default cover.
@@ -46,6 +45,10 @@ type TableMetaOption func(meta *TableMeta)
 type MetaRegistry interface {
 	Get(table interface{}) (*TableMeta, error)
 	Register(table interface{}, opts ...TableMetaOption) (*TableMeta, error)
+}
+
+func NewMetaRegistry() MetaRegistry {
+	return &tagMetaRegistry{}
 }
 
 // tagMetaRegistry is the default implementation based on tag eql
@@ -94,20 +97,20 @@ func (t *tagMetaRegistry) Register(table interface{}, opts ...TableMetaOption) (
 			continue
 		}
 		columnMeta := &ColumnMeta{
-			columnName:      internal.UnderscoreName(structField.Name),
-			fieldName:       structField.Name,
-			typ:             structField.Type,
-			isAutoIncrement: isAuto,
-			isPrimaryKey:    isKey,
+			ColumnName:      underscoreName(structField.Name),
+			FieldName:       structField.Name,
+			Typ:             structField.Type,
+			IsAutoIncrement: isAuto,
+			IsPrimaryKey:    isKey,
 		}
 		columnMetas = append(columnMetas, columnMeta)
-		fieldMap[columnMeta.fieldName] = columnMeta
+		fieldMap[columnMeta.FieldName] = columnMeta
 	}
 	tableMeta := &TableMeta{
-		columns:   columnMetas,
-		tableName: internal.UnderscoreName(v.Name()),
-		typ:       rtype,
-		fieldMap:  fieldMap,
+		Columns:   columnMetas,
+		TableName: underscoreName(v.Name()),
+		Typ:       rtype,
+		FieldMap:  fieldMap,
 	}
 	for _, o := range opts {
 		o(tableMeta)
@@ -121,17 +124,34 @@ func IgnoreFieldsOption(fieldNames ...string) TableMetaOption {
 	return func(meta *TableMeta) {
 		for _, field := range fieldNames {
 			// has field in the TableMeta
-			if _, ok := meta.fieldMap[field]; ok {
+			if _, ok := meta.FieldMap[field]; ok {
 				// delete field in columns slice
-				for index, column := range meta.columns {
-					if column.fieldName == field {
-						meta.columns = append(meta.columns[:index], meta.columns[index+1:]...)
+				for index, column := range meta.Columns {
+					if column.FieldName == field {
+						meta.Columns = append(meta.Columns[:index], meta.Columns[index+1:]...)
 						break
 					}
 				}
 				// delete field in fieldMap
-				delete(meta.fieldMap, field)
+				delete(meta.FieldMap, field)
 			}
 		}
 	}
+}
+
+// underscoreName function mainly converts upper case to lower case and adds an underscore in between
+func underscoreName(tableName string) string {
+	var buf []byte
+	for i, v := range tableName {
+		if unicode.IsUpper(v) {
+			if i != 0 {
+				buf = append(buf, '_')
+			}
+			buf = append(buf, byte(unicode.ToLower(v)))
+		} else {
+			buf = append(buf, byte(v))
+		}
+
+	}
+	return string(buf)
 }

@@ -16,7 +16,7 @@ package eorm
 
 import (
 	"fmt"
-	"github.com/gotomicro/eorm/internal"
+	err "github.com/gotomicro/eorm/internal/error"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
@@ -52,7 +52,7 @@ func TestSelectable(t *testing.T) {
 		{
 			name:    "invalid columns",
 			builder: NewSelector(db).Select(Columns("Invalid"), Raw("AVG(DISTINCT `age`)")).From(&TestModel{}),
-			wantErr: internal.NewInvalidColumnError("Invalid"),
+			wantErr: err.NewInvalidColumnError("Invalid"),
 		},
 		{
 			name:    "order by",
@@ -62,7 +62,7 @@ func TestSelectable(t *testing.T) {
 		{
 			name:    "order by invalid column",
 			builder: NewSelector(db).From(&TestModel{}).OrderBy(ASC("Invalid"), DESC("Id")),
-			wantErr: internal.NewInvalidColumnError("Invalid"),
+			wantErr: err.NewInvalidColumnError("Invalid"),
 		},
 		{
 			name:    "group by",
@@ -72,7 +72,7 @@ func TestSelectable(t *testing.T) {
 		{
 			name:    "group by invalid column",
 			builder: NewSelector(db).From(&TestModel{}).GroupBy("Invalid", "Id"),
-			wantErr: internal.NewInvalidColumnError("Invalid"),
+			wantErr: err.NewInvalidColumnError("Invalid"),
 		},
 		{
 			name:     "offset",
@@ -117,7 +117,7 @@ func TestSelectable(t *testing.T) {
 		{
 			name:    "invalid alias in having",
 			builder: NewSelector(db).Select(Columns("Id"), Columns("FirstName"), Avg("Age").As("avg_age")).From(&TestModel{}).GroupBy("FirstName").Having(C("Invalid").LT(20)),
-			wantErr: internal.NewInvalidColumnError("Invalid"),
+			wantErr: err.NewInvalidColumnError("Invalid"),
 		},
 	}
 
@@ -172,6 +172,6 @@ func ExampleSelector_Having() {
 	// SQL: SELECT `id`,`first_name`,AVG(`age`) AS `avg_age` FROM `test_model` GROUP BY `first_name` HAVING `avg_age`<?;
 	// Args: []interface {}{20}
 	// case2
-	// eql: invalid column name Invalid, it must be a valid field name of structure
+	// eorm: invalid column name Invalid, it must be a valid field name of structure
 
 }

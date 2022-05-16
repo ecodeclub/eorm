@@ -15,6 +15,8 @@
 package eorm
 
 import (
+	"github.com/gotomicro/eorm/internal/dialect"
+	"github.com/gotomicro/eorm/internal/model"
 	"github.com/valyala/bytebufferpool"
 )
 
@@ -23,16 +25,16 @@ type DBOption func(db *DB)
 
 // DB represents a database
 type DB struct {
-	metaRegistry MetaRegistry
-	dialect      Dialect
+	metaRegistry model.MetaRegistry
+	dialect      dialect.Dialect
 }
 
 // NewDB returns DB.
 // By default, it will create an instance of MetaRegistry and use MySQL as the dialect
 func NewDB(opts ...DBOption) *DB {
 	db := &DB{
-		metaRegistry: &tagMetaRegistry{},
-		dialect:      MySQL,
+		metaRegistry: model.NewMetaRegistry(),
+		dialect:      dialect.MySQL,
 	}
 	for _, o := range opts {
 		o(db)
@@ -41,14 +43,14 @@ func NewDB(opts ...DBOption) *DB {
 }
 
 // DBWithMetaRegistry specify the MetaRegistry
-func DBWithMetaRegistry(registry MetaRegistry) DBOption {
+func DBWithMetaRegistry(registry model.MetaRegistry) DBOption {
 	return func(db *DB) {
 		db.metaRegistry = registry
 	}
 }
 
 // DBWithDialect specify dialect
-func DBWithDialect(dialect Dialect) DBOption {
+func DBWithDialect(dialect dialect.Dialect) DBOption {
 	return func(db *DB) {
 		db.dialect = dialect
 	}

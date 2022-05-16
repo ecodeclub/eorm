@@ -16,7 +16,7 @@ package eorm
 
 import (
 	"fmt"
-	"github.com/gotomicro/eorm/internal"
+	err "github.com/gotomicro/eorm/internal/error"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
@@ -44,7 +44,7 @@ func TestUpdater_Set(t *testing.T) {
 		{
 			name:    "set invalid columns",
 			builder: NewDB().Update(tm).Set(Columns("FirstNameInvalid", "Age")),
-			wantErr: internal.NewInvalidColumnError("FirstNameInvalid"),
+			wantErr: err.NewInvalidColumnError("FirstNameInvalid"),
 		},
 		{
 			name:     "set c2",
@@ -56,7 +56,7 @@ func TestUpdater_Set(t *testing.T) {
 		{
 			name:    "set invalid c2",
 			builder: NewDB().Update(tm).Set(C("FirstNameInvalid"), C("Age")),
-			wantErr: internal.NewInvalidColumnError("FirstNameInvalid"),
+			wantErr: err.NewInvalidColumnError("FirstNameInvalid"),
 		},
 
 		{
@@ -68,7 +68,7 @@ func TestUpdater_Set(t *testing.T) {
 		{
 			name:    "set invalid assignment",
 			builder: NewDB().Update(tm).Set(C("FirstName"), Assign("InvalidAge", 30)),
-			wantErr: internal.NewInvalidColumnError("InvalidAge"),
+			wantErr: err.NewInvalidColumnError("InvalidAge"),
 		},
 		{
 			name:     "set age+1",

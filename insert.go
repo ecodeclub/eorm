@@ -17,6 +17,7 @@ package eorm
 import (
 	"errors"
 	"fmt"
+	"github.com/gotomicro/eorm/internal/model"
 	"reflect"
 )
 
@@ -42,7 +43,7 @@ func (i *Inserter) Build() (*Query, error) {
 	if err != nil {
 		return &Query{}, err
 	}
-	i.quote(i.meta.tableName)
+	i.quote(i.meta.TableName)
 	i.buffer.WriteString("(")
 	fields, err := i.buildColumns()
 	if err != nil {
@@ -54,9 +55,9 @@ func (i *Inserter) Build() (*Query, error) {
 		i.buffer.WriteString("(")
 		refVal := reflect.ValueOf(value).Elem()
 		for j, v := range fields {
-			field := refVal.FieldByName(v.fieldName)
+			field := refVal.FieldByName(v.FieldName)
 			if !field.IsValid() {
-				return &Query{}, fmt.Errorf("invalid column %s", v.fieldName)
+				return &Query{}, fmt.Errorf("invalid column %s", v.FieldName)
 			}
 			val := field.Interface()
 			i.parameter(val)
@@ -101,24 +102,24 @@ func (i *Inserter) OnConflict(cs ...string) *PgSQLUpserter {
 	panic("implement me")
 }
 
-func (i *Inserter) buildColumns() ([]*ColumnMeta, error) {
-	cs := i.meta.columns
+func (i *Inserter) buildColumns() ([]*model.ColumnMeta, error) {
+	cs := i.meta.Columns
 	if len(i.columns) != 0 {
-		cs = make([]*ColumnMeta, 0, len(i.columns))
+		cs = make([]*model.ColumnMeta, 0, len(i.columns))
 		for index, value := range i.columns {
-			v, isOk := i.meta.fieldMap[value]
+			v, isOk := i.meta.FieldMap[value]
 			if !isOk {
 				return cs, fmt.Errorf("invalid column %s", value)
 			}
-			i.quote(v.columnName)
+			i.quote(v.ColumnName)
 			if index != len(i.columns)-1 {
 				i.comma()
 			}
 			cs = append(cs, v)
 		}
 	} else {
-		for index, value := range i.meta.columns {
-			i.quote(value.columnName)
+		for index, value := range i.meta.Columns {
+			i.quote(value.ColumnName)
 			if index != len(cs)-1 {
 				i.comma()
 			}

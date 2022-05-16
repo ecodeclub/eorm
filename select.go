@@ -15,7 +15,7 @@
 package eorm
 
 import (
-	"github.com/gotomicro/eorm/internal"
+	error2 "github.com/gotomicro/eorm/internal/error"
 	"github.com/valyala/bytebufferpool"
 )
 
@@ -57,7 +57,7 @@ func (s *Selector) Build() (*Query, error) {
 		}
 	}
 	_, _ = s.buffer.WriteString(" FROM ")
-	s.quote(s.meta.tableName)
+	s.quote(s.meta.TableName)
 	if len(s.where) > 0 {
 		_, _ = s.buffer.WriteString(" WHERE ")
 		err = s.buildPredicates(s.where)
@@ -111,11 +111,11 @@ func (s *Selector) buildOrderBy() error {
 			s.comma()
 		}
 		for _, c := range ob.fields {
-			cMeta, ok := s.meta.fieldMap[c]
+			cMeta, ok := s.meta.FieldMap[c]
 			if !ok {
-				return internal.NewInvalidColumnError(c)
+				return error2.NewInvalidColumnError(c)
 			}
-			s.quote(cMeta.columnName)
+			s.quote(cMeta.ColumnName)
 		}
 		s.space()
 		_, _ = s.buffer.WriteString(ob.order)
@@ -126,25 +126,25 @@ func (s *Selector) buildOrderBy() error {
 func (s *Selector) buildGroupBy() error {
 	_, _ = s.buffer.WriteString(" GROUP BY ")
 	for i, gb := range s.groupBy {
-		cMeta, ok := s.meta.fieldMap[gb]
+		cMeta, ok := s.meta.FieldMap[gb]
 		if !ok {
-			return internal.NewInvalidColumnError(gb)
+			return error2.NewInvalidColumnError(gb)
 		}
 		if i > 0 {
 			s.comma()
 		}
-		s.quote(cMeta.columnName)
+		s.quote(cMeta.ColumnName)
 	}
 	return nil
 }
 
 func (s *Selector) buildAllColumns() {
-	for i, cMeta := range s.meta.columns {
+	for i, cMeta := range s.meta.Columns {
 		if i > 0 {
 			s.comma()
 		}
 		// it should never return error, we can safely ignore it
-		_ = s.buildColumn(cMeta.fieldName, "")
+		_ = s.buildColumn(cMeta.FieldName, "")
 	}
 }
 
@@ -185,12 +185,12 @@ func (s *Selector) buildSelectedList() error {
 func (s *Selector) selectAggregate(aggregate Aggregate) error {
 	_, _ = s.buffer.WriteString(aggregate.fn)
 	_ = s.buffer.WriteByte('(')
-	cMeta, ok := s.meta.fieldMap[aggregate.arg]
+	cMeta, ok := s.meta.FieldMap[aggregate.arg]
 	s.aliases[aggregate.alias] = struct{}{}
 	if !ok {
-		return internal.NewInvalidColumnError(aggregate.arg)
+		return error2.NewInvalidColumnError(aggregate.arg)
 	}
-	s.quote(cMeta.columnName)
+	s.quote(cMeta.ColumnName)
 	_ = s.buffer.WriteByte(')')
 	if aggregate.alias != "" {
 		if _, ok := s.aliases[aggregate.alias]; ok {
@@ -202,11 +202,11 @@ func (s *Selector) selectAggregate(aggregate Aggregate) error {
 }
 
 func (s *Selector) buildColumn(field, alias string) error {
-	cMeta, ok := s.meta.fieldMap[field]
+	cMeta, ok := s.meta.FieldMap[field]
 	if !ok {
-		return internal.NewInvalidColumnError(field)
+		return error2.NewInvalidColumnError(field)
 	}
-	s.quote(cMeta.columnName)
+	s.quote(cMeta.ColumnName)
 	if alias != "" {
 		s.aliases[alias] = struct{}{}
 		_, _ = s.buffer.WriteString(" AS ")

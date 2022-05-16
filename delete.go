@@ -32,7 +32,7 @@ func (d *Deleter) Build() (*Query, error) {
 		return nil, err
 	}
 
-	d.quote(d.meta.tableName)
+	d.quote(d.meta.TableName)
 	if len(d.where) > 0 {
 		_, err = d.buffer.WriteString(" WHERE ")
 		if err != nil {
