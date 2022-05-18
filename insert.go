@@ -38,21 +38,21 @@ func (i *Inserter) Build() (*Query, error) {
 	if len(i.values) == 0 {
 		return &Query{}, errors.New("插入0行")
 	}
-	i.buffer.WriteString("INSERT INTO ")
+	i.writeString("INSERT INTO ")
 	i.meta, err = i.registry.Get(i.values[0])
 	if err != nil {
 		return &Query{}, err
 	}
 	i.quote(i.meta.TableName)
-	i.buffer.WriteString("(")
+	i.writeString("(")
 	fields, err := i.buildColumns()
 	if err != nil {
 		return &Query{}, err
 	}
-	i.buffer.WriteString(")")
-	i.buffer.WriteString(" VALUES")
+	i.writeString(")")
+	i.writeString(" VALUES")
 	for index, val := range i.values {
-		i.buffer.WriteString("(")
+		i.writeString("(")
 		refVal := value.NewValue(val)
 		for j, v := range fields {
 			fdVal, err := refVal.Field(v.FieldName)
@@ -64,7 +64,7 @@ func (i *Inserter) Build() (*Query, error) {
 				i.comma()
 			}
 		}
-		i.buffer.WriteString(")")
+		i.writeString(")")
 		if index != len(i.values)-1 {
 			i.comma()
 		}

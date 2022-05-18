@@ -17,13 +17,13 @@ TARGET=.git/hooks/pre-push
 
 # copy pre-push file if not exist.
 if [ ! -f $TARGET ]; then
-    echo "start copy file..."
+    echo "设置 github hooks..."
     cp $SOURCE $TARGET
 fi
 
 # add permission to TARGET file.
 test -x $TARGET || chmod +x $TARGET
 
-echo "start install golangci-lint..."
+echo "安装 golangci-lint..."
 # install golangci-lint when golangci-lint not installed.
 go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.42.1

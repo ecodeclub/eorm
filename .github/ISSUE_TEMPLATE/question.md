@@ -1,10 +1,7 @@
 ---
-name: Question
-about: Want to ask some questions
-title: '问题咨询'
+name: 问题咨询
+title: ''
 labels: question
-assignees: ''
-
 ---
 
 **仅限中文**

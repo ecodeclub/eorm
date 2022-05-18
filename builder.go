@@ -55,6 +55,14 @@ func (b *builder) space() {
 	_ = b.buffer.WriteByte(' ')
 }
 
+func (b *builder) writeString(val string) {
+	_, _ = b.buffer.WriteString(val)
+}
+
+func (b *builder) writeByte(c byte) {
+	_ = b.buffer.WriteByte(c)
+}
+
 func (b *builder) end() {
 	_ = b.buffer.WriteByte(';')
 }
