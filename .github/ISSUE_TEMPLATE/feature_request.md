@@ -1,7 +1,6 @@
 ---
-name: Feature request
-about: Suggest an idea for this project
-title: '新特性提议'
+name: 新特性提议
+title: ''
 labels: feature
 assignees: ''
 

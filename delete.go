@@ -23,10 +23,8 @@ type Deleter struct {
 
 // Build returns DELETE query
 func (d *Deleter) Build() (*Query, error) {
-	_, err := d.buffer.WriteString("DELETE FROM ")
-	if err != nil {
-		return nil, err
-	}
+	_, _ = d.buffer.WriteString("DELETE FROM ")
+	var err error
 	d.meta, err = d.registry.Get(d.table)
 	if err != nil {
 		return nil, err
@@ -34,10 +32,7 @@ func (d *Deleter) Build() (*Query, error) {
 
 	d.quote(d.meta.TableName)
 	if len(d.where) > 0 {
-		_, err = d.buffer.WriteString(" WHERE ")
-		if err != nil {
-			return nil, err
-		}
+		d.writeString(" WHERE ")
 		err = d.buildPredicates(d.where)
 		if err != nil {
 			return nil, err

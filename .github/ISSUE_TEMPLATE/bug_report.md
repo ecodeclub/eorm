@@ -1,7 +1,6 @@
 ---
-name: Bug report
-about: Create a report to help us improve
-title: 'Bug 上报'
+name: Bug 上报
+title: ''
 labels: bug
 assignees: ''
 

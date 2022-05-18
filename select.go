@@ -47,7 +47,7 @@ func (s *Selector) Build() (*Query, error) {
 	if err != nil {
 		return nil, err
 	}
-	_, _ = s.buffer.WriteString("SELECT ")
+	s.writeString("SELECT ")
 	if len(s.columns) == 0 {
 		s.buildAllColumns()
 	} else {
@@ -56,10 +56,10 @@ func (s *Selector) Build() (*Query, error) {
 			return nil, err
 		}
 	}
-	_, _ = s.buffer.WriteString(" FROM ")
+	s.writeString(" FROM ")
 	s.quote(s.meta.TableName)
 	if len(s.where) > 0 {
-		_, _ = s.buffer.WriteString(" WHERE ")
+		s.writeString(" WHERE ")
 		err = s.buildPredicates(s.where)
 		if err != nil {
 			return nil, err
@@ -84,7 +84,7 @@ func (s *Selector) Build() (*Query, error) {
 
 	// having
 	if len(s.having) > 0 {
-		_, _ = s.buffer.WriteString(" HAVING ")
+		s.writeString(" HAVING ")
 		err = s.buildPredicates(s.having)
 		if err != nil {
 			return nil, err
@@ -92,12 +92,12 @@ func (s *Selector) Build() (*Query, error) {
 	}
 
 	if s.offset > 0 {
-		_, _ = s.buffer.WriteString(" OFFSET ")
+		s.writeString(" OFFSET ")
 		s.parameter(s.offset)
 	}
 
 	if s.limit > 0 {
-		_, _ = s.buffer.WriteString(" LIMIT ")
+		s.writeString(" LIMIT ")
 		s.parameter(s.limit)
 	}
 	s.end()
@@ -105,7 +105,7 @@ func (s *Selector) Build() (*Query, error) {
 }
 
 func (s *Selector) buildOrderBy() error {
-	_, _ = s.buffer.WriteString(" ORDER BY ")
+	s.writeString(" ORDER BY ")
 	for i, ob := range s.orderBy {
 		if i > 0 {
 			s.comma()
@@ -118,13 +118,13 @@ func (s *Selector) buildOrderBy() error {
 			s.quote(cMeta.ColumnName)
 		}
 		s.space()
-		_, _ = s.buffer.WriteString(ob.order)
+		s.writeString(ob.order)
 	}
 	return nil
 }
 
 func (s *Selector) buildGroupBy() error {
-	_, _ = s.buffer.WriteString(" GROUP BY ")
+	s.writeString(" GROUP BY ")
 	for i, gb := range s.groupBy {
 		cMeta, ok := s.meta.FieldMap[gb]
 		if !ok {
@@ -183,18 +183,18 @@ func (s *Selector) buildSelectedList() error {
 
 }
 func (s *Selector) selectAggregate(aggregate Aggregate) error {
-	_, _ = s.buffer.WriteString(aggregate.fn)
-	_ = s.buffer.WriteByte('(')
+	s.writeString(aggregate.fn)
+	s.writeByte('(')
 	cMeta, ok := s.meta.FieldMap[aggregate.arg]
 	s.aliases[aggregate.alias] = struct{}{}
 	if !ok {
 		return oerror.NewInvalidColumnError(aggregate.arg)
 	}
 	s.quote(cMeta.ColumnName)
-	_ = s.buffer.WriteByte(')')
+	s.writeByte(')')
 	if aggregate.alias != "" {
 		if _, ok := s.aliases[aggregate.alias]; ok {
-			_, _ = s.buffer.WriteString(" AS ")
+			s.writeString(" AS ")
 			s.quote(aggregate.alias)
 		}
 	}
@@ -209,7 +209,7 @@ func (s *Selector) buildColumn(field, alias string) error {
 	s.quote(cMeta.ColumnName)
 	if alias != "" {
 		s.aliases[alias] = struct{}{}
-		_, _ = s.buffer.WriteString(" AS ")
+		s.writeString(" AS ")
 		s.quote(alias)
 	}
 	return nil

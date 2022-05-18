@@ -44,9 +44,9 @@ func (u *Updater) Build() (*Query, error) {
 	u.val = value.NewValue(u.table)
 	u.args = make([]interface{}, 0, len(u.meta.Columns))
 
-	_, _ = u.buffer.WriteString("UPDATE ")
+	u.writeString("UPDATE ")
 	u.quote(u.meta.TableName)
-	_, _ = u.buffer.WriteString(" SET ")
+	u.writeString(" SET ")
 	if len(u.assigns) == 0 {
 		err = u.buildDefaultColumns()
 	} else {
@@ -57,7 +57,7 @@ func (u *Updater) Build() (*Query, error) {
 	}
 
 	if len(u.where) > 0 {
-		_, _ = u.buffer.WriteString(" WHERE ")
+		u.writeString(" WHERE ")
 		err = u.buildPredicates(u.where)
 		if err != nil {
 			return nil, err
