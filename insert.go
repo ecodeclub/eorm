@@ -16,9 +16,9 @@ package eorm
 
 import (
 	"errors"
-	"fmt"
+	"github.com/gotomicro/eorm/internal/errs"
 	"github.com/gotomicro/eorm/internal/model"
-	"reflect"
+	"github.com/gotomicro/eorm/internal/value"
 )
 
 // Inserter is used to construct an insert query
@@ -36,7 +36,7 @@ type Inserter struct {
 func (i *Inserter) Build() (*Query, error) {
 	var err error
 	if len(i.values) == 0 {
-		return &Query{}, errors.New("no values")
+		return &Query{}, errors.New("插入0行")
 	}
 	i.buffer.WriteString("INSERT INTO ")
 	i.meta, err = i.registry.Get(i.values[0])
@@ -51,16 +51,15 @@ func (i *Inserter) Build() (*Query, error) {
 	}
 	i.buffer.WriteString(")")
 	i.buffer.WriteString(" VALUES")
-	for index, value := range i.values {
+	for index, val := range i.values {
 		i.buffer.WriteString("(")
-		refVal := reflect.ValueOf(value).Elem()
+		refVal := value.NewValue(val)
 		for j, v := range fields {
-			field := refVal.FieldByName(v.FieldName)
-			if !field.IsValid() {
-				return &Query{}, fmt.Errorf("invalid column %s", v.FieldName)
+			fdVal, err := refVal.Field(v.FieldName)
+			if err != nil {
+				return &Query{}, err
 			}
-			val := field.Interface()
-			i.parameter(val)
+			i.parameter(fdVal)
 			if j != len(fields)-1 {
 				i.comma()
 			}
@@ -106,10 +105,10 @@ func (i *Inserter) buildColumns() ([]*model.ColumnMeta, error) {
 	cs := i.meta.Columns
 	if len(i.columns) != 0 {
 		cs = make([]*model.ColumnMeta, 0, len(i.columns))
-		for index, value := range i.columns {
-			v, isOk := i.meta.FieldMap[value]
+		for index, c := range i.columns {
+			v, isOk := i.meta.FieldMap[c]
 			if !isOk {
-				return cs, fmt.Errorf("invalid column %s", value)
+				return cs, errs.NewInvalidColumnError(c)
 			}
 			i.quote(v.ColumnName)
 			if index != len(i.columns)-1 {

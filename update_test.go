@@ -16,7 +16,7 @@ package eorm
 
 import (
 	"fmt"
-	err "github.com/gotomicro/eorm/internal/error"
+	err "github.com/gotomicro/eorm/internal/errs"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )

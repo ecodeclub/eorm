@@ -15,7 +15,7 @@
 package eorm
 
 import (
-	error2 "github.com/gotomicro/eorm/internal/error"
+	oerror "github.com/gotomicro/eorm/internal/errs"
 	"github.com/valyala/bytebufferpool"
 )
 
@@ -113,7 +113,7 @@ func (s *Selector) buildOrderBy() error {
 		for _, c := range ob.fields {
 			cMeta, ok := s.meta.FieldMap[c]
 			if !ok {
-				return error2.NewInvalidColumnError(c)
+				return oerror.NewInvalidColumnError(c)
 			}
 			s.quote(cMeta.ColumnName)
 		}
@@ -128,7 +128,7 @@ func (s *Selector) buildGroupBy() error {
 	for i, gb := range s.groupBy {
 		cMeta, ok := s.meta.FieldMap[gb]
 		if !ok {
-			return error2.NewInvalidColumnError(gb)
+			return oerror.NewInvalidColumnError(gb)
 		}
 		if i > 0 {
 			s.comma()
@@ -188,7 +188,7 @@ func (s *Selector) selectAggregate(aggregate Aggregate) error {
 	cMeta, ok := s.meta.FieldMap[aggregate.arg]
 	s.aliases[aggregate.alias] = struct{}{}
 	if !ok {
-		return error2.NewInvalidColumnError(aggregate.arg)
+		return oerror.NewInvalidColumnError(aggregate.arg)
 	}
 	s.quote(cMeta.ColumnName)
 	_ = s.buffer.WriteByte(')')
@@ -204,7 +204,7 @@ func (s *Selector) selectAggregate(aggregate Aggregate) error {
 func (s *Selector) buildColumn(field, alias string) error {
 	cMeta, ok := s.meta.FieldMap[field]
 	if !ok {
-		return error2.NewInvalidColumnError(field)
+		return oerror.NewInvalidColumnError(field)
 	}
 	s.quote(cMeta.ColumnName)
 	if alias != "" {
