@@ -16,7 +16,8 @@ package eorm
 
 import (
 	"fmt"
-	error2 "github.com/gotomicro/eorm/internal/error"
+	"github.com/gotomicro/eorm/internal/errs"
+	"github.com/gotomicro/eorm/internal/value"
 	"reflect"
 
 	"github.com/valyala/bytebufferpool"
@@ -25,9 +26,9 @@ import (
 // Updater is the builder responsible for building UPDATE query
 type Updater struct {
 	builder
-	table    interface{}
-	tableEle reflect.Value
-	where    []Predicate
+	table interface{}
+	val   value.Value
+	where []Predicate
 	assigns  []Assignable
 }
 
@@ -40,7 +41,7 @@ func (u *Updater) Build() (*Query, error) {
 		return nil, err
 	}
 
-	u.tableEle = reflect.ValueOf(u.table).Elem()
+	u.val = value.NewValue(u.table)
 	u.args = make([]interface{}, 0, len(u.meta.Columns))
 
 	_, _ = u.buffer.WriteString("UPDATE ")
@@ -80,9 +81,9 @@ func (u *Updater) buildAssigns() error {
 		case Column:
 			c, ok := u.meta.FieldMap[a.name]
 			if !ok {
-				return error2.NewInvalidColumnError(a.name)
+				return errs.NewInvalidColumnError(a.name)
 			}
-			val := u.getValue(a.name)
+			val, _ := u.val.Field(a.name)
 			u.quote(c.ColumnName)
 			_ = u.buffer.WriteByte('=')
 			u.parameter(val)
@@ -91,9 +92,9 @@ func (u *Updater) buildAssigns() error {
 			for _, name := range a.cs {
 				c, ok := u.meta.FieldMap[name]
 				if !ok {
-					return error2.NewInvalidColumnError(name)
+					return errs.NewInvalidColumnError(name)
 				}
-				val := u.getValue(name)
+				val, _ := u.val.Field(name)
 				if has {
 					u.comma()
 				}
@@ -112,7 +113,7 @@ func (u *Updater) buildAssigns() error {
 		}
 	}
 	if !has {
-		return error2.NewValueNotSetError()
+		return errs.NewValueNotSetError()
 	}
 	return nil
 }
@@ -120,7 +121,7 @@ func (u *Updater) buildAssigns() error {
 func (u *Updater) buildDefaultColumns() error {
 	has := false
 	for _, c := range u.meta.Columns {
-		val := u.getValue(c.FieldName)
+		val, _ := u.val.Field(c.FieldName)
 		if has {
 			_ = u.buffer.WriteByte(',')
 		}
@@ -130,14 +131,9 @@ func (u *Updater) buildDefaultColumns() error {
 		has = true
 	}
 	if !has {
-		return error2.NewValueNotSetError()
+		return errs.NewValueNotSetError()
 	}
 	return nil
-}
-
-func (u *Updater) getValue(fieldName string) interface{} {
-	val := u.tableEle.FieldByName(fieldName)
-	return val.Interface()
 }
 
 // Set represents SET clause

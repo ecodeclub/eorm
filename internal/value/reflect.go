@@ -12,14 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package reflect
+package value
 
 import (
-	"fmt"
-	"github.com/gotomicro/eorm/internal/value"
+	"github.com/gotomicro/eorm/internal/errs"
 	"reflect"
 )
-
 
 // reflectValue 基于反射的 Value
 type reflectValue struct {
@@ -28,7 +26,7 @@ type reflectValue struct {
 
 // NewValue 返回一个封装好的，基于反射实现的 Value
 // 输入 val 必须是一个指向结构体实例的指针，而不能是任何其它类型
-func NewValue(val interface{}) value.Value {
+func NewValue(val interface{}) Value {
 	return reflectValue{
 		val: reflect.ValueOf(val).Elem(),
 	}
@@ -38,7 +36,7 @@ func NewValue(val interface{}) value.Value {
 func (r reflectValue) Field(name string) (interface{}, error) {
 	res := r.val.FieldByName(name)
 	if res == (reflect.Value{}) {
-		return nil, fmt.Errorf("eorm: 找不到字段 %s", name)
+		return nil, errs.NewInvalidColumnError(name)
 	}
 	return res.Interface(), nil
 }

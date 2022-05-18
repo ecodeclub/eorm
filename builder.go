@@ -16,8 +16,8 @@ package eorm
 
 import (
 	"errors"
-	dialect2 "github.com/gotomicro/eorm/internal/dialect"
-	error2 "github.com/gotomicro/eorm/internal/error"
+	"github.com/gotomicro/eorm/internal/dialect"
+	"github.com/gotomicro/eorm/internal/errs"
 	"github.com/gotomicro/eorm/internal/model"
 	"github.com/valyala/bytebufferpool"
 )
@@ -35,7 +35,7 @@ type Query struct {
 
 type builder struct {
 	registry model.MetaRegistry
-	dialect  dialect2.Dialect
+	dialect  dialect.Dialect
 	// Use bytebufferpool to reduce memory allocation.
 	// After using buffer, it must be put back in bytebufferpool.
 	// Call bytebufferpool.Get() to get a buffer, call bytebufferpool.Put() to put buffer back to bytebufferpool.
@@ -85,7 +85,7 @@ func (b *builder) buildExpr(expr Expr) error {
 			}
 			cm, ok := b.meta.FieldMap[e.name]
 			if !ok {
-				return error2.NewInvalidColumnError(e.name)
+				return errs.NewInvalidColumnError(e.name)
 			}
 			b.quote(cm.ColumnName)
 		}
@@ -127,7 +127,7 @@ func (b *builder) buildHavingAggregate(aggregate Aggregate) error {
 	_ = b.buffer.WriteByte('(')
 	cMeta, ok := b.meta.FieldMap[aggregate.arg]
 	if !ok {
-		return error2.NewInvalidColumnError(aggregate.arg)
+		return errs.NewInvalidColumnError(aggregate.arg)
 	}
 	b.quote(cMeta.ColumnName)
 	_ = b.buffer.WriteByte(')')

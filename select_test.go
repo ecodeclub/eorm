@@ -16,7 +16,7 @@ package eorm
 
 import (
 	"fmt"
-	err "github.com/gotomicro/eorm/internal/error"
+	err "github.com/gotomicro/eorm/internal/errs"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
@@ -172,6 +172,6 @@ func ExampleSelector_Having() {
 	// SQL: SELECT `id`,`first_name`,AVG(`age`) AS `avg_age` FROM `test_model` GROUP BY `first_name` HAVING `avg_age`<?;
 	// Args: []interface {}{20}
 	// case2
-	// eorm: invalid column name Invalid, it must be a valid field name of structure
+	// eorm: 非法字段 Invalid
 
 }

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package error
+package errs
 
 import (
 	"errors"
@@ -25,10 +25,8 @@ var (
 
 
 // NewInvalidColumnError returns an error represents invalid field name
-// TODO(do we need errors pkg?)
 func NewInvalidColumnError(field string) error {
-	return fmt.Errorf("eorm: invalid column name %s, " +
-		"it must be a valid field name of structure", field)
+	return fmt.Errorf("eorm: 非法字段 %s", field)
 }
 
 func NewValueNotSetError() error {

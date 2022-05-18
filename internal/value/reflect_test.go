@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package reflect
+package value
 
 import (
 	"errors"
@@ -38,7 +38,7 @@ func TestReflectValue_Field(t *testing.T) {
 		{
 			name: "不存在字段",
 			field: "InvalidField",
-			wantError: errors.New("eorm: 找不到字段 InvalidField"),
+			wantError: errors.New("eorm: 非法字段 InvalidField"),
 		},
 	}
 

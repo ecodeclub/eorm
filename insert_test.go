@@ -53,7 +53,7 @@ func TestInserter_Values(t *testing.T) {
 		{
 			name:    "no examples of values",
 			builder: NewDB().Insert().Values(),
-			wantErr: errors.New("no values"),
+			wantErr: errors.New("插入0行"),
 		},
 		{
 			name:     "single example of values",
@@ -78,7 +78,7 @@ func TestInserter_Values(t *testing.T) {
 		{
 			name:    "an example with invalid columns",
 			builder: NewDB().Insert().Columns("id", "FirstName").Values(u),
-			wantErr: errors.New("invalid column id"),
+			wantErr: errors.New("eorm: 非法字段 id"),
 		},
 		{
 			name:     "no whole columns and multiple values of same type",
@@ -89,7 +89,7 @@ func TestInserter_Values(t *testing.T) {
 		{
 			name:    "multiple values of invalid column",
 			builder: NewDB().Insert().Values(u, o1),
-			wantErr: errors.New("invalid column FirstName"),
+			wantErr: errors.New("eorm: 非法字段 FirstName"),
 		},
 	}
 
