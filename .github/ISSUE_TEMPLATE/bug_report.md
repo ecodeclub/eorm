@@ -1,45 +1,34 @@
 ---
 name: Bug report
 about: Create a report to help us improve
-title: ''
+title: 'Bug 上报'
 labels: bug
 assignees: ''
 
 ---
 
-#### English Only
+**仅限中文**
 
-Please check [existing issues](https://github.com/gotomicro/eorm/issues) first to avoid duplication and answer the questions below before submitting your issue.
+在提之前请先查找[已有 issues](https://github.com/gotomicro/eorm/issues)，避免重复上报。
 
-### Issue Type
+并且确保自己已经：
+- [ ] 阅读过文档
+- [ ] 阅读过注释
+- [ ] 阅读过例子
 
-This is a Bug Report.
+### 问题简要描述
 
-### Summary
+### 复现步骤
+> 如果涉及到数据库表，你必须提供模型定义和表结构定义
 
-(Summarize the bug encountered concisely)
+### 错误日志或者截图
 
-### What version of EQL are you using?
+### 你期望的结果
 
+### 你排查的结果，或者你觉得可行的修复方案
+> 可选。我们希望你能够尽量先排查问题，帮助我们减轻维护负担。这对于你个人能力提升同样是有帮助的。
 
-### What version of Go are you using?
+### 你使用的是 eorm 哪个版本?
 
-(Get your go version by `go version`)
-
-### Steps to reproduce
-
-(How one can reproduce the issue - this is very important, please be as detailed as possible)
-(You **MUST** provide database schemas or model definitions)
-
-### What is the current bug behavior?
-
-(What actually happens)
-
-### What is the expected correct behavior?
-
-(What you should see instead)
-
-### Relevant logs and/or screenshots
-
-(Paste any relevant logs - please use code blocks (```) to format console output,
-logs, and code as it's very hard to read otherwise.)
+### 你设置的的 Go 环境?
+> 上传 `go env` 的结果

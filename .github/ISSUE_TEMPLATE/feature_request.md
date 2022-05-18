@@ -1,31 +1,26 @@
 ---
 name: Feature request
 about: Suggest an idea for this project
-title: ''
+title: '新特性提议'
 labels: feature
 assignees: ''
 
 ---
 
-#### English Only
+**仅限中文**
 
-Please check [existing issues](https://github.com/gotomicro/eorm/issues) first to avoid duplication and answer the questions below before submitting your issue.
+### 使用场景
 
-### Use case(s) 
+### 行业分析
+> 如果你知道有框架提供了类似功能，可以在这里描述，并且给出文档或者例子
 
-(Please state use cases, what problem will this feature solve?)
+### 可行方案
+> 如果你有设计思路或者解决方案，请在这里提供。你可以提供多个方案，并且给出自己的选择
 
-### Proposed Solution
+### 其它
+> 任何你觉得有利于解决问题的补充说明
 
-(Please describe your proposed design/solution, if any)
+### 你使用的是 eorm 哪个版本?
 
-### Alternatives Considered
-
-(Other possible options for solving the problem?)
-
-### Additional Context
-
-(Paste any relevant logs - please use code blocks (```) to format console output,
-logs, and code as it's very hard to read otherwise.)
-
-(If you can, link to the line of code that might be helpful to explain the context)
+### 你设置的的 Go 环境?
+> 上传 `go env` 的结果

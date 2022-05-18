@@ -1,28 +1,24 @@
 ---
 name: Question
 about: Want to ask some questions
-title: ''
+title: '问题咨询'
 labels: question
 assignees: ''
 
 ---
 
-#### English Only
+**仅限中文**
 
-Please check [existing issues](https://github.com/gotomicro/eorm/issues) first to avoid duplication and answer the questions below before submitting your issue.
+在提之前请先查找[已有 issues](https://github.com/gotomicro/eorm/issues)，避免重复上报。
 
-### What version of EQL are you using?
+并且确保自己已经：
+- [ ] 阅读过文档
+- [ ] 阅读过注释
+- [ ] 阅读过例子
 
+### 你的问题
 
-### What version of Go are you using?
+### 你使用的是 eorm 哪个版本?
 
-(Get your go version by `go version`)
-
-### What is your question/issue?
-
-(Please be as detailed as possible)
-
-(Paste any relevant logs - please use code blocks (```) to format console output,
-logs, and code as it's very hard to read otherwise.)
-
-(If you can, link to the line of code that might be responsible for the problem)
+### 你设置的的 Go 环境?
+> 上传 `go env` 的结果
