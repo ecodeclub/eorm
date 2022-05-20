@@ -35,12 +35,8 @@
 
 我想要的社区是大家统一在 github 下，利用 issue 和 discussion 来讨论问题。这样别的用户都可以搜索到所有的讨论。
 
-
-## 设计
-
-[设计思路](./docs/design.md)
-
 ## 加入我们
+- [贡献指南](.docs/contribution.md)
 
 我们欢迎任何人给我们提合并请求，但是我们希望合并请求能够做到：
 - 一个合并请求一个 Commit ID

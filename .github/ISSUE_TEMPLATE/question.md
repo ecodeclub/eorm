@@ -1,5 +1,6 @@
 ---
-name: 问题咨询
+name: Question
+about: Want to ask some questions
 title: ''
 labels: question
 ---
