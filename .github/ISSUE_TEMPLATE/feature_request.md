@@ -1,5 +1,6 @@
 ---
-name: 新特性提议
+name: Feature request
+about: Suggest an idea for this project
 title: ''
 labels: feature
 assignees: ''
