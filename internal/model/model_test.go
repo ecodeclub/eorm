@@ -84,9 +84,9 @@ func TestIgnoreFieldsOption(t *testing.T) {
 }
 
 type TestIgnoreModel struct {
-	Id        int64 `eql:"auto_increment,primary_key,-"`
+	Id        int64 `eorm:"auto_increment,primary_key,-"`
 	FirstName string
-	Age       int8 `eql:"-"`
+	Age       int8 `eorm:"-"`
 	LastName  string
 }
 
@@ -146,7 +146,7 @@ case3：
 }
 
 type TestModel struct {
-	Id        int64 `eql:"auto_increment,primary_key"`
+	Id        int64 `eorm:"auto_increment,primary_key"`
 	FirstName string
 	Age       int8
 	LastName  *string

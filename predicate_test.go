@@ -144,7 +144,7 @@ func TestPredicate_C(t *testing.T) {
 }
 
 type TestModel struct {
-	Id        int64 `eql:"auto_increment,primary_key"`
+	Id        int64 `eorm:"auto_increment,primary_key"`
 	FirstName string
 	Age       int8
 	LastName  *string

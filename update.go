@@ -109,7 +109,7 @@ func (u *Updater) buildAssigns() error {
 			}
 			has = true
 		default:
-			return fmt.Errorf("eql: unsupported assignment %v", a)
+			return fmt.Errorf("eorm: unsupported assignment %v", a)
 		}
 	}
 	if !has {
