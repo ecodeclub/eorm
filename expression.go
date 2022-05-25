@@ -37,8 +37,8 @@ func (r RawExpr) expr() (string, error) {
 	return r.raw, nil
 }
 
-// AsPredicate return the Predicate represented by this RawExpr
-// EQL has no validation for Predicate
+// AsPredicate 将会返回一个 Predicate，RawExpr 将会作为这个 Predicate 的左边部分
+// eorm 将不会校验任何从 RawExpr 生成的 Predicate
 func (r RawExpr) AsPredicate() Predicate {
 	return Predicate{
 		left: r,

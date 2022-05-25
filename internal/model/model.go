@@ -51,7 +51,7 @@ func NewMetaRegistry() MetaRegistry {
 	return &tagMetaRegistry{}
 }
 
-// tagMetaRegistry is the default implementation based on tag eql
+// tagMetaRegistry is the default implementation based on tag eorm
 type tagMetaRegistry struct {
 	metas sync.Map
 }
@@ -80,7 +80,7 @@ func (t *tagMetaRegistry) Register(table interface{}, opts ...TableMetaOption) (
 	fieldMap := make(map[string]*ColumnMeta, lens)
 	for i := 0; i < lens; i++ {
 		structField := v.Field(i)
-		tag := structField.Tag.Get("eql")
+		tag := structField.Tag.Get("eorm")
 		var isKey, isAuto, isIgnore bool
 		for _, t := range strings.Split(tag, ",") {
 			switch t {
