@@ -23,39 +23,82 @@ import (
 )
 
 func TestTagMetaRegistry(t *testing.T) {
-	tm := &TestModel{}
-	registry := &tagMetaRegistry{}
-	meta, err := registry.Register(tm)
-	if err != nil {
-		t.Fatal(err)
+
+	testCases := []struct {
+		name string
+		wantMeta *TableMeta
+		wantErr error
+		input interface{}
+	}{
+		{
+			name: "普通model",
+			wantMeta: &TableMeta{
+				TableName: "test_model",
+				Columns: []*ColumnMeta{
+					{
+						ColumnName: "id",
+						FieldName: "Id",
+						Typ: reflect.TypeOf(int64(0)),
+						IsPrimaryKey: true,
+						IsAutoIncrement: true,
+					},
+					{
+						ColumnName: "first_name",
+						FieldName: "FirstName",
+						Typ: reflect.TypeOf(""),
+					},
+					{
+						ColumnName: "age",
+						FieldName: "Age",
+						Typ: reflect.TypeOf(int8(0)),
+					},
+					{
+						ColumnName: "last_name",
+						FieldName: "LastName",
+						Typ: reflect.TypeOf((*string)(nil)),
+					},
+				},
+				FieldMap: map[string]*ColumnMeta{
+					"Id": {
+						ColumnName: "id",
+						FieldName: "Id",
+						Typ: reflect.TypeOf(int64(0)),
+						IsPrimaryKey: true,
+						IsAutoIncrement: true,
+					},
+					"FirstName":{
+						ColumnName: "first_name",
+						FieldName: "FirstName",
+						Typ: reflect.TypeOf(""),
+					},
+					"Age": {
+						ColumnName: "age",
+						FieldName: "Age",
+						Typ: reflect.TypeOf(int8(0)),
+					},
+					"LastName": {
+						ColumnName: "last_name",
+						FieldName: "LastName",
+						Typ: reflect.TypeOf((*string)(nil)),
+					},
+				},
+				Typ: reflect.TypeOf(&TestModel{}),
+			},
+			input: &TestModel{},
+		},
 	}
-	assert.Equal(t, 4, len(meta.Columns))
-	assert.Equal(t, 4, len(meta.FieldMap))
-	assert.Equal(t, reflect.TypeOf(tm), meta.Typ)
-	assert.Equal(t, "test_model", meta.TableName)
 
-	idMeta := meta.FieldMap["Id"]
-	assert.Equal(t, "id", idMeta.ColumnName)
-	assert.Equal(t, "Id", idMeta.FieldName)
-	assert.Equal(t, reflect.TypeOf(int64(0)), idMeta.Typ)
-	assert.True(t, idMeta.IsAutoIncrement)
-	assert.True(t, idMeta.IsPrimaryKey)
-
-	idMetaFistName := meta.FieldMap["FirstName"]
-	assert.Equal(t, "first_name", idMetaFistName.ColumnName)
-	assert.Equal(t, "FirstName", idMetaFistName.FieldName)
-	assert.Equal(t, reflect.TypeOf(string("")), idMetaFistName.Typ)
-
-	idMetaLastName := meta.FieldMap["LastName"]
-	assert.Equal(t, "last_name", idMetaLastName.ColumnName)
-	assert.Equal(t, "LastName", idMetaLastName.FieldName)
-	assert.Equal(t, reflect.TypeOf((*string)(nil)), idMetaLastName.Typ)
-
-	idMetaLastAge := meta.FieldMap["Age"]
-	assert.Equal(t, "age", idMetaLastAge.ColumnName)
-	assert.Equal(t, "Age", idMetaLastAge.FieldName)
-	assert.Equal(t, reflect.TypeOf(int8(0)), idMetaLastAge.Typ)
-
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			registry := &tagMetaRegistry{}
+			meta, err := registry.Register(tc.input)
+			assert.Equal(t, tc.wantErr, err)
+			if err != nil {
+				return
+			}
+			assert.Equal(t, tc.wantMeta, meta)
+		})
+	}
 }
 
 func TestIgnoreFieldsOption(t *testing.T) {
