@@ -15,6 +15,7 @@
 package eorm
 
 import (
+	"database/sql"
 	"fmt"
 	"github.com/stretchr/testify/assert"
 	"testing"
@@ -147,7 +148,7 @@ type TestModel struct {
 	Id        int64 `eorm:"auto_increment,primary_key"`
 	FirstName string
 	Age       int8
-	LastName  *string
+	LastName  *sql.NullString
 }
 
 type CommonTestCase struct {
@@ -156,10 +157,6 @@ type CommonTestCase struct {
 	wantArgs []interface{}
 	wantSql  string
 	wantErr  error
-}
-
-func stringPtr(val string) *string {
-	return &val
 }
 
 func ExampleNot() {

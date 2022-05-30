@@ -8,6 +8,8 @@
 
 丑话说前头。
 
+- [eorm 支持的字段类型](https://github.com/gotomicro/eorm/discussions/71)：这是指在 Go 语言层面上支持的类型，eorm 本身并不关心数据库表里面定义的类型；
+
 ### Go 版本
 
 请使用 Go 1.18 以上版本。

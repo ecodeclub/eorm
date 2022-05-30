@@ -17,18 +17,30 @@ package errs
 import (
 	"errors"
 	"fmt"
+	"reflect"
 )
 
 var (
-	errValueNotSet = errors.New("value unset")
+	errValueNotSet = errors.New("eorm: 值未设置")
 )
 
 
 // NewInvalidColumnError returns an error represents invalid field name
 func NewInvalidColumnError(field string) error {
-	return fmt.Errorf("eorm: 非法字段 %s", field)
+	return fmt.Errorf("eorm: 未知字段 %s", field)
 }
 
 func NewValueNotSetError() error {
 	return errValueNotSet
+}
+
+// NewUnsupportedTypeError 不支持的字段类型
+// 请参阅 https://github.com/gotomicro/eorm/discussions/71
+func NewUnsupportedTypeError(typ reflect.Type) error {
+	return fmt.Errorf("eorm: 不支持字段类型 %s, %s", typ.PkgPath(), typ.Name())
+}
+
+// NewInsertDiffTypesError 在批量插入中，试图插入不同类型的数据
+func NewInsertDiffTypesError(origin, now string) error {
+	return fmt.Errorf("eorm: 试图插入不同类型的数据，原来：%s，现在：%s", origin, now)
 }

@@ -19,6 +19,7 @@ import (
 	"github.com/gotomicro/eorm/internal/dialect"
 	"github.com/gotomicro/eorm/internal/errs"
 	"github.com/gotomicro/eorm/internal/model"
+	"github.com/gotomicro/eorm/internal/valuer"
 	"github.com/valyala/bytebufferpool"
 )
 
@@ -35,10 +36,11 @@ type Query struct {
 
 type builder struct {
 	registry model.MetaRegistry
-	dialect  dialect.Dialect
-	// Use bytebufferpool to reduce memory allocation.
-	// After using buffer, it must be put back in bytebufferpool.
-	// Call bytebufferpool.Get() to get a buffer, call bytebufferpool.Put() to put buffer back to bytebufferpool.
+	dialect    dialect.Dialect
+	valCreator valuer.Creator
+
+	// 使用 bytebufferpool 以减少内存分配
+	// 每次调用 Get 之后不要忘记再调用 Put
 	buffer  *bytebufferpool.ByteBuffer
 	meta    *model.TableMeta
 	args    []interface{}

@@ -17,6 +17,7 @@ package eorm
 import (
 	"github.com/gotomicro/eorm/internal/dialect"
 	"github.com/gotomicro/eorm/internal/model"
+	"github.com/gotomicro/eorm/internal/valuer"
 	"github.com/valyala/bytebufferpool"
 )
 
@@ -27,6 +28,7 @@ type DBOption func(db *DB)
 type DB struct {
 	metaRegistry model.MetaRegistry
 	dialect      dialect.Dialect
+	valCreator valuer.Creator
 }
 
 // NewDB returns DB.
@@ -35,6 +37,7 @@ func NewDB(opts ...DBOption) *DB {
 	db := &DB{
 		metaRegistry: model.NewMetaRegistry(),
 		dialect:      dialect.MySQL,
+		valCreator: valuer.NewUnsafeValue,
 	}
 	for _, o := range opts {
 		o(db)
@@ -42,27 +45,28 @@ func NewDB(opts ...DBOption) *DB {
 	return db
 }
 
-// DBWithMetaRegistry specify the MetaRegistry
+// DBWithMetaRegistry 指定元数据注册中心
 func DBWithMetaRegistry(registry model.MetaRegistry) DBOption {
 	return func(db *DB) {
 		db.metaRegistry = registry
 	}
 }
 
-// DBWithDialect specify dialect
+// DBWithDialect 指定方言
 func DBWithDialect(dialect dialect.Dialect) DBOption {
 	return func(db *DB) {
 		db.dialect = dialect
 	}
 }
 
-// Delete starts a "delete" query.
+// Delete 开始构建一个 DELETE 查询
 func (db *DB) Delete() *Deleter {
 	return &Deleter{
 		builder: db.builder(),
 	}
 }
 
+// Update 开始构建一个 UPDATE 查询
 func (db *DB) Update(table interface{}) *Updater {
 	return &Updater{
 		builder: db.builder(),
@@ -70,7 +74,7 @@ func (db *DB) Update(table interface{}) *Updater {
 	}
 }
 
-// Insert generate Inserter to builder insert query
+// Insert 开始构建一个 INSERT 查询
 func (db *DB) Insert() *Inserter {
 	return &Inserter{
 		builder: db.builder(),
@@ -82,5 +86,6 @@ func (db *DB) builder() builder {
 		registry: db.metaRegistry,
 		dialect:  db.dialect,
 		buffer:   bytebufferpool.Get(),
+		valCreator: db.valCreator,
 	}
 }

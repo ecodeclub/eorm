@@ -16,24 +16,23 @@ package eorm
 import (
 	"errors"
 	"fmt"
+	"github.com/gotomicro/eorm/internal/errs"
 	"github.com/stretchr/testify/assert"
 	"testing"
-	"time"
 )
 
 func TestInserter_Values(t *testing.T) {
 	type User struct {
 		Id        int64
 		FirstName string
-		Ctime     time.Time
+		Ctime     uint64
 	}
 	type Order struct {
 		Id    int64
 		Name  string
 		Price int64
 	}
-
-	n := time.Now()
+	n := uint64(1000)
 	u := &User{
 		Id:        12,
 		FirstName: "Tom",
@@ -78,7 +77,7 @@ func TestInserter_Values(t *testing.T) {
 		{
 			name:    "an example with invalid columns",
 			builder: NewDB().Insert().Columns("id", "FirstName").Values(u),
-			wantErr: errors.New("eorm: 非法字段 id"),
+			wantErr: errors.New("eorm: 未知字段 id"),
 		},
 		{
 			name:     "no whole columns and multiple values of same type",
@@ -87,9 +86,9 @@ func TestInserter_Values(t *testing.T) {
 			wantArgs: []interface{}{int64(12), "Tom", int64(13), "Jerry"},
 		},
 		{
-			name:    "multiple values of invalid column",
+			name:    "insert diff types",
 			builder: NewDB().Insert().Values(u, o1),
-			wantErr: errors.New("eorm: 非法字段 FirstName"),
+			wantErr: errs.NewInsertDiffTypesError("User", "Order"),
 		},
 	}
 
@@ -99,6 +98,9 @@ func TestInserter_Values(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			q, err := c.builder.Build()
 			assert.Equal(t, c.wantErr, err)
+			if err != nil {
+				return
+			}
 			assert.Equal(t, c.wantSql, q.SQL)
 			assert.Equal(t, c.wantArgs, q.Args)
 		})
@@ -118,10 +120,10 @@ func ExampleInserter_Build() {
 	// Output:
 	// case1
 	// SQL: INSERT INTO `test_model`(`id`,`first_name`,`age`,`last_name`) VALUES(?,?,?,?);
-	// Args: []interface {}{1, "", 18, (*string)(nil)}
+	// Args: []interface {}{1, "", 18, (*sql.NullString)(nil)}
 	// case2
 	// SQL: INSERT INTO `test_model`(`id`,`first_name`,`age`,`last_name`) VALUES(?,?,?,?);
-	// Args: []interface {}{0, "", 0, (*string)(nil)}
+	// Args: []interface {}{0, "", 0, (*sql.NullString)(nil)}
 }
 
 func ExampleInserter_Columns() {
@@ -155,5 +157,5 @@ func ExampleInserter_Values() {
 	fmt.Println(query.string())
 	// Output:
 	// SQL: INSERT INTO `test_model`(`id`,`first_name`,`age`,`last_name`) VALUES(?,?,?,?),(?,?,?,?);
-	// Args: []interface {}{1, "", 18, (*string)(nil), 0, "", 0, (*string)(nil)}
+	// Args: []interface {}{1, "", 18, (*sql.NullString)(nil), 0, "", 0, (*sql.NullString)(nil)}
 }

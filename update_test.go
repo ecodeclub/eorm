@@ -15,6 +15,7 @@
 package eorm
 
 import (
+	"database/sql"
 	"fmt"
 	err "github.com/gotomicro/eorm/internal/errs"
 	"github.com/stretchr/testify/assert"
@@ -26,14 +27,14 @@ func TestUpdater_Set(t *testing.T) {
 		Id:        12,
 		FirstName: "Tom",
 		Age:       18,
-		LastName:  stringPtr("Jerry"),
+		LastName:  &sql.NullString{String: "Jerry", Valid: true},
 	}
 	testCases := []CommonTestCase{
 		{
 			name:     "no set",
 			builder:  NewDB().Update(tm),
 			wantSql:  "UPDATE `test_model` SET `id`=?,`first_name`=?,`age`=?,`last_name`=?;",
-			wantArgs: []interface{}{int64(12), "Tom", int8(18), stringPtr("Jerry")},
+			wantArgs: []interface{}{int64(12), "Tom", int8(18), &sql.NullString{String: "Jerry", Valid: true}},
 		},
 		{
 			name:     "set columns",
