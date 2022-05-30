@@ -31,7 +31,8 @@ func TestTagMetaRegistry(t *testing.T) {
 		input interface{}
 	}{
 		{
-			name: "普通model",
+			// 普通
+			name: "normal model",
 			wantMeta: &TableMeta{
 				TableName: "test_model",
 				Columns: []*ColumnMeta{
@@ -46,16 +47,19 @@ func TestTagMetaRegistry(t *testing.T) {
 						ColumnName: "first_name",
 						FieldName: "FirstName",
 						Typ: reflect.TypeOf(""),
+						Offset: 8,
 					},
 					{
 						ColumnName: "age",
 						FieldName: "Age",
 						Typ: reflect.TypeOf(int8(0)),
+						Offset: 24,
 					},
 					{
 						ColumnName: "last_name",
 						FieldName: "LastName",
 						Typ: reflect.TypeOf((*string)(nil)),
+						Offset: 32,
 					},
 				},
 				FieldMap: map[string]*ColumnMeta{
@@ -70,16 +74,19 @@ func TestTagMetaRegistry(t *testing.T) {
 						ColumnName: "first_name",
 						FieldName: "FirstName",
 						Typ: reflect.TypeOf(""),
+						Offset: 8,
 					},
 					"Age": {
 						ColumnName: "age",
 						FieldName: "Age",
 						Typ: reflect.TypeOf(int8(0)),
+						Offset: 24,
 					},
 					"LastName": {
 						ColumnName: "last_name",
 						FieldName: "LastName",
 						Typ: reflect.TypeOf((*string)(nil)),
+						Offset: 32,
 					},
 				},
 				Typ: reflect.TypeOf(&TestModel{}),

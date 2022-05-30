@@ -12,15 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package value
+package test
 
-// Value 是对结构体实例的内部抽象
-type Value interface {
-	// Field 访问结构体字段
-	Field(name string) (interface{}, error)
+func ToPtr[T any](t T) *T {
+	return &t
 }
-
-
-
-
-

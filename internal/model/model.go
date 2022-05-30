@@ -15,10 +15,18 @@
 package model
 
 import (
+	"database/sql"
+	"database/sql/driver"
 	"reflect"
 	"strings"
 	"sync"
+	// nolint
 	"unicode"
+)
+
+var (
+	scannerType = reflect.TypeOf((*sql.Scanner)(nil)).Elem()
+	driverValuerType = reflect.TypeOf((*driver.Valuer)(nil)).Elem()
 )
 
 // TableMeta represents data model, or a table
@@ -36,6 +44,20 @@ type ColumnMeta struct {
 	Typ             reflect.Type
 	IsPrimaryKey    bool
 	IsAutoIncrement bool
+	// Offset 是字段偏移量。需要注意的是，这里的字段偏移量是相对于整个结构体的偏移量
+	// 例如在组合的情况下，
+	// type A struct {
+	//     name string
+	//     B
+	// }
+	// type B struct {
+	//     age int
+	// }
+	// age 的偏移量是相对于 A 的起始地址的偏移量
+	Offset uintptr
+	// IsHolderType 用于表达是否是 Holder 的类型
+	// 所谓的 Holder，就是指同时实现了 sql.Scanner 和 driver.Valuer 两个接口的类型
+	IsHolderType bool
 }
 
 // TableMetaOption represents options of TableMeta, this options will cover default cover.
@@ -63,7 +85,6 @@ func NewTagMetaRegistry() MetaRegistry {
 // Get the metadata for each column of the data table,
 // If there is none, it will register one and return the metadata for each column
 func (t *tagMetaRegistry) Get(table interface{}) (*TableMeta, error) {
-
 	if v, ok := t.metas.Load(reflect.TypeOf(table)); ok {
 		return v.(*TableMeta), nil
 	}
@@ -75,7 +96,7 @@ func (t *tagMetaRegistry) Get(table interface{}) (*TableMeta, error) {
 func (t *tagMetaRegistry) Register(table interface{}, opts ...TableMetaOption) (*TableMeta, error) {
 	rtype := reflect.TypeOf(table)
 	v := rtype.Elem()
-	columnMetas := []*ColumnMeta{}
+	var columnMetas []*ColumnMeta
 	lens := v.NumField()
 	fieldMap := make(map[string]*ColumnMeta, lens)
 	for i := 0; i < lens; i++ {
@@ -102,6 +123,8 @@ func (t *tagMetaRegistry) Register(table interface{}, opts ...TableMetaOption) (
 			Typ:             structField.Type,
 			IsAutoIncrement: isAuto,
 			IsPrimaryKey:    isKey,
+			Offset: structField.Offset,
+			IsHolderType: structField.Type.AssignableTo(scannerType) && structField.Type.AssignableTo(driverValuerType),
 		}
 		columnMetas = append(columnMetas, columnMeta)
 		fieldMap[columnMeta.FieldName] = columnMeta

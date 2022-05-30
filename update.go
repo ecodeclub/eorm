@@ -17,7 +17,7 @@ package eorm
 import (
 	"fmt"
 	"github.com/gotomicro/eorm/internal/errs"
-	"github.com/gotomicro/eorm/internal/value"
+	"github.com/gotomicro/eorm/internal/valuer"
 	"reflect"
 
 	"github.com/valyala/bytebufferpool"
@@ -27,7 +27,7 @@ import (
 type Updater struct {
 	builder
 	table interface{}
-	val   value.Value
+	val   valuer.Value
 	where []Predicate
 	assigns  []Assignable
 }
@@ -41,7 +41,7 @@ func (u *Updater) Build() (*Query, error) {
 		return nil, err
 	}
 
-	u.val = value.NewValue(u.table)
+	u.val = u.valCreator(u.table, u.meta)
 	u.args = make([]interface{}, 0, len(u.meta.Columns))
 
 	u.writeString("UPDATE ")

@@ -12,21 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package value
+package valuer
 
 import (
 	"github.com/gotomicro/eorm/internal/errs"
+	"github.com/gotomicro/eorm/internal/model"
 	"reflect"
 )
+
+var _ Creator = NewReflectValue
 
 // reflectValue 基于反射的 Value
 type reflectValue struct {
 	val reflect.Value
 }
 
-// NewValue 返回一个封装好的，基于反射实现的 Value
+// NewReflectValue 返回一个封装好的，基于反射实现的 Value
 // 输入 val 必须是一个指向结构体实例的指针，而不能是任何其它类型
-func NewValue(val interface{}) Value {
+func NewReflectValue(val interface{}, _ *model.TableMeta) Value {
 	return reflectValue{
 		val: reflect.ValueOf(val).Elem(),
 	}

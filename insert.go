@@ -18,7 +18,6 @@ import (
 	"errors"
 	"github.com/gotomicro/eorm/internal/errs"
 	"github.com/gotomicro/eorm/internal/model"
-	"github.com/gotomicro/eorm/internal/value"
 )
 
 // Inserter is used to construct an insert query
@@ -47,17 +46,24 @@ func (i *Inserter) Build() (*Query, error) {
 	i.writeString("(")
 	fields, err := i.buildColumns()
 	if err != nil {
-		return &Query{}, err
+		return nil, err
 	}
 	i.writeString(")")
 	i.writeString(" VALUES")
 	for index, val := range i.values {
 		i.writeString("(")
-		refVal := value.NewValue(val)
+		meta, err := i.registry.Get(val)
+		if err != nil {
+			return nil, err
+		}
+		if meta.Typ != i.meta.Typ {
+			return nil, errs.NewInsertDiffTypesError(i.meta.Typ.Elem().Name(), meta.Typ.Elem().Name())
+		}
+		refVal := i.valCreator(val, meta)
 		for j, v := range fields {
 			fdVal, err := refVal.Field(v.FieldName)
 			if err != nil {
-				return &Query{}, err
+				return nil, err
 			}
 			i.parameter(fdVal)
 			if j != len(fields)-1 {
@@ -117,8 +123,8 @@ func (i *Inserter) buildColumns() ([]*model.ColumnMeta, error) {
 			cs = append(cs, v)
 		}
 	} else {
-		for index, value := range i.meta.Columns {
-			i.quote(value.ColumnName)
+		for index, val := range i.meta.Columns {
+			i.quote(val.ColumnName)
 			if index != len(cs)-1 {
 				i.comma()
 			}
