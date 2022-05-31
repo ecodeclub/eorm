@@ -15,6 +15,7 @@
 package test
 
 import (
+	"github.com/gotomicro/ekit"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
@@ -26,53 +27,53 @@ func TestJsonColumn_Scan(t *testing.T) {
 	testCases := []struct{
 		name string
 		input any
-		val any
-		wantVal any
+		wantVal User
 		wantErr string
 	} {
+		{
+			name: "empty string",
+			input: ``,
+		},
+		{
+			name: "no fields",
+			input: `{}`,
+			wantVal: User{},
+		},
+		{
+			name: "string",
+			input: `{"name":"Tom"}`,
+			wantVal: User{Name: "Tom"},
+		},
+		{
+			name: "nil bytes",
+			input: []byte(nil),
+		},
+		{
+			name: "empty bytes",
+			input: []byte(""),
+		},
+		{
+			name: "bytes",
+			input: []byte(`{"name":"Tom"}`),
+			wantVal: User{Name: "Tom"},
+		},
 		{
 			name: "nil",
 		},
 		{
-			name: "empty string",
-			input: "",
-			wantErr: "unexpected end of JSON input",
+			name: "empty bytes ptr",
+			input: ekit.ToPtr[[]byte]([]byte("")),
 		},
 		{
-			name: "empty byte array",
-			input: []byte{},
-			wantErr: "unexpected end of JSON input",
-		},
-		{
-			name: "empty byte array pointer",
-			input: ToPtr[[]byte]([]byte{}),
-			wantErr: "unexpected end of JSON input",
-		},
-		{
-			name: "happy case",
-			input: `{"name": "Tom"}`,
-			val: &User{},
-			wantVal: &User{Name: "Tom"},
-		},
-		{
-			name: "invalid input",
-			input: 10,
-			wantErr: "不合法类型 10",
-		},
-		{
-			// 使用切片，只能传入切片指针
-			name: "array value",
-			val: ToPtr[[]string]([]string{}),
-			input: `["abc"]`,
-			wantVal: ToPtr[[]string]([]string{"abc"}),
+			name: "bytes ptr",
+			input: ekit.ToPtr[[]byte]([]byte(`{"name":"Tom"}`)),
+			wantVal: User{Name: "Tom"},
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			js := &JsonColumn{
-				Val: tc.val,
-			}
+			js := &JsonColumn{}
 			err := js.Scan(tc.input)
 			if tc.wantErr != "" {
 				assert.EqualError(t, err, tc.wantErr)
@@ -80,7 +81,9 @@ func TestJsonColumn_Scan(t *testing.T) {
 			} else {
 				assert.Nil(t, err)
 			}
-			assert.Equal(t, tc.wantVal, js.Val)
+			_, err = js.Value()
+			assert.Nil(t, err)
+			assert.EqualValues(t, tc.wantVal, js.Val)
 		})
 	}
 }

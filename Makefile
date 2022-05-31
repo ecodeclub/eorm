@@ -9,8 +9,9 @@ lint:
 	golangci-lint run
 
 # e2e 测试
-# make e2e
-# make e2e up 只启动测试环境
-# make e2e down 只清理测试环境
 e2e:
-	sh ./script/integrate_test.sh $*
+	sh ./script/integrate_test.sh
+e2e_up:
+	docker compose -f script/integration_test_compose.yml up -d
+e2e_down:
+	docker compose -f script/integration_test_compose.yml down

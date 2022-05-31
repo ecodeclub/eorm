@@ -33,7 +33,10 @@ var (
 type TableMeta struct {
 	TableName string
 	Columns  []*ColumnMeta
+	// FieldMap 是字段名到列元数据的映射
 	FieldMap map[string]*ColumnMeta
+	// ColumnMap 是列名到列元数据的映射
+	ColumnMap map[string]*ColumnMeta
 	Typ      reflect.Type
 }
 
@@ -99,6 +102,7 @@ func (t *tagMetaRegistry) Register(table interface{}, opts ...TableMetaOption) (
 	var columnMetas []*ColumnMeta
 	lens := v.NumField()
 	fieldMap := make(map[string]*ColumnMeta, lens)
+	columnMap := make(map[string]*ColumnMeta, lens)
 	for i := 0; i < lens; i++ {
 		structField := v.Field(i)
 		tag := structField.Tag.Get("eorm")
@@ -128,12 +132,14 @@ func (t *tagMetaRegistry) Register(table interface{}, opts ...TableMetaOption) (
 		}
 		columnMetas = append(columnMetas, columnMeta)
 		fieldMap[columnMeta.FieldName] = columnMeta
+		columnMap[columnMeta.ColumnName] = columnMeta
 	}
 	tableMeta := &TableMeta{
 		Columns:   columnMetas,
 		TableName: underscoreName(v.Name()),
 		Typ:       rtype,
 		FieldMap:  fieldMap,
+		ColumnMap: columnMap,
 	}
 	for _, o := range opts {
 		o(tableMeta)

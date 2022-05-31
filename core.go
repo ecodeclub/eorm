@@ -12,20 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package valuer
+package eorm
 
 import (
-	"database/sql"
+	"github.com/gotomicro/eorm/internal/dialect"
 	"github.com/gotomicro/eorm/internal/model"
+	"github.com/gotomicro/eorm/internal/valuer"
 )
 
-// Value 是对结构体实例的内部抽象
-type Value interface {
-	// Field 访问结构体字段, name 是字段名
-	Field(name string) (interface{}, error)
-	// SetColumn 设置新值，column 是列名
-	// 要注意，val 可能存在被上层复用，从而引起篡改的问题
-	SetColumn(column string, val *sql.RawBytes) error
+type core struct {
+	metaRegistry model.MetaRegistry
+	dialect      dialect.Dialect
+	valCreator valuer.Creator
 }
-
-type Creator func(val interface{}, meta *model.TableMeta) Value

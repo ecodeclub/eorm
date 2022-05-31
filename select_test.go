@@ -26,98 +26,98 @@ func TestSelectable(t *testing.T) {
 	testCases := []CommonTestCase{
 		{
 			name:    "simple",
-			builder: NewSelector(db).From(&TestModel{}),
+			builder: NewSelector[TestModel](db).From(&TestModel{}),
 			wantSql: "SELECT `id`,`first_name`,`age`,`last_name` FROM `test_model`;",
 		},
 		{
 			name:    "columns",
-			builder: NewSelector(db).Select(Columns("Id", "FirstName")).From(&TestModel{}),
+			builder: NewSelector[TestModel](db).Select(Columns("Id", "FirstName")).From(&TestModel{}),
 			wantSql: "SELECT `id`,`first_name` FROM `test_model`;",
 		},
 		{
 			name:    "alias",
-			builder: NewSelector(db).Select(Columns("Id"), C("FirstName").As("name")).From(&TestModel{}),
+			builder: NewSelector[TestModel](db).Select(Columns("Id"), C("FirstName").As("name")).From(&TestModel{}),
 			wantSql: "SELECT `id`,`first_name` AS `name` FROM `test_model`;",
 		},
 		{
 			name:    "aggregate",
-			builder: NewSelector(db).Select(Columns("Id"), Avg("Age").As("avg_age")).From(&TestModel{}),
+			builder: NewSelector[TestModel](db).Select(Columns("Id"), Avg("Age").As("avg_age")).From(&TestModel{}),
 			wantSql: "SELECT `id`,AVG(`age`) AS `avg_age` FROM `test_model`;",
 		},
 		{
 			name:    "raw",
-			builder: NewSelector(db).Select(Columns("Id"), Raw("AVG(DISTINCT `age`)")).From(&TestModel{}),
+			builder: NewSelector[TestModel](db).Select(Columns("Id"), Raw("AVG(DISTINCT `age`)")).From(&TestModel{}),
 			wantSql: "SELECT `id`,AVG(DISTINCT `age`) FROM `test_model`;",
 		},
 		{
 			name:    "invalid columns",
-			builder: NewSelector(db).Select(Columns("Invalid"), Raw("AVG(DISTINCT `age`)")).From(&TestModel{}),
-			wantErr: errs.NewInvalidColumnError("Invalid"),
+			builder: NewSelector[TestModel](db).Select(Columns("Invalid"), Raw("AVG(DISTINCT `age`)")).From(&TestModel{}),
+			wantErr: errs.NewInvalidFieldError("Invalid"),
 		},
 		{
 			name:    "order by",
-			builder: NewSelector(db).From(&TestModel{}).OrderBy(ASC("Age"), DESC("Id")),
+			builder: NewSelector[TestModel](db).From(&TestModel{}).OrderBy(ASC("Age"), DESC("Id")),
 			wantSql: "SELECT `id`,`first_name`,`age`,`last_name` FROM `test_model` ORDER BY `age` ASC,`id` DESC;",
 		},
 		{
 			name:    "order by invalid column",
-			builder: NewSelector(db).From(&TestModel{}).OrderBy(ASC("Invalid"), DESC("Id")),
-			wantErr: errs.NewInvalidColumnError("Invalid"),
+			builder: NewSelector[TestModel](db).From(&TestModel{}).OrderBy(ASC("Invalid"), DESC("Id")),
+			wantErr: errs.NewInvalidFieldError("Invalid"),
 		},
 		{
 			name:    "group by",
-			builder: NewSelector(db).From(&TestModel{}).GroupBy("Age", "Id"),
+			builder: NewSelector[TestModel](db).From(&TestModel{}).GroupBy("Age", "Id"),
 			wantSql: "SELECT `id`,`first_name`,`age`,`last_name` FROM `test_model` GROUP BY `age`,`id`;",
 		},
 		{
 			name:    "group by invalid column",
-			builder: NewSelector(db).From(&TestModel{}).GroupBy("Invalid", "Id"),
-			wantErr: errs.NewInvalidColumnError("Invalid"),
+			builder: NewSelector[TestModel](db).From(&TestModel{}).GroupBy("Invalid", "Id"),
+			wantErr: errs.NewInvalidFieldError("Invalid"),
 		},
 		{
 			name:     "offset",
-			builder:  NewSelector(db).From(&TestModel{}).OrderBy(ASC("Age"), DESC("Id")).Offset(10),
+			builder:  NewSelector[TestModel](db).From(&TestModel{}).OrderBy(ASC("Age"), DESC("Id")).Offset(10),
 			wantSql:  "SELECT `id`,`first_name`,`age`,`last_name` FROM `test_model` ORDER BY `age` ASC,`id` DESC OFFSET ?;",
 			wantArgs: []interface{}{10},
 		},
 		{
 			name:     "limit",
-			builder:  NewSelector(db).From(&TestModel{}).OrderBy(ASC("Age"), DESC("Id")).Offset(10).Limit(100),
+			builder:  NewSelector[TestModel](db).From(&TestModel{}).OrderBy(ASC("Age"), DESC("Id")).Offset(10).Limit(100),
 			wantSql:  "SELECT `id`,`first_name`,`age`,`last_name` FROM `test_model` ORDER BY `age` ASC,`id` DESC OFFSET ? LIMIT ?;",
 			wantArgs: []interface{}{10, 100},
 		},
 		{
 			name:     "where",
-			builder:  NewSelector(db).From(&TestModel{}).Where(C("Id").EQ(10)),
+			builder:  NewSelector[TestModel](db).From(&TestModel{}).Where(C("Id").EQ(10)),
 			wantSql:  "SELECT `id`,`first_name`,`age`,`last_name` FROM `test_model` WHERE `id`=?;",
 			wantArgs: []interface{}{10},
 		},
 		{
 			name:    "no where",
-			builder: NewSelector(db).From(&TestModel{}).Where(),
+			builder: NewSelector[TestModel](db).From(&TestModel{}).Where(),
 			wantSql: "SELECT `id`,`first_name`,`age`,`last_name` FROM `test_model`;",
 		},
 		{
 			name:     "having",
-			builder:  NewSelector(db).From(&TestModel{}).GroupBy("FirstName").Having(Avg("Age").EQ(18)),
+			builder:  NewSelector[TestModel](db).From(&TestModel{}).GroupBy("FirstName").Having(Avg("Age").EQ(18)),
 			wantSql:  "SELECT `id`,`first_name`,`age`,`last_name` FROM `test_model` GROUP BY `first_name` HAVING AVG(`age`)=?;",
 			wantArgs: []interface{}{18},
 		},
 		{
 			name:    "no having",
-			builder: NewSelector(db).From(&TestModel{}).GroupBy("FirstName").Having(),
+			builder: NewSelector[TestModel](db).From(&TestModel{}).GroupBy("FirstName").Having(),
 			wantSql: "SELECT `id`,`first_name`,`age`,`last_name` FROM `test_model` GROUP BY `first_name`;",
 		},
 		{
 			name:     "alias in having",
-			builder:  NewSelector(db).Select(Columns("Id"), Columns("FirstName"), Avg("Age").As("avg_age")).From(&TestModel{}).GroupBy("FirstName").Having(C("avg_age").LT(20)),
+			builder:  NewSelector[TestModel](db).Select(Columns("Id"), Columns("FirstName"), Avg("Age").As("avg_age")).From(&TestModel{}).GroupBy("FirstName").Having(C("avg_age").LT(20)),
 			wantSql:  "SELECT `id`,`first_name`,AVG(`age`) AS `avg_age` FROM `test_model` GROUP BY `first_name` HAVING `avg_age`<?;",
 			wantArgs: []interface{}{20},
 		},
 		{
 			name:    "invalid alias in having",
-			builder: NewSelector(db).Select(Columns("Id"), Columns("FirstName"), Avg("Age").As("avg_age")).From(&TestModel{}).GroupBy("FirstName").Having(C("Invalid").LT(20)),
-			wantErr: errs.NewInvalidColumnError("Invalid"),
+			builder: NewSelector[TestModel](db).Select(Columns("Id"), Columns("FirstName"), Avg("Age").As("avg_age")).From(&TestModel{}).GroupBy("FirstName").Having(C("Invalid").LT(20)),
+			wantErr: errs.NewInvalidFieldError("Invalid"),
 		},
 	}
 
@@ -137,13 +137,13 @@ func TestSelectable(t *testing.T) {
 
 func ExampleSelector_OrderBy() {
 	db := memoryOrm()
-	query, _ := NewSelector(db).From(&TestModel{}).OrderBy(ASC("Age")).Build()
+	query, _ := NewSelector[TestModel](db).From(&TestModel{}).OrderBy(ASC("Age")).Build()
 	fmt.Printf("case1\n%s", query.string())
-	query, _ = NewSelector(db).From(&TestModel{}).OrderBy(ASC("Age", "Id")).Build()
+	query, _ = NewSelector[TestModel](db).From(&TestModel{}).OrderBy(ASC("Age", "Id")).Build()
 	fmt.Printf("case2\n%s", query.string())
-	query, _ = NewSelector(db).From(&TestModel{}).OrderBy(ASC("Age"), ASC("Id")).Build()
+	query, _ = NewSelector[TestModel](db).From(&TestModel{}).OrderBy(ASC("Age"), ASC("Id")).Build()
 	fmt.Printf("case3\n%s", query.string())
-	query, _ = NewSelector(db).From(&TestModel{}).OrderBy(ASC("Age"), DESC("Id")).Build()
+	query, _ = NewSelector[TestModel](db).From(&TestModel{}).OrderBy(ASC("Age"), DESC("Id")).Build()
 	fmt.Printf("case4\n%s", query.string())
 	// Output:
 	// case1
@@ -162,9 +162,9 @@ func ExampleSelector_OrderBy() {
 
 func ExampleSelector_Having() {
 	db := memoryOrm()
-	query, _ := NewSelector(db).Select(Columns("Id"), Columns("FirstName"), Avg("Age").As("avg_age")).From(&TestModel{}).GroupBy("FirstName").Having(C("avg_age").LT(20)).Build()
+	query, _ := NewSelector[TestModel](db).Select(Columns("Id"), Columns("FirstName"), Avg("Age").As("avg_age")).From(&TestModel{}).GroupBy("FirstName").Having(C("avg_age").LT(20)).Build()
 	fmt.Printf("case1\n%s", query.string())
-	query, err := NewSelector(db).Select(Columns("Id"), Columns("FirstName"), Avg("Age").As("avg_age")).From(&TestModel{}).GroupBy("FirstName").Having(C("Invalid").LT(20)).Build()
+	query, err := NewSelector[TestModel](db).Select(Columns("Id"), Columns("FirstName"), Avg("Age").As("avg_age")).From(&TestModel{}).GroupBy("FirstName").Having(C("Invalid").LT(20)).Build()
 	fmt.Printf("case2\n%s", err)
 	// Output:
 	// case1
@@ -177,17 +177,17 @@ func ExampleSelector_Having() {
 func ExampleSelector_Select() {
 	db := memoryOrm()
 	tm := &TestModel{}
-	cases := []*Selector{
+	cases := []*Selector[TestModel]{
 		// case0: all columns are included
-		NewSelector(db).From(tm),
+		NewSelector[TestModel](db).From(tm),
 		// case1: only query specific columns
-		NewSelector(db).Select(Columns("Id", "Age")).From(tm),
+		NewSelector[TestModel](db).Select(Columns("Id", "Age")).From(tm),
 		// case2: using alias
-		NewSelector(db).Select(C("Id").As("my_id")).From(tm),
+		NewSelector[TestModel](db).Select(C("Id").As("my_id")).From(tm),
 		// case3: using aggregation function and alias
-		NewSelector(db).Select(Avg("Age").As("avg_age")).From(tm),
+		NewSelector[TestModel](db).Select(Avg("Age").As("avg_age")).From(tm),
 		// case4: using raw expression
-		NewSelector(db).Select(Raw("COUNT(DISTINCT `age`) AS `age_cnt`")).From(tm),
+		NewSelector[TestModel](db).Select(Raw("COUNT(DISTINCT `age`) AS `age_cnt`")).From(tm),
 	}
 
 	for index, tc := range cases {

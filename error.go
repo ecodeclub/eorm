@@ -12,20 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package valuer
+package eorm
 
-import (
-	"database/sql"
-	"github.com/gotomicro/eorm/internal/model"
+import "github.com/gotomicro/eorm/internal/errs"
+
+// 哨兵错误，或者说预定义错误，谨慎添加
+var (
+	// ErrNoRows 代表没有找到数据
+	// eorm 的行为和 sql.NoRows 不太一样
+	// eorm 统一表达为只要 eorm 没有从数据库里面拿到任何数据
+	// 就会返回这个错误
+	ErrNoRows = errs.ErrNoRows
 )
-
-// Value 是对结构体实例的内部抽象
-type Value interface {
-	// Field 访问结构体字段, name 是字段名
-	Field(name string) (interface{}, error)
-	// SetColumn 设置新值，column 是列名
-	// 要注意，val 可能存在被上层复用，从而引起篡改的问题
-	SetColumn(column string, val *sql.RawBytes) error
-}
-
-type Creator func(val interface{}, meta *model.TableMeta) Value

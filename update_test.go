@@ -45,7 +45,7 @@ func TestUpdater_Set(t *testing.T) {
 		{
 			name:    "set invalid columns",
 			builder: memoryOrm().Update(tm).Set(Columns("FirstNameInvalid", "Age")),
-			wantErr: err.NewInvalidColumnError("FirstNameInvalid"),
+			wantErr: err.NewInvalidFieldError("FirstNameInvalid"),
 		},
 		{
 			name:     "set c2",
@@ -57,7 +57,7 @@ func TestUpdater_Set(t *testing.T) {
 		{
 			name:    "set invalid c2",
 			builder: memoryOrm().Update(tm).Set(C("FirstNameInvalid"), C("Age")),
-			wantErr: err.NewInvalidColumnError("FirstNameInvalid"),
+			wantErr: err.NewInvalidFieldError("FirstNameInvalid"),
 		},
 
 		{
@@ -69,7 +69,7 @@ func TestUpdater_Set(t *testing.T) {
 		{
 			name:    "set invalid assignment",
 			builder: memoryOrm().Update(tm).Set(C("FirstName"), Assign("InvalidAge", 30)),
-			wantErr: err.NewInvalidColumnError("InvalidAge"),
+			wantErr: err.NewInvalidFieldError("InvalidAge"),
 		},
 		{
 			name:     "set age+1",

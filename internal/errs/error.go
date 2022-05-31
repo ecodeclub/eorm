@@ -22,12 +22,24 @@ import (
 
 var (
 	errValueNotSet = errors.New("eorm: 值未设置")
+	ErrNoRows = errors.New("eorm: 未找到数据")
+	// ErrTooManyColumns 过多列
+	// 一般是查询的列多于结构体的列
+	ErrTooManyColumns=errors.New("eorm: 过多列")
 )
 
-
-// NewInvalidColumnError returns an error represents invalid field name
-func NewInvalidColumnError(field string) error {
+// NewInvalidFieldError 返回代表未知字段的错误。
+// 通常来说，是字段名没写对
+// 注意区分 NewInvalidColumnError
+func NewInvalidFieldError(field string) error {
 	return fmt.Errorf("eorm: 未知字段 %s", field)
+}
+
+// NewInvalidColumnError 返回代表未知列名的错误
+// 通常来说，是列名不对
+// 注意区分 NewInvalidFieldError
+func NewInvalidColumnError(column string) error {
+	return fmt.Errorf("eorm: 未知列 %s", column)
 }
 
 func NewValueNotSetError() error {
@@ -40,6 +52,7 @@ func NewUnsupportedTypeError(typ reflect.Type) error {
 	return fmt.Errorf("eorm: 不支持字段类型 %s, %s", typ.PkgPath(), typ.Name())
 }
 
+// NewUnsupportedDriverError 不支持驱动类型
 func NewUnsupportedDriverError(driver string) error {
 	return fmt.Errorf("eorm: 不支持driver类型 %s", driver)
 }

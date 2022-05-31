@@ -18,11 +18,9 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"github.com/gotomicro/eorm/internal/dialect"
 	"github.com/gotomicro/eorm/internal/errs"
 	"github.com/gotomicro/eorm/internal/executor"
 	"github.com/gotomicro/eorm/internal/model"
-	"github.com/gotomicro/eorm/internal/valuer"
 	"github.com/valyala/bytebufferpool"
 )
 
@@ -38,32 +36,79 @@ type Query struct {
 }
 
 // Querier 查询器，代表最基本的查询
-type Querier struct {
+type Querier[T any] struct {
 	q *Query
+	core
 	executor executor.Executor
 }
 
-// NewQuerier 创建一个 Querier 实例
-func NewQuerier(orm *Orm, sql string, args...any) Querier {
-	return Querier{
-		q: &Query{
-			SQL: sql,
-			Args: args,
-		},
-		executor: orm.db,
+// RawQuery 创建一个 Querier 实例
+// 泛型参数 T 是目标类型。
+// 例如，如果查询 User 的数据，那么 T 就是 User
+func RawQuery[T any](orm *Orm, sql string, args...any) Querier[T] {
+	return newQuerier[T](orm.core, orm.db,  &Query{
+		SQL: sql,
+		Args: args,
+	})
+}
+
+func newQuerier[T any](core core, exec executor.Executor, q *Query) Querier[T] {
+	return Querier[T]{
+		q: q,
+		core: core,
+		executor: exec,
 	}
 }
 
 // Exec 执行 SQL
-func (q Querier) Exec(ctx context.Context) (sql.Result, error) {
+func (q Querier[T]) Exec(ctx context.Context) (sql.Result, error) {
 	return q.executor.ExecContext(ctx, q.q.SQL, q.q.Args...)
 }
 
-type builder struct {
-	registry model.MetaRegistry
-	dialect    dialect.Dialect
-	valCreator valuer.Creator
+func (q Querier[T]) Get(ctx context.Context) (*T, error){
+	rows, err := q.executor.QueryContext(ctx, q.q.SQL, q.q.Args...)
+	if err != nil {
+		return nil, err
+	}
+	if !rows.Next() {
+		return nil, errs.ErrNoRows
+	}
 
+	tp := new(T)
+	meta, err := q.metaRegistry.Get(tp)
+	if err != nil {
+		return nil, err
+	}
+
+	cs, err := rows.Columns()
+	if err != nil {
+		return nil, err
+	}
+	if len(cs) > len(meta.Columns) {
+		return nil, errs.ErrTooManyColumns
+	}
+
+	// TODO 性能优化
+	colValues := make([]interface{}, len(cs))
+	for i := 0; i < len(cs); i++ {
+		colValues[i]=&sql.RawBytes{}
+	}
+	if err = rows.Scan(colValues...); err != nil {
+		return nil, err
+	}
+
+	val := q.valCreator(tp, meta)
+	for i := 0; i < len(cs); i++ {
+		if err = val.SetColumn(cs[i], colValues[i].(*sql.RawBytes)); err != nil {
+			return nil, err
+		}
+	}
+
+	return tp, nil
+}
+
+type builder struct {
+	core
 	// 使用 bytebufferpool 以减少内存分配
 	// 每次调用 Get 之后不要忘记再调用 Put
 	buffer  *bytebufferpool.ByteBuffer
@@ -120,7 +165,7 @@ func (b *builder) buildExpr(expr Expr) error {
 			}
 			cm, ok := b.meta.FieldMap[e.name]
 			if !ok {
-				return errs.NewInvalidColumnError(e.name)
+				return errs.NewInvalidFieldError(e.name)
 			}
 			b.quote(cm.ColumnName)
 		}
@@ -162,7 +207,7 @@ func (b *builder) buildHavingAggregate(aggregate Aggregate) error {
 	_ = b.buffer.WriteByte('(')
 	cMeta, ok := b.meta.FieldMap[aggregate.arg]
 	if !ok {
-		return errs.NewInvalidColumnError(aggregate.arg)
+		return errs.NewInvalidFieldError(aggregate.arg)
 	}
 	b.quote(cMeta.ColumnName)
 	_ = b.buffer.WriteByte(')')

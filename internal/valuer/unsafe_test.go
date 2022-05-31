@@ -16,6 +16,7 @@ package valuer
 
 import (
 	"database/sql"
+	"github.com/gotomicro/ekit"
 	"github.com/gotomicro/eorm/internal/errs"
 	"github.com/gotomicro/eorm/internal/model"
 	"github.com/gotomicro/eorm/internal/test"
@@ -27,6 +28,182 @@ import (
 
 func Test_unsafeValue_Field(t *testing.T) {
 	testValueField(t, NewUnsafeValue)
+}
+
+func Test_unsafeValue_SetColumn(t *testing.T) {
+	testSetColumn(t, NewUnsafeValue)
+}
+
+func testSetColumn(t *testing.T, creator Creator) {
+	testCases := []struct{
+		name string
+		cs map[string]*sql.RawBytes
+		val *test.SimpleStruct
+		wantVal *test.SimpleStruct
+		wantErr error
+	} {
+		{
+			// 零值会覆盖掉已有的值
+			name: "nil override",
+			cs: map[string]*sql.RawBytes{
+				"id": nil,
+				"bool": nil,
+				"bool_ptr": nil,
+				"int": nil,
+				"int_ptr": nil,
+				"int8": nil,
+				"int8_ptr": nil,
+				"int16": nil,
+				"int16_ptr": nil,
+				"int32": nil,
+				"int32_ptr": nil,
+				"int64": nil,
+				"int64_ptr": nil,
+				"uint": nil,
+				"uint_ptr": nil,
+				"uint8": nil,
+				"uint8_ptr": nil,
+				"uint16": nil,
+				"uint16_ptr": nil,
+				"uint32": nil,
+				"uint32_ptr": nil,
+				"uint64": nil,
+				"uint64_ptr": nil,
+				"float32": nil,
+				"float32_ptr": nil,
+				"float64": nil,
+				"float64_ptr": nil,
+				"byte_array": nil,
+				"string": nil,
+				"null_string_ptr": nil,
+				"null_int16_ptr": nil,
+				"null_int32_ptr": nil,
+				"null_int64_ptr": nil,
+				"null_bool_ptr": nil,
+				"null_float64_ptr": nil,
+				"json_column": nil,
+			},
+			val: test.NewSimpleStruct(1),
+			wantVal: &test.SimpleStruct{},
+		},
+		{
+			// 零值会覆盖掉已有的值，这里的零值是带类型的零值
+			// 这个测试有点冗余，但是依旧保留
+			name: "bs nil override",
+			cs: map[string]*sql.RawBytes{
+				"id": (*sql.RawBytes)(nil),
+				"bool": (*sql.RawBytes)(nil),
+				"bool_ptr": (*sql.RawBytes)(nil),
+				"int": (*sql.RawBytes)(nil),
+				"int_ptr": (*sql.RawBytes)(nil),
+				"int8": (*sql.RawBytes)(nil),
+				"int8_ptr": (*sql.RawBytes)(nil),
+				"int16": (*sql.RawBytes)(nil),
+				"int16_ptr": (*sql.RawBytes)(nil),
+				"int32": (*sql.RawBytes)(nil),
+				"int32_ptr": (*sql.RawBytes)(nil),
+				"int64": (*sql.RawBytes)(nil),
+				"int64_ptr": (*sql.RawBytes)(nil),
+				"uint": (*sql.RawBytes)(nil),
+				"uint_ptr": (*sql.RawBytes)(nil),
+				"uint8": (*sql.RawBytes)(nil),
+				"uint8_ptr": (*sql.RawBytes)(nil),
+				"uint16": (*sql.RawBytes)(nil),
+				"uint16_ptr": (*sql.RawBytes)(nil),
+				"uint32": (*sql.RawBytes)(nil),
+				"uint32_ptr": (*sql.RawBytes)(nil),
+				"uint64": (*sql.RawBytes)(nil),
+				"uint64_ptr": (*sql.RawBytes)(nil),
+				"float32": (*sql.RawBytes)(nil),
+				"float32_ptr": (*sql.RawBytes)(nil),
+				"float64": (*sql.RawBytes)(nil),
+				"float64_ptr": (*sql.RawBytes)(nil),
+				"byte_array": (*sql.RawBytes)(nil),
+				"string": (*sql.RawBytes)(nil),
+				"null_string_ptr": (*sql.RawBytes)(nil),
+				"null_int16_ptr": (*sql.RawBytes)(nil),
+				"null_int32_ptr": (*sql.RawBytes)(nil),
+				"null_int64_ptr": (*sql.RawBytes)(nil),
+				"null_bool_ptr": (*sql.RawBytes)(nil),
+				"null_float64_ptr": (*sql.RawBytes)(nil),
+				"json_column": (*sql.RawBytes)(nil),
+			},
+			val: test.NewSimpleStruct(1),
+			wantVal: &test.SimpleStruct{},
+		},
+		{
+			name: "normal value",
+			cs: map[string]*sql.RawBytes{
+				"id": ekit.ToPtr[sql.RawBytes]([]byte("1")),
+				"bool": ekit.ToPtr[sql.RawBytes]([]byte("true")),
+				"bool_ptr": ekit.ToPtr[sql.RawBytes]([]byte("false")),
+				"int": ekit.ToPtr[sql.RawBytes]([]byte("12")),
+				"int_ptr": ekit.ToPtr[sql.RawBytes]([]byte("13")),
+				"int8": ekit.ToPtr[sql.RawBytes]([]byte("8")),
+				"int8_ptr": ekit.ToPtr[sql.RawBytes]([]byte("-8")),
+				"int16": ekit.ToPtr[sql.RawBytes]([]byte("16")),
+				"int16_ptr": ekit.ToPtr[sql.RawBytes]([]byte("-16")),
+				"int32": ekit.ToPtr[sql.RawBytes]([]byte("32")),
+				"int32_ptr": ekit.ToPtr[sql.RawBytes]([]byte("-32")),
+				"int64": ekit.ToPtr[sql.RawBytes]([]byte("64")),
+				"int64_ptr": ekit.ToPtr[sql.RawBytes]([]byte("-64")),
+				"uint": ekit.ToPtr[sql.RawBytes]([]byte("14")),
+				"uint_ptr": ekit.ToPtr[sql.RawBytes]([]byte("15")),
+				"uint8": ekit.ToPtr[sql.RawBytes]([]byte("8")),
+				"uint8_ptr": ekit.ToPtr[sql.RawBytes]([]byte("18")),
+				"uint16": ekit.ToPtr[sql.RawBytes]([]byte("16")),
+				"uint16_ptr": ekit.ToPtr[sql.RawBytes]([]byte("116")),
+				"uint32": ekit.ToPtr[sql.RawBytes]([]byte("32")),
+				"uint32_ptr": ekit.ToPtr[sql.RawBytes]([]byte("132")),
+				"uint64": ekit.ToPtr[sql.RawBytes]([]byte("64")),
+				"uint64_ptr": ekit.ToPtr[sql.RawBytes]([]byte("164")),
+				"float32": ekit.ToPtr[sql.RawBytes]([]byte("3.2")),
+				"float32_ptr": ekit.ToPtr[sql.RawBytes]([]byte("-3.2")),
+				"float64": ekit.ToPtr[sql.RawBytes]([]byte("6.4")),
+				"float64_ptr": ekit.ToPtr[sql.RawBytes]([]byte("-6.4")),
+				"byte_array": ekit.ToPtr[sql.RawBytes]([]byte("hello")),
+				"string": ekit.ToPtr[sql.RawBytes]([]byte("world")),
+				"null_string_ptr": ekit.ToPtr[sql.RawBytes]([]byte("null string")),
+				"null_int16_ptr": ekit.ToPtr[sql.RawBytes]([]byte("16")),
+				"null_int32_ptr": ekit.ToPtr[sql.RawBytes]([]byte("32")),
+				"null_int64_ptr": ekit.ToPtr[sql.RawBytes]([]byte("64")),
+				"null_bool_ptr": ekit.ToPtr[sql.RawBytes]([]byte("true")),
+				"null_float64_ptr": ekit.ToPtr[sql.RawBytes]([]byte("6.4")),
+				"json_column": ekit.ToPtr[sql.RawBytes]([]byte(`{"name": "Tom"}`)),
+			},
+			val: &test.SimpleStruct{},
+			wantVal: test.NewSimpleStruct(1),
+		},
+		{
+			name:"invalid field",
+			cs: map[string]*sql.RawBytes{
+				"invalid_column": nil,
+			},
+			wantErr: errs.NewInvalidColumnError("invalid_column"),
+		},
+	}
+
+	meta, err := model.NewMetaRegistry().Get(&test.SimpleStruct{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			val := creator(tc.val, meta)
+			for c, bs := range tc.cs {
+				err = val.SetColumn(c, bs)
+				if err != nil {
+					assert.Equal(t, tc.wantErr, err)
+					return
+				}
+			}
+			if tc.wantErr != nil {
+				t.Fatalf("期望得到错误，但是并没有得到 %v", tc.wantErr)
+			}
+			assert.Equal(t, tc.wantVal, tc.val)
+		})
+	}
+
 }
 
 func testValueField(t *testing.T, creator Creator) {
@@ -50,31 +227,7 @@ func testValueField(t *testing.T, creator Creator) {
 		}
 	})
 	t.Run("normal value", func(t *testing.T) {
-		entity := &test.SimpleStruct{
-			Bool: true, BoolPtr: test.ToPtr[bool](true),
-			Int: -1, IntPtr: test.ToPtr[int](-1),
-			Int8: -8, Int8Ptr: test.ToPtr[int8](-8),
-			Int16: -16, Int16Ptr: test.ToPtr[int16](-16),
-			Int32: -32, Int32Ptr: test.ToPtr[int32](-32),
-			Int64: -64, Int64Ptr: test.ToPtr[int64](-64),
-			Uint: 1, UintPtr: test.ToPtr[uint](1),
-			Uint8: 8, Uint8Ptr: test.ToPtr[uint8](8),
-			Uint16: 16, Uint16Ptr: test.ToPtr[uint16](16),
-			Uint32: 32, Uint32Ptr: test.ToPtr[uint32](32),
-			Uint64: 64, Uint64Ptr: test.ToPtr[uint64](64),
-			Float32: 3.2, Float32Ptr: test.ToPtr[float32](3.2),
-			Float64: 6.4, Float64Ptr: test.ToPtr[float64](6.4),
-			Byte: 'a', BytePtr: test.ToPtr[byte]('a'), ByteArray: []byte{},
-			String:         "hello",
-			NullStringPtr:  &sql.NullString{String: "world", Valid: true},
-			NullInt16Ptr:   &sql.NullInt16{Int16: -16, Valid: true},
-			NullInt32Ptr:   &sql.NullInt32{Int32: -32, Valid: true},
-			NullInt64Ptr:   &sql.NullInt64{Int64: -64, Valid: true},
-			NullBoolPtr:    &sql.NullBool{Bool: true, Valid: true},
-			NullBytePtr:    &sql.NullByte{Byte: 'b', Valid: true},
-			NullTimePtr:    &sql.NullTime{Time: time.UnixMilli(1000), Valid: true},
-			NullFloat64Ptr: &sql.NullFloat64{Float64: 6.4, Valid: true},
-		}
+		entity := test.NewSimpleStruct(1)
 		testCases := newValueFieldTestCases(entity)
 		val := NewUnsafeValue(entity, meta)
 		for _, tc := range testCases {
@@ -111,7 +264,7 @@ func testValueField(t *testing.T, creator Creator) {
 			// 不存在的字段
 			name: "invalid field",
 			field: "UpdateTime",
-			wantError: errs.NewInvalidColumnError("UpdateTime"),
+			wantError: errs.NewInvalidFieldError("UpdateTime"),
 		},
 	}
 	t.Run("invalid cases", func(t *testing.T) {
@@ -269,16 +422,6 @@ func newValueFieldTestCases(entity *test.SimpleStruct) []valueFieldTestCase{
 			wantVal: entity.Float64Ptr,
 		},
 		{
-			name: "byte",
-			field: "Byte",
-			wantVal: entity.Byte,
-		},
-		{
-			name: "byte pointer",
-			field: "BytePtr",
-			wantVal: entity.BytePtr,
-		},
-		{
 			name: "byte array",
 			field: "ByteArray",
 			wantVal: entity.ByteArray,
@@ -307,21 +450,6 @@ func newValueFieldTestCases(entity *test.SimpleStruct) []valueFieldTestCase{
 			name: "NullInt64Ptr",
 			field: "NullInt64Ptr",
 			wantVal: entity.NullInt64Ptr,
-		},
-		{
-			name: "NullBoolPtr",
-			field: "NullBoolPtr",
-			wantVal: entity.NullBoolPtr,
-		},
-		{
-			name: "NullBytePtr",
-			field: "NullBytePtr",
-			wantVal: entity.NullBytePtr,
-		},
-		{
-			name: "NullTimePtr",
-			field: "NullTimePtr",
-			wantVal: entity.NullTimePtr,
 		},
 		{
 			name: "NullFloat64Ptr",

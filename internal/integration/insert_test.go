@@ -12,13 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// +build e2e
+//go:build e2e
 
-package integration_test
+package integration
 
 import (
 	"context"
-	"database/sql"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/gotomicro/eorm"
 	"github.com/gotomicro/eorm/internal/test"
@@ -28,26 +27,11 @@ import (
 )
 
 type InsertTestSuite struct {
-	suite.Suite
-	driver string
-	dsn string
-	orm *eorm.Orm
-}
-
-func (i *InsertTestSuite) SetupSuite() {
-	t := i.T()
-	orm, err := eorm.Open(i.driver, i.dsn)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err = orm.Wait(); err != nil {
-		t.Fatal(err)
-	}
-	i.orm = orm
+	Suite
 }
 
 func (i *InsertTestSuite) TearDownTest() {
-	_, err := eorm.NewQuerier(i.orm, "DELETE FROM `simple_struct`").Exec(context.Background())
+	_, err := eorm.RawQuery[any](i.orm, "DELETE FROM `simple_struct`").Exec(context.Background())
 	if err != nil {
 		i.T().Fatal(err)
 	}
@@ -56,19 +40,24 @@ func (i *InsertTestSuite) TearDownTest() {
 func (i *InsertTestSuite) TestInsert() {
 	testCases := []struct{
 		name string
-		exec Exec
+		i *eorm.Inserter[test.SimpleStruct]
 		rowsAffected int64
 		wantErr error
 	} {
 		{
 			name: "id only",
-			exec: eorm.NewInserter[test.SimpleStruct](i.orm).Values(&test.SimpleStruct{Id: 1}),
+			i: eorm.NewInserter[test.SimpleStruct](i.orm).Values(&test.SimpleStruct{Id: 1}),
+			rowsAffected: 1,
+		},
+		{
+			name: "all field",
+			i: eorm.NewInserter[test.SimpleStruct](i.orm).Values(test.NewSimpleStruct(2)),
 			rowsAffected: 1,
 		},
 	}
 	for _, tc := range testCases {
 		i.T().Run(tc.name, func(t *testing.T) {
-			res, err := tc.exec.Exec(context.Background())
+			res, err := tc.i.Exec(context.Background())
 			assert.Equal(t, tc.wantErr, err)
 			if err != nil {
 				return
@@ -79,15 +68,11 @@ func (i *InsertTestSuite) TestInsert() {
 	}
 }
 
-// Exec 暂时作为测试的接口
-// TODO 挪过去 eorm
-type Exec interface {
-	Exec(ctx context.Context) (sql.Result, error)
-}
-
 func TestMySQL8Insert(t *testing.T) {
 	suite.Run(t, &InsertTestSuite{
-		driver: "mysql",
-		dsn: "root:root@tcp(localhost:13306)/integration_test",
+		Suite{
+			driver: "mysql",
+			dsn: "root:root@tcp(localhost:13306)/integration_test",
+		},
 	})
 }

@@ -25,7 +25,7 @@ type Deleter struct {
 func (d *Deleter) Build() (*Query, error) {
 	_, _ = d.buffer.WriteString("DELETE FROM ")
 	var err error
-	d.meta, err = d.registry.Get(d.table)
+	d.meta, err = d.metaRegistry.Get(d.table)
 	if err != nil {
 		return nil, err
 	}
