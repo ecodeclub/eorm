@@ -65,15 +65,15 @@ func testValueField(t *testing.T, creator Creator) {
 			Float32: 3.2, Float32Ptr: test.ToPtr[float32](3.2),
 			Float64: 6.4, Float64Ptr: test.ToPtr[float64](6.4),
 			Byte: 'a', BytePtr: test.ToPtr[byte]('a'), ByteArray: []byte{},
-			String: "hello",
-			NullStringPtr: &sql.NullString{String: "world", Valid: true},
-			NullInt16Ptr: &sql.NullInt16{Int16: -16, Valid: true},
-			NullInt32Ptr: &sql.NullInt32{Int32: -32, Valid: true},
-			NullInt64Ptr: &sql.NullInt64{Int64: -64, Valid: true},
-			NullBoolPtr: &sql.NullBool{Bool: true, Valid: true},
-			NullBytePtr: &sql.NullByte{Byte: 'b', Valid: true},
-			NullTimePtr: &sql.NullTime{Time: time.UnixMilli(1000), Valid: true},
-			NullFloat64: &sql.NullFloat64{Float64: 6.4, Valid: true},
+			String:         "hello",
+			NullStringPtr:  &sql.NullString{String: "world", Valid: true},
+			NullInt16Ptr:   &sql.NullInt16{Int16: -16, Valid: true},
+			NullInt32Ptr:   &sql.NullInt32{Int32: -32, Valid: true},
+			NullInt64Ptr:   &sql.NullInt64{Int64: -64, Valid: true},
+			NullBoolPtr:    &sql.NullBool{Bool: true, Valid: true},
+			NullBytePtr:    &sql.NullByte{Byte: 'b', Valid: true},
+			NullTimePtr:    &sql.NullTime{Time: time.UnixMilli(1000), Valid: true},
+			NullFloat64Ptr: &sql.NullFloat64{Float64: 6.4, Valid: true},
 		}
 		testCases := newValueFieldTestCases(entity)
 		val := NewUnsafeValue(entity, meta)
@@ -324,9 +324,9 @@ func newValueFieldTestCases(entity *test.SimpleStruct) []valueFieldTestCase{
 			wantVal: entity.NullTimePtr,
 		},
 		{
-			name: "NullFloat64",
-			field: "NullFloat64",
-			wantVal: entity.NullFloat64,
+			name: "NullFloat64Ptr",
+			field: "NullFloat64Ptr",
+			wantVal: entity.NullFloat64Ptr,
 		},
 		{
 			name: "JsonColumn",

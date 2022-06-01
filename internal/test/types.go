@@ -24,13 +24,14 @@ import (
 
 // SimpleStruct 包含所有 eorm 支持的类型
 type SimpleStruct struct {
+	Id uint64 `eorm:"primary_key,column=int_c"`
 	Bool bool
 	BoolPtr *bool
 
 	Int int
 	IntPtr *int
 
-	Int8 int8
+	Int8 int8 `eorm:"primary_key,column=int8_c"`
 	Int8Ptr *int8
 
 	Int16 int16
@@ -76,9 +77,9 @@ type SimpleStruct struct {
 	NullInt64Ptr *sql.NullInt64
 	NullBoolPtr *sql.NullBool
 	NullBytePtr *sql.NullByte
-	NullTimePtr *sql.NullTime
-	NullFloat64 *sql.NullFloat64
-	JsonColumn *JsonColumn
+	NullTimePtr    *sql.NullTime
+	NullFloat64Ptr *sql.NullFloat64
+	JsonColumn     *JsonColumn
 }
 
 // JsonColumn 是自定义的 JSON 类型字段
@@ -89,6 +90,9 @@ type JsonColumn struct {
 }
 
 func (j *JsonColumn) Scan(src any) error {
+	if src == nil {
+		return nil
+	}
 	var bs []byte
 	switch val := src.(type) {
 	case string:

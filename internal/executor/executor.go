@@ -12,18 +12,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package eorm
+package executor
 
-// MysqlUpserter is used to generated MySQL upsert query
-type MysqlUpserter struct {
-	*Inserter
-	// other fields
+import (
+	"context"
+	"database/sql"
+)
+
+var _ Executor = &sql.DB{}
+var _ TxExecutor = &sql.Tx{}
+
+// Executor 定义了执行语句的接口
+type Executor interface {
+	QueryContext(ctx context.Context, query string, args...any) (*sql.Rows, error)
+	ExecContext(ctx context.Context, query string, args...any) (sql.Result, error)
 }
 
-func (m *MysqlUpserter) Build() (*Query, error) {
-	panic("implement me")
+type TxExecutor interface {
+	Executor
+	Commit() error
+	Rollback() error
 }
 
-func (m *MysqlUpserter) Update(assignments ...Assignable) *MysqlUpserter {
-	panic("implement me")
+func NewExecutor(driverName, dataSourceName string) (Executor, error) {
+	return sql.Open(driverName, dataSourceName)
 }

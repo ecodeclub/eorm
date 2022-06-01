@@ -22,7 +22,7 @@ import (
 )
 
 func TestPredicate_C(t *testing.T) {
-	db := NewDB()
+	db := memoryOrm()
 	testCases := []CommonTestCase{
 		{
 			name:    "empty",
@@ -160,7 +160,7 @@ type CommonTestCase struct {
 }
 
 func ExampleNot() {
-	db := NewDB()
+	db := memoryOrm()
 	query, _ := NewSelector(db).Select(Columns("Id")).From(&TestModel{Id: 10}).Where(Not(C("Id").EQ(18))).Build()
 	fmt.Println(query.string())
 	// Output:
@@ -169,7 +169,7 @@ func ExampleNot() {
 }
 
 func ExamplePredicate_And() {
-	db := NewDB()
+	db := memoryOrm()
 	query, _ := NewSelector(db).Select(Columns("Id")).From(&TestModel{
 		Id: 10,
 	}).Where(C("Id").EQ(18).And(C("Age").GT(100))).Build()
@@ -180,7 +180,7 @@ func ExamplePredicate_And() {
 }
 
 func ExamplePredicate_Or() {
-	db := NewDB()
+	db := memoryOrm()
 	query, _ := NewSelector(db).Select(Columns("Id")).From(&TestModel{
 		Id: 10,
 	}).Where(C("Id").EQ(18).Or(C("Age").GT(100))).Build()

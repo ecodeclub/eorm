@@ -12,18 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-SOURCE=.github/pre-push
-TARGET=.git/hooks/pre-push
+name: Integration Test
 
-# copy pre-push file if not exist.
-if [ ! -f $TARGET ]; then
-    echo "设置 github hooks..."
-    cp $SOURCE $TARGET
-fi
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
-# add permission to TARGET file.
-test -x $TARGET || chmod +x $TARGET
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.18
 
-echo "安装 golangci-lint..."
-# install golangci-lint when golangci-lint not installed.
-go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.46.2
+      - name: Test
+        run: sh ./script/integrate_test.sh

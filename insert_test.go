@@ -14,9 +14,9 @@
 package eorm
 
 import (
+	"context"
 	"errors"
 	"fmt"
-	"github.com/gotomicro/eorm/internal/errs"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
@@ -26,11 +26,6 @@ func TestInserter_Values(t *testing.T) {
 		Id        int64
 		FirstName string
 		Ctime     uint64
-	}
-	type Order struct {
-		Id    int64
-		Name  string
-		Price int64
 	}
 	n := uint64(1000)
 	u := &User{
@@ -43,57 +38,47 @@ func TestInserter_Values(t *testing.T) {
 		FirstName: "Jerry",
 		Ctime:     n,
 	}
-	o1 := &Order{
-		Id:    14,
-		Name:  "Hellen",
-		Price: 200,
-	}
+	db := memoryOrm()
 	testCases := []CommonTestCase{
 		{
 			name:    "no examples of values",
-			builder: NewDB().Insert().Values(),
+			builder: NewInserter[User](db).Values(),
 			wantErr: errors.New("插入0行"),
 		},
 		{
 			name:     "single example of values",
-			builder:  NewDB().Insert().Values(u),
+			builder:  NewInserter[User](db).Values(u),
 			wantSql:  "INSERT INTO `user`(`id`,`first_name`,`ctime`) VALUES(?,?,?);",
 			wantArgs: []interface{}{int64(12), "Tom", n},
 		},
 
 		{
 			name:     "multiple values of same type",
-			builder:  NewDB().Insert().Values(u, u1),
+			builder:  NewInserter[User](db).Values(u, u1),
 			wantSql:  "INSERT INTO `user`(`id`,`first_name`,`ctime`) VALUES(?,?,?),(?,?,?);",
 			wantArgs: []interface{}{int64(12), "Tom", n, int64(13), "Jerry", n},
 		},
 
 		{
 			name:     "no example of a whole columns",
-			builder:  NewDB().Insert().Columns("Id", "FirstName").Values(u),
+			builder:  NewInserter[User](db).Columns("Id", "FirstName").Values(u),
 			wantSql:  "INSERT INTO `user`(`id`,`first_name`) VALUES(?,?);",
 			wantArgs: []interface{}{int64(12), "Tom"},
 		},
 		{
 			name:    "an example with invalid columns",
-			builder: NewDB().Insert().Columns("id", "FirstName").Values(u),
+			builder: NewInserter[User](db).Columns("id", "FirstName").Values(u),
 			wantErr: errors.New("eorm: 未知字段 id"),
 		},
 		{
 			name:     "no whole columns and multiple values of same type",
-			builder:  NewDB().Insert().Columns("Id", "FirstName").Values(u, u1),
+			builder:  NewInserter[User](db).Columns("Id", "FirstName").Values(u, u1),
 			wantSql:  "INSERT INTO `user`(`id`,`first_name`) VALUES(?,?),(?,?);",
 			wantArgs: []interface{}{int64(12), "Tom", int64(13), "Jerry"},
-		},
-		{
-			name:    "insert diff types",
-			builder: NewDB().Insert().Values(u, o1),
-			wantErr: errs.NewInsertDiffTypesError("User", "Order"),
 		},
 	}
 
 	for _, tc := range testCases {
-
 		c := tc
 		t.Run(tc.name, func(t *testing.T) {
 			q, err := c.builder.Build()
@@ -107,14 +92,53 @@ func TestInserter_Values(t *testing.T) {
 	}
 }
 
+func TestInserter_Exec(t *testing.T) {
+	orm := memoryOrm()
+	testCases := []struct {
+		name         string
+		i            *Inserter[TestModel]
+		wantErr      string
+		wantAffected int64
+	}{
+		{
+			name:    "invalid query",
+			i:       NewInserter[TestModel](orm).Values(),
+			wantErr: "插入0行",
+		},
+		{
+			// 表没创建
+			name:    "table not exist",
+			i:       NewInserter[TestModel](orm).Values(&TestModel{}),
+			wantErr: "no such table: test_model",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			res, err := tc.i.Exec(context.Background())
+			if err != nil {
+				assert.EqualError(t, err, tc.wantErr)
+				return
+			}
+			assert.Nil(t, tc.wantErr)
+			affected, err := res.RowsAffected()
+			if err != nil {
+				t.Fatal(err)
+			}
+			assert.Equal(t, tc.wantAffected, affected)
+		})
+	}
+}
+
 func ExampleInserter_Build() {
-	query, _ := NewDB().Insert().Values(&TestModel{
+	db := memoryOrm()
+	query, _ := NewInserter[TestModel](db).Values(&TestModel{
 		Id:  1,
 		Age: 18,
 	}).Build()
 	fmt.Printf("case1\n%s", query.string())
 
-	query, _ = NewDB().Insert().Values(&TestModel{}).Build()
+	query, _ = NewInserter[TestModel](db).Values(&TestModel{}).Build()
 	fmt.Printf("case2\n%s", query.string())
 
 	// Output:
@@ -127,13 +151,14 @@ func ExampleInserter_Build() {
 }
 
 func ExampleInserter_Columns() {
-	query, _ := NewDB().Insert().Values(&TestModel{
+	db := memoryOrm()
+	query, _ := NewInserter[TestModel](db).Values(&TestModel{
 		Id:  1,
 		Age: 18,
 	}).Columns("Id", "Age").Build()
 	fmt.Printf("case1\n%s", query.string())
 
-	query, _ = NewDB().Insert().Values(&TestModel{
+	query, _ = NewInserter[TestModel](db).Values(&TestModel{
 		Id:  1,
 		Age: 18,
 	}, &TestModel{}, &TestModel{FirstName: "Tom"}).Columns("Id", "Age").Build()
@@ -150,7 +175,8 @@ func ExampleInserter_Columns() {
 }
 
 func ExampleInserter_Values() {
-	query, _ := NewDB().Insert().Values(&TestModel{
+	db := memoryOrm()
+	query, _ := NewInserter[TestModel](db).Values(&TestModel{
 		Id:  1,
 		Age: 18,
 	}, &TestModel{}).Build()
@@ -158,4 +184,13 @@ func ExampleInserter_Values() {
 	// Output:
 	// SQL: INSERT INTO `test_model`(`id`,`first_name`,`age`,`last_name`) VALUES(?,?,?,?),(?,?,?,?);
 	// Args: []interface {}{1, "", 18, (*sql.NullString)(nil), 0, "", 0, (*sql.NullString)(nil)}
+}
+
+func ExampleNewInserter() {
+	db := memoryOrm()
+	tm := &TestModel{}
+	query, _ := NewInserter[TestModel](db).Values(tm).Build()
+	fmt.Printf("SQL: %s", query.SQL)
+	// Output:
+	// SQL: INSERT INTO `test_model`(`id`,`first_name`,`age`,`last_name`) VALUES(?,?,?,?);
 }

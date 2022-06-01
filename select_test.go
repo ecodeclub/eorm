@@ -22,7 +22,7 @@ import (
 )
 
 func TestSelectable(t *testing.T) {
-	db := NewDB()
+	db := memoryOrm()
 	testCases := []CommonTestCase{
 		{
 			name:    "simple",
@@ -136,7 +136,7 @@ func TestSelectable(t *testing.T) {
 }
 
 func ExampleSelector_OrderBy() {
-	db := NewDB()
+	db := memoryOrm()
 	query, _ := NewSelector(db).From(&TestModel{}).OrderBy(ASC("Age")).Build()
 	fmt.Printf("case1\n%s", query.string())
 	query, _ = NewSelector(db).From(&TestModel{}).OrderBy(ASC("Age", "Id")).Build()
@@ -161,7 +161,7 @@ func ExampleSelector_OrderBy() {
 }
 
 func ExampleSelector_Having() {
-	db := NewDB()
+	db := memoryOrm()
 	query, _ := NewSelector(db).Select(Columns("Id"), Columns("FirstName"), Avg("Age").As("avg_age")).From(&TestModel{}).GroupBy("FirstName").Having(C("avg_age").LT(20)).Build()
 	fmt.Printf("case1\n%s", query.string())
 	query, err := NewSelector(db).Select(Columns("Id"), Columns("FirstName"), Avg("Age").As("avg_age")).From(&TestModel{}).GroupBy("FirstName").Having(C("Invalid").LT(20)).Build()
@@ -172,5 +172,42 @@ func ExampleSelector_Having() {
 	// Args: []interface {}{20}
 	// case2
 	// eorm: 未知字段 Invalid
+}
 
+func ExampleSelector_Select() {
+	db := memoryOrm()
+	tm := &TestModel{}
+	cases := []*Selector{
+		// case0: all columns are included
+		NewSelector(db).From(tm),
+		// case1: only query specific columns
+		NewSelector(db).Select(Columns("Id", "Age")).From(tm),
+		// case2: using alias
+		NewSelector(db).Select(C("Id").As("my_id")).From(tm),
+		// case3: using aggregation function and alias
+		NewSelector(db).Select(Avg("Age").As("avg_age")).From(tm),
+		// case4: using raw expression
+		NewSelector(db).Select(Raw("COUNT(DISTINCT `age`) AS `age_cnt`")).From(tm),
+	}
+
+	for index, tc := range cases {
+		query, _ := tc.Build()
+		fmt.Printf("case%d:\n%s", index, query.string())
+	}
+	// Output:
+	// case0:
+	// SQL: SELECT `id`,`first_name`,`age`,`last_name` FROM `test_model`;
+	// Args: []interface {}(nil)
+	// case1:
+	// SQL: SELECT `id`,`age` FROM `test_model`;
+	// Args: []interface {}(nil)
+	// case2:
+	// SQL: SELECT `id` AS `my_id` FROM `test_model`;
+	// Args: []interface {}(nil)
+	// case3:
+	// SQL: SELECT AVG(`age`) AS `avg_age` FROM `test_model`;
+	// Args: []interface {}(nil)
+	// case4:
+	// SQL: SELECT COUNT(DISTINCT `age`) AS `age_cnt` FROM `test_model`;
+	// Args: []interface {}(nil)
 }

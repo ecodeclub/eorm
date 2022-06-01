@@ -15,77 +15,94 @@
 package eorm
 
 import (
+	"database/sql"
+	"database/sql/driver"
 	"github.com/gotomicro/eorm/internal/dialect"
 	"github.com/gotomicro/eorm/internal/model"
 	"github.com/gotomicro/eorm/internal/valuer"
 	"github.com/valyala/bytebufferpool"
+	"log"
+	"time"
 )
 
-// DBOption configure DB
-type DBOption func(db *DB)
+// OrmOption configure Orm
+type OrmOption func(db *Orm)
 
-// DB represents a database
-type DB struct {
+// Orm represents a database
+type Orm struct {
+	db *sql.DB
 	metaRegistry model.MetaRegistry
 	dialect      dialect.Dialect
 	valCreator valuer.Creator
 }
 
-// NewDB returns DB.
-// By default, it will create an instance of MetaRegistry and use MySQL as the dialect
-func NewDB(opts ...DBOption) *DB {
-	db := &DB{
+func Open(driver string, dsn string, opts...OrmOption) (*Orm, error) {
+	db, err := sql.Open(driver, dsn)
+	if err != nil {
+		return nil, err
+	}
+	dl, err := dialect.Of(driver)
+	if err != nil {
+		return nil, err
+	}
+	orm := &Orm{
 		metaRegistry: model.NewMetaRegistry(),
-		dialect:      dialect.MySQL,
+		dialect:      dl,
 		valCreator: valuer.NewUnsafeValue,
+		db: db,
 	}
 	for _, o := range opts {
-		o(db)
+		o(orm)
 	}
-	return db
+	return orm, nil
 }
 
-// DBWithMetaRegistry 指定元数据注册中心
-func DBWithMetaRegistry(registry model.MetaRegistry) DBOption {
-	return func(db *DB) {
+// WithMetaRegistry 指定元数据注册中心
+func WithMetaRegistry(registry model.MetaRegistry) OrmOption {
+	return func(db *Orm) {
 		db.metaRegistry = registry
 	}
 }
 
-// DBWithDialect 指定方言
-func DBWithDialect(dialect dialect.Dialect) DBOption {
-	return func(db *DB) {
+// WithDialect 指定方言
+func WithDialect(dialect dialect.Dialect) OrmOption {
+	return func(db *Orm) {
 		db.dialect = dialect
 	}
 }
 
 // Delete 开始构建一个 DELETE 查询
-func (db *DB) Delete() *Deleter {
+func (o *Orm) Delete() *Deleter {
 	return &Deleter{
-		builder: db.builder(),
+		builder: o.builder(),
 	}
 }
 
 // Update 开始构建一个 UPDATE 查询
-func (db *DB) Update(table interface{}) *Updater {
+func (o *Orm) Update(table interface{}) *Updater {
 	return &Updater{
-		builder: db.builder(),
+		builder: o.builder(),
 		table:   table,
 	}
 }
 
-// Insert 开始构建一个 INSERT 查询
-func (db *DB) Insert() *Inserter {
-	return &Inserter{
-		builder: db.builder(),
+// Wait 会等待数据库连接
+// 注意只能用于测试
+func (o *Orm) Wait() error {
+	err := o.db.Ping()
+	for err == driver.ErrBadConn {
+		log.Printf("等待数据库启动...")
+		err = o.db.Ping()
+		time.Sleep(time.Second)
 	}
+	return err
 }
 
-func (db *DB) builder() builder {
+func (o *Orm) builder() builder {
 	return builder{
-		registry: db.metaRegistry,
-		dialect:  db.dialect,
-		buffer:   bytebufferpool.Get(),
-		valCreator: db.valCreator,
+		registry:   o.metaRegistry,
+		dialect:    o.dialect,
+		buffer:     bytebufferpool.Get(),
+		valCreator: o.valCreator,
 	}
 }
