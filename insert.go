@@ -15,24 +15,36 @@
 package eorm
 
 import (
+	"context"
+	"database/sql"
 	"errors"
 	"github.com/gotomicro/eorm/internal/errs"
+	"github.com/gotomicro/eorm/internal/executor"
 	"github.com/gotomicro/eorm/internal/model"
 )
 
 // Inserter is used to construct an insert query
 // More details check Build function
-type Inserter struct {
+type Inserter[T any] struct {
 	builder
 	columns []string
-	values  []interface{}
+	values  []*T
+	executor executor.Executor
+}
+
+// NewInserter 开始构建一个 INSERT 查询
+func NewInserter[T any](orm *Orm) *Inserter[T] {
+	return &Inserter[T]{
+		builder: orm.builder(),
+		executor: orm.db,
+	}
 }
 
 // Build function build the query
 // notes:
 // - All the values from function Values should have the same type.
 // - It will insert all columns including auto-increment primary key
-func (i *Inserter) Build() (*Query, error) {
+func (i *Inserter[T]) Build() (*Query, error) {
 	var err error
 	if len(i.values) == 0 {
 		return &Query{}, errors.New("插入0行")
@@ -51,15 +63,11 @@ func (i *Inserter) Build() (*Query, error) {
 	i.writeString(")")
 	i.writeString(" VALUES")
 	for index, val := range i.values {
+		if index > 0 {
+			i.comma()
+		}
 		i.writeString("(")
-		meta, err := i.registry.Get(val)
-		if err != nil {
-			return nil, err
-		}
-		if meta.Typ != i.meta.Typ {
-			return nil, errs.NewInsertDiffTypesError(i.meta.Typ.Elem().Name(), meta.Typ.Elem().Name())
-		}
-		refVal := i.valCreator(val, meta)
+		refVal := i.valCreator(val, i.meta)
 		for j, v := range fields {
 			fdVal, err := refVal.Field(v.FieldName)
 			if err != nil {
@@ -71,9 +79,6 @@ func (i *Inserter) Build() (*Query, error) {
 			}
 		}
 		i.writeString(")")
-		if index != len(i.values)-1 {
-			i.comma()
-		}
 	}
 	i.end()
 	return &Query{SQL: i.buffer.String(), Args: i.args}, nil
@@ -82,7 +87,7 @@ func (i *Inserter) Build() (*Query, error) {
 // Columns specifies the columns that need to be inserted
 // if cs is empty, all columns will be inserted
 // cs must be the same with the field name in model
-func (i *Inserter) Columns(cs ...string) *Inserter {
+func (i *Inserter[T]) Columns(cs ...string) *Inserter[T] {
 	i.columns = cs
 	return i
 }
@@ -90,24 +95,24 @@ func (i *Inserter) Columns(cs ...string) *Inserter {
 // Values specify the rows
 // all the elements must be the same type
 // and users are supposed to passing at least one element
-func (i *Inserter) Values(values ...interface{}) *Inserter {
+func (i *Inserter[T]) Values(values ...*T) *Inserter[T]{
 	i.values = values
 	return i
 }
 
-// OnDuplicateKey generate MysqlUpserter
-// if the dialect is not MySQL, it will panic
-func (i *Inserter) OnDuplicateKey() *MysqlUpserter {
-	panic("implement me")
+// Exec 发起查询
+func (i *Inserter[T]) Exec(ctx context.Context) (sql.Result, error){
+	query, err := i.Build()
+	if err != nil {
+		return nil, err
+	}
+	return Querier{
+		q: query,
+		executor: i.executor,
+	}.Exec(ctx)
 }
 
-// OnConflict generate PgSQLUpserter
-// if the dialect is not PgSQL, it will panic
-func (i *Inserter) OnConflict(cs ...string) *PgSQLUpserter {
-	panic("implement me")
-}
-
-func (i *Inserter) buildColumns() ([]*model.ColumnMeta, error) {
+func (i *Inserter[T]) buildColumns() ([]*model.ColumnMeta, error) {
 	cs := i.meta.Columns
 	if len(i.columns) != 0 {
 		cs = make([]*model.ColumnMeta, 0, len(i.columns))
@@ -131,5 +136,4 @@ func (i *Inserter) buildColumns() ([]*model.ColumnMeta, error) {
 		}
 	}
 	return cs, nil
-
 }

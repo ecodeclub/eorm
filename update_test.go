@@ -32,78 +32,78 @@ func TestUpdater_Set(t *testing.T) {
 	testCases := []CommonTestCase{
 		{
 			name:     "no set",
-			builder:  NewDB().Update(tm),
+			builder:  memoryOrm().Update(tm),
 			wantSql:  "UPDATE `test_model` SET `id`=?,`first_name`=?,`age`=?,`last_name`=?;",
 			wantArgs: []interface{}{int64(12), "Tom", int8(18), &sql.NullString{String: "Jerry", Valid: true}},
 		},
 		{
 			name:     "set columns",
-			builder:  NewDB().Update(tm).Set(Columns("FirstName", "Age")),
+			builder:  memoryOrm().Update(tm).Set(Columns("FirstName", "Age")),
 			wantSql:  "UPDATE `test_model` SET `first_name`=?,`age`=?;",
 			wantArgs: []interface{}{"Tom", int8(18)},
 		},
 		{
 			name:    "set invalid columns",
-			builder: NewDB().Update(tm).Set(Columns("FirstNameInvalid", "Age")),
+			builder: memoryOrm().Update(tm).Set(Columns("FirstNameInvalid", "Age")),
 			wantErr: err.NewInvalidColumnError("FirstNameInvalid"),
 		},
 		{
 			name:     "set c2",
-			builder:  NewDB().Update(tm).Set(C("FirstName"), C("Age")),
+			builder:  memoryOrm().Update(tm).Set(C("FirstName"), C("Age")),
 			wantSql:  "UPDATE `test_model` SET `first_name`=?,`age`=?;",
 			wantArgs: []interface{}{"Tom", int8(18)},
 		},
 
 		{
 			name:    "set invalid c2",
-			builder: NewDB().Update(tm).Set(C("FirstNameInvalid"), C("Age")),
+			builder: memoryOrm().Update(tm).Set(C("FirstNameInvalid"), C("Age")),
 			wantErr: err.NewInvalidColumnError("FirstNameInvalid"),
 		},
 
 		{
 			name:     "set assignment",
-			builder:  NewDB().Update(tm).Set(C("FirstName"), Assign("Age", 30)),
+			builder:  memoryOrm().Update(tm).Set(C("FirstName"), Assign("Age", 30)),
 			wantSql:  "UPDATE `test_model` SET `first_name`=?,`age`=?;",
 			wantArgs: []interface{}{"Tom", 30},
 		},
 		{
 			name:    "set invalid assignment",
-			builder: NewDB().Update(tm).Set(C("FirstName"), Assign("InvalidAge", 30)),
+			builder: memoryOrm().Update(tm).Set(C("FirstName"), Assign("InvalidAge", 30)),
 			wantErr: err.NewInvalidColumnError("InvalidAge"),
 		},
 		{
 			name:     "set age+1",
-			builder:  NewDB().Update(tm).Set(C("FirstName"), Assign("Age", C("Age").Add(1))),
+			builder:  memoryOrm().Update(tm).Set(C("FirstName"), Assign("Age", C("Age").Add(1))),
 			wantSql:  "UPDATE `test_model` SET `first_name`=?,`age`=(`age`+?);",
 			wantArgs: []interface{}{"Tom", 1},
 		},
 		{
 			name:     "set age=id+1",
-			builder:  NewDB().Update(tm).Set(C("FirstName"), Assign("Age", C("Id").Add(10))),
+			builder:  memoryOrm().Update(tm).Set(C("FirstName"), Assign("Age", C("Id").Add(10))),
 			wantSql:  "UPDATE `test_model` SET `first_name`=?,`age`=(`id`+?);",
 			wantArgs: []interface{}{"Tom", 10},
 		},
 		{
 			name:     "set age=id+(age*100)",
-			builder:  NewDB().Update(tm).Set(C("FirstName"), Assign("Age", C("Id").Add(C("Age").Multi(100)))),
+			builder:  memoryOrm().Update(tm).Set(C("FirstName"), Assign("Age", C("Id").Add(C("Age").Multi(100)))),
 			wantSql:  "UPDATE `test_model` SET `first_name`=?,`age`=(`id`+(`age`*?));",
 			wantArgs: []interface{}{"Tom", 100},
 		},
 		{
 			name:     "set age=(id+(age*100))*110",
-			builder:  NewDB().Update(tm).Set(C("FirstName"), Assign("Age", C("Id").Add(C("Age").Multi(100)).Multi(110))),
+			builder:  memoryOrm().Update(tm).Set(C("FirstName"), Assign("Age", C("Id").Add(C("Age").Multi(100)).Multi(110))),
 			wantSql:  "UPDATE `test_model` SET `first_name`=?,`age`=((`id`+(`age`*?))*?);",
 			wantArgs: []interface{}{"Tom", 100, 110},
 		},
 		{
 			name:     "not nil columns",
-			builder:  NewDB().Update(&TestModel{}).Set(AssignNotNilColumns(&TestModel{Id: 13})...),
+			builder:  memoryOrm().Update(&TestModel{}).Set(AssignNotNilColumns(&TestModel{Id: 13})...),
 			wantSql:  "UPDATE `test_model` SET `id`=?,`first_name`=?,`age`=?;",
 			wantArgs: []interface{}{int64(13), "", int8(0)},
 		},
 		{
 			name:     "not zero columns",
-			builder:  NewDB().Update(&TestModel{}).Set(AssignNotZeroColumns(&TestModel{Id: 13})...),
+			builder:  memoryOrm().Update(&TestModel{}).Set(AssignNotZeroColumns(&TestModel{Id: 13})...),
 			wantSql:  "UPDATE `test_model` SET `id`=?;",
 			wantArgs: []interface{}{int64(13)},
 		},
@@ -124,7 +124,7 @@ func TestUpdater_Set(t *testing.T) {
 }
 
 func ExampleAssignNotNilColumns() {
-	db := NewDB()
+	db := memoryOrm()
 	query, _ := db.Update(&TestModel{}).Set(AssignNotNilColumns(&TestModel{Id: 13})...).Build()
 	fmt.Println(query.string())
 	// Output:
@@ -133,7 +133,7 @@ func ExampleAssignNotNilColumns() {
 }
 
 func ExampleAssignNotZeroColumns() {
-	db := NewDB()
+	db := memoryOrm()
 	query, _ := db.Update(&TestModel{}).Set(AssignNotZeroColumns(&TestModel{Id: 13})...).Build()
 	fmt.Println(query.string())
 	// Output:

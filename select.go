@@ -33,7 +33,7 @@ type Selector struct {
 	limit    int
 }
 
-func NewSelector(db *DB) *Selector {
+func NewSelector(db *Orm) *Selector {
 	return &Selector{
 		builder: db.builder(),
 	}

@@ -14,6 +14,8 @@
 
 package dialect
 
+import "github.com/gotomicro/eorm/internal/errs"
+
 // Dialect specify config or behavior of special SQL dialects
 type Dialect struct {
 	Name string
@@ -31,3 +33,14 @@ var (
 		Quote: '`',
 	}
 )
+
+func Of(driver string) (Dialect, error) {
+	switch driver {
+	case "sqlite3":
+		return SQLite, nil
+	case "mysql":
+		return MySQL, nil
+	default:
+		return Dialect{}, errs.NewUnsupportedDriverError(driver)
+	}
+}

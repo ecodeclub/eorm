@@ -15,9 +15,12 @@
 package eorm
 
 import (
+	"context"
+	"database/sql"
 	"errors"
 	"github.com/gotomicro/eorm/internal/dialect"
 	"github.com/gotomicro/eorm/internal/errs"
+	"github.com/gotomicro/eorm/internal/executor"
 	"github.com/gotomicro/eorm/internal/model"
 	"github.com/gotomicro/eorm/internal/valuer"
 	"github.com/valyala/bytebufferpool"
@@ -28,10 +31,32 @@ type QueryBuilder interface {
 	Build() (*Query, error)
 }
 
-// Query represents a query
+// Query 代表一个查询
 type Query struct {
 	SQL  string
-	Args []interface{}
+	Args []any
+}
+
+// Querier 查询器，代表最基本的查询
+type Querier struct {
+	q *Query
+	executor executor.Executor
+}
+
+// NewQuerier 创建一个 Querier 实例
+func NewQuerier(orm *Orm, sql string, args...any) Querier {
+	return Querier{
+		q: &Query{
+			SQL: sql,
+			Args: args,
+		},
+		executor: orm.db,
+	}
+}
+
+// Exec 执行 SQL
+func (q Querier) Exec(ctx context.Context) (sql.Result, error) {
+	return q.executor.ExecContext(ctx, q.q.SQL, q.q.Args...)
 }
 
 type builder struct {

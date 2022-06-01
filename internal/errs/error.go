@@ -40,7 +40,6 @@ func NewUnsupportedTypeError(typ reflect.Type) error {
 	return fmt.Errorf("eorm: 不支持字段类型 %s, %s", typ.PkgPath(), typ.Name())
 }
 
-// NewInsertDiffTypesError 在批量插入中，试图插入不同类型的数据
-func NewInsertDiffTypesError(origin, now string) error {
-	return fmt.Errorf("eorm: 试图插入不同类型的数据，原来：%s，现在：%s", origin, now)
+func NewUnsupportedDriverError(driver string) error {
+	return fmt.Errorf("eorm: 不支持driver类型 %s", driver)
 }
