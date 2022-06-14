@@ -12,8 +12,30 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package test
+//go:build e2e
 
-func ToPtr[T any](t T) *T {
-	return &t
+package integration
+
+import (
+	"github.com/gotomicro/eorm"
+	"github.com/stretchr/testify/suite"
+)
+
+type Suite struct {
+	suite.Suite
+	driver string
+	dsn string
+	orm *eorm.Orm
+}
+
+func (s *Suite) SetupSuite() {
+	t := s.T()
+	orm, err := eorm.Open(s.driver, s.dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = orm.Wait(); err != nil {
+		t.Fatal(err)
+	}
+	s.orm = orm
 }

@@ -36,7 +36,7 @@ type Updater struct {
 func (u *Updater) Build() (*Query, error) {
 	defer bytebufferpool.Put(u.buffer)
 	var err error
-	u.meta, err = u.registry.Get(u.table)
+	u.meta, err = u.metaRegistry.Get(u.table)
 	if err != nil {
 		return nil, err
 	}
@@ -81,7 +81,7 @@ func (u *Updater) buildAssigns() error {
 		case Column:
 			c, ok := u.meta.FieldMap[a.name]
 			if !ok {
-				return errs.NewInvalidColumnError(a.name)
+				return errs.NewInvalidFieldError(a.name)
 			}
 			val, _ := u.val.Field(a.name)
 			u.quote(c.ColumnName)
@@ -92,7 +92,7 @@ func (u *Updater) buildAssigns() error {
 			for _, name := range a.cs {
 				c, ok := u.meta.FieldMap[name]
 				if !ok {
-					return errs.NewInvalidColumnError(name)
+					return errs.NewInvalidFieldError(name)
 				}
 				val, _ := u.val.Field(name)
 				if has {

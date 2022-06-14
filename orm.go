@@ -31,24 +31,30 @@ type OrmOption func(db *Orm)
 // Orm represents a database
 type Orm struct {
 	db *sql.DB
-	metaRegistry model.MetaRegistry
-	dialect      dialect.Dialect
-	valCreator valuer.Creator
+	core
 }
 
+// Open 创建一个 ORM 实例
+// 注意该实例是一个无状态的对象，你应该尽可能复用它
 func Open(driver string, dsn string, opts...OrmOption) (*Orm, error) {
 	db, err := sql.Open(driver, dsn)
 	if err != nil {
 		return nil, err
 	}
+	return openDB(driver, db, opts...)
+}
+
+func openDB(driver string, db *sql.DB, opts...OrmOption) (*Orm, error) {
 	dl, err := dialect.Of(driver)
 	if err != nil {
 		return nil, err
 	}
 	orm := &Orm{
-		metaRegistry: model.NewMetaRegistry(),
-		dialect:      dl,
-		valCreator: valuer.NewUnsafeValue,
+		core: core {
+			metaRegistry: model.NewMetaRegistry(),
+			dialect:      dl,
+			valCreator: valuer.NewUnsafeValue,
+		},
 		db: db,
 	}
 	for _, o := range opts {
@@ -100,9 +106,8 @@ func (o *Orm) Wait() error {
 
 func (o *Orm) builder() builder {
 	return builder{
-		registry:   o.metaRegistry,
-		dialect:    o.dialect,
+		core: o.core,
 		buffer:     bytebufferpool.Get(),
-		valCreator: o.valCreator,
+
 	}
 }

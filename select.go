@@ -15,13 +15,16 @@
 package eorm
 
 import (
+	"context"
 	"github.com/gotomicro/eorm/internal/errs"
+	"github.com/gotomicro/eorm/internal/executor"
 	"github.com/valyala/bytebufferpool"
 )
 
 // Selector represents a select query
-type Selector struct {
+type Selector[T any] struct {
 	builder
+	executor executor.Executor
 	columns  []Selectable
 	table    interface{}
 	where    []Predicate
@@ -33,17 +36,19 @@ type Selector struct {
 	limit    int
 }
 
-func NewSelector(db *Orm) *Selector {
-	return &Selector{
-		builder: db.builder(),
+// NewSelector 创建一个 Selector
+func NewSelector[T any](orm *Orm) *Selector[T] {
+	return &Selector[T]{
+		builder: orm.builder(),
+		executor: orm.db,
 	}
 }
 
 // Build returns Select Query
-func (s *Selector) Build() (*Query, error) {
+func (s *Selector[T]) Build() (*Query, error) {
 	defer bytebufferpool.Put(s.buffer)
 	var err error
-	s.meta, err = s.registry.Get(s.table)
+	s.meta, err = s.metaRegistry.Get(s.table)
 	if err != nil {
 		return nil, err
 	}
@@ -104,7 +109,7 @@ func (s *Selector) Build() (*Query, error) {
 	return &Query{SQL: s.buffer.String(), Args: s.args}, nil
 }
 
-func (s *Selector) buildOrderBy() error {
+func (s *Selector[T]) buildOrderBy() error {
 	s.writeString(" ORDER BY ")
 	for i, ob := range s.orderBy {
 		if i > 0 {
@@ -113,7 +118,7 @@ func (s *Selector) buildOrderBy() error {
 		for _, c := range ob.fields {
 			cMeta, ok := s.meta.FieldMap[c]
 			if !ok {
-				return errs.NewInvalidColumnError(c)
+				return errs.NewInvalidFieldError(c)
 			}
 			s.quote(cMeta.ColumnName)
 		}
@@ -123,12 +128,12 @@ func (s *Selector) buildOrderBy() error {
 	return nil
 }
 
-func (s *Selector) buildGroupBy() error {
+func (s *Selector[T]) buildGroupBy() error {
 	s.writeString(" GROUP BY ")
 	for i, gb := range s.groupBy {
 		cMeta, ok := s.meta.FieldMap[gb]
 		if !ok {
-			return errs.NewInvalidColumnError(gb)
+			return errs.NewInvalidFieldError(gb)
 		}
 		if i > 0 {
 			s.comma()
@@ -138,7 +143,7 @@ func (s *Selector) buildGroupBy() error {
 	return nil
 }
 
-func (s *Selector) buildAllColumns() {
+func (s *Selector[T]) buildAllColumns() {
 	for i, cMeta := range s.meta.Columns {
 		if i > 0 {
 			s.comma()
@@ -149,7 +154,7 @@ func (s *Selector) buildAllColumns() {
 }
 
 // buildSelectedList users specify columns
-func (s *Selector) buildSelectedList() error {
+func (s *Selector[T]) buildSelectedList() error {
 	s.aliases = make(map[string]struct{})
 	for i, selectable := range s.columns {
 		if i > 0 {
@@ -182,13 +187,13 @@ func (s *Selector) buildSelectedList() error {
 	return nil
 
 }
-func (s *Selector) selectAggregate(aggregate Aggregate) error {
+func (s *Selector[T]) selectAggregate(aggregate Aggregate) error {
 	s.writeString(aggregate.fn)
 	s.writeByte('(')
 	cMeta, ok := s.meta.FieldMap[aggregate.arg]
 	s.aliases[aggregate.alias] = struct{}{}
 	if !ok {
-		return errs.NewInvalidColumnError(aggregate.arg)
+		return errs.NewInvalidFieldError(aggregate.arg)
 	}
 	s.quote(cMeta.ColumnName)
 	s.writeByte(')')
@@ -201,10 +206,10 @@ func (s *Selector) selectAggregate(aggregate Aggregate) error {
 	return nil
 }
 
-func (s *Selector) buildColumn(field, alias string) error {
+func (s *Selector[T]) buildColumn(field, alias string) error {
 	cMeta, ok := s.meta.FieldMap[field]
 	if !ok {
-		return errs.NewInvalidColumnError(field)
+		return errs.NewInvalidFieldError(field)
 	}
 	s.quote(cMeta.ColumnName)
 	if alias != "" {
@@ -215,59 +220,72 @@ func (s *Selector) buildColumn(field, alias string) error {
 	return nil
 }
 
-// Columns specifies the table which must be pointer of structure
-func (s *Selector) Select(columns ...Selectable) *Selector {
+// Select 指定查询的列。
+// 列可以是物理列，也可以是聚合函数，或者 RawExpr
+func (s *Selector[T]) Select(columns ...Selectable) *Selector[T] {
 	s.columns = columns
 	return s
 }
 
 // From specifies the table which must be pointer of structure
-func (s *Selector) From(table interface{}) *Selector {
+func (s *Selector[T]) From(table interface{}) *Selector[T] {
 	s.table = table
 	return s
 }
 
 // Where accepts predicates
-func (s *Selector) Where(predicates ...Predicate) *Selector {
+func (s *Selector[T]) Where(predicates ...Predicate) *Selector[T] {
 	s.where = predicates
 	return s
 }
 
 // Distinct indicates using keyword DISTINCT
-func (s *Selector) Distinct() *Selector {
+func (s *Selector[T]) Distinct() *Selector[T] {
 	s.distinct = true
 	return s
 }
 
 // Having accepts predicates
-func (s *Selector) Having(predicates ...Predicate) *Selector {
+func (s *Selector[T]) Having(predicates ...Predicate) *Selector[T] {
 	s.having = predicates
 	return s
 }
 
 // GroupBy means "GROUP BY"
-func (s *Selector) GroupBy(columns ...string) *Selector {
+func (s *Selector[T]) GroupBy(columns ...string) *Selector[T] {
 	s.groupBy = columns
 	return s
 }
 
 // OrderBy means "ORDER BY"
-func (s *Selector) OrderBy(orderBys ...OrderBy) *Selector {
+func (s *Selector[T]) OrderBy(orderBys ...OrderBy) *Selector[T] {
 	s.orderBy = orderBys
 	return s
 }
 
 // Limit limits the size of result set
-func (s *Selector) Limit(limit int) *Selector {
+func (s *Selector[T]) Limit(limit int) *Selector[T] {
 	s.limit = limit
 	return s
 }
 
 // Offset was used by "LIMIT"
-func (s *Selector) Offset(offset int) *Selector {
+func (s *Selector[T]) Offset(offset int) *Selector[T] {
 	s.offset = offset
 	return s
 }
+
+// Get 方法会执行查询，并且返回一条数据
+// 注意，在不同的数据库情况下，第一条数据可能是按照不同的列来排序的
+// 而且要注意，这个方法会强制设置 Limit 1
+func (s *Selector[T]) Get(ctx context.Context) (*T, error) {
+	query, err := s.Limit(1).Build()
+	if err != nil {
+		return nil, err
+	}
+	return newQuerier[T](s.core, s.executor, query).Get(ctx)
+}
+
 
 // OrderBy specify fields and ASC
 type OrderBy struct {

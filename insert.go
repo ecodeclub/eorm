@@ -50,7 +50,7 @@ func (i *Inserter[T]) Build() (*Query, error) {
 		return &Query{}, errors.New("插入0行")
 	}
 	i.writeString("INSERT INTO ")
-	i.meta, err = i.registry.Get(i.values[0])
+	i.meta, err = i.metaRegistry.Get(i.values[0])
 	if err != nil {
 		return &Query{}, err
 	}
@@ -106,7 +106,7 @@ func (i *Inserter[T]) Exec(ctx context.Context) (sql.Result, error){
 	if err != nil {
 		return nil, err
 	}
-	return Querier{
+	return Querier[T]{
 		q: query,
 		executor: i.executor,
 	}.Exec(ctx)
@@ -119,7 +119,7 @@ func (i *Inserter[T]) buildColumns() ([]*model.ColumnMeta, error) {
 		for index, c := range i.columns {
 			v, isOk := i.meta.FieldMap[c]
 			if !isOk {
-				return cs, errs.NewInvalidColumnError(c)
+				return cs, errs.NewInvalidFieldError(c)
 			}
 			i.quote(v.ColumnName)
 			if index != len(i.columns)-1 {

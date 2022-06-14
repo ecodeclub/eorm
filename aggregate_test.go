@@ -26,27 +26,27 @@ func TestAggregate(t *testing.T) {
 	testCases := []CommonTestCase{
 		{
 			name:    "avg",
-			builder: NewSelector(db).Select(Avg("Age")).From(&TestModel{}),
+			builder: NewSelector[TestModel](db).Select(Avg("Age")).From(&TestModel{}),
 			wantSql: "SELECT AVG(`age`) FROM `test_model`;",
 		},
 		{
 			name:    "max",
-			builder: NewSelector(db).Select(Max("Age")).From(&TestModel{}),
+			builder: NewSelector[TestModel](db).Select(Max("Age")).From(&TestModel{}),
 			wantSql: "SELECT MAX(`age`) FROM `test_model`;",
 		},
 		{
 			name:    "min",
-			builder: NewSelector(db).Select(Min("Age").As("min_age")).From(&TestModel{}),
+			builder: NewSelector[TestModel](db).Select(Min("Age").As("min_age")).From(&TestModel{}),
 			wantSql: "SELECT MIN(`age`) AS `min_age` FROM `test_model`;",
 		},
 		{
 			name:    "sum",
-			builder: NewSelector(db).Select(Sum("Age")).From(&TestModel{}),
+			builder: NewSelector[TestModel](db).Select(Sum("Age")).From(&TestModel{}),
 			wantSql: "SELECT SUM(`age`) FROM `test_model`;",
 		},
 		{
 			name:    "count",
-			builder: NewSelector(db).Select(Count("Age")).From(&TestModel{}),
+			builder: NewSelector[TestModel](db).Select(Count("Age")).From(&TestModel{}),
 			wantSql: "SELECT COUNT(`age`) FROM `test_model`;",
 		},
 	}
@@ -67,42 +67,42 @@ func TestAggregate(t *testing.T) {
 
 func ExampleAggregate_As() {
 	db := memoryOrm()
-	query, _ := NewSelector(db).Select(Avg("Age").As("avg_age")).From(&TestModel{}).Build()
+	query, _ := NewSelector[TestModel](db).Select(Avg("Age").As("avg_age")).From(&TestModel{}).Build()
 	fmt.Println(query.SQL)
 	// Output: SELECT AVG(`age`) AS `avg_age` FROM `test_model`;
 }
 
 func ExampleAvg() {
 	db := memoryOrm()
-	query, _ := NewSelector(db).Select(Avg("Age").As("avg_age")).From(&TestModel{}).Build()
+	query, _ := NewSelector[TestModel](db).Select(Avg("Age").As("avg_age")).From(&TestModel{}).Build()
 	fmt.Println(query.SQL)
 	// Output: SELECT AVG(`age`) AS `avg_age` FROM `test_model`;
 }
 
 func ExampleCount() {
 	db := memoryOrm()
-	query, _ := NewSelector(db).Select(Count("Age")).From(&TestModel{}).Build()
+	query, _ := NewSelector[TestModel](db).Select(Count("Age")).From(&TestModel{}).Build()
 	fmt.Println(query.SQL)
 	// Output: SELECT COUNT(`age`) FROM `test_model`;
 }
 
 func ExampleMax() {
 	db := memoryOrm()
-	query, _ := NewSelector(db).Select(Max("Age")).From(&TestModel{}).Build()
+	query, _ := NewSelector[TestModel](db).Select(Max("Age")).From(&TestModel{}).Build()
 	fmt.Println(query.SQL)
 	// Output: SELECT MAX(`age`) FROM `test_model`;
 }
 
 func ExampleMin() {
 	db := memoryOrm()
-	query, _ := NewSelector(db).Select(Min("Age")).From(&TestModel{}).Build()
+	query, _ := NewSelector[TestModel](db).Select(Min("Age")).From(&TestModel{}).Build()
 	fmt.Println(query.SQL)
 	// Output: SELECT MIN(`age`) FROM `test_model`;
 }
 
 func ExampleSum() {
 	db := memoryOrm()
-	query, _ := NewSelector(db).Select(Sum("Age")).From(&TestModel{}).Build()
+	query, _ := NewSelector[TestModel](db).Select(Sum("Age")).From(&TestModel{}).Build()
 	fmt.Println(query.SQL)
 	// Output: SELECT SUM(`age`) FROM `test_model`;
 }

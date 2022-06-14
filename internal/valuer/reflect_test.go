@@ -21,7 +21,6 @@ import (
 	"github.com/gotomicro/eorm/internal/test"
 	"github.com/stretchr/testify/assert"
 	"testing"
-	"time"
 )
 
 func TestReflectValue_Field(t *testing.T) {
@@ -31,7 +30,7 @@ func TestReflectValue_Field(t *testing.T) {
 			// 不存在的字段
 			name: "invalid field",
 			field: "UpdateTime",
-			wantError: errs.NewInvalidColumnError("UpdateTime"),
+			wantError: errs.NewInvalidFieldError("UpdateTime"),
 		},
 	}
 	t.Run("invalid cases", func(t *testing.T) {
@@ -51,6 +50,10 @@ func TestReflectValue_Field(t *testing.T) {
 			})
 		}
 	})
+}
+
+func Test_reflectValue_SetColumn(t *testing.T) {
+	testSetColumn(t, NewReflectValue)
 }
 
 func FuzzReflectValue_Field(f *testing.F) {
@@ -78,15 +81,12 @@ func fuzzValueField(factory Creator) any {
 			Uint64: u64, Uint64Ptr: &u64,
 			Float32: f32, Float32Ptr: &f32,
 			Float64: f64, Float64Ptr: &f64,
-			Byte: bt, BytePtr: &bt, ByteArray: bs,
 			String:         s,
 			NullStringPtr:  &sql.NullString{String: s, Valid: b},
 			NullInt16Ptr:   &sql.NullInt16{Int16: i16, Valid: b},
 			NullInt32Ptr:   &sql.NullInt32{Int32: i32, Valid: b},
 			NullInt64Ptr:   &sql.NullInt64{Int64: i64, Valid: b},
 			NullBoolPtr:    &sql.NullBool{Bool: b, Valid: b},
-			NullBytePtr:    &sql.NullByte{Byte: bt, Valid: b},
-			NullTimePtr:    &sql.NullTime{Time: time.UnixMicro(i64), Valid: b},
 			NullFloat64Ptr: &sql.NullFloat64{Float64: f64, Valid: b},
 		}
 		val := factory(entity, meta)
@@ -108,3 +108,5 @@ func BenchmarkReflectValue_Field(b *testing.B) {
 		assert.Equal(b, int64(13), val)
 	}
 }
+
+

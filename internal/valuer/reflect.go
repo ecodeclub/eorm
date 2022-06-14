@@ -15,6 +15,7 @@
 package valuer
 
 import (
+	"database/sql"
 	"github.com/gotomicro/eorm/internal/errs"
 	"github.com/gotomicro/eorm/internal/model"
 	"reflect"
@@ -25,13 +26,15 @@ var _ Creator = NewReflectValue
 // reflectValue 基于反射的 Value
 type reflectValue struct {
 	val reflect.Value
+	meta *model.TableMeta
 }
 
 // NewReflectValue 返回一个封装好的，基于反射实现的 Value
 // 输入 val 必须是一个指向结构体实例的指针，而不能是任何其它类型
-func NewReflectValue(val interface{}, _ *model.TableMeta) Value {
+func NewReflectValue(val interface{}, meta *model.TableMeta) Value {
 	return reflectValue{
 		val: reflect.ValueOf(val).Elem(),
+		meta: meta,
 	}
 }
 
@@ -39,7 +42,35 @@ func NewReflectValue(val interface{}, _ *model.TableMeta) Value {
 func (r reflectValue) Field(name string) (interface{}, error) {
 	res := r.val.FieldByName(name)
 	if res == (reflect.Value{}) {
-		return nil, errs.NewInvalidColumnError(name)
+		return nil, errs.NewInvalidFieldError(name)
 	}
 	return res.Interface(), nil
+}
+
+func (r reflectValue) SetColumn(column string, val *sql.RawBytes) error {
+	cm, ok := r.meta.ColumnMap[column]
+	if !ok {
+		return errs.NewInvalidColumnError(column)
+	}
+	fd := r.val.FieldByName(cm.FieldName)
+	if cm.IsHolderType {
+		scanner, err := decodeScanner(cm.Typ, val)
+		if err != nil {
+			return err
+		}
+		fd.Set(scanner)
+		return nil
+	}
+	cv, err := decode(cm.Typ, val)
+	if err != nil {
+		return err
+	}
+	var rv reflect.Value
+	if cv == nil {
+		rv = reflect.Zero(cm.Typ)
+	} else {
+		rv = reflect.ValueOf(cv)
+	}
+	fd.Set(rv)
+	return nil
 }

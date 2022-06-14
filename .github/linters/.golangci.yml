@@ -49,6 +49,9 @@ linters:
     - varcheck
     - whitespace
     - errcheck
+    - errname
+    - gochecknoglobals
+    - sqlclosecheck
 #  disable:
 
 linters-settings:

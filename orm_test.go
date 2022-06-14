@@ -70,3 +70,11 @@ func memoryOrm() *Orm {
 	}
 	return orm
 }
+
+func memoryOrmWithDB(db string) *Orm {
+	orm, err := Open("sqlite3", fmt.Sprintf("file:%s.db?cache=shared&mode=memory", db))
+	if err != nil {
+		panic(err)
+	}
+	return orm
+}
