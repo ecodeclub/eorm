@@ -24,12 +24,12 @@ func TestDeleter_Build(t *testing.T) {
 	testCases := []CommonTestCase{
 		{
 			name:    "no where",
-			builder: memoryOrm().Delete().From(&TestModel{}),
+			builder: memoryDB().Delete().From(&TestModel{}),
 			wantSql: "DELETE FROM `test_model`;",
 		},
 		{
 			name:     "where",
-			builder:  memoryOrm().Delete().From(&TestModel{}).Where(C("Id").EQ(16)),
+			builder:  memoryDB().Delete().From(&TestModel{}).Where(C("Id").EQ(16)),
 			wantSql:  "DELETE FROM `test_model` WHERE `id`=?;",
 			wantArgs: []interface{}{16},
 		},
@@ -47,21 +47,21 @@ func TestDeleter_Build(t *testing.T) {
 }
 
 func ExampleDeleter_Build() {
-	query, _ := memoryOrm().Delete().From(&TestModel{}).Build()
+	query, _ := memoryDB().Delete().From(&TestModel{}).Build()
 	fmt.Printf("SQL: %s", query.SQL)
 	// Output:
 	// SQL: DELETE FROM `test_model`;
 }
 
 func ExampleDeleter_From() {
-	query, _ := memoryOrm().Delete().From(&TestModel{}).Build()
+	query, _ := memoryDB().Delete().From(&TestModel{}).Build()
 	fmt.Printf("SQL: %s", query.SQL)
 	// Output:
 	// SQL: DELETE FROM `test_model`;
 }
 
 func ExampleDeleter_Where() {
-	query, _ := memoryOrm().Delete().From(&TestModel{}).Where(C("Id").EQ(12)).Build()
+	query, _ := memoryDB().Delete().From(&TestModel{}).Where(C("Id").EQ(12)).Build()
 	fmt.Printf("SQL: %s\nArgs: %v", query.SQL, query.Args)
 	// Output:
 	// SQL: DELETE FROM `test_model` WHERE `id`=?;

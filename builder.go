@@ -19,7 +19,6 @@ import (
 	"database/sql"
 	"errors"
 	"github.com/gotomicro/eorm/internal/errs"
-	"github.com/gotomicro/eorm/internal/executor"
 	"github.com/gotomicro/eorm/internal/model"
 	"github.com/valyala/bytebufferpool"
 )
@@ -39,34 +38,34 @@ type Query struct {
 type Querier[T any] struct {
 	q *Query
 	core
-	executor executor.Executor
+	session
 }
 
 // RawQuery 创建一个 Querier 实例
 // 泛型参数 T 是目标类型。
 // 例如，如果查询 User 的数据，那么 T 就是 User
-func RawQuery[T any](orm *Orm, sql string, args...any) Querier[T] {
-	return newQuerier[T](orm.core, orm.db,  &Query{
+func RawQuery[T any](sess session, sql string, args...any) Querier[T] {
+	return newQuerier[T](sess,  &Query{
 		SQL: sql,
 		Args: args,
 	})
 }
 
-func newQuerier[T any](core core, exec executor.Executor, q *Query) Querier[T] {
+func newQuerier[T any](sess session, q *Query) Querier[T] {
 	return Querier[T]{
 		q: q,
-		core: core,
-		executor: exec,
+		core: sess.getCore(),
+		session: sess,
 	}
 }
 
 // Exec 执行 SQL
 func (q Querier[T]) Exec(ctx context.Context) (sql.Result, error) {
-	return q.executor.ExecContext(ctx, q.q.SQL, q.q.Args...)
+	return q.session.execContext(ctx, q.q.SQL, q.q.Args...)
 }
 
 func (q Querier[T]) Get(ctx context.Context) (*T, error){
-	rows, err := q.executor.QueryContext(ctx, q.q.SQL, q.q.Args...)
+	rows, err := q.session.queryContext(ctx, q.q.SQL, q.q.Args...)
 	if err != nil {
 		return nil, err
 	}

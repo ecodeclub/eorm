@@ -17,7 +17,7 @@ package eorm
 import "fmt"
 
 func ExampleAssign() {
-	db := memoryOrm()
+	db := memoryDB()
 	tm := &TestModel{}
 	examples := []struct {
 		assign    Assignment

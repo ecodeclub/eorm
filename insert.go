@@ -19,24 +19,27 @@ import (
 	"database/sql"
 	"errors"
 	"github.com/gotomicro/eorm/internal/errs"
-	"github.com/gotomicro/eorm/internal/executor"
 	"github.com/gotomicro/eorm/internal/model"
+	"github.com/valyala/bytebufferpool"
 )
 
 // Inserter is used to construct an insert query
 // More details check Build function
 type Inserter[T any] struct {
 	builder
+	session
 	columns []string
 	values  []*T
-	executor executor.Executor
 }
 
 // NewInserter 开始构建一个 INSERT 查询
-func NewInserter[T any](orm *Orm) *Inserter[T] {
+func NewInserter[T any](sess session) *Inserter[T] {
 	return &Inserter[T]{
-		builder: orm.builder(),
-		executor: orm.db,
+		builder: builder{
+			core: sess.getCore(),
+			buffer: bytebufferpool.Get(),
+		},
+		session: sess,
 	}
 }
 
@@ -106,10 +109,7 @@ func (i *Inserter[T]) Exec(ctx context.Context) (sql.Result, error){
 	if err != nil {
 		return nil, err
 	}
-	return Querier[T]{
-		q: query,
-		executor: i.executor,
-	}.Exec(ctx)
+	return newQuerier[T](i.session, query).Exec(ctx)
 }
 
 func (i *Inserter[T]) buildColumns() ([]*model.ColumnMeta, error) {

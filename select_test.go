@@ -22,7 +22,7 @@ import (
 )
 
 func TestSelectable(t *testing.T) {
-	db := memoryOrm()
+	db := memoryDB()
 	testCases := []CommonTestCase{
 		{
 			name:    "simple",
@@ -136,7 +136,7 @@ func TestSelectable(t *testing.T) {
 }
 
 func ExampleSelector_OrderBy() {
-	db := memoryOrm()
+	db := memoryDB()
 	query, _ := NewSelector[TestModel](db).From(&TestModel{}).OrderBy(ASC("Age")).Build()
 	fmt.Printf("case1\n%s", query.string())
 	query, _ = NewSelector[TestModel](db).From(&TestModel{}).OrderBy(ASC("Age", "Id")).Build()
@@ -161,7 +161,7 @@ func ExampleSelector_OrderBy() {
 }
 
 func ExampleSelector_Having() {
-	db := memoryOrm()
+	db := memoryDB()
 	query, _ := NewSelector[TestModel](db).Select(Columns("Id"), Columns("FirstName"), Avg("Age").As("avg_age")).From(&TestModel{}).GroupBy("FirstName").Having(C("avg_age").LT(20)).Build()
 	fmt.Printf("case1\n%s", query.string())
 	query, err := NewSelector[TestModel](db).Select(Columns("Id"), Columns("FirstName"), Avg("Age").As("avg_age")).From(&TestModel{}).GroupBy("FirstName").Having(C("Invalid").LT(20)).Build()
@@ -175,7 +175,7 @@ func ExampleSelector_Having() {
 }
 
 func ExampleSelector_Select() {
-	db := memoryOrm()
+	db := memoryDB()
 	tm := &TestModel{}
 	cases := []*Selector[TestModel]{
 		// case0: all columns are included

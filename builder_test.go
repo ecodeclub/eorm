@@ -28,7 +28,7 @@ import (
 
 type QuerierTestSuite struct {
 	suite.Suite
-	orm *Orm
+	orm *DB
 }
 
 func TestQuerier(t *testing.T) {
@@ -36,7 +36,7 @@ func TestQuerier(t *testing.T) {
 }
 
 func (q *QuerierTestSuite) SetupSuite() {
-	q.orm = memoryOrmWithDB("querier")
+	q.orm = memoryDBWithDB("querier")
 	// 创建表
 	_, err := RawQuery[TestModel](q.orm, TestModel{}.CreateSQL()).Exec(context.Background())
 	if err != nil {
@@ -110,7 +110,7 @@ func (q *QuerierTestSuite) TestGet() {
 }
 
 func ExampleRawQuery() {
-	orm := memoryOrm()
+	orm := memoryDB()
 	q := RawQuery[any](orm, `SELECT * FROM user_tab WHERE id = ?;`, 1)
 	fmt.Printf(`
 SQL: %s
@@ -122,7 +122,7 @@ Args: %v
 }
 
 func ExampleQuerier_Exec() {
-	orm := memoryOrm()
+	orm := memoryDB()
 	// 在 Exec 的时候，泛型参数可以是任意的
 	q := RawQuery[any](orm, `CREATE TABLE IF NOT EXISTS groups (
    group_id INTEGER PRIMARY KEY,

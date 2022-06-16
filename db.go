@@ -15,6 +15,7 @@
 package eorm
 
 import (
+	"context"
 	"database/sql"
 	"database/sql/driver"
 	"github.com/gotomicro/eorm/internal/dialect"
@@ -25,18 +26,26 @@ import (
 	"time"
 )
 
-// OrmOption configure Orm
-type OrmOption func(db *Orm)
+// DBOption configure DB
+type DBOption func(db *DB)
 
-// Orm represents a database
-type Orm struct {
+// DB represents a database
+type DB struct {
 	db *sql.DB
 	core
 }
 
+func (db *DB) queryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
+	return db.db.QueryContext(ctx, query, args...)
+}
+
+func (db *DB) execContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
+	return db.db.ExecContext(ctx, query, args...)
+}
+
 // Open 创建一个 ORM 实例
 // 注意该实例是一个无状态的对象，你应该尽可能复用它
-func Open(driver string, dsn string, opts...OrmOption) (*Orm, error) {
+func Open(driver string, dsn string, opts...DBOption) (*DB, error) {
 	db, err := sql.Open(driver, dsn)
 	if err != nil {
 		return nil, err
@@ -44,12 +53,12 @@ func Open(driver string, dsn string, opts...OrmOption) (*Orm, error) {
 	return openDB(driver, db, opts...)
 }
 
-func openDB(driver string, db *sql.DB, opts...OrmOption) (*Orm, error) {
+func openDB(driver string, db *sql.DB, opts...DBOption) (*DB, error) {
 	dl, err := dialect.Of(driver)
 	if err != nil {
 		return nil, err
 	}
-	orm := &Orm{
+	orm := &DB{
 		core: core {
 			metaRegistry: model.NewMetaRegistry(),
 			dialect:      dl,
@@ -64,50 +73,64 @@ func openDB(driver string, db *sql.DB, opts...OrmOption) (*Orm, error) {
 }
 
 // WithMetaRegistry 指定元数据注册中心
-func WithMetaRegistry(registry model.MetaRegistry) OrmOption {
-	return func(db *Orm) {
+func WithMetaRegistry(registry model.MetaRegistry) DBOption {
+	return func(db *DB) {
 		db.metaRegistry = registry
 	}
 }
 
 // WithDialect 指定方言
-func WithDialect(dialect dialect.Dialect) OrmOption {
-	return func(db *Orm) {
+func WithDialect(dialect dialect.Dialect) DBOption {
+	return func(db *DB) {
 		db.dialect = dialect
 	}
 }
 
+func (db *DB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) {
+	tx, err := db.db.BeginTx(ctx, opts)
+	if err != nil {
+		return nil, err
+	}
+	return &Tx{tx: tx, db: db}, nil
+}
+
 // Delete 开始构建一个 DELETE 查询
-func (o *Orm) Delete() *Deleter {
+func (db *DB) Delete() *Deleter {
 	return &Deleter{
-		builder: o.builder(),
+		builder: builder{
+			core: db.core,
+			buffer: bytebufferpool.Get(),
+		},
 	}
 }
 
 // Update 开始构建一个 UPDATE 查询
-func (o *Orm) Update(table interface{}) *Updater {
+func (db *DB) Update(table interface{}) *Updater {
 	return &Updater{
-		builder: o.builder(),
+		builder: builder{
+			core: db.core,
+			buffer: bytebufferpool.Get(),
+		},
 		table:   table,
 	}
 }
 
 // Wait 会等待数据库连接
 // 注意只能用于测试
-func (o *Orm) Wait() error {
-	err := o.db.Ping()
+func (db *DB) Wait() error {
+	err := db.db.Ping()
 	for err == driver.ErrBadConn {
 		log.Printf("等待数据库启动...")
-		err = o.db.Ping()
+		err = db.db.Ping()
 		time.Sleep(time.Second)
 	}
 	return err
 }
 
-func (o *Orm) builder() builder {
-	return builder{
-		core: o.core,
-		buffer:     bytebufferpool.Get(),
+func (db *DB) Close() error {
+	return db.db.Close()
+}
 
-	}
+func (db *DB) getCore() core {
+	return db.core
 }

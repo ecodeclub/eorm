@@ -17,14 +17,13 @@ package eorm
 import (
 	"context"
 	"github.com/gotomicro/eorm/internal/errs"
-	"github.com/gotomicro/eorm/internal/executor"
 	"github.com/valyala/bytebufferpool"
 )
 
 // Selector represents a select query
 type Selector[T any] struct {
 	builder
-	executor executor.Executor
+	session
 	columns  []Selectable
 	table    interface{}
 	where    []Predicate
@@ -37,10 +36,13 @@ type Selector[T any] struct {
 }
 
 // NewSelector 创建一个 Selector
-func NewSelector[T any](orm *Orm) *Selector[T] {
+func NewSelector[T any](sess session) *Selector[T] {
 	return &Selector[T]{
-		builder: orm.builder(),
-		executor: orm.db,
+		builder: builder{
+			core: sess.getCore(),
+			buffer: bytebufferpool.Get(),
+		},
+		session: sess,
 	}
 }
 
@@ -283,7 +285,7 @@ func (s *Selector[T]) Get(ctx context.Context) (*T, error) {
 	if err != nil {
 		return nil, err
 	}
-	return newQuerier[T](s.core, s.executor, query).Get(ctx)
+	return newQuerier[T](s.session, query).Get(ctx)
 }
 
 

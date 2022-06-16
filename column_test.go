@@ -17,7 +17,7 @@ package eorm
 import "fmt"
 
 func ExampleC() {
-	db := memoryOrm()
+	db := memoryDB()
 	tm := &TestModel{}
 	query, _ := NewSelector[TestModel](db).Select(C("Id")).From(tm).Where(C("Id").EQ(18)).Build()
 	fmt.Printf(`
@@ -30,7 +30,7 @@ Args: %v
 }
 
 func ExampleColumn_EQ() {
-	db := memoryOrm()
+	db := memoryDB()
 	tm := &TestModel{}
 	query, _ := NewSelector[TestModel](db).Select(C("Id")).From(tm).Where(C("Id").EQ(18)).Build()
 	fmt.Printf(`
@@ -43,7 +43,7 @@ Args: %v
 }
 
 func ExampleColumn_Add() {
-	db := memoryOrm()
+	db := memoryDB()
 	tm := &TestModel{}
 	query, _ := db.Update(tm).Set(Assign("Age", C("Age").Add(1))).Build()
 	fmt.Printf(`
@@ -56,7 +56,7 @@ Args: %v
 }
 
 func ExampleColumn_As() {
-	db := memoryOrm()
+	db := memoryDB()
 	tm := &TestModel{}
 	query, _ := NewSelector[TestModel](db).Select(C("Id").As("my_id")).From(tm).Build()
 	fmt.Printf(`
@@ -69,7 +69,7 @@ Args: %v
 }
 
 func ExampleColumn_GT() {
-	db := memoryOrm()
+	db := memoryDB()
 	tm := &TestModel{}
 	query, _ := NewSelector[TestModel](db).Select(C("Id")).From(tm).Where(C("Id").GT(18)).Build()
 	fmt.Printf(`
@@ -82,7 +82,7 @@ Args: %v
 }
 
 func ExampleColumn_GTEQ() {
-	db := memoryOrm()
+	db := memoryDB()
 	tm := &TestModel{}
 	query, _ := NewSelector[TestModel](db).Select(C("Id")).From(tm).Where(C("Id").GTEQ(18)).Build()
 	fmt.Printf(`
@@ -95,7 +95,7 @@ Args: %v
 }
 
 func ExampleColumn_LT() {
-	db := memoryOrm()
+	db := memoryDB()
 	tm := &TestModel{}
 	query, _ := NewSelector[TestModel](db).Select(C("Id")).From(tm).Where(C("Id").LT(18)).Build()
 	fmt.Printf(`
@@ -108,7 +108,7 @@ Args: %v
 }
 
 func ExampleColumn_LTEQ() {
-	db := memoryOrm()
+	db := memoryDB()
 	tm := &TestModel{}
 	query, _ := NewSelector[TestModel](db).Select(C("Id")).From(tm).Where(C("Id").LTEQ(18)).Build()
 	fmt.Printf(`
@@ -121,7 +121,7 @@ Args: %v
 }
 
 func ExampleColumn_Multi() {
-	db := memoryOrm()
+	db := memoryDB()
 	tm := &TestModel{}
 	query, _ := db.Update(tm).Set(Assign("Age", C("Age").Multi(2))).Build()
 	fmt.Printf(`
@@ -134,7 +134,7 @@ Args: %v
 }
 
 func ExampleColumn_NEQ() {
-	db := memoryOrm()
+	db := memoryDB()
 	tm := &TestModel{}
 	query, _ := NewSelector[TestModel](db).Select(C("Id")).From(tm).Where(C("Id").NEQ(18)).Build()
 	fmt.Printf(`
@@ -147,7 +147,7 @@ Args: %v
 }
 
 func ExampleColumns() {
-	db := memoryOrm()
+	db := memoryDB()
 	tm := &TestModel{}
 	query, _ := NewSelector[TestModel](db).Select(Columns("Id", "Age")).From(tm).Build()
 	fmt.Printf(`

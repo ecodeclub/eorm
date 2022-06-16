@@ -38,7 +38,7 @@ func TestInserter_Values(t *testing.T) {
 		FirstName: "Jerry",
 		Ctime:     n,
 	}
-	db := memoryOrm()
+	db := memoryDB()
 	testCases := []CommonTestCase{
 		{
 			name:    "no examples of values",
@@ -93,7 +93,7 @@ func TestInserter_Values(t *testing.T) {
 }
 
 func TestInserter_Exec(t *testing.T) {
-	orm := memoryOrm()
+	orm := memoryDB()
 	testCases := []struct {
 		name         string
 		i            *Inserter[TestModel]
@@ -131,7 +131,7 @@ func TestInserter_Exec(t *testing.T) {
 }
 
 func ExampleInserter_Build() {
-	db := memoryOrm()
+	db := memoryDB()
 	query, _ := NewInserter[TestModel](db).Values(&TestModel{
 		Id:  1,
 		Age: 18,
@@ -151,7 +151,7 @@ func ExampleInserter_Build() {
 }
 
 func ExampleInserter_Columns() {
-	db := memoryOrm()
+	db := memoryDB()
 	query, _ := NewInserter[TestModel](db).Values(&TestModel{
 		Id:  1,
 		Age: 18,
@@ -175,7 +175,7 @@ func ExampleInserter_Columns() {
 }
 
 func ExampleInserter_Values() {
-	db := memoryOrm()
+	db := memoryDB()
 	query, _ := NewInserter[TestModel](db).Values(&TestModel{
 		Id:  1,
 		Age: 18,
@@ -187,7 +187,7 @@ func ExampleInserter_Values() {
 }
 
 func ExampleNewInserter() {
-	db := memoryOrm()
+	db := memoryDB()
 	tm := &TestModel{}
 	query, _ := NewInserter[TestModel](db).Values(tm).Build()
 	fmt.Printf("SQL: %s", query.SQL)
