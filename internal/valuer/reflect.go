@@ -39,7 +39,7 @@ func NewReflectValue(val interface{}, meta *model.TableMeta) Value {
 }
 
 // Field 返回字段值
-func (r reflectValue) Field(name string) (interface{}, error) {
+func (r reflectValue) Field(name string) (any, error) {
 	res := r.val.FieldByName(name)
 	if res == (reflect.Value{}) {
 		return nil, errs.NewInvalidFieldError(name)
@@ -47,30 +47,36 @@ func (r reflectValue) Field(name string) (interface{}, error) {
 	return res.Interface(), nil
 }
 
-func (r reflectValue) SetColumn(column string, val *sql.RawBytes) error {
-	cm, ok := r.meta.ColumnMap[column]
-	if !ok {
-		return errs.NewInvalidColumnError(column)
-	}
-	fd := r.val.FieldByName(cm.FieldName)
-	if cm.IsHolderType {
-		scanner, err := decodeScanner(cm.Typ, val)
-		if err != nil {
-			return err
-		}
-		fd.Set(scanner)
-		return nil
-	}
-	cv, err := decode(cm.Typ, val)
+func (r reflectValue) SetColumns(rows *sql.Rows) error {
+	cs, err := rows.Columns()
 	if err != nil {
 		return err
 	}
-	var rv reflect.Value
-	if cv == nil {
-		rv = reflect.Zero(cm.Typ)
-	} else {
-		rv = reflect.ValueOf(cv)
+	if len(cs) > len(r.meta.Columns) {
+		return errs.ErrTooManyColumns
 	}
-	fd.Set(rv)
+
+	// TODO 性能优化
+	// colValues 和 colEleValues 实质上最终都指向同一个对象
+	colValues := make([]interface{}, len(cs))
+	colEleValues := make([]reflect.Value, len(cs))
+	for i, c := range cs {
+		cm, ok := r.meta.ColumnMap[c]
+		if !ok {
+			return errs.NewInvalidColumnError(c)
+		}
+		val := reflect.New(cm.Typ)
+		colValues[i]=val.Interface()
+		colEleValues[i] = val.Elem()
+	}
+	if err = rows.Scan(colValues...); err != nil {
+		return err
+	}
+
+	for i, c := range cs {
+		cm := r.meta.ColumnMap[c]
+		fd := r.val.FieldByName(cm.FieldName)
+		fd.Set(colEleValues[i])
+	}
 	return nil
 }

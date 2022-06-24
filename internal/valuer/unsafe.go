@@ -115,120 +115,27 @@ func (u unsafeValue) Field(name string) (interface{}, error) {
 	}
 }
 
-func (u unsafeValue) SetColumn(column string, val *sql.RawBytes) error {
-	cm, ok := u.meta.ColumnMap[column]
-	if !ok {
-		return errs.NewInvalidColumnError(column)
-	}
-	ptr := unsafe.Pointer(uintptr(u.addr) + cm.Offset)
-	if cm.IsHolderType {
-		scanner, err := decodeScanner(cm.Typ, val)
-		if err != nil {
-			return err
-		}
-		*(*uintptr)(ptr) = scanner.Pointer()
-		return nil
-	}
-	cv, err := decode(cm.Typ, val)
+func (u unsafeValue) SetColumns(rows *sql.Rows) error {
+	
+	cs, err := rows.Columns()
 	if err != nil {
 		return err
 	}
-	if cv == nil {
-		cv = reflect.Zero(cm.Typ).Interface()
+	if len(cs) > len(u.meta.Columns) {
+		return errs.ErrTooManyColumns
 	}
-	switch cm.Typ.Kind() {
-	case reflect.Bool:
-		*(*bool)(ptr) = cv.(bool)
-		return nil
-	case reflect.Int:
-		*(*int)(ptr) = cv.(int)
-		return nil
-	case reflect.Int8:
-		*(*int8)(ptr) = cv.(int8)
-		return nil
-	case reflect.Int16:
-		*(*int16)(ptr) = cv.(int16)
-		return nil
-	case reflect.Int32:
-		*(*int32)(ptr) = cv.(int32)
-		return nil
-	case reflect.Int64:
-		*(*int64)(ptr) = cv.(int64)
-		return nil
-	case reflect.Uint:
-		*(*uint)(ptr) = cv.(uint)
-		return nil
-	case reflect.Uint8:
-		*(*uint8)(ptr) = cv.(uint8)
-		return nil
-	case reflect.Uint16:
-		*(*uint16)(ptr) = cv.(uint16)
-		return nil
-	case reflect.Uint32:
-		*(*uint32)(ptr) = cv.(uint32)
-		return nil
-	case reflect.Uint64:
-		*(*uint64)(ptr) = cv.(uint64)
-		return nil
-	case reflect.Float32:
-		*(*float32)(ptr) = cv.(float32)
-		return nil
-	case reflect.Float64:
-		*(*float64)(ptr) = cv.(float64)
-		return nil
-	case reflect.String:
-		*(*string)(ptr) = cv.(string)
-		return nil
-	case reflect.Slice:
-		// Array 只有一种可能，那就是 []byte
-		*(*[]byte)(ptr) = cv.([]byte)
-		return nil
-	case reflect.Pointer:
-		ele := cm.Typ.Elem()
-		switch ele.Kind() {
-		case reflect.Bool:
-			*(**bool)(ptr) = cv.(*bool)
-			return nil
-		case reflect.Int:
-			*(**int)(ptr) = cv.(*int)
-			return nil
-		case reflect.Int8:
-			*(**int8)(ptr) = cv.(*int8)
-			return nil
-		case reflect.Int16:
-			*(**int16)(ptr) = cv.(*int16)
-			return nil
-		case reflect.Int32:
-			*(**int32)(ptr) = cv.(*int32)
-			return nil
-		case reflect.Int64:
-			*(**int64)(ptr) = cv.(*int64)
-			return nil
-		case reflect.Uint:
-			*(**uint)(ptr) = cv.(*uint)
-			return nil
-		case reflect.Uint8:
-			*(**uint8)(ptr) = cv.(*uint8)
-			return nil
-		case reflect.Uint16:
-			*(**uint16)(ptr) = cv.(*uint16)
-			return nil
-		case reflect.Uint32:
-			*(**uint32)(ptr) = cv.(*uint32)
-			return nil
-		case reflect.Uint64:
-			*(**uint64)(ptr) = cv.(*uint64)
-			return nil
-		case reflect.Float32:
-			*(**float32)(ptr) = cv.(*float32)
-			return nil
-		case reflect.Float64:
-			*(**float64)(ptr) = cv.(*float64)
-			return nil
-		default:
-			return errs.NewUnsupportedTypeError(cm.Typ)
+
+	// TODO 性能优化
+	// colValues 和 colEleValues 实质上最终都指向同一个对象
+	colValues := make([]interface{}, len(cs))
+	for i, c := range cs {
+		cm, ok := u.meta.ColumnMap[c]
+		if !ok {
+			return errs.NewInvalidColumnError(c)
 		}
-	default:
-		return errs.NewUnsupportedTypeError(cm.Typ)
+		ptr := unsafe.Pointer(uintptr(u.addr) + cm.Offset)
+		val := reflect.NewAt(cm.Typ, ptr)
+		colValues[i]=val.Interface()
 	}
+	return rows.Scan(colValues...)
 }

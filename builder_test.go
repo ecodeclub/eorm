@@ -19,8 +19,9 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	sqlmock "github.com/DATA-DOG/go-sqlmock"
+	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/gotomicro/eorm/internal/errs"
+	"github.com/gotomicro/eorm/internal/valuer"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	"testing"
@@ -141,6 +142,16 @@ func (q Query) string() string {
 }
 
 func TestQuerier_Get(t *testing.T) {
+	t.Run("unsafe", func(t *testing.T) {
+		testQuerierGet(t, valuer.NewUnsafeValue)
+	})
+
+	t.Run("reflect", func(t *testing.T) {
+		testQuerierGet(t, valuer.NewReflectValue)
+	})
+}
+
+func testQuerierGet(t *testing.T, c valuer.Creator) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
 		t.Fatal(err)
@@ -208,6 +219,7 @@ func TestQuerier_Get(t *testing.T) {
 		}
 	}
 
+	orm.valCreator = c
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			res, err := RawQuery[TestModel](orm, tc.query).Get(context.Background())

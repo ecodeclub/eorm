@@ -72,20 +72,7 @@ func openDB(driver string, db *sql.DB, opts...DBOption) (*DB, error) {
 	return orm, nil
 }
 
-// WithMetaRegistry 指定元数据注册中心
-func WithMetaRegistry(registry model.MetaRegistry) DBOption {
-	return func(db *DB) {
-		db.metaRegistry = registry
-	}
-}
-
-// WithDialect 指定方言
-func WithDialect(dialect dialect.Dialect) DBOption {
-	return func(db *DB) {
-		db.dialect = dialect
-	}
-}
-
+// BeginTx 开启事务
 func (db *DB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) {
 	tx, err := db.db.BeginTx(ctx, opts)
 	if err != nil {

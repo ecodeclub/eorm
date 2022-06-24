@@ -79,30 +79,10 @@ func (q Querier[T]) Get(ctx context.Context) (*T, error){
 		return nil, err
 	}
 
-	cs, err := rows.Columns()
-	if err != nil {
-		return nil, err
-	}
-	if len(cs) > len(meta.Columns) {
-		return nil, errs.ErrTooManyColumns
-	}
-
-	// TODO 性能优化
-	colValues := make([]interface{}, len(cs))
-	for i := 0; i < len(cs); i++ {
-		colValues[i]=&sql.RawBytes{}
-	}
-	if err = rows.Scan(colValues...); err != nil {
-		return nil, err
-	}
-
 	val := q.valCreator(tp, meta)
-	for i := 0; i < len(cs); i++ {
-		if err = val.SetColumn(cs[i], colValues[i].(*sql.RawBytes)); err != nil {
-			return nil, err
-		}
+	if err = val.SetColumns(rows); err != nil {
+		return nil, err
 	}
-
 	return tp, nil
 }
 

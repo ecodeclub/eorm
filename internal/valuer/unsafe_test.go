@@ -16,7 +16,8 @@ package valuer
 
 import (
 	"database/sql"
-	"github.com/gotomicro/ekit"
+	"database/sql/driver"
+	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/gotomicro/eorm/internal/errs"
 	"github.com/gotomicro/eorm/internal/model"
 	"github.com/gotomicro/eorm/internal/test"
@@ -37,146 +38,57 @@ func Test_unsafeValue_SetColumn(t *testing.T) {
 func testSetColumn(t *testing.T, creator Creator) {
 	testCases := []struct{
 		name string
-		cs map[string]*sql.RawBytes
+		cs map[string][]byte
 		val *test.SimpleStruct
 		wantVal *test.SimpleStruct
 		wantErr error
 	} {
 		{
-			// 零值会覆盖掉已有的值
-			name: "nil override",
-			cs: map[string]*sql.RawBytes{
-				"id": nil,
-				"bool": nil,
-				"bool_ptr": nil,
-				"int": nil,
-				"int_ptr": nil,
-				"int8": nil,
-				"int8_ptr": nil,
-				"int16": nil,
-				"int16_ptr": nil,
-				"int32": nil,
-				"int32_ptr": nil,
-				"int64": nil,
-				"int64_ptr": nil,
-				"uint": nil,
-				"uint_ptr": nil,
-				"uint8": nil,
-				"uint8_ptr": nil,
-				"uint16": nil,
-				"uint16_ptr": nil,
-				"uint32": nil,
-				"uint32_ptr": nil,
-				"uint64": nil,
-				"uint64_ptr": nil,
-				"float32": nil,
-				"float32_ptr": nil,
-				"float64": nil,
-				"float64_ptr": nil,
-				"byte_array": nil,
-				"string": nil,
-				"null_string_ptr": nil,
-				"null_int16_ptr": nil,
-				"null_int32_ptr": nil,
-				"null_int64_ptr": nil,
-				"null_bool_ptr": nil,
-				"null_float64_ptr": nil,
-				"json_column": nil,
-			},
-			val: test.NewSimpleStruct(1),
-			wantVal: &test.SimpleStruct{},
-		},
-		{
-			// 零值会覆盖掉已有的值，这里的零值是带类型的零值
-			// 这个测试有点冗余，但是依旧保留
-			name: "bs nil override",
-			cs: map[string]*sql.RawBytes{
-				"id": (*sql.RawBytes)(nil),
-				"bool": (*sql.RawBytes)(nil),
-				"bool_ptr": (*sql.RawBytes)(nil),
-				"int": (*sql.RawBytes)(nil),
-				"int_ptr": (*sql.RawBytes)(nil),
-				"int8": (*sql.RawBytes)(nil),
-				"int8_ptr": (*sql.RawBytes)(nil),
-				"int16": (*sql.RawBytes)(nil),
-				"int16_ptr": (*sql.RawBytes)(nil),
-				"int32": (*sql.RawBytes)(nil),
-				"int32_ptr": (*sql.RawBytes)(nil),
-				"int64": (*sql.RawBytes)(nil),
-				"int64_ptr": (*sql.RawBytes)(nil),
-				"uint": (*sql.RawBytes)(nil),
-				"uint_ptr": (*sql.RawBytes)(nil),
-				"uint8": (*sql.RawBytes)(nil),
-				"uint8_ptr": (*sql.RawBytes)(nil),
-				"uint16": (*sql.RawBytes)(nil),
-				"uint16_ptr": (*sql.RawBytes)(nil),
-				"uint32": (*sql.RawBytes)(nil),
-				"uint32_ptr": (*sql.RawBytes)(nil),
-				"uint64": (*sql.RawBytes)(nil),
-				"uint64_ptr": (*sql.RawBytes)(nil),
-				"float32": (*sql.RawBytes)(nil),
-				"float32_ptr": (*sql.RawBytes)(nil),
-				"float64": (*sql.RawBytes)(nil),
-				"float64_ptr": (*sql.RawBytes)(nil),
-				"byte_array": (*sql.RawBytes)(nil),
-				"string": (*sql.RawBytes)(nil),
-				"null_string_ptr": (*sql.RawBytes)(nil),
-				"null_int16_ptr": (*sql.RawBytes)(nil),
-				"null_int32_ptr": (*sql.RawBytes)(nil),
-				"null_int64_ptr": (*sql.RawBytes)(nil),
-				"null_bool_ptr": (*sql.RawBytes)(nil),
-				"null_float64_ptr": (*sql.RawBytes)(nil),
-				"json_column": (*sql.RawBytes)(nil),
-			},
-			val: test.NewSimpleStruct(1),
-			wantVal: &test.SimpleStruct{},
-		},
-		{
 			name: "normal value",
-			cs: map[string]*sql.RawBytes{
-				"id": ekit.ToPtr[sql.RawBytes]([]byte("1")),
-				"bool": ekit.ToPtr[sql.RawBytes]([]byte("true")),
-				"bool_ptr": ekit.ToPtr[sql.RawBytes]([]byte("false")),
-				"int": ekit.ToPtr[sql.RawBytes]([]byte("12")),
-				"int_ptr": ekit.ToPtr[sql.RawBytes]([]byte("13")),
-				"int8": ekit.ToPtr[sql.RawBytes]([]byte("8")),
-				"int8_ptr": ekit.ToPtr[sql.RawBytes]([]byte("-8")),
-				"int16": ekit.ToPtr[sql.RawBytes]([]byte("16")),
-				"int16_ptr": ekit.ToPtr[sql.RawBytes]([]byte("-16")),
-				"int32": ekit.ToPtr[sql.RawBytes]([]byte("32")),
-				"int32_ptr": ekit.ToPtr[sql.RawBytes]([]byte("-32")),
-				"int64": ekit.ToPtr[sql.RawBytes]([]byte("64")),
-				"int64_ptr": ekit.ToPtr[sql.RawBytes]([]byte("-64")),
-				"uint": ekit.ToPtr[sql.RawBytes]([]byte("14")),
-				"uint_ptr": ekit.ToPtr[sql.RawBytes]([]byte("15")),
-				"uint8": ekit.ToPtr[sql.RawBytes]([]byte("8")),
-				"uint8_ptr": ekit.ToPtr[sql.RawBytes]([]byte("18")),
-				"uint16": ekit.ToPtr[sql.RawBytes]([]byte("16")),
-				"uint16_ptr": ekit.ToPtr[sql.RawBytes]([]byte("116")),
-				"uint32": ekit.ToPtr[sql.RawBytes]([]byte("32")),
-				"uint32_ptr": ekit.ToPtr[sql.RawBytes]([]byte("132")),
-				"uint64": ekit.ToPtr[sql.RawBytes]([]byte("64")),
-				"uint64_ptr": ekit.ToPtr[sql.RawBytes]([]byte("164")),
-				"float32": ekit.ToPtr[sql.RawBytes]([]byte("3.2")),
-				"float32_ptr": ekit.ToPtr[sql.RawBytes]([]byte("-3.2")),
-				"float64": ekit.ToPtr[sql.RawBytes]([]byte("6.4")),
-				"float64_ptr": ekit.ToPtr[sql.RawBytes]([]byte("-6.4")),
-				"byte_array": ekit.ToPtr[sql.RawBytes]([]byte("hello")),
-				"string": ekit.ToPtr[sql.RawBytes]([]byte("world")),
-				"null_string_ptr": ekit.ToPtr[sql.RawBytes]([]byte("null string")),
-				"null_int16_ptr": ekit.ToPtr[sql.RawBytes]([]byte("16")),
-				"null_int32_ptr": ekit.ToPtr[sql.RawBytes]([]byte("32")),
-				"null_int64_ptr": ekit.ToPtr[sql.RawBytes]([]byte("64")),
-				"null_bool_ptr": ekit.ToPtr[sql.RawBytes]([]byte("true")),
-				"null_float64_ptr": ekit.ToPtr[sql.RawBytes]([]byte("6.4")),
-				"json_column": ekit.ToPtr[sql.RawBytes]([]byte(`{"name": "Tom"}`)),
+			cs: map[string][]byte{
+				"id": []byte("1"),
+				"bool": []byte("true"),
+				"bool_ptr": []byte("false"),
+				"int": []byte("12"),
+				"int_ptr": []byte("13"),
+				"int8": []byte("8"),
+				"int8_ptr": []byte("-8"),
+				"int16": []byte("16"),
+				"int16_ptr": []byte("-16"),
+				"int32": []byte("32"),
+				"int32_ptr": []byte("-32"),
+				"int64": []byte("64"),
+				"int64_ptr": []byte("-64"),
+				"uint": []byte("14"),
+				"uint_ptr": []byte("15"),
+				"uint8": []byte("8"),
+				"uint8_ptr": []byte("18"),
+				"uint16": []byte("16"),
+				"uint16_ptr": []byte("116"),
+				"uint32": []byte("32"),
+				"uint32_ptr": []byte("132"),
+				"uint64": []byte("64"),
+				"uint64_ptr": []byte("164"),
+				"float32": []byte("3.2"),
+				"float32_ptr": []byte("-3.2"),
+				"float64": []byte("6.4"),
+				"float64_ptr": []byte("-6.4"),
+				"byte_array": []byte("hello"),
+				"string": []byte("world"),
+				"null_string_ptr": []byte("null string"),
+				"null_int16_ptr": []byte("16"),
+				"null_int32_ptr": []byte("32"),
+				"null_int64_ptr": []byte("64"),
+				"null_bool_ptr": []byte("true"),
+				"null_float64_ptr": []byte("6.4"),
+				"json_column": []byte(`{"name": "Tom"}`),
 			},
 			val: &test.SimpleStruct{},
 			wantVal: test.NewSimpleStruct(1),
 		},
 		{
 			name:"invalid field",
-			cs: map[string]*sql.RawBytes{
+			cs: map[string][]byte{
 				"invalid_column": nil,
 			},
 			wantErr: errs.NewInvalidColumnError("invalid_column"),
@@ -189,13 +101,27 @@ func testSetColumn(t *testing.T, creator Creator) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			db, mock, err := sqlmock.New()
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = db.Close() }()
 			val := creator(tc.val, meta)
-			for c, bs := range tc.cs {
-				err = val.SetColumn(c, bs)
-				if err != nil {
-					assert.Equal(t, tc.wantErr, err)
-					return
-				}
+			cols := make([]string, 0, len(tc.cs))
+			colVals := make([]driver.Value, 0, len(tc.cs))
+			for k, v := range tc.cs {
+				cols = append(cols, k)
+				colVals = append(colVals, v)
+			}
+			mock.ExpectQuery("SELECT *").
+				WillReturnRows(sqlmock.NewRows(cols).
+					AddRow(colVals...))
+			rows, _ := db.Query("SELECT *")
+			rows.Next()
+			err = val.SetColumns(rows)
+			if err != nil {
+				assert.Equal(t, tc.wantErr, err)
+				return
 			}
 			if tc.wantErr != nil {
 				t.Fatalf("期望得到错误，但是并没有得到 %v", tc.wantErr)

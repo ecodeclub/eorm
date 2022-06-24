@@ -20,8 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/gotomicro/eorm/internal/dialect"
-	"github.com/gotomicro/eorm/internal/model"
+	"github.com/gotomicro/eorm/internal/valuer"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/assert"
 	"testing"
@@ -90,20 +89,8 @@ func ExampleOpen() {
 	db, _ := Open("sqlite3", "file:test.db?cache=shared&mode=memory")
 	fmt.Printf("case1 dialect: %s\n", db.dialect.Name)
 
-	// case2 use DBOption
-	db, _ = Open("sqlite3", "file:test.db?cache=shared&mode=memory", WithDialect(dialect.MySQL))
-	fmt.Printf("case2 dialect: %s\n", db.dialect.Name)
-
-	// case3 share registry among DB
-	registry := model.NewTagMetaRegistry()
-	db1, _ := Open("sqlite3", "file:test.db?cache=shared&mode=memory", WithMetaRegistry(registry))
-	db2, _ := Open("sqlite3", "file:test.db?cache=shared&mode=memory", WithMetaRegistry(registry))
-	fmt.Printf("case3 same registry: %v", db1.metaRegistry == db2.metaRegistry)
-
 	// Output:
 	// case1 dialect: SQLite
-	// case2 dialect: MySQL
-	// case3 same registry: true
 }
 
 func ExampleDB_Delete() {
@@ -141,5 +128,59 @@ func memoryDBWithDB(db string) *DB {
 		panic(err)
 	}
 	return orm
+}
+
+// go test -bench=BenchmarkQuerier_Get -benchmem -benchtime=10000x
+// goos: linux
+// goarch: amd64
+// pkg: github.com/gotomicro/eorm
+// cpu: Intel(R) Core(TM) i5-10400F CPU @ 2.90GHz
+// BenchmarkQuerier_Get/unsafe-12             10000            446263 ns/op            3849 B/op        116 allocs/op
+// BenchmarkQuerier_Get/reflect-12            10000            854557 ns/op            4062 B/op        128 allocs/op
+// PASS
+// ok      github.com/gotomicro/eorm       13.072s
+func BenchmarkQuerier_Get(b *testing.B) {
+	b.ReportAllocs()
+	orm := memoryDBWithDB("benchmarkQuerierGet")
+	defer func() {
+		_ = orm.Close()
+	}()
+	_, _ = RawQuery[any](orm, TestModel{}.CreateSQL()).Exec(context.Background())
+	res, err := NewInserter[TestModel](orm).Values(&TestModel{
+		Id: 12,
+		FirstName: "Deng",
+		Age: 18,
+		LastName: &sql.NullString{String: "Ming", Valid: true},
+	}).Exec(context.Background())
+	if err != nil {
+		b.Fatal(err)
+	}
+	affected, err := res.RowsAffected()
+	if err != nil {
+		b.Fatal(err)
+	}
+	if affected == 0 {
+		b.Fatal()
+	}
+
+	b.Run("unsafe", func(b *testing.B) {
+		orm.valCreator = valuer.NewUnsafeValue
+		for i := 0; i < b.N; i++ {
+			_, err = NewSelector[TestModel](orm).From(&TestModel{}).Get(context.Background())
+			if err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+
+	b.Run("reflect", func(b *testing.B) {
+		orm.valCreator = valuer.NewReflectValue
+		for i := 0; i < b.N; i++ {
+			_, err = NewSelector[TestModel](orm).From(&TestModel{}).Get(context.Background())
+			if err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
 }
 
