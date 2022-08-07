@@ -64,6 +64,9 @@ func (q Querier[T]) Exec(ctx context.Context) (sql.Result, error) {
 	return q.session.execContext(ctx, q.q.SQL, q.q.Args...)
 }
 
+// Get 执行查询并且返回第一行数据
+// 注意在不同的数据库里面，排序可能会不同
+// 在没有查找到数据的情况下，会返回 ErrNoRows
 func (q Querier[T]) Get(ctx context.Context) (*T, error){
 	rows, err := q.session.queryContext(ctx, q.q.SQL, q.q.Args...)
 	if err != nil {
