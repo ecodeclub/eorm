@@ -280,6 +280,7 @@ func (s *Selector[T]) Offset(offset int) *Selector[T] {
 // Get 方法会执行查询，并且返回一条数据
 // 注意，在不同的数据库情况下，第一条数据可能是按照不同的列来排序的
 // 而且要注意，这个方法会强制设置 Limit 1
+// 在没有查找到数据的情况下，会返回 ErrNoRows
 func (s *Selector[T]) Get(ctx context.Context) (*T, error) {
 	query, err := s.Limit(1).Build()
 	if err != nil {

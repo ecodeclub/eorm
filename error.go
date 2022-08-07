@@ -19,8 +19,5 @@ import "github.com/gotomicro/eorm/internal/errs"
 // 哨兵错误，或者说预定义错误，谨慎添加
 var (
 	// ErrNoRows 代表没有找到数据
-	// eorm 的行为和 sql.NoRows 不太一样
-	// eorm 统一表达为只要 eorm 没有从数据库里面拿到任何数据
-	// 就会返回这个错误
 	ErrNoRows = errs.ErrNoRows
 )
