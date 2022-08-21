@@ -23,5 +23,5 @@ import (
 type core struct {
 	metaRegistry model.MetaRegistry
 	dialect      dialect.Dialect
-	valCreator valuer.Creator
+	valCreator   valuer.Creator
 }

@@ -24,8 +24,8 @@ import (
 type Suite struct {
 	suite.Suite
 	driver string
-	dsn string
-	orm *eorm.DB
+	dsn    string
+	orm    *eorm.DB
 }
 
 func (s *Suite) SetupSuite() {

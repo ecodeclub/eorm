@@ -16,9 +16,10 @@ package eorm
 
 import (
 	"fmt"
+	"testing"
+
 	"github.com/gotomicro/eorm/internal/errs"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestSelectable(t *testing.T) {

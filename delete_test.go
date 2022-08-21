@@ -16,8 +16,9 @@ package eorm
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestDeleter_Build(t *testing.T) {

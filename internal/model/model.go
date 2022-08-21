@@ -20,30 +20,31 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+
 	// nolint
 	"unicode"
 )
 
 var (
-	scannerType = reflect.TypeOf((*sql.Scanner)(nil)).Elem()
+	scannerType      = reflect.TypeOf((*sql.Scanner)(nil)).Elem()
 	driverValuerType = reflect.TypeOf((*driver.Valuer)(nil)).Elem()
 )
 
 // TableMeta represents data model, or a table
 type TableMeta struct {
 	TableName string
-	Columns  []*ColumnMeta
+	Columns   []*ColumnMeta
 	// FieldMap 是字段名到列元数据的映射
 	FieldMap map[string]*ColumnMeta
 	// ColumnMap 是列名到列元数据的映射
 	ColumnMap map[string]*ColumnMeta
-	Typ      reflect.Type
+	Typ       reflect.Type
 }
 
 // ColumnMeta represents model's field, or column
 type ColumnMeta struct {
-	ColumnName string
-	FieldName    string
+	ColumnName      string
+	FieldName       string
 	Typ             reflect.Type
 	IsPrimaryKey    bool
 	IsAutoIncrement bool
@@ -127,8 +128,8 @@ func (t *tagMetaRegistry) Register(table interface{}, opts ...TableMetaOption) (
 			Typ:             structField.Type,
 			IsAutoIncrement: isAuto,
 			IsPrimaryKey:    isKey,
-			Offset: structField.Offset,
-			IsHolderType: structField.Type.AssignableTo(scannerType) && structField.Type.AssignableTo(driverValuerType),
+			Offset:          structField.Offset,
+			IsHolderType:    structField.Type.AssignableTo(scannerType) && structField.Type.AssignableTo(driverValuerType),
 		}
 		columnMetas = append(columnMetas, columnMeta)
 		fieldMap[columnMeta.FieldName] = columnMeta

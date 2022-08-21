@@ -18,11 +18,12 @@ package integration
 
 import (
 	"context"
+	"testing"
+
 	"github.com/gotomicro/eorm"
 	"github.com/gotomicro/eorm/internal/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
-	"testing"
 )
 
 type SelectTestSuite struct {
@@ -47,9 +48,9 @@ func (s *SelectTestSuite) TearDownSuite() {
 }
 
 func (s *SelectTestSuite) TestGet() {
-	testCases := []struct{
-		name string
-		s *eorm.Selector[test.SimpleStruct]
+	testCases := []struct {
+		name    string
+		s       *eorm.Selector[test.SimpleStruct]
 		wantErr error
 		wantRes *test.SimpleStruct
 	}{
@@ -85,7 +86,7 @@ func TestMySQL8Select(t *testing.T) {
 	suite.Run(t, &SelectTestSuite{
 		Suite: Suite{
 			driver: "mysql",
-			dsn: "root:root@tcp(localhost:13306)/integration_test",
+			dsn:    "root:root@tcp(localhost:13306)/integration_test",
 		},
 	})
 }

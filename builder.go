@@ -18,6 +18,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+
 	"github.com/gotomicro/eorm/internal/errs"
 	"github.com/gotomicro/eorm/internal/model"
 	"github.com/valyala/bytebufferpool"
@@ -44,17 +45,17 @@ type Querier[T any] struct {
 // RawQuery 创建一个 Querier 实例
 // 泛型参数 T 是目标类型。
 // 例如，如果查询 User 的数据，那么 T 就是 User
-func RawQuery[T any](sess session, sql string, args...any) Querier[T] {
-	return newQuerier[T](sess,  &Query{
-		SQL: sql,
+func RawQuery[T any](sess session, sql string, args ...any) Querier[T] {
+	return newQuerier[T](sess, &Query{
+		SQL:  sql,
 		Args: args,
 	})
 }
 
 func newQuerier[T any](sess session, q *Query) Querier[T] {
 	return Querier[T]{
-		q: q,
-		core: sess.getCore(),
+		q:       q,
+		core:    sess.getCore(),
 		session: sess,
 	}
 }
@@ -67,7 +68,7 @@ func (q Querier[T]) Exec(ctx context.Context) (sql.Result, error) {
 // Get 执行查询并且返回第一行数据
 // 注意在不同的数据库里面，排序可能会不同
 // 在没有查找到数据的情况下，会返回 ErrNoRows
-func (q Querier[T]) Get(ctx context.Context) (*T, error){
+func (q Querier[T]) Get(ctx context.Context) (*T, error) {
 	rows, err := q.session.queryContext(ctx, q.q.SQL, q.q.Args...)
 	if err != nil {
 		return nil, err

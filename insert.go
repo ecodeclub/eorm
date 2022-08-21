@@ -18,6 +18,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+
 	"github.com/gotomicro/eorm/internal/errs"
 	"github.com/gotomicro/eorm/internal/model"
 	"github.com/valyala/bytebufferpool"
@@ -36,7 +37,7 @@ type Inserter[T any] struct {
 func NewInserter[T any](sess session) *Inserter[T] {
 	return &Inserter[T]{
 		builder: builder{
-			core: sess.getCore(),
+			core:   sess.getCore(),
 			buffer: bytebufferpool.Get(),
 		},
 		session: sess,
@@ -98,13 +99,13 @@ func (i *Inserter[T]) Columns(cs ...string) *Inserter[T] {
 // Values specify the rows
 // all the elements must be the same type
 // and users are supposed to passing at least one element
-func (i *Inserter[T]) Values(values ...*T) *Inserter[T]{
+func (i *Inserter[T]) Values(values ...*T) *Inserter[T] {
 	i.values = values
 	return i
 }
 
 // Exec 发起查询
-func (i *Inserter[T]) Exec(ctx context.Context) (sql.Result, error){
+func (i *Inserter[T]) Exec(ctx context.Context) (sql.Result, error) {
 	query, err := i.Build()
 	if err != nil {
 		return nil, err

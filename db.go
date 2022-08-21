@@ -18,12 +18,13 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"log"
+	"time"
+
 	"github.com/gotomicro/eorm/internal/dialect"
 	"github.com/gotomicro/eorm/internal/model"
 	"github.com/gotomicro/eorm/internal/valuer"
 	"github.com/valyala/bytebufferpool"
-	"log"
-	"time"
 )
 
 // DBOption configure DB
@@ -45,7 +46,7 @@ func (db *DB) execContext(ctx context.Context, query string, args ...any) (sql.R
 
 // Open 创建一个 ORM 实例
 // 注意该实例是一个无状态的对象，你应该尽可能复用它
-func Open(driver string, dsn string, opts...DBOption) (*DB, error) {
+func Open(driver string, dsn string, opts ...DBOption) (*DB, error) {
 	db, err := sql.Open(driver, dsn)
 	if err != nil {
 		return nil, err
@@ -53,16 +54,16 @@ func Open(driver string, dsn string, opts...DBOption) (*DB, error) {
 	return openDB(driver, db, opts...)
 }
 
-func openDB(driver string, db *sql.DB, opts...DBOption) (*DB, error) {
+func openDB(driver string, db *sql.DB, opts ...DBOption) (*DB, error) {
 	dl, err := dialect.Of(driver)
 	if err != nil {
 		return nil, err
 	}
 	orm := &DB{
-		core: core {
+		core: core{
 			metaRegistry: model.NewMetaRegistry(),
 			dialect:      dl,
-			valCreator: valuer.NewUnsafeValue,
+			valCreator:   valuer.NewUnsafeValue,
 		},
 		db: db,
 	}
@@ -85,7 +86,7 @@ func (db *DB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) {
 func (db *DB) Delete() *Deleter {
 	return &Deleter{
 		builder: builder{
-			core: db.core,
+			core:   db.core,
 			buffer: bytebufferpool.Get(),
 		},
 	}
@@ -95,10 +96,10 @@ func (db *DB) Delete() *Deleter {
 func (db *DB) Update(table interface{}) *Updater {
 	return &Updater{
 		builder: builder{
-			core: db.core,
+			core:   db.core,
 			buffer: bytebufferpool.Get(),
 		},
-		table:   table,
+		table: table,
 	}
 }
 

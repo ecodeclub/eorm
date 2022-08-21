@@ -16,9 +16,10 @@ package eorm
 
 import (
 	"fmt"
+	"reflect"
+
 	"github.com/gotomicro/eorm/internal/errs"
 	"github.com/gotomicro/eorm/internal/valuer"
-	"reflect"
 
 	"github.com/valyala/bytebufferpool"
 )
@@ -26,10 +27,10 @@ import (
 // Updater is the builder responsible for building UPDATE query
 type Updater struct {
 	builder
-	table interface{}
-	val   valuer.Value
-	where []Predicate
-	assigns  []Assignable
+	table   interface{}
+	val     valuer.Value
+	where   []Predicate
+	assigns []Assignable
 }
 
 // Build returns UPDATE query
