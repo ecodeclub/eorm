@@ -18,12 +18,13 @@ package integration
 
 import (
 	"context"
+	"testing"
+
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/gotomicro/eorm"
 	"github.com/gotomicro/eorm/internal/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
-	"testing"
 )
 
 type InsertTestSuite struct {
@@ -38,20 +39,20 @@ func (i *InsertTestSuite) TearDownTest() {
 }
 
 func (i *InsertTestSuite) TestInsert() {
-	testCases := []struct{
-		name string
-		i *eorm.Inserter[test.SimpleStruct]
+	testCases := []struct {
+		name         string
+		i            *eorm.Inserter[test.SimpleStruct]
 		rowsAffected int64
-		wantErr error
-	} {
+		wantErr      error
+	}{
 		{
-			name: "id only",
-			i: eorm.NewInserter[test.SimpleStruct](i.orm).Values(&test.SimpleStruct{Id: 1}),
+			name:         "id only",
+			i:            eorm.NewInserter[test.SimpleStruct](i.orm).Values(&test.SimpleStruct{Id: 1}),
 			rowsAffected: 1,
 		},
 		{
-			name: "all field",
-			i: eorm.NewInserter[test.SimpleStruct](i.orm).Values(test.NewSimpleStruct(2)),
+			name:         "all field",
+			i:            eorm.NewInserter[test.SimpleStruct](i.orm).Values(test.NewSimpleStruct(2)),
 			rowsAffected: 1,
 		},
 	}
@@ -72,7 +73,7 @@ func TestMySQL8Insert(t *testing.T) {
 	suite.Run(t, &InsertTestSuite{
 		Suite{
 			driver: "mysql",
-			dsn: "root:root@tcp(localhost:13306)/integration_test",
+			dsn:    "root:root@tcp(localhost:13306)/integration_test",
 		},
 	})
 }

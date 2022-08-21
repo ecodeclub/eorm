@@ -22,10 +22,10 @@ import (
 
 var (
 	errValueNotSet = errors.New("eorm: 值未设置")
-	ErrNoRows = errors.New("eorm: 未找到数据")
+	ErrNoRows      = errors.New("eorm: 未找到数据")
 	// ErrTooManyColumns 过多列
 	// 一般是查询的列多于结构体的列
-	ErrTooManyColumns=errors.New("eorm: 过多列")
+	ErrTooManyColumns = errors.New("eorm: 过多列")
 )
 
 // NewInvalidFieldError 返回代表未知字段的错误。

@@ -16,10 +16,11 @@ package valuer
 
 import (
 	"database/sql"
-	"github.com/gotomicro/eorm/internal/errs"
-	"github.com/gotomicro/eorm/internal/model"
 	"reflect"
 	"unsafe"
+
+	"github.com/gotomicro/eorm/internal/errs"
+	"github.com/gotomicro/eorm/internal/model"
 )
 
 var _ Creator = NewUnsafeValue
@@ -116,7 +117,7 @@ func (u unsafeValue) Field(name string) (interface{}, error) {
 }
 
 func (u unsafeValue) SetColumns(rows *sql.Rows) error {
-	
+
 	cs, err := rows.Columns()
 	if err != nil {
 		return err
@@ -135,7 +136,7 @@ func (u unsafeValue) SetColumns(rows *sql.Rows) error {
 		}
 		ptr := unsafe.Pointer(uintptr(u.addr) + cm.Offset)
 		val := reflect.NewAt(cm.Typ, ptr)
-		colValues[i]=val.Interface()
+		colValues[i] = val.Interface()
 	}
 	return rows.Scan(colValues...)
 }

@@ -16,11 +16,12 @@ package valuer
 
 import (
 	"database/sql"
+	"testing"
+
 	"github.com/gotomicro/eorm/internal/errs"
 	"github.com/gotomicro/eorm/internal/model"
 	"github.com/gotomicro/eorm/internal/test"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestReflectValue_Field(t *testing.T) {
@@ -28,14 +29,14 @@ func TestReflectValue_Field(t *testing.T) {
 	invalidCases := []valueFieldTestCase{
 		{
 			// 不存在的字段
-			name: "invalid field",
-			field: "UpdateTime",
+			name:      "invalid field",
+			field:     "UpdateTime",
 			wantError: errs.NewInvalidFieldError("UpdateTime"),
 		},
 	}
 	t.Run("invalid cases", func(t *testing.T) {
 		meta, err := model.NewMetaRegistry().Get(&test.SimpleStruct{})
-		if err !=nil {
+		if err != nil {
 			t.Fatal(err)
 		}
 		val := NewReflectValue(&test.SimpleStruct{}, meta)
@@ -108,5 +109,3 @@ func BenchmarkReflectValue_Field(b *testing.B) {
 		assert.Equal(b, int64(13), val)
 	}
 }
-
-

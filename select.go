@@ -16,6 +16,7 @@ package eorm
 
 import (
 	"context"
+
 	"github.com/gotomicro/eorm/internal/errs"
 	"github.com/valyala/bytebufferpool"
 )
@@ -39,7 +40,7 @@ type Selector[T any] struct {
 func NewSelector[T any](sess session) *Selector[T] {
 	return &Selector[T]{
 		builder: builder{
-			core: sess.getCore(),
+			core:   sess.getCore(),
 			buffer: bytebufferpool.Get(),
 		},
 		session: sess,
@@ -288,7 +289,6 @@ func (s *Selector[T]) Get(ctx context.Context) (*T, error) {
 	}
 	return newQuerier[T](s.session, query).Get(ctx)
 }
-
 
 // OrderBy specify fields and ASC
 type OrderBy struct {

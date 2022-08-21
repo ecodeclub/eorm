@@ -25,10 +25,10 @@ import (
 func TestTagMetaRegistry(t *testing.T) {
 
 	testCases := []struct {
-		name string
+		name     string
 		wantMeta *TableMeta
-		wantErr error
-		input interface{}
+		wantErr  error
+		input    interface{}
 	}{
 		{
 			// 普通
@@ -37,83 +37,83 @@ func TestTagMetaRegistry(t *testing.T) {
 				TableName: "test_model",
 				Columns: []*ColumnMeta{
 					{
-						ColumnName: "id",
-						FieldName: "Id",
-						Typ: reflect.TypeOf(int64(0)),
-						IsPrimaryKey: true,
+						ColumnName:      "id",
+						FieldName:       "Id",
+						Typ:             reflect.TypeOf(int64(0)),
+						IsPrimaryKey:    true,
 						IsAutoIncrement: true,
 					},
 					{
 						ColumnName: "first_name",
-						FieldName: "FirstName",
-						Typ: reflect.TypeOf(""),
-						Offset: 8,
+						FieldName:  "FirstName",
+						Typ:        reflect.TypeOf(""),
+						Offset:     8,
 					},
 					{
 						ColumnName: "age",
-						FieldName: "Age",
-						Typ: reflect.TypeOf(int8(0)),
-						Offset: 24,
+						FieldName:  "Age",
+						Typ:        reflect.TypeOf(int8(0)),
+						Offset:     24,
 					},
 					{
 						ColumnName: "last_name",
-						FieldName: "LastName",
-						Typ: reflect.TypeOf((*string)(nil)),
-						Offset: 32,
+						FieldName:  "LastName",
+						Typ:        reflect.TypeOf((*string)(nil)),
+						Offset:     32,
 					},
 				},
 				FieldMap: map[string]*ColumnMeta{
 					"Id": {
-						ColumnName: "id",
-						FieldName: "Id",
-						Typ: reflect.TypeOf(int64(0)),
-						IsPrimaryKey: true,
+						ColumnName:      "id",
+						FieldName:       "Id",
+						Typ:             reflect.TypeOf(int64(0)),
+						IsPrimaryKey:    true,
 						IsAutoIncrement: true,
 					},
-					"FirstName":{
+					"FirstName": {
 						ColumnName: "first_name",
-						FieldName: "FirstName",
-						Typ: reflect.TypeOf(""),
-						Offset: 8,
+						FieldName:  "FirstName",
+						Typ:        reflect.TypeOf(""),
+						Offset:     8,
 					},
 					"Age": {
 						ColumnName: "age",
-						FieldName: "Age",
-						Typ: reflect.TypeOf(int8(0)),
-						Offset: 24,
+						FieldName:  "Age",
+						Typ:        reflect.TypeOf(int8(0)),
+						Offset:     24,
 					},
 					"LastName": {
 						ColumnName: "last_name",
-						FieldName: "LastName",
-						Typ: reflect.TypeOf((*string)(nil)),
-						Offset: 32,
+						FieldName:  "LastName",
+						Typ:        reflect.TypeOf((*string)(nil)),
+						Offset:     32,
 					},
 				},
 				ColumnMap: map[string]*ColumnMeta{
 					"id": {
-						ColumnName: "id",
-						FieldName: "Id",
-						Typ: reflect.TypeOf(int64(0)),
-						IsPrimaryKey: true,
+						ColumnName:      "id",
+						FieldName:       "Id",
+						Typ:             reflect.TypeOf(int64(0)),
+						IsPrimaryKey:    true,
 						IsAutoIncrement: true,
 					},
-					"first_name":{
+					"first_name": {
 						ColumnName: "first_name",
-						FieldName: "FirstName",
-						Typ: reflect.TypeOf(""),
-						Offset: 8,
+						FieldName:  "FirstName",
+						Typ:        reflect.TypeOf(""),
+						Offset:     8,
 					},
 					"age": {
 						ColumnName: "age",
-						FieldName: "Age",
-						Typ: reflect.TypeOf(int8(0)),
-						Offset: 24,
+						FieldName:  "Age",
+						Typ:        reflect.TypeOf(int8(0)),
+						Offset:     24,
 					},
 					"last_name": {
 						ColumnName: "last_name",
-						FieldName: "LastName",
-						Typ: reflect.TypeOf((*string)(nil)),
-						Offset: 32,
+						FieldName:  "LastName",
+						Typ:        reflect.TypeOf((*string)(nil)),
+						Offset:     32,
 					},
 				},
 				Typ: reflect.TypeOf(&TestModel{}),
