@@ -41,11 +41,23 @@ func NewReflectValue(val interface{}, meta *model.TableMeta) Value {
 
 // Field 返回字段值
 func (r reflectValue) Field(name string) (any, error) {
-	res := r.val.FieldByName(name)
-	if res == (reflect.Value{}) {
+	res, ok := r.fieldByIndex(name)
+	if !ok {
 		return nil, errs.NewInvalidFieldError(name)
 	}
 	return res.Interface(), nil
+}
+
+func (r reflectValue) fieldByIndex(name string) (reflect.Value, bool) {
+	cm, ok := r.meta.FieldMap[name]
+	if !ok {
+		return reflect.Value{}, false
+	}
+	value := r.val
+	for _, i := range cm.FieldIndexes {
+		value = value.Field(i)
+	}
+	return value, true
 }
 
 func (r reflectValue) SetColumns(rows *sql.Rows) error {
@@ -76,7 +88,7 @@ func (r reflectValue) SetColumns(rows *sql.Rows) error {
 
 	for i, c := range cs {
 		cm := r.meta.ColumnMap[c]
-		fd := r.val.FieldByName(cm.FieldName)
+		fd, _ := r.fieldByIndex(cm.FieldName)
 		fd.Set(colEleValues[i])
 	}
 	return nil
