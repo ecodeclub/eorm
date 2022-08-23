@@ -379,6 +379,11 @@ func newValueFieldTestCases(entity *test.SimpleStruct) []valueFieldTestCase {
 			wantVal: entity.NullInt64Ptr,
 		},
 		{
+			name:    "NullBoolPtr",
+			field:   "NullBoolPtr",
+			wantVal: entity.NullBoolPtr,
+		},
+		{
 			name:    "NullFloat64Ptr",
 			field:   "NullFloat64Ptr",
 			wantVal: entity.NullFloat64Ptr,

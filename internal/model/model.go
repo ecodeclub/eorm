@@ -62,6 +62,8 @@ type ColumnMeta struct {
 	// IsHolderType 用于表达是否是 Holder 的类型
 	// 所谓的 Holder，就是指同时实现了 sql.Scanner 和 driver.Valuer 两个接口的类型
 	IsHolderType bool
+	// FieldIndexes 用于表达从最外层结构体找到当前ColumnMeta对应的Field所需要的索引集
+	FieldIndexes []int
 }
 
 // TableMetaOption represents options of TableMeta, this options will cover default cover.
@@ -130,6 +132,7 @@ func (t *tagMetaRegistry) Register(table interface{}, opts ...TableMetaOption) (
 			IsPrimaryKey:    isKey,
 			Offset:          structField.Offset,
 			IsHolderType:    structField.Type.AssignableTo(scannerType) && structField.Type.AssignableTo(driverValuerType),
+			FieldIndexes:    []int{i},
 		}
 		columnMetas = append(columnMetas, columnMeta)
 		fieldMap[columnMeta.FieldName] = columnMeta
