@@ -22,28 +22,30 @@ import (
 	"sync"
 	// nolint
 	"unicode"
+
+	"github.com/gotomicro/eorm/internal/errs"
 )
 
 var (
-	scannerType = reflect.TypeOf((*sql.Scanner)(nil)).Elem()
+	scannerType      = reflect.TypeOf((*sql.Scanner)(nil)).Elem()
 	driverValuerType = reflect.TypeOf((*driver.Valuer)(nil)).Elem()
 )
 
 // TableMeta represents data model, or a table
 type TableMeta struct {
 	TableName string
-	Columns  []*ColumnMeta
+	Columns   []*ColumnMeta
 	// FieldMap 是字段名到列元数据的映射
 	FieldMap map[string]*ColumnMeta
 	// ColumnMap 是列名到列元数据的映射
 	ColumnMap map[string]*ColumnMeta
-	Typ      reflect.Type
+	Typ       reflect.Type
 }
 
 // ColumnMeta represents model's field, or column
 type ColumnMeta struct {
-	ColumnName string
-	FieldName    string
+	ColumnName      string
+	FieldName       string
 	Typ             reflect.Type
 	IsPrimaryKey    bool
 	IsAutoIncrement bool
@@ -61,6 +63,8 @@ type ColumnMeta struct {
 	// IsHolderType 用于表达是否是 Holder 的类型
 	// 所谓的 Holder，就是指同时实现了 sql.Scanner 和 driver.Valuer 两个接口的类型
 	IsHolderType bool
+	// Ancestors 引入祖先概念
+	Ancestors []string
 }
 
 // TableMetaOption represents options of TableMeta, this options will cover default cover.
@@ -99,10 +103,30 @@ func (t *tagMetaRegistry) Get(table interface{}) (*TableMeta, error) {
 func (t *tagMetaRegistry) Register(table interface{}, opts ...TableMetaOption) (*TableMeta, error) {
 	rtype := reflect.TypeOf(table)
 	v := rtype.Elem()
-	var columnMetas []*ColumnMeta
+	columnMetas, fieldMap, columnMap, err := t.parseFields(v)
+	if err != nil {
+		return nil, err
+	}
+	tableMeta := &TableMeta{
+		Columns:   columnMetas,
+		TableName: underscoreName(v.Name()),
+		Typ:       rtype,
+		FieldMap:  fieldMap,
+		ColumnMap: columnMap,
+	}
+	for _, o := range opts {
+		o(tableMeta)
+	}
+	t.metas.Store(rtype, tableMeta)
+	return tableMeta, nil
+}
+
+func (t *tagMetaRegistry) parseFields(v reflect.Type) ([]*ColumnMeta, map[string]*ColumnMeta, map[string]*ColumnMeta, error) {
 	lens := v.NumField()
+	columnMetas := make([]*ColumnMeta, 0, lens)
 	fieldMap := make(map[string]*ColumnMeta, lens)
 	columnMap := make(map[string]*ColumnMeta, lens)
+	fieldExist := make(map[string]bool, lens)
 	for i := 0; i < lens; i++ {
 		structField := v.Field(i)
 		tag := structField.Tag.Get("eorm")
@@ -121,48 +145,66 @@ func (t *tagMetaRegistry) Register(table interface{}, opts ...TableMetaOption) (
 			// skip the field.
 			continue
 		}
-		columnMeta := &ColumnMeta{
-			ColumnName:      underscoreName(structField.Name),
-			FieldName:       structField.Name,
-			Typ:             structField.Type,
-			IsAutoIncrement: isAuto,
-			IsPrimaryKey:    isKey,
-			Offset: structField.Offset,
-			IsHolderType: structField.Type.AssignableTo(scannerType) && structField.Type.AssignableTo(driverValuerType),
+		// 判断是不是指针类型
+		if structField.Type.Kind() == reflect.Ptr {
+			return nil, nil, nil, errs.ErrDataIsPtr
 		}
-		columnMetas = append(columnMetas, columnMeta)
-		fieldMap[columnMeta.FieldName] = columnMeta
-		columnMap[columnMeta.ColumnName] = columnMeta
+		// 检查列有没有冲突
+		if f := fieldExist[structField.Name]; f {
+			return nil, nil, nil, errs.NewFieldConflictError(structField.Name)
+		}
+		// 是组合
+		if structField.Anonymous && structField.Type.Kind() == reflect.Struct {
+			// 递归解析
+			subColumns, _, _, err := t.parseFields(structField.Type)
+			if err != nil {
+				return nil, nil, nil, err
+			}
+			for j := 0; j < len(subColumns); j++ {
+				columnMetas = append(columnMetas, subColumns[j])
+				fieldMap[subColumns[j].FieldName] = subColumns[j]
+				columnMap[subColumns[j].ColumnName] = subColumns[j]
+				fieldExist[subColumns[j].FieldName] = true
+			}
+
+		} else {
+			columnMeta := &ColumnMeta{
+				ColumnName:      underscoreName(structField.Name),
+				FieldName:       structField.Name,
+				Typ:             structField.Type,
+				IsAutoIncrement: isAuto,
+				IsPrimaryKey:    isKey,
+				Offset:          structField.Offset,
+				IsHolderType:    structField.Type.AssignableTo(scannerType) && structField.Type.AssignableTo(driverValuerType),
+				Ancestors:       []string{v.Name()},
+			}
+			columnMetas = append(columnMetas, columnMeta)
+			fieldMap[columnMeta.FieldName] = columnMeta
+			columnMap[columnMeta.ColumnName] = columnMeta
+			fieldExist[columnMeta.FieldName] = true
+		}
 	}
-	tableMeta := &TableMeta{
-		Columns:   columnMetas,
-		TableName: underscoreName(v.Name()),
-		Typ:       rtype,
-		FieldMap:  fieldMap,
-		ColumnMap: columnMap,
-	}
-	for _, o := range opts {
-		o(tableMeta)
-	}
-	t.metas.Store(rtype, tableMeta)
-	return tableMeta, nil
+	return columnMetas, fieldMap, columnMap, nil
 }
 
 // IgnoreFieldsOption function provide an option to ignore some fields when register table.
 func IgnoreFieldsOption(fieldNames ...string) TableMetaOption {
 	return func(meta *TableMeta) {
+		var delColName string
 		for _, field := range fieldNames {
 			// has field in the TableMeta
 			if _, ok := meta.FieldMap[field]; ok {
 				// delete field in columns slice
 				for index, column := range meta.Columns {
 					if column.FieldName == field {
+						delColName = column.ColumnName
 						meta.Columns = append(meta.Columns[:index], meta.Columns[index+1:]...)
 						break
 					}
 				}
-				// delete field in fieldMap
+				// delete field in FieldMap & ColumnMap
 				delete(meta.FieldMap, field)
+				delete(meta.ColumnMap, delColName)
 			}
 		}
 	}

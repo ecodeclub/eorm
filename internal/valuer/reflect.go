@@ -16,16 +16,17 @@ package valuer
 
 import (
 	"database/sql"
+	"reflect"
+
 	"github.com/gotomicro/eorm/internal/errs"
 	"github.com/gotomicro/eorm/internal/model"
-	"reflect"
 )
 
 var _ Creator = NewReflectValue
 
 // reflectValue 基于反射的 Value
 type reflectValue struct {
-	val reflect.Value
+	val  reflect.Value
 	meta *model.TableMeta
 }
 
@@ -33,18 +34,29 @@ type reflectValue struct {
 // 输入 val 必须是一个指向结构体实例的指针，而不能是任何其它类型
 func NewReflectValue(val interface{}, meta *model.TableMeta) Value {
 	return reflectValue{
-		val: reflect.ValueOf(val).Elem(),
+		val:  reflect.ValueOf(val).Elem(),
 		meta: meta,
 	}
 }
 
 // Field 返回字段值
-func (r reflectValue) Field(name string) (any, error) {
-	res := r.val.FieldByName(name)
-	if res == (reflect.Value{}) {
-		return nil, errs.NewInvalidFieldError(name)
+func (r reflectValue) Field(name string) (interface{}, error) {
+	columnMeta, ok := r.meta.FieldMap[name]
+	if !ok {
+		return nil, errs.NewInvalidColumnError(name)
 	}
-	return res.Interface(), nil
+
+	val := r.val.FieldByName(name)
+	if val == (reflect.Value{}) {
+		return nil, errs.NewInvalidColumnError(name)
+	}
+	var rv interface{}
+	if columnMeta.Ancestors != nil {
+		rv = columnMeta.Ancestors[0] + "." + name
+	} else {
+		rv = val.Interface()
+	}
+	return rv, nil
 }
 
 func (r reflectValue) SetColumns(rows *sql.Rows) error {
@@ -66,7 +78,7 @@ func (r reflectValue) SetColumns(rows *sql.Rows) error {
 			return errs.NewInvalidColumnError(c)
 		}
 		val := reflect.New(cm.Typ)
-		colValues[i]=val.Interface()
+		colValues[i] = val.Interface()
 		colEleValues[i] = val.Elem()
 	}
 	if err = rows.Scan(colValues...); err != nil {

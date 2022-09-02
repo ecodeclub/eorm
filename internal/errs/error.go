@@ -22,11 +22,19 @@ import (
 
 var (
 	errValueNotSet = errors.New("eorm: 值未设置")
-	ErrNoRows = errors.New("eorm: 未找到数据")
+	ErrNoRows      = errors.New("eorm: 未找到数据")
 	// ErrTooManyColumns 过多列
 	// 一般是查询的列多于结构体的列
-	ErrTooManyColumns=errors.New("eorm: 过多列")
+	ErrTooManyColumns = errors.New("eorm: 过多列")
+
+	// ErrDataIsPtr 数据是指针
+	ErrDataIsPtr = errors.New("eorm: 数据是指针")
 )
+
+// NewFieldConflictError 列冲突的错误
+func NewFieldConflictError(field string) error {
+	return fmt.Errorf("eorm: `%s`列冲突", field)
+}
 
 // NewInvalidFieldError 返回代表未知字段的错误。
 // 通常来说，是字段名没写对
