@@ -15,31 +15,32 @@
 package dialect
 
 import (
+	"testing"
+
 	"github.com/gotomicro/eorm/internal/errs"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestOf(t *testing.T) {
-	testCases := []struct{
-		name string
-		driver string
-		wantErr error
+	testCases := []struct {
+		name        string
+		driver      string
+		wantErr     error
 		wantDialect Dialect
-	} {
+	}{
 		{
-			name: "mysql",
-			driver: "mysql",
+			name:        "mysql",
+			driver:      "mysql",
 			wantDialect: MySQL,
 		},
 		{
-			name: "sqlite3",
-			driver: "sqlite3",
+			name:        "sqlite3",
+			driver:      "sqlite3",
 			wantDialect: SQLite,
 		},
 		{
-			name: "unsupported",
-			driver: "abc",
+			name:    "unsupported",
+			driver:  "abc",
 			wantErr: errs.NewUnsupportedDriverError("abc"),
 		},
 	}

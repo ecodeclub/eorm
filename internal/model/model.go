@@ -20,6 +20,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+
 	// nolint
 	"unicode"
 
@@ -65,6 +66,8 @@ type ColumnMeta struct {
 	IsHolderType bool
 	// Ancestors 引入祖先概念
 	Ancestors []string
+	// FieldIndexes 用于表达从最外层结构体找到当前ColumnMeta对应的Field所需要的索引集
+	FieldIndexes []int
 }
 
 // TableMetaOption represents options of TableMeta, this options will cover default cover.
@@ -166,7 +169,6 @@ func (t *tagMetaRegistry) parseFields(v reflect.Type) ([]*ColumnMeta, map[string
 				columnMap[subColumns[j].ColumnName] = subColumns[j]
 				fieldExist[subColumns[j].FieldName] = true
 			}
-
 		} else {
 			columnMeta := &ColumnMeta{
 				ColumnName:      underscoreName(structField.Name),

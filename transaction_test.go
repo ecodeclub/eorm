@@ -17,9 +17,10 @@ package eorm
 import (
 	"context"
 	"database/sql"
+	"testing"
+
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestTx_Commit(t *testing.T) {
@@ -46,7 +47,6 @@ func TestTx_Commit(t *testing.T) {
 	assert.Nil(t, err)
 	err = tx.Commit()
 	assert.Nil(t, err)
-
 
 }
 

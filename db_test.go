@@ -19,11 +19,12 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"testing"
+
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/gotomicro/eorm/internal/valuer"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestDB_BeginTx(t *testing.T) {
@@ -147,10 +148,10 @@ func BenchmarkQuerier_Get(b *testing.B) {
 	}()
 	_, _ = RawQuery[any](orm, TestModel{}.CreateSQL()).Exec(context.Background())
 	res, err := NewInserter[TestModel](orm).Values(&TestModel{
-		Id: 12,
+		Id:        12,
 		FirstName: "Deng",
-		Age: 18,
-		LastName: &sql.NullString{String: "Ming", Valid: true},
+		Age:       18,
+		LastName:  &sql.NullString{String: "Ming", Valid: true},
 	}).Exec(context.Background())
 	if err != nil {
 		b.Fatal(err)
@@ -183,4 +184,3 @@ func BenchmarkQuerier_Get(b *testing.B) {
 		}
 	})
 }
-

@@ -16,6 +16,7 @@ package valuer
 
 import (
 	"database/sql"
+
 	"github.com/gotomicro/eorm/internal/model"
 )
 

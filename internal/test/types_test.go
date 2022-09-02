@@ -15,58 +15,59 @@
 package test
 
 import (
+	"testing"
+
 	"github.com/gotomicro/ekit"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestJsonColumn_Scan(t *testing.T) {
 	type User struct {
 		Name string
 	}
-	testCases := []struct{
-		name string
-		input any
+	testCases := []struct {
+		name    string
+		input   any
 		wantVal User
 		wantErr string
-	} {
+	}{
 		{
-			name: "empty string",
+			name:  "empty string",
 			input: ``,
 		},
 		{
-			name: "no fields",
-			input: `{}`,
+			name:    "no fields",
+			input:   `{}`,
 			wantVal: User{},
 		},
 		{
-			name: "string",
-			input: `{"name":"Tom"}`,
+			name:    "string",
+			input:   `{"name":"Tom"}`,
 			wantVal: User{Name: "Tom"},
 		},
 		{
-			name: "nil bytes",
+			name:  "nil bytes",
 			input: []byte(nil),
 		},
 		{
-			name: "empty bytes",
+			name:  "empty bytes",
 			input: []byte(""),
 		},
 		{
-			name: "bytes",
-			input: []byte(`{"name":"Tom"}`),
+			name:    "bytes",
+			input:   []byte(`{"name":"Tom"}`),
 			wantVal: User{Name: "Tom"},
 		},
 		{
 			name: "nil",
 		},
 		{
-			name: "empty bytes ptr",
+			name:  "empty bytes ptr",
 			input: ekit.ToPtr[[]byte]([]byte("")),
 		},
 		{
-			name: "bytes ptr",
-			input: ekit.ToPtr[[]byte]([]byte(`{"name":"Tom"}`)),
+			name:    "bytes ptr",
+			input:   ekit.ToPtr[[]byte]([]byte(`{"name":"Tom"}`)),
 			wantVal: User{Name: "Tom"},
 		},
 	}

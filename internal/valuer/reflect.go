@@ -59,6 +59,18 @@ func (r reflectValue) Field(name string) (interface{}, error) {
 	return rv, nil
 }
 
+func (r reflectValue) fieldByIndex(name string) (reflect.Value, bool) {
+	cm, ok := r.meta.FieldMap[name]
+	if !ok {
+		return reflect.Value{}, false
+	}
+	value := r.val
+	for _, i := range cm.FieldIndexes {
+		value = value.Field(i)
+	}
+	return value, true
+}
+
 func (r reflectValue) SetColumns(rows *sql.Rows) error {
 	cs, err := rows.Columns()
 	if err != nil {
@@ -87,7 +99,7 @@ func (r reflectValue) SetColumns(rows *sql.Rows) error {
 
 	for i, c := range cs {
 		cm := r.meta.ColumnMap[c]
-		fd := r.val.FieldByName(cm.FieldName)
+		fd, _ := r.fieldByIndex(cm.FieldName)
 		fd.Set(colEleValues[i])
 	}
 	return nil

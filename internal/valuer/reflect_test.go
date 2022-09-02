@@ -16,11 +16,13 @@ package valuer
 
 import (
 	"database/sql"
+	"reflect"
+	"testing"
+
 	"github.com/gotomicro/eorm/internal/errs"
 	"github.com/gotomicro/eorm/internal/model"
 	"github.com/gotomicro/eorm/internal/test"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func Test_reflectValue_SetColumn(t *testing.T) {
@@ -207,4 +209,39 @@ type ConflictModel struct {
 type UserModel struct {
 	Bio string
 	ProfileModel
+}
+
+func BenchmarkReflectValue_fieldByIndexes_VS_FieldByName(b *testing.B) {
+	meta, _ := model.NewMetaRegistry().Get(&test.SimpleStruct{})
+	ins := NewReflectValue(&test.SimpleStruct{Int64: 13}, meta)
+	in, ok := ins.(reflectValue)
+	assert.True(b, ok)
+	fieldName, unknownFieldName := "Int64", "XXXX"
+	fieldValue, unknownValue := int64(13), reflect.Value{}
+	b.Run("fieldByIndex found", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			val, ok := in.fieldByIndex(fieldName)
+			assert.True(b, ok)
+			assert.Equal(b, fieldValue, val.Interface())
+		}
+	})
+	b.Run("fieldByIndex not found", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			val, ok := in.fieldByIndex(unknownFieldName)
+			assert.False(b, ok)
+			assert.Equal(b, unknownValue, val)
+		}
+	})
+	b.Run("FieldByName found", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			val := in.val.FieldByName(fieldName)
+			assert.Equal(b, fieldValue, val.Interface())
+		}
+	})
+	b.Run("fieldByIndex not found", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			val := in.val.FieldByName(unknownFieldName)
+			assert.Equal(b, unknownValue, val)
+		}
+	})
 }

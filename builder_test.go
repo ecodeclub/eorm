@@ -19,12 +19,13 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"testing"
+
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/gotomicro/eorm/internal/errs"
 	"github.com/gotomicro/eorm/internal/valuer"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
-	"testing"
 )
 
 type QuerierTestSuite struct {
@@ -76,20 +77,20 @@ func (q *QuerierTestSuite) TestExec() {
 
 func (q *QuerierTestSuite) TestGet() {
 	t := q.T()
-	testCases := []struct{
-		name string
-		s *Selector[TestModel]
-		wantErr error
+	testCases := []struct {
+		name       string
+		s          *Selector[TestModel]
+		wantErr    error
 		wantResult *TestModel
-	} {
+	}{
 		{
-			name: "not found",
-			s: NewSelector[TestModel](q.orm).From(&TestModel{}).Where(C("Id").EQ(12)),
+			name:    "not found",
+			s:       NewSelector[TestModel](q.orm).From(&TestModel{}).Where(C("Id").EQ(12)),
 			wantErr: errs.ErrNoRows,
 		},
 		{
 			name: "found",
-			s: NewSelector[TestModel](q.orm).From(&TestModel{}).Where(C("Id").EQ(1)),
+			s:    NewSelector[TestModel](q.orm).From(&TestModel{}).Where(C("Id").EQ(1)),
 			wantResult: &TestModel{
 				Id:        1,
 				FirstName: "Tom",
@@ -162,31 +163,31 @@ func testQuerierGet(t *testing.T, c valuer.Creator) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	testCases := []struct{
-		name string
-		query string
-		mockErr error
+	testCases := []struct {
+		name     string
+		query    string
+		mockErr  error
 		mockRows *sqlmock.Rows
-		wantErr error
-		wantVal *TestModel
+		wantErr  error
+		wantVal  *TestModel
 	}{
 		{
 			// 查询返回错误
-			name: "query error",
+			name:    "query error",
 			mockErr: errors.New("invalid query"),
 			wantErr: errors.New("invalid query"),
-			query: "invalid query",
+			query:   "invalid query",
 		},
 		{
-			name: "no row",
-			wantErr: ErrNoRows,
-			query: "no row",
+			name:     "no row",
+			wantErr:  ErrNoRows,
+			query:    "no row",
 			mockRows: sqlmock.NewRows([]string{"id"}),
 		},
 		{
-			name: "too many column",
+			name:    "too many column",
 			wantErr: errs.ErrTooManyColumns,
-			query: "too many column",
+			query:   "too many column",
 			mockRows: func() *sqlmock.Rows {
 				res := sqlmock.NewRows([]string{"id", "first_name", "age", "last_name", "extra_column"})
 				res.AddRow([]byte("1"), []byte("Da"), []byte("18"), []byte("Ming"), []byte("nothing"))
@@ -194,7 +195,7 @@ func testQuerierGet(t *testing.T, c valuer.Creator) {
 			}(),
 		},
 		{
-			name: "get data",
+			name:  "get data",
 			query: "SELECT xx FROM `test_model`",
 			mockRows: func() *sqlmock.Rows {
 				res := sqlmock.NewRows([]string{"id", "first_name", "age", "last_name"})
@@ -202,10 +203,10 @@ func testQuerierGet(t *testing.T, c valuer.Creator) {
 				return res
 			}(),
 			wantVal: &TestModel{
-				Id: 1,
+				Id:        1,
 				FirstName: "Da",
-				Age: 18,
-				LastName: &sql.NullString{String: "Ming", Valid: true},
+				Age:       18,
+				LastName:  &sql.NullString{String: "Ming", Valid: true},
 			},
 		},
 	}

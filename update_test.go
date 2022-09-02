@@ -17,9 +17,10 @@ package eorm
 import (
 	"database/sql"
 	"fmt"
+	"testing"
+
 	err "github.com/gotomicro/eorm/internal/errs"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestUpdater_Set(t *testing.T) {
