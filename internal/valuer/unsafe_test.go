@@ -127,42 +127,22 @@ func testSetColumn(t *testing.T, creator Creator) {
 		{
 			name: "normal value",
 			cs: map[string][]byte{
-				"id":   []byte("1"),
-				"bool": []byte("true"),
-				//"bool_ptr":         []byte("false"),
-				"int": []byte("12"),
-				//"int_ptr":          []byte("13"),
-				"int8": []byte("8"),
-				//"int8_ptr":         []byte("-8"),
-				"int16": []byte("16"),
-				//"int16_ptr":        []byte("-16"),
-				"int32": []byte("32"),
-				//"int32_ptr":        []byte("-32"),
-				"int64": []byte("64"),
-				//"int64_ptr":        []byte("-64"),
-				"uint": []byte("14"),
-				//"uint_ptr":         []byte("15"),
-				"uint8": []byte("8"),
-				//"uint8_ptr":        []byte("18"),
-				"uint16": []byte("16"),
-				//"uint16_ptr":       []byte("116"),
-				"uint32": []byte("32"),
-				//"uint32_ptr":       []byte("132"),
-				"uint64": []byte("64"),
-				//"uint64_ptr":       []byte("164"),
-				"float32": []byte("3.2"),
-				//"float32_ptr":      []byte("-3.2"),
-				"float64": []byte("6.4"),
-				//"float64_ptr":      []byte("-6.4"),
+				"id":         []byte("1"),
+				"bool":       []byte("true"),
+				"int":        []byte("12"),
+				"int8":       []byte("8"),
+				"int16":      []byte("16"),
+				"int32":      []byte("32"),
+				"int64":      []byte("64"),
+				"uint":       []byte("14"),
+				"uint8":      []byte("8"),
+				"uint16":     []byte("16"),
+				"uint32":     []byte("32"),
+				"uint64":     []byte("64"),
+				"float32":    []byte("3.2"),
+				"float64":    []byte("6.4"),
 				"byte_array": []byte("hello"),
 				"string":     []byte("world"),
-				//"null_string_ptr":  []byte("null string"),
-				//"null_int16_ptr":   []byte("16"),
-				//"null_int32_ptr":   []byte("32"),
-				//"null_int64_ptr":   []byte("64"),
-				//"null_bool_ptr":    []byte("true"),
-				//"null_float64_ptr": []byte("6.4"),
-				//"json_column":      []byte(`{"name": "Tom"}`),
 			},
 			val:     &test.SimpleStruct{},
 			wantVal: test.NewSimpleStruct(1),
@@ -405,23 +385,3 @@ type valueFieldTestCase struct {
 func FuzzUnsafeValue_Field(f *testing.F) {
 	f.Fuzz(fuzzValueField(NewUnsafeValue))
 }
-
-//func BenchmarkUnsafeValue_Field(b *testing.B) {
-//	meta, _ := model.NewMetaRegistry().Get(&test.SimpleStruct{})
-//	//ins := NewReflectValue(&test.SimpleStruct{Int64: 13, NullStringPtr: &sql.NullString{}}, meta)
-//	ins := NewReflectValue(&test.SimpleStruct{Int64: 13}, meta)
-//	b.Run("int64", func(b *testing.B) {
-//		for i := 0; i < b.N; i++ {
-//			val, err := ins.Field("Int64")
-//			assert.Nil(b, err)
-//			//assert.Equal(b, int64(13), val)
-//		}
-//	})
-//	//b.Run("holder", func(b *testing.B) {
-//	//	for i := 0; i < b.N; i++ {
-//	//		val, err := ins.Field("NullStringPtr")
-//	//		assert.Nil(b, err)
-//	//		assert.Equal(b, &sql.NullString{}, val)
-//	//	}
-//	//})
-//}
