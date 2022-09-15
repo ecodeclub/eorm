@@ -144,29 +144,6 @@ func BenchmarkReflectValue_Field(b *testing.B) {
 
 }
 
-func FuzzReflectValue_Field(f *testing.F) {
-	f.Fuzz(fuzzValueField(NewReflectValue))
-}
-
-func fuzzValueField(factory Creator) any {
-	meta, _ := model.NewMetaRegistry().Get(&test.SimpleStruct{})
-	return func(t *testing.T, b bool,
-		i int, i8 int8, i16 int16, i32 int32, i64 int64,
-		u uint, u8 uint8, u16 uint16, u32 uint32, u64 uint64,
-		f32 float32, f64 float64, bt byte, bs []byte, s string) {
-		entity := &test.SimpleStruct{
-			String: s,
-		}
-		val := factory(entity, meta)
-		cases := newValueFieldTestCases(entity)
-		for _, c := range cases {
-			v, err := val.Field(c.field)
-			assert.Nil(t, err)
-			assert.Equal(t, c.wantVal, v)
-		}
-	}
-}
-
 type TestModel struct {
 	Id        int64 `eorm:"auto_increment,primary_key"`
 	FirstName string

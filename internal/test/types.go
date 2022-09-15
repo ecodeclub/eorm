@@ -25,59 +25,34 @@ import (
 type SimpleStruct struct {
 	Id   uint64 `eorm:"primary_key,column=int_c"`
 	Bool bool
-	//BoolPtr *bool
 
 	Int int
-	//IntPtr *int
 
 	Int8 int8 `eorm:"primary_key,column=int8_c"`
-	//Int8Ptr *int8
 
 	Int16 int16
-	//Int16Ptr *int16
 
 	Int32 int32
-	//Int32Ptr *int32
 
 	Int64 int64
-	//Int64Ptr *int64
 
 	Uint uint
-	//UintPtr *uint
 
 	Uint8 uint8
-	//Uint8Ptr *uint8
 
 	Uint16 uint16
-	//Uint16Ptr *uint16
 
 	Uint32 uint32
-	//Uint32Ptr *uint32
 
 	Uint64 uint64
-	//Uint64Ptr *uint64
 
 	Float32 float32
-	//Float32Ptr *float32
 
 	Float64 float64
-	//Float64Ptr *float64
 
-	// Byte byte
-	// BytePtr *byte
 	ByteArray []byte
 
 	String string
-
-	// 特殊类型
-	//NullStringPtr *sql.NullString
-	//NullInt16Ptr  *sql.NullInt16
-	//NullInt32Ptr  *sql.NullInt32
-	//NullInt64Ptr  *sql.NullInt64
-	//NullBoolPtr   *sql.NullBool
-	// NullTimePtr    *sql.NullTime
-	//NullFloat64Ptr *sql.NullFloat64
-	//JsonColumn     *JsonColumn
 }
 
 // JsonColumn 是自定义的 JSON 类型字段
