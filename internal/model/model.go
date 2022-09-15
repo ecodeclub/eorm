@@ -20,7 +20,6 @@ import (
 	"reflect"
 	"strings"
 	"sync"
-
 	// nolint
 	"unicode"
 
@@ -107,6 +106,7 @@ func (t *tagMetaRegistry) Register(table interface{}, opts ...TableMetaOption) (
 	rtype := reflect.TypeOf(table)
 	v := rtype.Elem()
 	columnMetas, fieldMap, columnMap, err := t.parseFields(v)
+	anonymousOffset = 0
 	if err != nil {
 		return nil, err
 	}
@@ -124,12 +124,12 @@ func (t *tagMetaRegistry) Register(table interface{}, opts ...TableMetaOption) (
 	return tableMeta, nil
 }
 
+var anonymousOffset uintptr = 0 // 记录结构体的偏移量
 func (t *tagMetaRegistry) parseFields(v reflect.Type) ([]*ColumnMeta, map[string]*ColumnMeta, map[string]*ColumnMeta, error) {
 	lens := v.NumField()
 	columnMetas := make([]*ColumnMeta, 0, lens)
 	fieldMap := make(map[string]*ColumnMeta, lens)
 	columnMap := make(map[string]*ColumnMeta, lens)
-	fieldExist := make(map[string]bool, lens)
 	for i := 0; i < lens; i++ {
 		structField := v.Field(i)
 		tag := structField.Tag.Get("eorm")
@@ -153,11 +153,12 @@ func (t *tagMetaRegistry) parseFields(v reflect.Type) ([]*ColumnMeta, map[string
 			return nil, nil, nil, errs.ErrDataIsPtr
 		}
 		// 检查列有没有冲突
-		if f := fieldExist[structField.Name]; f {
+		if fieldMap[structField.Name] != nil {
 			return nil, nil, nil, errs.NewFieldConflictError(structField.Name)
 		}
 		// 是组合
 		if structField.Anonymous && structField.Type.Kind() == reflect.Struct {
+			anonymousOffset += structField.Offset
 			// 递归解析
 			subColumns, _, _, err := t.parseFields(structField.Type)
 			if err != nil {
@@ -167,7 +168,6 @@ func (t *tagMetaRegistry) parseFields(v reflect.Type) ([]*ColumnMeta, map[string
 				columnMetas = append(columnMetas, subColumns[j])
 				fieldMap[subColumns[j].FieldName] = subColumns[j]
 				columnMap[subColumns[j].ColumnName] = subColumns[j]
-				fieldExist[subColumns[j].FieldName] = true
 			}
 		} else {
 			columnMeta := &ColumnMeta{
@@ -176,14 +176,13 @@ func (t *tagMetaRegistry) parseFields(v reflect.Type) ([]*ColumnMeta, map[string
 				Typ:             structField.Type,
 				IsAutoIncrement: isAuto,
 				IsPrimaryKey:    isKey,
-				Offset:          structField.Offset,
+				Offset:          structField.Offset + anonymousOffset,
 				IsHolderType:    structField.Type.AssignableTo(scannerType) && structField.Type.AssignableTo(driverValuerType),
 				Ancestors:       []string{v.Name()},
 			}
 			columnMetas = append(columnMetas, columnMeta)
 			fieldMap[columnMeta.FieldName] = columnMeta
 			columnMap[columnMeta.ColumnName] = columnMeta
-			fieldExist[columnMeta.FieldName] = true
 		}
 	}
 	return columnMetas, fieldMap, columnMap, nil

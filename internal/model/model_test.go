@@ -152,26 +152,27 @@ func TestTagMetaRegistry(t *testing.T) {
 						IsPrimaryKey:    true,
 						IsAutoIncrement: true,
 						Ancestors:       []string{"TestModel"},
+						Offset:          16,
 					},
 					{
 						ColumnName: "first_name",
 						FieldName:  "FirstName",
 						Typ:        reflect.TypeOf(""),
-						Offset:     8,
+						Offset:     24,
 						Ancestors:  []string{"TestModel"},
 					},
 					{
 						ColumnName: "age",
 						FieldName:  "Age",
 						Typ:        reflect.TypeOf(int8(0)),
-						Offset:     24,
+						Offset:     40,
 						Ancestors:  []string{"TestModel"},
 					},
 					{
 						ColumnName: "last_name",
 						FieldName:  "LastName",
 						Typ:        reflect.TypeOf(""),
-						Offset:     32,
+						Offset:     48,
 						Ancestors:  []string{"TestModel"},
 					},
 				},
@@ -191,26 +192,27 @@ func TestTagMetaRegistry(t *testing.T) {
 						IsPrimaryKey:    true,
 						IsAutoIncrement: true,
 						Ancestors:       []string{"TestModel"},
+						Offset:          16,
 					},
 					"FirstName": {
 						ColumnName: "first_name",
 						FieldName:  "FirstName",
 						Typ:        reflect.TypeOf(""),
-						Offset:     8,
+						Offset:     24,
 						Ancestors:  []string{"TestModel"},
 					},
 					"Age": {
 						ColumnName: "age",
 						FieldName:  "Age",
 						Typ:        reflect.TypeOf(int8(0)),
-						Offset:     24,
+						Offset:     40,
 						Ancestors:  []string{"TestModel"},
 					},
 					"LastName": {
 						ColumnName: "last_name",
 						FieldName:  "LastName",
 						Typ:        reflect.TypeOf(""),
-						Offset:     32,
+						Offset:     48,
 						Ancestors:  []string{"TestModel"},
 					},
 				},
@@ -230,26 +232,27 @@ func TestTagMetaRegistry(t *testing.T) {
 						IsPrimaryKey:    true,
 						IsAutoIncrement: true,
 						Ancestors:       []string{"TestModel"},
+						Offset:          16,
 					},
 					"first_name": {
 						ColumnName: "first_name",
 						FieldName:  "FirstName",
 						Typ:        reflect.TypeOf(""),
-						Offset:     8,
+						Offset:     24,
 						Ancestors:  []string{"TestModel"},
 					},
 					"age": {
 						ColumnName: "age",
 						FieldName:  "Age",
 						Typ:        reflect.TypeOf(int8(0)),
-						Offset:     24,
+						Offset:     40,
 						Ancestors:  []string{"TestModel"},
 					},
 					"last_name": {
 						ColumnName: "last_name",
 						FieldName:  "LastName",
 						Typ:        reflect.TypeOf(""),
-						Offset:     32,
+						Offset:     48,
 						Ancestors:  []string{"TestModel"},
 					},
 				},
@@ -279,7 +282,7 @@ func TestTagMetaRegistry(t *testing.T) {
 						ColumnName: "bio",
 						FieldName:  "Bio",
 						Typ:        reflect.TypeOf(""),
-						Offset:     0,
+						Offset:     32,
 						Ancestors:  []string{"UserModel"},
 					},
 					{
@@ -289,26 +292,27 @@ func TestTagMetaRegistry(t *testing.T) {
 						IsPrimaryKey:    true,
 						IsAutoIncrement: true,
 						Ancestors:       []string{"TestModel"},
+						Offset:          48,
 					},
 					{
 						ColumnName: "first_name",
 						FieldName:  "FirstName",
 						Typ:        reflect.TypeOf(""),
-						Offset:     8,
+						Offset:     56,
 						Ancestors:  []string{"TestModel"},
 					},
 					{
 						ColumnName: "age",
 						FieldName:  "Age",
 						Typ:        reflect.TypeOf(int8(0)),
-						Offset:     24,
+						Offset:     72,
 						Ancestors:  []string{"TestModel"},
 					},
 					{
 						ColumnName: "last_name",
 						FieldName:  "LastName",
 						Typ:        reflect.TypeOf(""),
-						Offset:     32,
+						Offset:     80,
 						Ancestors:  []string{"TestModel"},
 					},
 				},
@@ -332,7 +336,7 @@ func TestTagMetaRegistry(t *testing.T) {
 						ColumnName: "bio",
 						FieldName:  "Bio",
 						Typ:        reflect.TypeOf(""),
-						Offset:     0,
+						Offset:     32,
 						Ancestors:  []string{"UserModel"},
 					},
 					"Id": {
@@ -342,26 +346,27 @@ func TestTagMetaRegistry(t *testing.T) {
 						IsPrimaryKey:    true,
 						IsAutoIncrement: true,
 						Ancestors:       []string{"TestModel"},
+						Offset:          48,
 					},
 					"FirstName": {
 						ColumnName: "first_name",
 						FieldName:  "FirstName",
 						Typ:        reflect.TypeOf(""),
-						Offset:     8,
+						Offset:     56,
 						Ancestors:  []string{"TestModel"},
 					},
 					"Age": {
 						ColumnName: "age",
 						FieldName:  "Age",
 						Typ:        reflect.TypeOf(int8(0)),
-						Offset:     24,
+						Offset:     72,
 						Ancestors:  []string{"TestModel"},
 					},
 					"LastName": {
 						ColumnName: "last_name",
 						FieldName:  "LastName",
 						Typ:        reflect.TypeOf(""),
-						Offset:     32,
+						Offset:     80,
 						Ancestors:  []string{"TestModel"},
 					},
 				},
@@ -385,7 +390,7 @@ func TestTagMetaRegistry(t *testing.T) {
 						ColumnName: "bio",
 						FieldName:  "Bio",
 						Typ:        reflect.TypeOf(""),
-						Offset:     0,
+						Offset:     32,
 						Ancestors:  []string{"UserModel"},
 					},
 					"id": {
@@ -395,26 +400,27 @@ func TestTagMetaRegistry(t *testing.T) {
 						IsPrimaryKey:    true,
 						IsAutoIncrement: true,
 						Ancestors:       []string{"TestModel"},
+						Offset:          48,
 					},
 					"first_name": {
 						ColumnName: "first_name",
 						FieldName:  "FirstName",
 						Typ:        reflect.TypeOf(""),
-						Offset:     8,
+						Offset:     56,
 						Ancestors:  []string{"TestModel"},
 					},
 					"age": {
 						ColumnName: "age",
 						FieldName:  "Age",
 						Typ:        reflect.TypeOf(int8(0)),
-						Offset:     24,
+						Offset:     72,
 						Ancestors:  []string{"TestModel"},
 					},
 					"last_name": {
 						ColumnName: "last_name",
 						FieldName:  "LastName",
 						Typ:        reflect.TypeOf(""),
-						Offset:     32,
+						Offset:     80,
 						Ancestors:  []string{"TestModel"},
 					},
 				},
@@ -1071,11 +1077,6 @@ type TestModel struct {
 	LastName  string
 }
 
-type Conflict struct {
-	TestModel
-	Age int8
-}
-
 type UserModel struct {
 	Bio string
 	TestModel
@@ -1085,6 +1086,11 @@ type ProfileModel struct {
 	Email    string
 	Password string
 	UserModel
+}
+
+type Conflict struct {
+	TestModel
+	Age int8
 }
 
 type CustomerModel struct {
