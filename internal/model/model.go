@@ -106,8 +106,7 @@ func (t *tagMetaRegistry) Get(table interface{}) (*TableMeta, error) {
 func (t *tagMetaRegistry) Register(table interface{}, opts ...TableMetaOption) (*TableMeta, error) {
 	rtype := reflect.TypeOf(table)
 	v := rtype.Elem()
-	columnMetas, fieldMap, columnMap, err := t.parseFields(v)
-	anonymousOffset = 0
+	columnMetas, fieldMap, columnMap, err := t.parseFields(v, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -125,8 +124,10 @@ func (t *tagMetaRegistry) Register(table interface{}, opts ...TableMetaOption) (
 	return tableMeta, nil
 }
 
-var anonymousOffset uintptr = 0 // 记录结构体的偏移量
-func (t *tagMetaRegistry) parseFields(v reflect.Type) ([]*ColumnMeta, map[string]*ColumnMeta, map[string]*ColumnMeta, error) {
+// parseFields
+// v
+// pOffset is Parent Offset
+func (t *tagMetaRegistry) parseFields(v reflect.Type, pOffset uintptr) ([]*ColumnMeta, map[string]*ColumnMeta, map[string]*ColumnMeta, error) {
 	lens := v.NumField()
 	columnMetas := make([]*ColumnMeta, 0, lens)
 	fieldMap := make(map[string]*ColumnMeta, lens)
@@ -155,13 +156,13 @@ func (t *tagMetaRegistry) parseFields(v reflect.Type) ([]*ColumnMeta, map[string
 		}
 		// 检查列有没有冲突
 		if fieldMap[structField.Name] != nil {
-			return nil, nil, nil, errs.NewFieldConflictError(structField.Name)
+			return nil, nil, nil, errs.NewFieldConflictError(v.Name() + "." + structField.Name)
 		}
 		// 是组合
 		if structField.Anonymous && structField.Type.Kind() == reflect.Struct {
-			anonymousOffset += structField.Offset
 			// 递归解析
-			subColumns, _, _, err := t.parseFields(structField.Type)
+			o := structField.Offset + pOffset
+			subColumns, _, _, err := t.parseFields(structField.Type, o)
 			if err != nil {
 				return nil, nil, nil, err
 			}
@@ -177,7 +178,7 @@ func (t *tagMetaRegistry) parseFields(v reflect.Type) ([]*ColumnMeta, map[string
 				Typ:             structField.Type,
 				IsAutoIncrement: isAuto,
 				IsPrimaryKey:    isKey,
-				Offset:          structField.Offset + anonymousOffset,
+				Offset:          structField.Offset + pOffset,
 				IsHolderType:    structField.Type.AssignableTo(scannerType) && structField.Type.AssignableTo(driverValuerType),
 				Ancestors:       []string{v.Name()},
 			}

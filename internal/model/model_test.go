@@ -554,7 +554,7 @@ func TestTagMetaRegistry(t *testing.T) {
 			// 冲突
 			name:    "Conflict",
 			input:   &Conflict{},
-			wantErr: errs.NewFieldConflictError("Age"),
+			wantErr: errs.NewFieldConflictError("Conflict.Age"),
 		},
 		{
 			// 指针
