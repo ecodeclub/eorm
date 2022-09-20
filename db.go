@@ -89,6 +89,7 @@ func (db *DB) Delete() *Deleter {
 			core:   db.core,
 			buffer: bytebufferpool.Get(),
 		},
+		session: db,
 	}
 }
 

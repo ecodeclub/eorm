@@ -14,9 +14,15 @@
 
 package eorm
 
+import (
+	"context"
+	"database/sql"
+)
+
 // Deleter builds DELETE query
 type Deleter struct {
 	builder
+	session
 	table interface{}
 	where []Predicate
 }
@@ -52,4 +58,20 @@ func (d *Deleter) From(table interface{}) *Deleter {
 func (d *Deleter) Where(predicates ...Predicate) *Deleter {
 	d.where = predicates
 	return d
+}
+
+func (d *Deleter) ExecWithTx(ctx context.Context, delSession session) (sql.Result, error) {
+	query, err := d.Build()
+	if err != nil {
+		return nil, err
+	}
+	return newQuerier[Deleter](delSession, query).Exec(ctx)
+}
+
+func (d *Deleter) Exec(ctx context.Context) (sql.Result, error) {
+	query, err := d.Build()
+	if err != nil {
+		return nil, err
+	}
+	return newQuerier[Deleter](d.session, query).Exec(ctx)
 }
