@@ -100,6 +100,9 @@ func TestDeleter_Exec(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			mockDB, mock, err := sqlmock.New()
+			if err != nil {
+				t.Fatal(err)
+			}
 			db, err := openDB("mysql", mockDB)
 			defer func(db *DB) { _ = db.Close() }(db)
 			if err != nil {
