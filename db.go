@@ -83,8 +83,8 @@ func (db *DB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) {
 }
 
 // Delete 开始构建一个 DELETE 查询
-func (db *DB) Delete() *Deleter {
-	return &Deleter{
+func (db *DB) Delete() *Deleter[DB] {
+	return &Deleter[DB]{
 		builder: builder{
 			core:   db.core,
 			buffer: bytebufferpool.Get(),

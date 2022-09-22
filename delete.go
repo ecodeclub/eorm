@@ -17,18 +17,30 @@ package eorm
 import (
 	"context"
 	"database/sql"
+	"github.com/valyala/bytebufferpool"
 )
 
 // Deleter builds DELETE query
-type Deleter struct {
+type Deleter[T any] struct {
 	builder
 	session
 	table interface{}
 	where []Predicate
 }
 
+// NewDeleter 开始构建一个 DELETE 查询
+func NewDeleter[T any](sess session) *Deleter[T] {
+	return &Deleter[T]{
+		builder: builder{
+			core:   sess.getCore(),
+			buffer: bytebufferpool.Get(),
+		},
+		session: sess,
+	}
+}
+
 // Build returns DELETE query
-func (d *Deleter) Build() (*Query, error) {
+func (d *Deleter[T]) Build() (*Query, error) {
 	_, _ = d.buffer.WriteString("DELETE FROM ")
 	var err error
 	d.meta, err = d.metaRegistry.Get(d.table)
@@ -49,29 +61,21 @@ func (d *Deleter) Build() (*Query, error) {
 }
 
 // From accepts model definition
-func (d *Deleter) From(table interface{}) *Deleter {
+func (d *Deleter[T]) From(table interface{}) *Deleter[T] {
 	d.table = table
 	return d
 }
 
 // Where accepts predicates
-func (d *Deleter) Where(predicates ...Predicate) *Deleter {
+func (d *Deleter[T]) Where(predicates ...Predicate) *Deleter[T] {
 	d.where = predicates
 	return d
 }
 
-func (d *Deleter) ExecWithTx(ctx context.Context, delSession session) (sql.Result, error) {
+func (d *Deleter[T]) Exec(ctx context.Context) (sql.Result, error) {
 	query, err := d.Build()
 	if err != nil {
 		return nil, err
 	}
-	return newQuerier[Deleter](delSession, query).Exec(ctx)
-}
-
-func (d *Deleter) Exec(ctx context.Context) (sql.Result, error) {
-	query, err := d.Build()
-	if err != nil {
-		return nil, err
-	}
-	return newQuerier[Deleter](d.session, query).Exec(ctx)
+	return newQuerier[T](d.session, query).Exec(ctx)
 }

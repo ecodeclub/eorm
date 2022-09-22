@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/stretchr/testify/require"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -56,50 +57,43 @@ func TestDeleter_Exec(t *testing.T) {
 	testCases := []struct {
 		name      string
 		mockOrder func(mock sqlmock.Sqlmock)
-		dbOrder   func(*DB) ([]sql.Result, []error)
-		wantErrs  []error
-		wantVals  []sql.Result
+		dbOrder   func(*DB, *testing.T) (sql.Result, error)
+		wantErr   error
+		wantVal   sql.Result
 	}{
 		{
 			name: "直接删除",
 			mockOrder: func(mock sqlmock.Sqlmock) {
-				mock.ExpectExec("DELETE FROM `product` WHERE `id`=").WithArgs(1).WillReturnResult(sqlmock.NewResult(100, 1000))
+				mock.ExpectExec("DELETE FROM `test_product` WHERE `id`=").WithArgs(1).WillReturnResult(sqlmock.NewResult(100, 1000))
 			},
-			dbOrder: func(db *DB) ([]sql.Result, []error) {
-				results := make([]sql.Result, 0, 0)
-				errs := make([]error, 0, 0)
-
-				exec, err := db.Delete().From(&Product{}).Where(C("Id").EQ(1)).Exec(context.Background())
-				results = append(results, exec)
-				errs = append(errs, err)
-
-				return results, errs
+			dbOrder: func(db *DB, t *testing.T) (sql.Result, error) {
+				deleter := NewDeleter[TestProduct](db)
+				result, err := deleter.From(&TestProduct{}).Where(C("Id").EQ(1)).Exec(context.Background())
+				return result, err
 			},
-			wantErrs: []error{nil},
-			wantVals: []sql.Result{sqlmock.NewResult(100, 1000)},
+			wantErr: nil,
+			wantVal: sqlmock.NewResult(100, 1000),
 		},
 		{
 			name: "事务删除",
 			mockOrder: func(mock sqlmock.Sqlmock) {
 				mock.ExpectBegin()
-				mock.ExpectExec("DELETE FROM `product` WHERE `id`=").WithArgs(1).WillReturnResult(sqlmock.NewResult(10, 20))
-				mock.ExpectCommit().WillReturnError(errors.New("最后一步"))
+				mock.ExpectExec("DELETE FROM `test_product` WHERE `id`=").WithArgs(1).WillReturnResult(sqlmock.NewResult(10, 20))
+				mock.ExpectCommit().WillReturnError(errors.New("commit 错误"))
 			},
-			dbOrder: func(db *DB) ([]sql.Result, []error) {
-				results := make([]sql.Result, 0, 0)
-				errs := make([]error, 0, 0)
+			dbOrder: func(db *DB, t *testing.T) (sql.Result, error) {
+				tx, err := db.BeginTx(context.Background(), &sql.TxOptions{})
+				require.NoError(t, err)
 
-				tx, _ := db.BeginTx(context.Background(), &sql.TxOptions{})
-				exec, err := db.Delete().From(&Product{}).Where(C("Id").EQ(1)).ExecWithTx(context.Background(), tx)
-				results = append(results, exec)
-				errs = append(errs, err)
+				deleter := NewDeleter[TestProduct](db)
+				result, err := deleter.From(&TestProduct{}).Where(C("Id").EQ(1)).Exec(context.Background())
+				require.NoError(t, err)
+
 				err = tx.Commit()
-				errs = append(errs, err)
-
-				return results, errs
+				return result, err
 			},
-			wantErrs: []error{nil, errors.New("最后一步")},
-			wantVals: []sql.Result{sqlmock.NewResult(10, 20)},
+			wantErr: errors.New("commit 错误"),
+			wantVal: sqlmock.NewResult(10, 20),
 		},
 	}
 
@@ -112,24 +106,22 @@ func TestDeleter_Exec(t *testing.T) {
 				t.Fatal(err)
 			}
 			tc.mockOrder(mock)
-			results, errs := tc.dbOrder(db)
+			result, err := tc.dbOrder(db, t)
 
-			assert.Equal(t, len(tc.wantVals), len(results))
-			assert.Equal(t, len(tc.wantErrs), len(errs))
+			assert.Equal(t, tc.wantErr, err)
 
-			for i, result := range results {
-				wantLastId, _ := tc.wantVals[i].LastInsertId()
-				lastId, _ := result.LastInsertId()
-				assert.Equal(t, wantLastId, lastId)
+			rowsAffectedExpect, err := tc.wantVal.RowsAffected()
+			require.NoError(t, err)
+			rowsAffected, err := result.RowsAffected()
+			require.NoError(t, err)
+			assert.Equal(t, rowsAffectedExpect, rowsAffected)
 
-				wantAffected, _ := tc.wantVals[i].RowsAffected()
-				affected, _ := result.RowsAffected()
-				assert.Equal(t, wantAffected, affected)
-			}
+			lastInsertIdExpected, err := tc.wantVal.LastInsertId()
+			require.NoError(t, err)
+			lastInsertId, err := result.LastInsertId()
+			require.NoError(t, err)
+			assert.Equal(t, lastInsertIdExpected, lastInsertId)
 
-			for i, errR := range errs {
-				assert.Equal(t, tc.wantErrs[i], errR)
-			}
 			if err = mock.ExpectationsWereMet(); err != nil {
 				t.Error(err)
 			}
@@ -159,7 +151,7 @@ func ExampleDeleter_Where() {
 	// Args: [12]
 }
 
-type Product struct {
+type TestProduct struct {
 	Id   int64
 	Sale float64
 	Size int64
