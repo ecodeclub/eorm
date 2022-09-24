@@ -58,7 +58,6 @@ func (u unsafeValue) SetColumns(rows *sql.Rows) error {
 	}
 
 	// TODO 性能优化
-	// colValues 和 colEleValues 实质上最终都指向同一个对象
 	colValues := make([]interface{}, len(cs))
 	for i, c := range cs {
 		cm, ok := u.meta.ColumnMap[c]
