@@ -17,7 +17,6 @@ package valuer
 import (
 	"database/sql"
 	"database/sql/driver"
-	"reflect"
 	"testing"
 	"time"
 
@@ -175,18 +174,6 @@ func testValueField(t *testing.T, creator Creator) {
 	}
 
 	invalidCases := []valueFieldTestCase{
-		{
-			// 不支持的字段类型
-			name:      "invalid type",
-			field:     "CreateTime",
-			wantError: errs.NewUnsupportedTypeError(reflect.TypeOf(time.Now())),
-		},
-		{
-			// 不支持的指针类型
-			name:      "invalid pointer type",
-			field:     "Name",
-			wantError: errs.NewUnsupportedTypeError(reflect.TypeOf((*string)(nil))),
-		},
 		{
 			// 不存在的字段
 			name:      "invalid field",
