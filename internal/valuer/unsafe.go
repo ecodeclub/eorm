@@ -43,77 +43,8 @@ func (u unsafeValue) Field(name string) (interface{}, error) {
 		return nil, errs.NewInvalidFieldError(name)
 	}
 	ptr := unsafe.Pointer(uintptr(u.addr) + fd.Offset)
-	if fd.IsHolderType {
-		val := reflect.NewAt(fd.Typ, ptr).Elem()
-		return val.Interface(), nil
-	}
-	switch fd.Typ.Kind() {
-	case reflect.Bool:
-		return *(*bool)(ptr), nil
-	case reflect.Int:
-		return *(*int)(ptr), nil
-	case reflect.Int8:
-		return *(*int8)(ptr), nil
-	case reflect.Int16:
-		return *(*int16)(ptr), nil
-	case reflect.Int32:
-		return *(*int32)(ptr), nil
-	case reflect.Int64:
-		return *(*int64)(ptr), nil
-	case reflect.Uint:
-		return *(*uint)(ptr), nil
-	case reflect.Uint8:
-		return *(*uint8)(ptr), nil
-	case reflect.Uint16:
-		return *(*uint16)(ptr), nil
-	case reflect.Uint32:
-		return *(*uint32)(ptr), nil
-	case reflect.Uint64:
-		return *(*uint64)(ptr), nil
-	case reflect.Float32:
-		return *(*float32)(ptr), nil
-	case reflect.Float64:
-		return *(*float64)(ptr), nil
-	case reflect.String:
-		return *(*string)(ptr), nil
-	case reflect.Slice:
-		// Array 只有一种可能，那就是 []byte
-		return *(*[]byte)(ptr), nil
-	case reflect.Pointer:
-		ele := fd.Typ.Elem()
-		switch ele.Kind() {
-		case reflect.Bool:
-			return *(**bool)(ptr), nil
-		case reflect.Int:
-			return *(**int)(ptr), nil
-		case reflect.Int8:
-			return *(**int8)(ptr), nil
-		case reflect.Int16:
-			return *(**int16)(ptr), nil
-		case reflect.Int32:
-			return *(**int32)(ptr), nil
-		case reflect.Int64:
-			return *(**int64)(ptr), nil
-		case reflect.Uint:
-			return *(**uint)(ptr), nil
-		case reflect.Uint8:
-			return *(**uint8)(ptr), nil
-		case reflect.Uint16:
-			return *(**uint16)(ptr), nil
-		case reflect.Uint32:
-			return *(**uint32)(ptr), nil
-		case reflect.Uint64:
-			return *(**uint64)(ptr), nil
-		case reflect.Float32:
-			return *(**float32)(ptr), nil
-		case reflect.Float64:
-			return *(**float64)(ptr), nil
-		default:
-			return nil, errs.NewUnsupportedTypeError(fd.Typ)
-		}
-	default:
-		return nil, errs.NewUnsupportedTypeError(fd.Typ)
-	}
+	val := reflect.NewAt(fd.Typ, ptr).Elem()
+	return val.Interface(), nil
 }
 
 func (u unsafeValue) SetColumns(rows *sql.Rows) error {
@@ -127,7 +58,6 @@ func (u unsafeValue) SetColumns(rows *sql.Rows) error {
 	}
 
 	// TODO 性能优化
-	// colValues 和 colEleValues 实质上最终都指向同一个对象
 	colValues := make([]interface{}, len(cs))
 	for i, c := range cs {
 		cm, ok := u.meta.ColumnMap[c]
