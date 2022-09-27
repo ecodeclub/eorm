@@ -152,14 +152,19 @@ func (t *tagMetaRegistry) parseFields(v reflect.Type, pOffset uintptr) ([]*Colum
 		}
 		// 判断是不是指针类型
 		if structField.Type.Kind() == reflect.Ptr {
-			return nil, nil, nil, errs.ErrDataIsPtr
+			if !structField.Type.AssignableTo(scannerType) || !structField.Type.AssignableTo(driverValuerType) {
+				return nil, nil, nil, errs.ErrDataIsPtr
+			}
 		}
 		// 检查列有没有冲突
 		if fieldMap[structField.Name] != nil {
 			return nil, nil, nil, errs.NewFieldConflictError(v.Name() + "." + structField.Name)
 		}
 		// 是组合
-		if structField.Anonymous && structField.Type.Kind() == reflect.Struct {
+		if structField.Anonymous {
+			if structField.Type.Kind() != reflect.Struct {
+				return nil, nil, nil, errs.ErrDataIsCombination
+			}
 			// 递归解析
 			o := structField.Offset + pOffset
 			subColumns, _, _, err := t.parseFields(structField.Type, o)

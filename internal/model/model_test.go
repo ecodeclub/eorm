@@ -15,6 +15,7 @@
 package model
 
 import (
+	"database/sql"
 	"fmt"
 	"reflect"
 	"testing"
@@ -24,7 +25,6 @@ import (
 )
 
 func TestTagMetaRegistry(t *testing.T) {
-
 	testCases := []struct {
 		name     string
 		wantMeta *TableMeta
@@ -591,402 +591,24 @@ func TestTagMetaRegistry(t *testing.T) {
 
 // cpu: Intel(R) Core(TM) i7-6700HQ CPU @ 2.60GHz
 // BenchmarkNewMetaRegistry
-// BenchmarkNewMetaRegistry-8   	    6144	    182975 ns/op
+// BenchmarkNewMetaRegistry-8   	   38319	     30120 ns/op
 func BenchmarkNewMetaRegistry(b *testing.B) {
 	// 普通
 	for i := 0; i < b.N; i++ {
 		registry := &tagMetaRegistry{}
-		meta, _ := registry.Register(&TestModel{})
-		wantMeta := &TableMeta{
-			TableName: "test_model",
-			Columns: []*ColumnMeta{
-				{
-					ColumnName:      "id",
-					FieldName:       "Id",
-					Typ:             reflect.TypeOf(int64(0)),
-					IsPrimaryKey:    true,
-					IsAutoIncrement: true,
-					Ancestors:       []string{"TestModel"},
-				},
-				{
-					ColumnName: "first_name",
-					FieldName:  "FirstName",
-					Typ:        reflect.TypeOf(""),
-					Offset:     8,
-					Ancestors:  []string{"TestModel"},
-				},
-				{
-					ColumnName: "age",
-					FieldName:  "Age",
-					Typ:        reflect.TypeOf(int8(0)),
-					Offset:     24,
-					Ancestors:  []string{"TestModel"},
-				},
-				{
-					ColumnName: "last_name",
-					FieldName:  "LastName",
-					Typ:        reflect.TypeOf(""),
-					Offset:     32,
-					Ancestors:  []string{"TestModel"},
-				},
-			},
-			FieldMap: map[string]*ColumnMeta{
-				"Id": {
-					ColumnName:      "id",
-					FieldName:       "Id",
-					Typ:             reflect.TypeOf(int64(0)),
-					IsPrimaryKey:    true,
-					IsAutoIncrement: true,
-					Ancestors:       []string{"TestModel"},
-				},
-				"FirstName": {
-					ColumnName: "first_name",
-					FieldName:  "FirstName",
-					Typ:        reflect.TypeOf(""),
-					Offset:     8,
-					Ancestors:  []string{"TestModel"},
-				},
-				"Age": {
-					ColumnName: "age",
-					FieldName:  "Age",
-					Typ:        reflect.TypeOf(int8(0)),
-					Offset:     24,
-					Ancestors:  []string{"TestModel"},
-				},
-				"LastName": {
-					ColumnName: "last_name",
-					FieldName:  "LastName",
-					Typ:        reflect.TypeOf(""),
-					Offset:     32,
-					Ancestors:  []string{"TestModel"},
-				},
-			},
-			ColumnMap: map[string]*ColumnMeta{
-				"id": {
-					ColumnName:      "id",
-					FieldName:       "Id",
-					Typ:             reflect.TypeOf(int64(0)),
-					IsPrimaryKey:    true,
-					IsAutoIncrement: true,
-					Ancestors:       []string{"TestModel"},
-				},
-				"first_name": {
-					ColumnName: "first_name",
-					FieldName:  "FirstName",
-					Typ:        reflect.TypeOf(""),
-					Offset:     8,
-					Ancestors:  []string{"TestModel"},
-				},
-				"age": {
-					ColumnName: "age",
-					FieldName:  "Age",
-					Typ:        reflect.TypeOf(int8(0)),
-					Offset:     24,
-					Ancestors:  []string{"TestModel"},
-				},
-				"last_name": {
-					ColumnName: "last_name",
-					FieldName:  "LastName",
-					Typ:        reflect.TypeOf(""),
-					Offset:     32,
-					Ancestors:  []string{"TestModel"},
-				},
-			},
-			Typ: reflect.TypeOf(&TestModel{}),
-		}
-		assert.Equal(b, wantMeta, meta)
+		_, _ = registry.Register(&TestModel{})
 	}
 
 	// 组合
 	for i := 0; i < b.N; i++ {
 		registry := &tagMetaRegistry{}
-		meta, _ := registry.Register(&UserModel{})
-		wantMeta := &TableMeta{
-			Columns: []*ColumnMeta{
-				{
-					ColumnName: "bio",
-					FieldName:  "Bio",
-					Typ:        reflect.TypeOf(""),
-					Offset:     0,
-					Ancestors:  []string{"UserModel"},
-				},
-				{
-					ColumnName:      "id",
-					FieldName:       "Id",
-					Typ:             reflect.TypeOf(int64(0)),
-					IsPrimaryKey:    true,
-					IsAutoIncrement: true,
-					Ancestors:       []string{"TestModel"},
-				},
-				{
-					ColumnName: "first_name",
-					FieldName:  "FirstName",
-					Typ:        reflect.TypeOf(""),
-					Offset:     8,
-					Ancestors:  []string{"TestModel"},
-				},
-				{
-					ColumnName: "age",
-					FieldName:  "Age",
-					Typ:        reflect.TypeOf(int8(0)),
-					Offset:     24,
-					Ancestors:  []string{"TestModel"},
-				},
-				{
-					ColumnName: "last_name",
-					FieldName:  "LastName",
-					Typ:        reflect.TypeOf(""),
-					Offset:     32,
-					Ancestors:  []string{"TestModel"},
-				},
-			},
-			Typ: reflect.TypeOf(&UserModel{}),
-			FieldMap: map[string]*ColumnMeta{
-				"Bio": {
-					ColumnName: "bio",
-					FieldName:  "Bio",
-					Typ:        reflect.TypeOf(""),
-					Offset:     0,
-					Ancestors:  []string{"UserModel"},
-				},
-				"Id": {
-					ColumnName:      "id",
-					FieldName:       "Id",
-					Typ:             reflect.TypeOf(int64(0)),
-					IsPrimaryKey:    true,
-					IsAutoIncrement: true,
-					Ancestors:       []string{"TestModel"},
-				},
-				"FirstName": {
-					ColumnName: "first_name",
-					FieldName:  "FirstName",
-					Typ:        reflect.TypeOf(""),
-					Offset:     8,
-					Ancestors:  []string{"TestModel"},
-				},
-				"Age": {
-					ColumnName: "age",
-					FieldName:  "Age",
-					Typ:        reflect.TypeOf(int8(0)),
-					Offset:     24,
-					Ancestors:  []string{"TestModel"},
-				},
-				"LastName": {
-					ColumnName: "last_name",
-					FieldName:  "LastName",
-					Typ:        reflect.TypeOf(""),
-					Offset:     32,
-					Ancestors:  []string{"TestModel"},
-				},
-			},
-			TableName: "user_model",
-			ColumnMap: map[string]*ColumnMeta{
-				"bio": {
-					ColumnName: "bio",
-					FieldName:  "Bio",
-					Typ:        reflect.TypeOf(""),
-					Offset:     0,
-					Ancestors:  []string{"UserModel"},
-				},
-				"id": {
-					ColumnName:      "id",
-					FieldName:       "Id",
-					Typ:             reflect.TypeOf(int64(0)),
-					IsPrimaryKey:    true,
-					IsAutoIncrement: true,
-					Ancestors:       []string{"TestModel"},
-				},
-				"first_name": {
-					ColumnName: "first_name",
-					FieldName:  "FirstName",
-					Typ:        reflect.TypeOf(""),
-					Offset:     8,
-					Ancestors:  []string{"TestModel"},
-				},
-				"age": {
-					ColumnName: "age",
-					FieldName:  "Age",
-					Typ:        reflect.TypeOf(int8(0)),
-					Offset:     24,
-					Ancestors:  []string{"TestModel"},
-				},
-				"last_name": {
-					ColumnName: "last_name",
-					FieldName:  "LastName",
-					Typ:        reflect.TypeOf(""),
-					Offset:     32,
-					Ancestors:  []string{"TestModel"},
-				},
-			},
-		}
-		assert.Equal(b, wantMeta, meta)
+		_, _ = registry.Register(&UserModel{})
 	}
 
 	// 嵌套组合
 	for i := 0; i < b.N; i++ {
 		registry := &tagMetaRegistry{}
-		meta, _ := registry.Register(&ProfileModel{})
-		wantMeta := &TableMeta{
-			Columns: []*ColumnMeta{
-				{
-					ColumnName: "email",
-					FieldName:  "Email",
-					Typ:        reflect.TypeOf(""),
-					Offset:     0,
-					Ancestors:  []string{"ProfileModel"},
-				},
-				{
-					ColumnName: "password",
-					FieldName:  "Password",
-					Typ:        reflect.TypeOf(""),
-					Offset:     16,
-					Ancestors:  []string{"ProfileModel"},
-				},
-				{
-					ColumnName: "bio",
-					FieldName:  "Bio",
-					Typ:        reflect.TypeOf(""),
-					Offset:     0,
-					Ancestors:  []string{"UserModel"},
-				},
-				{
-					ColumnName:      "id",
-					FieldName:       "Id",
-					Typ:             reflect.TypeOf(int64(0)),
-					IsPrimaryKey:    true,
-					IsAutoIncrement: true,
-					Ancestors:       []string{"TestModel"},
-				},
-				{
-					ColumnName: "first_name",
-					FieldName:  "FirstName",
-					Typ:        reflect.TypeOf(""),
-					Offset:     8,
-					Ancestors:  []string{"TestModel"},
-				},
-				{
-					ColumnName: "age",
-					FieldName:  "Age",
-					Typ:        reflect.TypeOf(int8(0)),
-					Offset:     24,
-					Ancestors:  []string{"TestModel"},
-				},
-				{
-					ColumnName: "last_name",
-					FieldName:  "LastName",
-					Typ:        reflect.TypeOf(""),
-					Offset:     32,
-					Ancestors:  []string{"TestModel"},
-				},
-			},
-			Typ: reflect.TypeOf(&ProfileModel{}),
-			FieldMap: map[string]*ColumnMeta{
-				"Email": {
-					ColumnName: "email",
-					FieldName:  "Email",
-					Typ:        reflect.TypeOf(""),
-					Offset:     0,
-					Ancestors:  []string{"ProfileModel"},
-				},
-				"Password": {
-					ColumnName: "password",
-					FieldName:  "Password",
-					Typ:        reflect.TypeOf(""),
-					Offset:     16,
-					Ancestors:  []string{"ProfileModel"},
-				},
-				"Bio": {
-					ColumnName: "bio",
-					FieldName:  "Bio",
-					Typ:        reflect.TypeOf(""),
-					Offset:     0,
-					Ancestors:  []string{"UserModel"},
-				},
-				"Id": {
-					ColumnName:      "id",
-					FieldName:       "Id",
-					Typ:             reflect.TypeOf(int64(0)),
-					IsPrimaryKey:    true,
-					IsAutoIncrement: true,
-					Ancestors:       []string{"TestModel"},
-				},
-				"FirstName": {
-					ColumnName: "first_name",
-					FieldName:  "FirstName",
-					Typ:        reflect.TypeOf(""),
-					Offset:     8,
-					Ancestors:  []string{"TestModel"},
-				},
-				"Age": {
-					ColumnName: "age",
-					FieldName:  "Age",
-					Typ:        reflect.TypeOf(int8(0)),
-					Offset:     24,
-					Ancestors:  []string{"TestModel"},
-				},
-				"LastName": {
-					ColumnName: "last_name",
-					FieldName:  "LastName",
-					Typ:        reflect.TypeOf(""),
-					Offset:     32,
-					Ancestors:  []string{"TestModel"},
-				},
-			},
-			TableName: "profile_model",
-			ColumnMap: map[string]*ColumnMeta{
-				"email": {
-					ColumnName: "email",
-					FieldName:  "Email",
-					Typ:        reflect.TypeOf(""),
-					Offset:     0,
-					Ancestors:  []string{"ProfileModel"},
-				},
-				"password": {
-					ColumnName: "password",
-					FieldName:  "Password",
-					Typ:        reflect.TypeOf(""),
-					Offset:     16,
-					Ancestors:  []string{"ProfileModel"},
-				},
-				"bio": {
-					ColumnName: "bio",
-					FieldName:  "Bio",
-					Typ:        reflect.TypeOf(""),
-					Offset:     0,
-					Ancestors:  []string{"UserModel"},
-				},
-				"id": {
-					ColumnName:      "id",
-					FieldName:       "Id",
-					Typ:             reflect.TypeOf(int64(0)),
-					IsPrimaryKey:    true,
-					IsAutoIncrement: true,
-					Ancestors:       []string{"TestModel"},
-				},
-				"first_name": {
-					ColumnName: "first_name",
-					FieldName:  "FirstName",
-					Typ:        reflect.TypeOf(""),
-					Offset:     8,
-					Ancestors:  []string{"TestModel"},
-				},
-				"age": {
-					ColumnName: "age",
-					FieldName:  "Age",
-					Typ:        reflect.TypeOf(int8(0)),
-					Offset:     24,
-					Ancestors:  []string{"TestModel"},
-				},
-				"last_name": {
-					ColumnName: "last_name",
-					FieldName:  "LastName",
-					Typ:        reflect.TypeOf(""),
-					Offset:     32,
-					Ancestors:  []string{"TestModel"},
-				},
-			},
-		}
-		assert.Equal(b, wantMeta, meta)
+		_, _ = registry.Register(&ProfileModel{})
 	}
 }
 
@@ -1127,4 +749,8 @@ type TestIgnoreModel struct {
 	FirstName string
 	Age       int8 `eorm:"-"`
 	LastName  string
+}
+
+type TestSqlModel struct {
+	NickName *sql.NullString
 }

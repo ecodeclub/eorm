@@ -29,6 +29,9 @@ var (
 
 	// ErrDataIsPtr 数据是指针
 	ErrDataIsPtr = errors.New("eorm: 数据是指针")
+
+	// ErrDataIsCombination 不支持的组合类型，eorm 只支持结构体组合
+	ErrDataIsCombination = errors.New("eorm: 不支持的组合类型，eorm 只支持结构体组合")
 )
 
 // NewFieldConflictError 列冲突的错误
