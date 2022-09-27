@@ -97,7 +97,7 @@ func ExampleOpen() {
 func ExampleDB_Delete() {
 	db := memoryDB()
 	tm := &TestModel{}
-	query, _ := db.Delete().From(tm).Build()
+	query, _ := NewDeleter[TestModel](db).From(tm).Build()
 	fmt.Printf("SQL: %s", query.SQL)
 	// Output:
 	// SQL: DELETE FROM `test_model`;

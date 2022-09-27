@@ -18,12 +18,14 @@ package integration
 
 import (
 	"context"
+	"testing"
+
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/gotomicro/eorm"
 	"github.com/gotomicro/eorm/internal/test"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"testing"
 )
 
 type DeleteTestSuite struct {
@@ -69,11 +71,9 @@ func (i *DeleteTestSuite) TestDeleter() {
 	for _, tc := range testCases {
 		i.T().Run(tc.name, func(t *testing.T) {
 			res, err := tc.i.Exec(context.Background())
-			assert.Equal(t, tc.wantErr, err)
-			if err != nil {
-				return
-			}
+			require.Equal(t, tc.wantErr, err)
 			affected, err := res.RowsAffected()
+			require.NotNil(t, err)
 			assert.Equal(t, tc.rowsAffected, affected)
 		})
 	}

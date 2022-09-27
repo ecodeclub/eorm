@@ -19,9 +19,11 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"reflect"
+	"testing"
+
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/stretchr/testify/require"
-	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -30,12 +32,12 @@ func TestDeleter_Build(t *testing.T) {
 	testCases := []CommonTestCase{
 		{
 			name:    "no where",
-			builder: memoryDB().Delete().From(&TestModel{}),
+			builder: NewDeleter[TestModel](memoryDB()).From(&TestModel{}),
 			wantSql: "DELETE FROM `test_model`;",
 		},
 		{
 			name:     "where",
-			builder:  memoryDB().Delete().From(&TestModel{}).Where(C("Id").EQ(16)),
+			builder:  NewDeleter[TestModel](memoryDB()).Where(C("Id").EQ(16)),
 			wantSql:  "DELETE FROM `test_model` WHERE `id`=?;",
 			wantArgs: []interface{}{16},
 		},
@@ -57,18 +59,18 @@ func TestDeleter_Exec(t *testing.T) {
 	testCases := []struct {
 		name      string
 		mockOrder func(mock sqlmock.Sqlmock)
-		dbOrder   func(*DB, *testing.T) (sql.Result, error)
+		delete    func(*DB, *testing.T) (sql.Result, error)
 		wantErr   error
 		wantVal   sql.Result
 	}{
 		{
 			name: "直接删除",
 			mockOrder: func(mock sqlmock.Sqlmock) {
-				mock.ExpectExec("DELETE FROM `test_product` WHERE `id`=").WithArgs(1).WillReturnResult(sqlmock.NewResult(100, 1000))
+				mock.ExpectExec("DELETE FROM `test_model` WHERE `id`=").WithArgs(1).WillReturnResult(sqlmock.NewResult(100, 1000))
 			},
-			dbOrder: func(db *DB, t *testing.T) (sql.Result, error) {
-				deleter := NewDeleter[TestProduct](db)
-				result, err := deleter.From(&TestProduct{}).Where(C("Id").EQ(1)).Exec(context.Background())
+			delete: func(db *DB, t *testing.T) (sql.Result, error) {
+				deleter := NewDeleter[TestModel](db)
+				result, err := deleter.From(&TestModel{}).Where(C("Id").EQ(1)).Exec(context.Background())
 				return result, err
 			},
 			wantErr: nil,
@@ -78,15 +80,15 @@ func TestDeleter_Exec(t *testing.T) {
 			name: "事务删除",
 			mockOrder: func(mock sqlmock.Sqlmock) {
 				mock.ExpectBegin()
-				mock.ExpectExec("DELETE FROM `test_product` WHERE `id`=").WithArgs(1).WillReturnResult(sqlmock.NewResult(10, 20))
+				mock.ExpectExec("DELETE FROM `test_model` WHERE `id`=").WithArgs(1).WillReturnResult(sqlmock.NewResult(10, 20))
 				mock.ExpectCommit().WillReturnError(errors.New("commit 错误"))
 			},
-			dbOrder: func(db *DB, t *testing.T) (sql.Result, error) {
+			delete: func(db *DB, t *testing.T) (sql.Result, error) {
 				tx, err := db.BeginTx(context.Background(), &sql.TxOptions{})
 				require.NoError(t, err)
 
-				deleter := NewDeleter[TestProduct](db)
-				result, err := deleter.From(&TestProduct{}).Where(C("Id").EQ(1)).Exec(context.Background())
+				deleter := NewDeleter[TestModel](db)
+				result, err := deleter.From(&TestModel{}).Where(C("Id").EQ(1)).Exec(context.Background())
 				require.NoError(t, err)
 
 				err = tx.Commit()
@@ -109,21 +111,10 @@ func TestDeleter_Exec(t *testing.T) {
 				t.Fatal(err)
 			}
 			tc.mockOrder(mock)
-			result, err := tc.dbOrder(db, t)
+			result, err := tc.delete(db, t)
 
 			assert.Equal(t, tc.wantErr, err)
-
-			rowsAffectedExpect, err := tc.wantVal.RowsAffected()
-			require.NoError(t, err)
-			rowsAffected, err := result.RowsAffected()
-			require.NoError(t, err)
-			assert.Equal(t, rowsAffectedExpect, rowsAffected)
-
-			lastInsertIdExpected, err := tc.wantVal.LastInsertId()
-			require.NoError(t, err)
-			lastInsertId, err := result.LastInsertId()
-			require.NoError(t, err)
-			assert.Equal(t, lastInsertIdExpected, lastInsertId)
+			assert.Same(t, reflect.ValueOf(tc.wantVal), reflect.ValueOf(result).Field(1).Elem())
 
 			if err = mock.ExpectationsWereMet(); err != nil {
 				t.Error(err)
@@ -133,29 +124,23 @@ func TestDeleter_Exec(t *testing.T) {
 }
 
 func ExampleDeleter_Build() {
-	query, _ := memoryDB().Delete().From(&TestModel{}).Build()
+	query, _ := NewDeleter[TestModel](memoryDB()).From(&TestModel{}).Build()
 	fmt.Printf("SQL: %s", query.SQL)
 	// Output:
 	// SQL: DELETE FROM `test_model`;
 }
 
 func ExampleDeleter_From() {
-	query, _ := memoryDB().Delete().From(&TestModel{}).Build()
+	query, _ := NewDeleter[TestModel](memoryDB()).From(&TestModel{}).Build()
 	fmt.Printf("SQL: %s", query.SQL)
 	// Output:
 	// SQL: DELETE FROM `test_model`;
 }
 
 func ExampleDeleter_Where() {
-	query, _ := memoryDB().Delete().From(&TestModel{}).Where(C("Id").EQ(12)).Build()
+	query, _ := NewDeleter[TestModel](memoryDB()).Where(C("Id").EQ(12)).Build()
 	fmt.Printf("SQL: %s\nArgs: %v", query.SQL, query.Args)
 	// Output:
 	// SQL: DELETE FROM `test_model` WHERE `id`=?;
 	// Args: [12]
-}
-
-type TestProduct struct {
-	Id   int64
-	Sale float64
-	Size int64
 }

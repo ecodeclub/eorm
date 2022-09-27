@@ -17,6 +17,7 @@ package eorm
 import (
 	"context"
 	"database/sql"
+
 	"github.com/valyala/bytebufferpool"
 )
 
@@ -43,6 +44,9 @@ func NewDeleter[T any](sess session) *Deleter[T] {
 func (d *Deleter[T]) Build() (*Query, error) {
 	_, _ = d.buffer.WriteString("DELETE FROM ")
 	var err error
+	if d.table == nil {
+		d.table = new(T)
+	}
 	d.meta, err = d.metaRegistry.Get(d.table)
 	if err != nil {
 		return nil, err
