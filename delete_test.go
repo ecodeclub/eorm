@@ -19,7 +19,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"reflect"
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
@@ -114,7 +113,18 @@ func TestDeleter_Exec(t *testing.T) {
 			result, err := tc.delete(db, t)
 
 			assert.Equal(t, tc.wantErr, err)
-			assert.Same(t, reflect.ValueOf(tc.wantVal), reflect.ValueOf(result).Field(1).Elem())
+
+			rowsAffectedExpect, err := tc.wantVal.RowsAffected()
+			require.NoError(t, err)
+			rowsAffected, err := result.RowsAffected()
+			require.NoError(t, err)
+			assert.Equal(t, rowsAffectedExpect, rowsAffected)
+
+			lastInsertIdExpected, err := tc.wantVal.LastInsertId()
+			require.NoError(t, err)
+			lastInsertId, err := result.LastInsertId()
+			require.NoError(t, err)
+			assert.Equal(t, lastInsertIdExpected, lastInsertId)
 
 			if err = mock.ExpectationsWereMet(); err != nil {
 				t.Error(err)

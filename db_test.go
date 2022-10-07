@@ -94,7 +94,7 @@ func ExampleOpen() {
 	// case1 dialect: SQLite
 }
 
-func ExampleDB_Delete() {
+func ExampleNewDeleter() {
 	db := memoryDB()
 	tm := &TestModel{}
 	query, _ := NewDeleter[TestModel](db).From(tm).Build()
