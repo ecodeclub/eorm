@@ -82,16 +82,6 @@ func (db *DB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) {
 	return &Tx{tx: tx, db: db}, nil
 }
 
-// Delete 开始构建一个 DELETE 查询
-func (db *DB) Delete() *Deleter {
-	return &Deleter{
-		builder: builder{
-			core:   db.core,
-			buffer: bytebufferpool.Get(),
-		},
-	}
-}
-
 // Update 开始构建一个 UPDATE 查询
 func (db *DB) Update(table interface{}) *Updater {
 	return &Updater{
