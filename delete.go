@@ -14,6 +14,8 @@
 
 package eorm
 
+import "github.com/valyala/bytebufferpool"
+
 // Deleter builds DELETE query
 type Deleter struct {
 	builder
@@ -23,6 +25,7 @@ type Deleter struct {
 
 // Build returns DELETE query
 func (d *Deleter) Build() (*Query, error) {
+	defer bytebufferpool.Put(d.buffer)
 	_, _ = d.buffer.WriteString("DELETE FROM ")
 	var err error
 	d.meta, err = d.metaRegistry.Get(d.table)

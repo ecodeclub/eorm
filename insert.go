@@ -49,6 +49,7 @@ func NewInserter[T any](sess session) *Inserter[T] {
 // - All the values from function Values should have the same type.
 // - It will insert all columns including auto-increment primary key
 func (i *Inserter[T]) Build() (*Query, error) {
+	defer bytebufferpool.Put(i.buffer)
 	var err error
 	if len(i.values) == 0 {
 		return &Query{}, errors.New("插入0行")
