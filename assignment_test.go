@@ -49,7 +49,7 @@ func ExampleAssign() {
 		},
 	}
 	for _, exp := range examples {
-		query, _ := db.Update(tm).Set(exp.assign).Build()
+		query, _ := NewUpdater[TestModel](db).Update(tm).Set(exp.assign).Build()
 		fmt.Printf(`
 Assignment: %s
 SQL: %s

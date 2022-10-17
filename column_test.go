@@ -45,7 +45,7 @@ Args: %v
 func ExampleColumn_Add() {
 	db := memoryDB()
 	tm := &TestModel{}
-	query, _ := db.Update(tm).Set(Assign("Age", C("Age").Add(1))).Build()
+	query, _ := NewUpdater[TestModel](db).Update(tm).Set(Assign("Age", C("Age").Add(1))).Build()
 	fmt.Printf(`
 SQL: %s
 Args: %v
@@ -123,7 +123,7 @@ Args: %v
 func ExampleColumn_Multi() {
 	db := memoryDB()
 	tm := &TestModel{}
-	query, _ := db.Update(tm).Set(Assign("Age", C("Age").Multi(2))).Build()
+	query, _ := NewUpdater[TestModel](db).Update(tm).Set(Assign("Age", C("Age").Multi(2))).Build()
 	fmt.Printf(`
 SQL: %s
 Args: %v

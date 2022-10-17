@@ -19,6 +19,7 @@ import "github.com/valyala/bytebufferpool"
 // Deleter builds DELETE query
 type Deleter struct {
 	builder
+	session
 	table interface{}
 	where []Predicate
 }

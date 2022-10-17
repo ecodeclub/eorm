@@ -15,6 +15,8 @@
 package eorm
 
 import (
+	"context"
+	"database/sql"
 	"fmt"
 	"reflect"
 
@@ -25,19 +27,40 @@ import (
 )
 
 // Updater is the builder responsible for building UPDATE query
-type Updater struct {
+type Updater[T any] struct {
 	builder
+	session
 	table   interface{}
 	val     valuer.Value
 	where   []Predicate
 	assigns []Assignable
 }
 
+// NewUpdater 开始构建一个 UPDATE 查询
+func NewUpdater[T any](sess session) *Updater[T] {
+	return &Updater[T]{
+		builder: builder{
+			core:   sess.getCore(),
+			buffer: bytebufferpool.Get(),
+		},
+		session: sess,
+	}
+}
+
+func (u *Updater[T]) Update(val *T) *Updater[T] {
+	u.table = val
+	return u
+}
+
 // Build returns UPDATE query
-func (u *Updater) Build() (*Query, error) {
+func (u *Updater[T]) Build() (*Query, error) {
 	defer bytebufferpool.Put(u.buffer)
 	var err error
-	u.meta, err = u.metaRegistry.Get(u.table)
+	t := new(T)
+	if u.table == nil {
+		u.table = t
+	}
+	u.meta, err = u.metaRegistry.Get(t)
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +95,7 @@ func (u *Updater) Build() (*Query, error) {
 	}, nil
 }
 
-func (u *Updater) buildAssigns() error {
+func (u *Updater[T]) buildAssigns() error {
 	has := false
 	for _, assign := range u.assigns {
 		if has {
@@ -119,7 +142,7 @@ func (u *Updater) buildAssigns() error {
 	return nil
 }
 
-func (u *Updater) buildDefaultColumns() error {
+func (u *Updater[T]) buildDefaultColumns() error {
 	has := false
 	for _, c := range u.meta.Columns {
 		val, _ := u.val.Field(c.FieldName)
@@ -138,13 +161,13 @@ func (u *Updater) buildDefaultColumns() error {
 }
 
 // Set represents SET clause
-func (u *Updater) Set(assigns ...Assignable) *Updater {
+func (u *Updater[T]) Set(assigns ...Assignable) *Updater[T] {
 	u.assigns = assigns
 	return u
 }
 
 // Where represents WHERE clause
-func (u *Updater) Where(predicates ...Predicate) *Updater {
+func (u *Updater[T]) Where(predicates ...Predicate) *Updater[T] {
 	u.where = predicates
 	return u
 }
@@ -182,4 +205,13 @@ func AssignColumns(entity interface{}, filter func(typ reflect.StructField, val 
 		}
 	}
 	return res
+}
+
+// Exec sql
+func (u *Updater[T]) Exec(ctx context.Context) (sql.Result, error) {
+	query, err := u.Build()
+	if err != nil {
+		return nil, err
+	}
+	return newQuerier[T](u.session, query).Exec(ctx)
 }

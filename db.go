@@ -89,17 +89,7 @@ func (db *DB) Delete() *Deleter {
 			core:   db.core,
 			buffer: bytebufferpool.Get(),
 		},
-	}
-}
-
-// Update 开始构建一个 UPDATE 查询
-func (db *DB) Update(table interface{}) *Updater {
-	return &Updater{
-		builder: builder{
-			core:   db.core,
-			buffer: bytebufferpool.Get(),
-		},
-		table: table,
+		session: db,
 	}
 }
 
