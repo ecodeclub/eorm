@@ -154,12 +154,6 @@ func (t *tagMetaRegistry) parseFields(v reflect.Type, fieldIndexes []int,
 			// skip the field.
 			continue
 		}
-		//// 不支持使用指针的组合
-		//if structField.Type.Kind() == reflect.Ptr {
-		//	if structField.Type.Kind() == reflect.Struct {
-		//		return errs.ErrCombinationIsPtr
-		//	}
-		//}
 		// 检查列有没有冲突
 		if fieldMap[structField.Name] != nil {
 			return errs.NewFieldConflictError(v.Name() + "." + structField.Name)

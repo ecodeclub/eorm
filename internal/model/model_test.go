@@ -801,16 +801,6 @@ func TestTagMetaRegistry_Combination(t *testing.T) {
 				return
 			}
 			assert.Equal(t, tc.wantMeta, meta)
-			//assert.Equal(t, tc.wantMeta.Columns, meta.Columns)
-			//assert.Equal(t, tc.wantMeta.FieldMap, meta.FieldMap)
-			//assert.Equal(t, tc.wantMeta.ColumnMap, meta.ColumnMap)
-			//assert.Equal(t, tc.wantMeta.Typ, meta.Typ)
-			//assert.Equal(t, tc.wantMeta.TableName, meta.TableName)
-			//for i := 0; i < len(meta.Columns); i++ {
-			//	assert.Equal(t, tc.wantMeta.Columns[i], meta.Columns[i])
-			//	//assert.Equal(t, tc.wantMeta.Columns[i].Typ, meta.Columns[i].Typ)
-			//	//assert.Equal(t, tc.wantMeta.Columns[i].Offset, meta.Columns[i].Offset)
-			//}
 		})
 	}
 }
