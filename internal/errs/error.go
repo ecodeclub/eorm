@@ -26,7 +26,14 @@ var (
 	// ErrTooManyColumns 过多列
 	// 一般是查询的列多于结构体的列
 	ErrTooManyColumns = errors.New("eorm: 过多列")
+
+	// ErrCombinationIsNotStruct 不支持的组合类型，eorm 只支持结构体组合
+	ErrCombinationIsNotStruct = errors.New("eorm: 不支持的组合类型，eorm 只支持结构体组合")
 )
+
+func NewFieldConflictError(field string) error {
+	return fmt.Errorf("eorm: `%s`列冲突", field)
+}
 
 // NewInvalidFieldError 返回代表未知字段的错误。
 // 通常来说，是字段名没写对

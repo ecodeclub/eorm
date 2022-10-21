@@ -21,6 +21,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/gotomicro/eorm/internal/errs"
+
 	// nolint
 	"unicode"
 )
@@ -102,10 +104,38 @@ func (t *tagMetaRegistry) Get(table interface{}) (*TableMeta, error) {
 func (t *tagMetaRegistry) Register(table interface{}, opts ...TableMetaOption) (*TableMeta, error) {
 	rtype := reflect.TypeOf(table)
 	v := rtype.Elem()
-	var columnMetas []*ColumnMeta
 	lens := v.NumField()
+	columnMetas := make([]*ColumnMeta, 0, lens)
 	fieldMap := make(map[string]*ColumnMeta, lens)
 	columnMap := make(map[string]*ColumnMeta, lens)
+	err := t.parseFields(v, []int{}, &columnMetas, fieldMap, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, columnMeta := range columnMetas {
+		columnMap[columnMeta.ColumnName] = columnMeta
+	}
+
+	tableMeta := &TableMeta{
+		Columns:   columnMetas,
+		TableName: underscoreName(v.Name()),
+		Typ:       rtype,
+		FieldMap:  fieldMap,
+		ColumnMap: columnMap,
+	}
+	for _, o := range opts {
+		o(tableMeta)
+	}
+	t.metas.Store(rtype, tableMeta)
+	return tableMeta, nil
+
+}
+
+func (t *tagMetaRegistry) parseFields(v reflect.Type, fieldIndexes []int,
+	columnMetas *[]*ColumnMeta, fieldMap map[string]*ColumnMeta,
+	pOffset uintptr) error {
+	lens := v.NumField()
 	for i := 0; i < lens; i++ {
 		structField := v.Field(i)
 		tag := structField.Tag.Get("eorm")
@@ -124,32 +154,45 @@ func (t *tagMetaRegistry) Register(table interface{}, opts ...TableMetaOption) (
 			// skip the field.
 			continue
 		}
+		//// 不支持使用指针的组合
+		//if structField.Type.Kind() == reflect.Ptr {
+		//	if structField.Type.Kind() == reflect.Struct {
+		//		return errs.ErrCombinationIsPtr
+		//	}
+		//}
+		// 检查列有没有冲突
+		if fieldMap[structField.Name] != nil {
+			return errs.NewFieldConflictError(v.Name() + "." + structField.Name)
+		}
+		// 是组合
+		if structField.Anonymous {
+			// 不支持使用指针的组合
+			if structField.Type.Kind() != reflect.Struct {
+				return errs.ErrCombinationIsNotStruct
+			}
+			// 递归解析
+			o := structField.Offset + pOffset
+			err := t.parseFields(structField.Type, append(fieldIndexes, i), columnMetas, fieldMap, o)
+			if err != nil {
+				return err
+			}
+			continue
+		}
+
 		columnMeta := &ColumnMeta{
 			ColumnName:      underscoreName(structField.Name),
 			FieldName:       structField.Name,
 			Typ:             structField.Type,
 			IsAutoIncrement: isAuto,
 			IsPrimaryKey:    isKey,
-			Offset:          structField.Offset,
+			Offset:          structField.Offset + pOffset,
 			IsHolderType:    structField.Type.AssignableTo(scannerType) && structField.Type.AssignableTo(driverValuerType),
-			FieldIndexes:    []int{i},
+			FieldIndexes:    append(fieldIndexes, i),
 		}
-		columnMetas = append(columnMetas, columnMeta)
+		*columnMetas = append(*columnMetas, columnMeta)
 		fieldMap[columnMeta.FieldName] = columnMeta
-		columnMap[columnMeta.ColumnName] = columnMeta
 	}
-	tableMeta := &TableMeta{
-		Columns:   columnMetas,
-		TableName: underscoreName(v.Name()),
-		Typ:       rtype,
-		FieldMap:  fieldMap,
-		ColumnMap: columnMap,
-	}
-	for _, o := range opts {
-		o(tableMeta)
-	}
-	t.metas.Store(rtype, tableMeta)
-	return tableMeta, nil
+	return nil
 }
 
 // IgnoreFieldsOption function provide an option to ignore some fields when register table.
