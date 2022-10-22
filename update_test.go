@@ -17,8 +17,11 @@ package eorm
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
+	"github.com/DATA-DOG/go-sqlmock"
 	err "github.com/gotomicro/eorm/internal/errs"
+	"github.com/stretchr/testify/require"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -34,10 +37,20 @@ func TestUpdater_Set(t *testing.T) {
 	orm := memoryDB()
 	testCases := []CommonTestCase{
 		{
-			name:     "no set",
+			name:     "no set and update",
 			builder:  NewUpdater[TestModel](orm),
 			wantSql:  "UPDATE `test_model` SET `id`=?,`first_name`=?,`age`=?,`last_name`=?;",
 			wantArgs: []interface{}{int64(0), "", int8(0), (*sql.NullString)(nil)},
+		},
+		{
+			name: "no set",
+			builder: NewUpdater[TestModel](orm).Update(&TestModel{
+				Id:        12,
+				FirstName: "Tom",
+				Age:       18,
+			}),
+			wantSql:  "UPDATE `test_model` SET `id`=?,`first_name`=?,`age`=?,`last_name`=?;",
+			wantArgs: []interface{}{int64(12), "Tom", int8(18), (*sql.NullString)(nil)},
 		},
 		{
 			name:     "set columns",
@@ -125,44 +138,84 @@ func TestUpdater_Set(t *testing.T) {
 }
 
 func TestUpdater_Exec(t *testing.T) {
+
 	tm := &TestModel{
 		Id:        12,
 		FirstName: "Tom",
 		Age:       18,
 		LastName:  &sql.NullString{String: "Jerry", Valid: true},
 	}
-	orm := memoryDB()
 	testCases := []struct {
-		name         string
-		u            *Updater[TestModel]
-		wantErr      string
-		wantAffected int64
+		name      string
+		u         *Updater[TestModel]
+		update    func(*DB, *testing.T) (sql.Result, error)
+		wantErr   error
+		mockOrder func(mock sqlmock.Sqlmock)
+		wantVal   sql.Result
 	}{
 		{
-			name:    "all columns",
-			u:       NewUpdater[TestModel](orm).Update(tm),
-			wantErr: "no such table: test_model",
+			name: "update err",
+			update: func(db *DB, t *testing.T) (sql.Result, error) {
+				updater := NewUpdater[TestModel](db).Set(Assign("Age", 12))
+				result, err := updater.Exec(context.Background())
+				return result, err
+			},
+			mockOrder: func(mock sqlmock.Sqlmock) {
+				mock.ExpectExec("UPDATE `test_model` SET `age`=").
+					WithArgs(int64(12)).
+					WillReturnError(errors.New("no such table: test_model"))
+			},
+			wantErr: errors.New("no such table: test_model"),
 		},
 		{
-			name:    "specify columns",
-			u:       NewUpdater[TestModel](orm).Update(tm).Set(Columns("FirstName", "Age")),
-			wantErr: "no such table: test_model",
+			name: "specify columns",
+			update: func(db *DB, t *testing.T) (sql.Result, error) {
+				updater := NewUpdater[TestModel](db).Update(tm).Set(Columns("FirstName"))
+				result, err := updater.Exec(context.Background())
+				return result, err
+			},
+			mockOrder: func(mock sqlmock.Sqlmock) {
+				mock.ExpectExec("UPDATE `test_model` SET `first_name`=").
+					WithArgs("Tom").WillReturnResult(sqlmock.NewResult(100, 1))
+			},
+			wantVal: sqlmock.NewResult(100, 1),
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			res, err := tc.u.Exec(context.Background())
-			if err != nil {
-				assert.EqualError(t, err, tc.wantErr)
-				return
-			}
-			assert.Nil(t, tc.wantErr)
-			affected, err := res.RowsAffected()
+			mockDB, mock, err := sqlmock.New()
 			if err != nil {
 				t.Fatal(err)
 			}
-			assert.Equal(t, tc.wantAffected, affected)
+			orm, err := openDB("mysql", mockDB)
+			defer func(db *DB) { _ = db.Close() }(orm)
+			if err != nil {
+				t.Fatal(err)
+			}
+			tc.mockOrder(mock)
+
+			res, err := tc.update(orm, t)
+			if err != nil {
+				assert.Equal(t, tc.wantErr, err)
+				return
+			}
+			assert.Nil(t, tc.wantErr)
+			rowsAffectedExpect, err := tc.wantVal.RowsAffected()
+			require.NoError(t, err)
+			rowsAffected, err := res.RowsAffected()
+			require.NoError(t, err)
+
+			lastInsertIdExpected, err := tc.wantVal.LastInsertId()
+			require.NoError(t, err)
+			lastInsertId, err := res.LastInsertId()
+			require.NoError(t, err)
+			assert.Equal(t, lastInsertIdExpected, lastInsertId)
+			assert.Equal(t, rowsAffectedExpect, rowsAffected)
+
+			if err = mock.ExpectationsWereMet(); err != nil {
+				t.Error(err)
+			}
 		})
 	}
 }

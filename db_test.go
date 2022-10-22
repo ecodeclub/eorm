@@ -103,7 +103,7 @@ func ExampleNewDeleter() {
 	// SQL: DELETE FROM `test_model`;
 }
 
-func ExampleDB_Update() {
+func ExampleNewUpdater() {
 	db := memoryDB()
 	tm := &TestModel{
 		Age: 18,

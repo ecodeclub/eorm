@@ -11,7 +11,7 @@ setup:
 lint:
 	golangci-lint run
 
-.PHONY:	fmt
+.PHONY: fmt
 fmt:
 	@goimports -l -w .
 

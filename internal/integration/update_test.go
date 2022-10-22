@@ -18,69 +18,62 @@ package integration
 
 import (
 	"context"
-	"testing"
-
-	_ "github.com/go-sql-driver/mysql"
 	"github.com/gotomicro/eorm"
 	"github.com/gotomicro/eorm/internal/test"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"testing"
 )
 
-type DeleteTestSuite struct {
+type UpdateTestSuite struct {
 	Suite
 }
 
-func (s *DeleteTestSuite) SetupSuite() {
-	s.Suite.SetupSuite()
+func (u *UpdateTestSuite) SetupSuite() {
+	u.Suite.SetupSuite()
 	data1 := test.NewSimpleStruct(1)
-	data2 := test.NewSimpleStruct(2)
-	data3 := test.NewSimpleStruct(3)
-	_, err := eorm.NewInserter[test.SimpleStruct](s.orm).Values(data1, data2, data3).Exec(context.Background())
+	_, err := eorm.NewInserter[test.SimpleStruct](u.orm).Values(data1).Exec(context.Background())
 	if err != nil {
-		s.T().Fatal(err)
+		u.T().Fatal(err)
 	}
 }
 
-func (i *DeleteTestSuite) TearDownTest() {
-	_, err := eorm.RawQuery[any](i.orm, "DELETE FROM `simple_struct`").Exec(context.Background())
+func (u *UpdateTestSuite) TearDownTest() {
+	_, err := eorm.RawQuery[any](u.orm, "DELETE FROM `simple_struct`").Exec(context.Background())
 	if err != nil {
-		i.T().Fatal(err)
+		u.T().Fatal(err)
 	}
 }
 
-func (i *DeleteTestSuite) TestDeleter() {
+func (u *UpdateTestSuite) TestUpdate() {
 	testCases := []struct {
 		name         string
-		i            *eorm.Deleter[test.SimpleStruct]
+		u            *eorm.Updater[test.SimpleStruct]
 		rowsAffected int64
 		wantErr      error
 	}{
 		{
-			name:         "id only",
-			i:            eorm.NewDeleter[test.SimpleStruct](i.orm).From(&test.SimpleStruct{}).Where(eorm.C("Id").EQ("1")),
+			name: "update columns",
+			u: eorm.NewUpdater[test.SimpleStruct](u.orm).Update(&test.SimpleStruct{Int: 18}).
+				Set(eorm.Columns("Int")).Where(eorm.C("Id").EQ(1)),
 			rowsAffected: 1,
-		},
-		{
-			name:         "delete all",
-			i:            eorm.NewDeleter[test.SimpleStruct](i.orm).From(&test.SimpleStruct{}),
-			rowsAffected: 2,
 		},
 	}
 	for _, tc := range testCases {
-		i.T().Run(tc.name, func(t *testing.T) {
-			res, err := tc.i.Exec(context.Background())
-			require.Equal(t, tc.wantErr, err)
+		u.T().Run(tc.name, func(t *testing.T) {
+			res, err := tc.u.Exec(context.Background())
+			assert.Equal(t, tc.wantErr, err)
+			if err != nil {
+				return
+			}
 			affected, err := res.RowsAffected()
-			require.Nil(t, err)
 			assert.Equal(t, tc.rowsAffected, affected)
 		})
 	}
 }
 
-func TestMySQL8tDelete(t *testing.T) {
-	suite.Run(t, &DeleteTestSuite{
+func TestMySQL8Update(t *testing.T) {
+	suite.Run(t, &UpdateTestSuite{
 		Suite{
 			driver: "mysql",
 			dsn:    "root:root@tcp(localhost:13306)/integration_test",
