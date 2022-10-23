@@ -18,11 +18,12 @@ package integration
 
 import (
 	"context"
+	"testing"
+
 	"github.com/gotomicro/eorm"
 	"github.com/gotomicro/eorm/internal/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
-	"testing"
 )
 
 type UpdateTestSuite struct {
