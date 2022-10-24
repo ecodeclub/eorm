@@ -19,6 +19,8 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/gotomicro/eorm/internal/errs"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -33,7 +35,7 @@ func TestTagMetaRegistry(t *testing.T) {
 		{
 			// 普通
 			name: "normal model",
-			wantMeta: &TableMeta{
+			wantMeta: tableMetaBuilder{
 				TableName: "test_model",
 				Columns: []*ColumnMeta{
 					{
@@ -66,71 +68,273 @@ func TestTagMetaRegistry(t *testing.T) {
 						FieldIndexes: []int{3},
 					},
 				},
-				FieldMap: map[string]*ColumnMeta{
-					"Id": {
-						ColumnName:      "id",
-						FieldName:       "Id",
-						Typ:             reflect.TypeOf(int64(0)),
-						IsPrimaryKey:    true,
-						IsAutoIncrement: true,
-						FieldIndexes:    []int{0},
-					},
-					"FirstName": {
-						ColumnName:   "first_name",
-						FieldName:    "FirstName",
-						Typ:          reflect.TypeOf(""),
-						Offset:       8,
-						FieldIndexes: []int{1},
-					},
-					"Age": {
-						ColumnName:   "age",
-						FieldName:    "Age",
-						Typ:          reflect.TypeOf(int8(0)),
-						Offset:       24,
-						FieldIndexes: []int{2},
-					},
-					"LastName": {
-						ColumnName:   "last_name",
-						FieldName:    "LastName",
-						Typ:          reflect.TypeOf((*string)(nil)),
-						Offset:       32,
-						FieldIndexes: []int{3},
-					},
-				},
-				ColumnMap: map[string]*ColumnMeta{
-					"id": {
-						ColumnName:      "id",
-						FieldName:       "Id",
-						Typ:             reflect.TypeOf(int64(0)),
-						IsPrimaryKey:    true,
-						IsAutoIncrement: true,
-						FieldIndexes:    []int{0},
-					},
-					"first_name": {
-						ColumnName:   "first_name",
-						FieldName:    "FirstName",
-						Typ:          reflect.TypeOf(""),
-						Offset:       8,
-						FieldIndexes: []int{1},
-					},
-					"age": {
-						ColumnName:   "age",
-						FieldName:    "Age",
-						Typ:          reflect.TypeOf(int8(0)),
-						Offset:       24,
-						FieldIndexes: []int{2},
-					},
-					"last_name": {
-						ColumnName:   "last_name",
-						FieldName:    "LastName",
-						Typ:          reflect.TypeOf((*string)(nil)),
-						Offset:       32,
-						FieldIndexes: []int{3},
-					},
-				},
 				Typ: reflect.TypeOf(&TestModel{}),
-			},
+			}.build(),
 			input: &TestModel{},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			registry := &tagMetaRegistry{}
+			meta, err := registry.Register(tc.input)
+			assert.Equal(t, tc.wantErr, err)
+			if err != nil {
+				return
+			}
+			assert.Equal(t, tc.wantMeta, meta)
+		})
+	}
+}
+func TestTagMetaRegistry_Combination(t *testing.T) {
+
+	testCases := []struct {
+		name     string
+		wantMeta *TableMeta
+		wantErr  error
+		input    interface{}
+	}{
+		// 普通组合
+		{
+			name: "普通组合",
+			wantMeta: tableMetaBuilder{
+				TableName: "test_combined_model",
+				Columns: []*ColumnMeta{
+					{
+						ColumnName:      "create_time",
+						FieldName:       "CreateTime",
+						Typ:             reflect.TypeOf(uint64(0)),
+						IsPrimaryKey:    false,
+						IsAutoIncrement: false,
+						Offset:          0,
+						FieldIndexes:    []int{0, 0},
+					}, {
+						ColumnName:      "update_time",
+						FieldName:       "UpdateTime",
+						Typ:             reflect.TypeOf(uint64(0)),
+						IsPrimaryKey:    false,
+						IsAutoIncrement: false,
+						Offset:          8,
+						FieldIndexes:    []int{0, 1},
+					},
+					{
+						ColumnName:      "id",
+						FieldName:       "Id",
+						Typ:             reflect.TypeOf(int64(0)),
+						IsPrimaryKey:    true,
+						IsAutoIncrement: true,
+						Offset:          16,
+						FieldIndexes:    []int{1},
+					},
+					{
+						ColumnName:   "first_name",
+						FieldName:    "FirstName",
+						Typ:          reflect.TypeOf(""),
+						Offset:       24,
+						FieldIndexes: []int{2},
+					},
+					{
+						ColumnName:   "age",
+						FieldName:    "Age",
+						Typ:          reflect.TypeOf(int8(0)),
+						Offset:       40,
+						FieldIndexes: []int{3},
+					},
+					{
+						ColumnName:   "last_name",
+						FieldName:    "LastName",
+						Typ:          reflect.TypeOf((*string)(nil)),
+						Offset:       48,
+						FieldIndexes: []int{4},
+					},
+				},
+				Typ: reflect.TypeOf(&TestCombinedModel{}),
+			}.build(),
+			input: &TestCombinedModel{},
+		},
+		// 指针组合
+		{
+			name:    "指针组合",
+			input:   &TestCombinedModelPtr{},
+			wantErr: errs.ErrCombinationIsNotStruct,
+		},
+		// 忽略组合
+		{
+			name: "忽略组合",
+			wantMeta: tableMetaBuilder{
+				TableName: "test_combined_model_ignore",
+				Columns: []*ColumnMeta{
+					{
+						ColumnName:      "id",
+						FieldName:       "Id",
+						Typ:             reflect.TypeOf(int64(0)),
+						IsPrimaryKey:    true,
+						IsAutoIncrement: true,
+						Offset:          16,
+						FieldIndexes:    []int{1},
+					},
+					{
+						ColumnName:   "first_name",
+						FieldName:    "FirstName",
+						Typ:          reflect.TypeOf(""),
+						Offset:       24,
+						FieldIndexes: []int{2},
+					},
+					{
+						ColumnName:   "age",
+						FieldName:    "Age",
+						Typ:          reflect.TypeOf(int8(0)),
+						Offset:       40,
+						FieldIndexes: []int{3},
+					},
+					{
+						ColumnName:   "last_name",
+						FieldName:    "LastName",
+						Typ:          reflect.TypeOf((*string)(nil)),
+						Offset:       48,
+						FieldIndexes: []int{4},
+					},
+				},
+				Typ: reflect.TypeOf(&TestCombinedModelIgnore{}),
+			}.build(),
+			input: &TestCombinedModelIgnore{},
+		},
+		// 多重组合
+		{
+			name: "多重组合",
+			wantMeta: tableMetaBuilder{
+				TableName: "test_combined_model_multi",
+				Columns: []*ColumnMeta{
+					{
+						ColumnName:      "create_time",
+						FieldName:       "CreateTime",
+						Typ:             reflect.TypeOf(uint64(0)),
+						IsPrimaryKey:    false,
+						IsAutoIncrement: false,
+						Offset:          0,
+						FieldIndexes:    []int{0, 0},
+					},
+					{
+						ColumnName:      "update_time",
+						FieldName:       "UpdateTime",
+						Typ:             reflect.TypeOf(uint64(0)),
+						IsPrimaryKey:    false,
+						IsAutoIncrement: false,
+						Offset:          8,
+						FieldIndexes:    []int{0, 1},
+					},
+					{
+						ColumnName:      "id",
+						FieldName:       "Id",
+						Typ:             reflect.TypeOf(int64(0)),
+						IsPrimaryKey:    true,
+						IsAutoIncrement: true,
+						Offset:          16,
+						FieldIndexes:    []int{1},
+					},
+					{
+						ColumnName:   "first_name",
+						FieldName:    "FirstName",
+						Typ:          reflect.TypeOf(""),
+						Offset:       24,
+						FieldIndexes: []int{2},
+					},
+					{
+						ColumnName:   "age",
+						FieldName:    "Age",
+						Typ:          reflect.TypeOf(int8(0)),
+						Offset:       40,
+						FieldIndexes: []int{3},
+					},
+					{
+						ColumnName:   "last_name",
+						FieldName:    "LastName",
+						Typ:          reflect.TypeOf((*string)(nil)),
+						Offset:       48,
+						FieldIndexes: []int{4},
+					},
+					{
+						ColumnName:   "phone",
+						FieldName:    "Phone",
+						Typ:          reflect.TypeOf(""),
+						Offset:       56,
+						FieldIndexes: []int{5, 0},
+					},
+					{
+						ColumnName:   "address",
+						FieldName:    "Address",
+						Typ:          reflect.TypeOf(""),
+						Offset:       72,
+						FieldIndexes: []int{5, 1},
+					},
+				},
+				Typ: reflect.TypeOf(&TestCombinedModelMulti{}),
+			}.build(),
+			input: &TestCombinedModelMulti{},
+		},
+		// 嵌套组合
+		{
+			name: "嵌套组合",
+			wantMeta: tableMetaBuilder{
+				TableName: "test_combined_model_nested",
+				Columns: []*ColumnMeta{
+					{
+						ColumnName:      "create_time",
+						FieldName:       "CreateTime",
+						Typ:             reflect.TypeOf(uint64(0)),
+						IsPrimaryKey:    false,
+						IsAutoIncrement: false,
+						Offset:          0,
+						FieldIndexes:    []int{0, 0, 0},
+					}, {
+						ColumnName:      "update_time",
+						FieldName:       "UpdateTime",
+						Typ:             reflect.TypeOf(uint64(0)),
+						IsPrimaryKey:    false,
+						IsAutoIncrement: false,
+						Offset:          8,
+						FieldIndexes:    []int{0, 0, 1},
+					},
+					{
+						ColumnName:      "id",
+						FieldName:       "Id",
+						Typ:             reflect.TypeOf(int64(0)),
+						IsPrimaryKey:    true,
+						IsAutoIncrement: true,
+						Offset:          16,
+						FieldIndexes:    []int{0, 1},
+					},
+					{
+						ColumnName:   "first_name",
+						FieldName:    "FirstName",
+						Typ:          reflect.TypeOf(""),
+						Offset:       24,
+						FieldIndexes: []int{0, 2},
+					},
+					{
+						ColumnName:   "age",
+						FieldName:    "Age",
+						Typ:          reflect.TypeOf(int8(0)),
+						Offset:       40,
+						FieldIndexes: []int{0, 3},
+					},
+					{
+						ColumnName:   "last_name",
+						FieldName:    "LastName",
+						Typ:          reflect.TypeOf((*string)(nil)),
+						Offset:       48,
+						FieldIndexes: []int{0, 4},
+					},
+				},
+				Typ: reflect.TypeOf(&TestCombinedModelNested{}),
+			}.build(),
+			input: &TestCombinedModelNested{},
+		},
+		// 组合字段冲突
+		{
+			name:    "组合字段冲突",
+			input:   &TestCombinedModelConflict{},
+			wantErr: errs.NewFieldConflictError("TestCombinedModelConflict.Id"),
 		},
 	}
 
@@ -234,7 +438,92 @@ case3：
 	// 	column names：last_name
 }
 
+type tableMetaBuilder struct {
+	TableName string
+	Columns   []*ColumnMeta
+	Typ       reflect.Type
+}
+
+func (t tableMetaBuilder) build() *TableMeta {
+	res := &TableMeta{
+		TableName: t.TableName,
+		Columns:   t.Columns,
+		Typ:       t.Typ,
+	}
+	n := len(t.Columns)
+	fieldMap := make(map[string]*ColumnMeta, n)
+	columnMap := make(map[string]*ColumnMeta, n)
+	for _, columnMeta := range t.Columns {
+		fieldMap[columnMeta.FieldName] = columnMeta
+		columnMap[columnMeta.ColumnName] = columnMeta
+	}
+	res.FieldMap = fieldMap
+	res.ColumnMap = columnMap
+	return res
+}
+
 type TestModel struct {
+	Id        int64 `eorm:"auto_increment,primary_key"`
+	FirstName string
+	Age       int8
+	LastName  *string
+}
+
+type BaseEntity struct {
+	CreateTime uint64
+	UpdateTime uint64
+}
+
+type BaseEntity2 struct {
+	Id         int64 `eorm:"auto_increment,primary_key"`
+	CreateTime uint64
+	UpdateTime uint64
+}
+
+type Contact struct {
+	Phone   string
+	Address string
+}
+
+type TestCombinedModel struct {
+	BaseEntity
+	Id        int64 `eorm:"auto_increment,primary_key"`
+	FirstName string
+	Age       int8
+	LastName  *string
+}
+
+type TestCombinedModelPtr struct {
+	*BaseEntity
+	Id        int64 `eorm:"auto_increment,primary_key"`
+	FirstName string
+	Age       int8
+	LastName  *string
+}
+
+type TestCombinedModelIgnore struct {
+	BaseEntity `eorm:"-"`
+	Id         int64 `eorm:"auto_increment,primary_key"`
+	FirstName  string
+	Age        int8
+	LastName   *string
+}
+
+type TestCombinedModelMulti struct {
+	BaseEntity
+	Id        int64 `eorm:"auto_increment,primary_key"`
+	FirstName string
+	Age       int8
+	LastName  *string
+	Contact
+}
+
+type TestCombinedModelNested struct {
+	TestCombinedModel
+}
+
+type TestCombinedModelConflict struct {
+	BaseEntity2
 	Id        int64 `eorm:"auto_increment,primary_key"`
 	FirstName string
 	Age       int8
