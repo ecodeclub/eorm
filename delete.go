@@ -16,6 +16,7 @@ package eorm
 
 import (
 	"context"
+
 	"github.com/valyala/bytebufferpool"
 )
 

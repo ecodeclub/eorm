@@ -18,10 +18,11 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"testing"
+
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestResult_res(t *testing.T) {
@@ -89,6 +90,9 @@ func TestResult_res(t *testing.T) {
 			defer func(db *DB) {
 				_ = orm.Close()
 			}(orm)
+			if err != nil {
+				t.Fatal(err)
+			}
 			tc.mockOrder(mock)
 			res := tc.exec(orm, t)
 			assert.Equal(t, tc.wantErr, res.Err())
