@@ -103,12 +103,12 @@ func ExampleNewDeleter() {
 	// SQL: DELETE FROM `test_model`;
 }
 
-func ExampleDB_Update() {
+func ExampleNewUpdater() {
 	db := memoryDB()
 	tm := &TestModel{
 		Age: 18,
 	}
-	query, _ := db.Update(tm).Build()
+	query, _ := NewUpdater[TestModel](db).Update(tm).Build()
 	fmt.Printf("SQL: %s", query.SQL)
 	// Output:
 	// SQL: UPDATE `test_model` SET `id`=?,`first_name`=?,`age`=?,`last_name`=?;

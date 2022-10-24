@@ -24,7 +24,6 @@ import (
 	"github.com/gotomicro/eorm/internal/dialect"
 	"github.com/gotomicro/eorm/internal/model"
 	"github.com/gotomicro/eorm/internal/valuer"
-	"github.com/valyala/bytebufferpool"
 )
 
 // DBOption configure DB
@@ -80,17 +79,6 @@ func (db *DB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) {
 		return nil, err
 	}
 	return &Tx{tx: tx, db: db}, nil
-}
-
-// Update 开始构建一个 UPDATE 查询
-func (db *DB) Update(table interface{}) *Updater {
-	return &Updater{
-		builder: builder{
-			core:   db.core,
-			buffer: bytebufferpool.Get(),
-		},
-		table: table,
-	}
 }
 
 // Wait 会等待数据库连接

@@ -42,6 +42,7 @@ func NewDeleter[T any](sess session) *Deleter[T] {
 
 // Build returns DELETE query
 func (d *Deleter[T]) Build() (*Query, error) {
+	defer bytebufferpool.Put(d.buffer)
 	_, _ = d.buffer.WriteString("DELETE FROM ")
 	var err error
 	if d.table == nil {
