@@ -40,21 +40,21 @@ func TestQuerier(t *testing.T) {
 func (q *QuerierTestSuite) SetupSuite() {
 	q.orm = memoryDBWithDB("querier")
 	// 创建表
-	_, err := RawQuery[TestModel](q.orm, TestModel{}.CreateSQL()).Exec(context.Background())
-	if err != nil {
-		q.T().Fatal(err)
+	r := RawQuery[TestModel](q.orm, TestModel{}.CreateSQL()).Exec(context.Background())
+	if r.Err() != nil {
+		q.T().Fatal(r.Err())
 	}
 
 	// 准备数据
-	_, err = NewInserter[TestModel](q.orm).Values(&TestModel{
+	res := NewInserter[TestModel](q.orm).Values(&TestModel{
 		Id:        1,
 		FirstName: "Tom",
 		Age:       18,
 		LastName:  &sql.NullString{String: "Jerry", Valid: true},
 	}).Exec(context.Background())
 
-	if err != nil {
-		q.T().Fatal(err)
+	if res.Err() != nil {
+		q.T().Fatal(res.Err())
 	}
 }
 
@@ -64,9 +64,9 @@ func (q *QuerierTestSuite) TestExec() {
    group_id INTEGER PRIMARY KEY,
    name TEXT NOT NULL
 )`)
-	res, err := query.Exec(context.Background())
-	if err != nil {
-		t.Fatal(err)
+	res := query.Exec(context.Background())
+	if res.Err() != nil {
+		t.Fatal(res.Err())
 	}
 	affected, err := res.RowsAffected()
 	if err != nil {
@@ -130,8 +130,8 @@ func ExampleQuerier_Exec() {
    group_id INTEGER PRIMARY KEY,
    name TEXT NOT NULL
 )`)
-	_, err := q.Exec(context.Background())
-	if err == nil {
+	res := q.Exec(context.Background())
+	if res.Err() == nil {
 		fmt.Print("SUCCESS")
 	}
 	// Output:

@@ -16,7 +16,6 @@ package eorm
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 
 	"github.com/gotomicro/eorm/internal/errs"
@@ -27,6 +26,11 @@ import (
 // QueryBuilder is used to build a query
 type QueryBuilder interface {
 	Build() (*Query, error)
+}
+
+// Executor is used to build a query
+type Executor interface {
+	Exec(ctx *context.Context) Result
 }
 
 // Query 代表一个查询
@@ -61,8 +65,9 @@ func newQuerier[T any](sess session, q *Query) Querier[T] {
 }
 
 // Exec 执行 SQL
-func (q Querier[T]) Exec(ctx context.Context) (sql.Result, error) {
-	return q.session.execContext(ctx, q.q.SQL, q.q.Args...)
+func (q Querier[T]) Exec(ctx context.Context) Result {
+	res, err := q.session.execContext(ctx, q.q.SQL, q.q.Args...)
+	return Result{res: res, err: err}
 }
 
 // Get 执行查询并且返回第一行数据

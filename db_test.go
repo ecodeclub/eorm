@@ -146,15 +146,15 @@ func BenchmarkQuerier_Get(b *testing.B) {
 	defer func() {
 		_ = orm.Close()
 	}()
-	_, _ = RawQuery[any](orm, TestModel{}.CreateSQL()).Exec(context.Background())
-	res, err := NewInserter[TestModel](orm).Values(&TestModel{
+	_ = RawQuery[any](orm, TestModel{}.CreateSQL()).Exec(context.Background())
+	res := NewInserter[TestModel](orm).Values(&TestModel{
 		Id:        12,
 		FirstName: "Deng",
 		Age:       18,
 		LastName:  &sql.NullString{String: "Ming", Valid: true},
 	}).Exec(context.Background())
-	if err != nil {
-		b.Fatal(err)
+	if res.Err() != nil {
+		b.Fatal(res.Err())
 	}
 	affected, err := res.RowsAffected()
 	if err != nil {

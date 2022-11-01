@@ -58,7 +58,7 @@ func TestDeleter_Exec(t *testing.T) {
 	testCases := []struct {
 		name      string
 		mockOrder func(mock sqlmock.Sqlmock)
-		delete    func(*DB, *testing.T) (sql.Result, error)
+		delete    func(*DB, *testing.T) Result
 		wantErr   error
 		wantVal   sql.Result
 	}{
@@ -67,10 +67,10 @@ func TestDeleter_Exec(t *testing.T) {
 			mockOrder: func(mock sqlmock.Sqlmock) {
 				mock.ExpectExec("DELETE FROM `test_model` WHERE `id`=").WithArgs(1).WillReturnResult(sqlmock.NewResult(100, 1000))
 			},
-			delete: func(db *DB, t *testing.T) (sql.Result, error) {
+			delete: func(db *DB, t *testing.T) Result {
 				deleter := NewDeleter[TestModel](db)
-				result, err := deleter.From(&TestModel{}).Where(C("Id").EQ(1)).Exec(context.Background())
-				return result, err
+				result := deleter.From(&TestModel{}).Where(C("Id").EQ(1)).Exec(context.Background())
+				return result
 			},
 			wantErr: nil,
 			wantVal: sqlmock.NewResult(100, 1000),
@@ -82,16 +82,19 @@ func TestDeleter_Exec(t *testing.T) {
 				mock.ExpectExec("DELETE FROM `test_model` WHERE `id`=").WithArgs(1).WillReturnResult(sqlmock.NewResult(10, 20))
 				mock.ExpectCommit().WillReturnError(errors.New("commit 错误"))
 			},
-			delete: func(db *DB, t *testing.T) (sql.Result, error) {
+			delete: func(db *DB, t *testing.T) Result {
 				tx, err := db.BeginTx(context.Background(), &sql.TxOptions{})
 				require.NoError(t, err)
 
 				deleter := NewDeleter[TestModel](db)
-				result, err := deleter.From(&TestModel{}).Where(C("Id").EQ(1)).Exec(context.Background())
-				require.NoError(t, err)
+				result := deleter.From(&TestModel{}).Where(C("Id").EQ(1)).Exec(context.Background())
+				require.NoError(t, result.Err())
 
 				err = tx.Commit()
-				return result, err
+				if err != nil {
+					return Result{err: err}
+				}
+				return result
 			},
 			wantErr: errors.New("commit 错误"),
 			wantVal: sqlmock.NewResult(10, 20),
@@ -110,9 +113,13 @@ func TestDeleter_Exec(t *testing.T) {
 				t.Fatal(err)
 			}
 			tc.mockOrder(mock)
-			result, err := tc.delete(db, t)
+			result := tc.delete(db, t)
 
-			assert.Equal(t, tc.wantErr, err)
+			assert.Equal(t, tc.wantErr, result.Err())
+
+			if result.Err() != nil {
+				return
+			}
 
 			rowsAffectedExpect, err := tc.wantVal.RowsAffected()
 			require.NoError(t, err)
