@@ -19,6 +19,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"github.com/gotomicro/eorm/internal/errs"
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
@@ -62,6 +63,19 @@ func TestDeleter_Exec(t *testing.T) {
 		wantErr   error
 		wantVal   sql.Result
 	}{
+		{
+			name: "exec err",
+			mockOrder: func(mock sqlmock.Sqlmock) {
+				mock.ExpectExec("DELETE FROM `test_model` WHERE `invalid`=").
+					WithArgs(1).WillReturnError(errs.NewInvalidFieldError("Invalid"))
+			},
+			delete: func(db *DB, t *testing.T) Result {
+				deleter := NewDeleter[TestModel](db)
+				result := deleter.From(&TestModel{}).Where(C("Invalid").EQ(1)).Exec(context.Background())
+				return result
+			},
+			wantErr: errs.NewInvalidFieldError("Invalid"),
+		},
 		{
 			name: "直接删除",
 			mockOrder: func(mock sqlmock.Sqlmock) {

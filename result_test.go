@@ -15,103 +15,79 @@
 package eorm
 
 import (
-	"context"
-	"database/sql"
 	"errors"
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
-func TestResult_res(t *testing.T) {
-	tm := &TestModel{
-		Id:        12,
-		FirstName: "Tom",
-		Age:       18,
-		LastName:  &sql.NullString{String: "Jerry", Valid: true},
-	}
+func TestResult_RowsAffected(t *testing.T) {
 	testCases := []struct {
 		name         string
-		exec         func(*DB, *testing.T) Result
-		mockOrder    func(mock sqlmock.Sqlmock)
-		wantErr      error
+		res          Result
 		wantAffected int64
-		wantInsertId int64
+		wantErr      error
 	}{
 		{
-			name: "db server err",
-			exec: func(db *DB, t *testing.T) Result {
-				result := Result{err: errors.New("服务器异常")}
-				return result
-			},
-			mockOrder: func(mock sqlmock.Sqlmock) {
-				mock.ExpectExec("").WillReturnError(errors.New("服务器异常"))
-			},
-			wantErr: errors.New("服务器异常"),
+			name:    "err",
+			wantErr: errors.New("exec err"),
+			res:     Result{err: errors.New("exec err")},
 		},
 		{
-			name: "update rows",
-			exec: func(db *DB, t *testing.T) Result {
-				updater := NewUpdater[TestModel](db).Update(tm).Set(Columns("FirstName"))
-				result := updater.Exec(context.Background())
-				return result
-			},
-			mockOrder: func(mock sqlmock.Sqlmock) {
-				mock.ExpectExec("UPDATE `test_model` SET `first_name`=").
-					WithArgs("Tom").WillReturnResult(sqlmock.NewResult(100, 1))
-			},
-			wantAffected: int64(1),
-			wantInsertId: int64(100),
+			name:    "unknown error",
+			wantErr: errors.New("unknown error"),
+			res:     Result{res: sqlmock.NewErrorResult(errors.New("unknown error"))},
 		},
 		{
-			name: "delete row",
-			exec: func(db *DB, t *testing.T) Result {
-				deleter := NewDeleter[TestModel](db)
-				result := deleter.From(&TestModel{}).Where(C("Id").EQ(11)).Exec(context.Background())
-				return result
-			},
-			mockOrder: func(mock sqlmock.Sqlmock) {
-				mock.ExpectExec("DELETE FROM `test_model` WHERE `id`=").
-					WithArgs(11).WillReturnResult(sqlmock.NewResult(100, 1))
-			},
-			wantAffected: int64(1),
-			wantInsertId: int64(100),
+			name:         "no err",
+			wantAffected: int64(234),
+			res:          Result{res: sqlmock.NewResult(123, 234)},
 		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			mockDB, mock, err := sqlmock.New()
+			affected, err := tc.res.RowsAffected()
+			assert.Equal(t, tc.wantErr, err)
 			if err != nil {
-				t.Error(err)
-			}
-			orm, err := openDB("mysql", mockDB)
-			defer func(db *DB) {
-				_ = orm.Close()
-			}(orm)
-			if err != nil {
-				t.Fatal(err)
-			}
-			tc.mockOrder(mock)
-			res := tc.exec(orm, t)
-			assert.Equal(t, tc.wantErr, res.Err())
-			if res.Err() != nil {
 				return
 			}
-			assert.Nil(t, tc.wantErr)
-			rowsAffected, err := res.RowsAffected()
-			require.NoError(t, err)
+			assert.Equal(t, tc.wantAffected, affected)
+		})
+	}
+}
 
-			lastInsertId, err := res.LastInsertId()
-			require.NoError(t, err)
-
-			assert.Equal(t, tc.wantInsertId, lastInsertId)
-			assert.Equal(t, tc.wantAffected, rowsAffected)
-
-			if err = mock.ExpectationsWereMet(); err != nil {
-				t.Error(err)
+func TestResult_LastInsertId(t *testing.T) {
+	testCases := []struct {
+		name       string
+		res        Result
+		wantLastId int64
+		wantErr    error
+	}{
+		{
+			name:    "err",
+			wantErr: errors.New("exec err"),
+			res:     Result{err: errors.New("exec err")},
+		},
+		{
+			name:    "res err",
+			wantErr: errors.New("exec err"),
+			res:     Result{res: sqlmock.NewErrorResult(errors.New("exec err"))},
+		},
+		{
+			name:       "no err",
+			wantLastId: int64(123),
+			res:        Result{res: sqlmock.NewResult(123, 234)},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			id, err := tc.res.LastInsertId()
+			assert.Equal(t, tc.wantErr, err)
+			if err != nil {
+				return
 			}
+			assert.Equal(t, tc.wantLastId, id)
 		})
 	}
 }
