@@ -19,8 +19,9 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"github.com/gotomicro/eorm/internal/errs"
 	"testing"
+
+	"github.com/gotomicro/eorm/internal/errs"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/stretchr/testify/require"
