@@ -149,17 +149,17 @@ func TestUpdater_Exec(t *testing.T) {
 	testCases := []struct {
 		name      string
 		u         *Updater[TestModel]
-		update    func(*DB, *testing.T) (sql.Result, error)
+		update    func(*DB, *testing.T) Result
 		wantErr   error
 		mockOrder func(mock sqlmock.Sqlmock)
 		wantVal   sql.Result
 	}{
 		{
 			name: "update err",
-			update: func(db *DB, t *testing.T) (sql.Result, error) {
+			update: func(db *DB, t *testing.T) Result {
 				updater := NewUpdater[TestModel](db).Set(Assign("Age", 12))
-				result, err := updater.Exec(context.Background())
-				return result, err
+				result := updater.Exec(context.Background())
+				return result
 			},
 			mockOrder: func(mock sqlmock.Sqlmock) {
 				mock.ExpectExec("UPDATE `test_model` SET `age`=").
@@ -170,10 +170,10 @@ func TestUpdater_Exec(t *testing.T) {
 		},
 		{
 			name: "specify columns",
-			update: func(db *DB, t *testing.T) (sql.Result, error) {
+			update: func(db *DB, t *testing.T) Result {
 				updater := NewUpdater[TestModel](db).Update(tm).Set(Columns("FirstName"))
-				result, err := updater.Exec(context.Background())
-				return result, err
+				result := updater.Exec(context.Background())
+				return result
 			},
 			mockOrder: func(mock sqlmock.Sqlmock) {
 				mock.ExpectExec("UPDATE `test_model` SET `first_name`=").
@@ -196,9 +196,9 @@ func TestUpdater_Exec(t *testing.T) {
 			}
 			tc.mockOrder(mock)
 
-			res, err := tc.update(orm, t)
-			if err != nil {
-				assert.Equal(t, tc.wantErr, err)
+			res := tc.update(orm, t)
+			if res.Err() != nil {
+				assert.Equal(t, tc.wantErr, res.Err())
 				return
 			}
 			assert.Nil(t, tc.wantErr)

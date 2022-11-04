@@ -16,7 +16,6 @@ package eorm
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"reflect"
 
@@ -208,10 +207,10 @@ func AssignColumns(entity interface{}, filter func(typ reflect.StructField, val 
 }
 
 // Exec sql
-func (u *Updater[T]) Exec(ctx context.Context) (sql.Result, error) {
+func (u *Updater[T]) Exec(ctx context.Context) Result {
 	query, err := u.Build()
 	if err != nil {
-		return nil, err
+		return Result{err: err}
 	}
 	return newQuerier[T](u.session, query).Exec(ctx)
 }

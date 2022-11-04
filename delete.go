@@ -16,7 +16,6 @@ package eorm
 
 import (
 	"context"
-	"database/sql"
 
 	"github.com/valyala/bytebufferpool"
 )
@@ -77,10 +76,11 @@ func (d *Deleter[T]) Where(predicates ...Predicate) *Deleter[T] {
 	return d
 }
 
-func (d *Deleter[T]) Exec(ctx context.Context) (sql.Result, error) {
+// Exec sql
+func (d *Deleter[T]) Exec(ctx context.Context) Result {
 	query, err := d.Build()
 	if err != nil {
-		return nil, err
+		return Result{err: err}
 	}
 	return newQuerier[T](d.session, query).Exec(ctx)
 }

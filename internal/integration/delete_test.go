@@ -37,16 +37,16 @@ func (s *DeleteTestSuite) SetupSuite() {
 	data1 := test.NewSimpleStruct(1)
 	data2 := test.NewSimpleStruct(2)
 	data3 := test.NewSimpleStruct(3)
-	_, err := eorm.NewInserter[test.SimpleStruct](s.orm).Values(data1, data2, data3).Exec(context.Background())
-	if err != nil {
-		s.T().Fatal(err)
+	res := eorm.NewInserter[test.SimpleStruct](s.orm).Values(data1, data2, data3).Exec(context.Background())
+	if res.Err() != nil {
+		s.T().Fatal(res.Err())
 	}
 }
 
 func (i *DeleteTestSuite) TearDownTest() {
-	_, err := eorm.RawQuery[any](i.orm, "DELETE FROM `simple_struct`").Exec(context.Background())
-	if err != nil {
-		i.T().Fatal(err)
+	res := eorm.RawQuery[any](i.orm, "DELETE FROM `simple_struct`").Exec(context.Background())
+	if res.Err() != nil {
+		i.T().Fatal(res.Err())
 	}
 }
 
@@ -70,8 +70,8 @@ func (i *DeleteTestSuite) TestDeleter() {
 	}
 	for _, tc := range testCases {
 		i.T().Run(tc.name, func(t *testing.T) {
-			res, err := tc.i.Exec(context.Background())
-			require.Equal(t, tc.wantErr, err)
+			res := tc.i.Exec(context.Background())
+			require.Equal(t, tc.wantErr, res.Err())
 			affected, err := res.RowsAffected()
 			require.Nil(t, err)
 			assert.Equal(t, tc.rowsAffected, affected)

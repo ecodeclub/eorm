@@ -116,9 +116,9 @@ func TestInserter_Exec(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			res, err := tc.i.Exec(context.Background())
-			if err != nil {
-				assert.EqualError(t, err, tc.wantErr)
+			res := tc.i.Exec(context.Background())
+			if res.Err() != nil {
+				assert.EqualError(t, res.Err(), tc.wantErr)
 				return
 			}
 			assert.Nil(t, tc.wantErr)

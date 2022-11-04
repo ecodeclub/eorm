@@ -34,16 +34,16 @@ type SelectTestSuite struct {
 func (s *SelectTestSuite) SetupSuite() {
 	s.Suite.SetupSuite()
 	s.data = test.NewSimpleStruct(1)
-	_, err := eorm.NewInserter[test.SimpleStruct](s.orm).Values(s.data).Exec(context.Background())
-	if err != nil {
-		s.T().Fatal(err)
+	res := eorm.NewInserter[test.SimpleStruct](s.orm).Values(s.data).Exec(context.Background())
+	if res.Err() != nil {
+		s.T().Fatal(res.Err())
 	}
 }
 
 func (s *SelectTestSuite) TearDownSuite() {
-	_, err := eorm.RawQuery[any](s.orm, "DELETE FROM `simple_struct`").Exec(context.Background())
-	if err != nil {
-		s.T().Fatal(err)
+	res := eorm.RawQuery[any](s.orm, "DELETE FROM `simple_struct`").Exec(context.Background())
+	if res.Err() != nil {
+		s.T().Fatal(res.Err())
 	}
 }
 

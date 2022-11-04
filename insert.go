@@ -16,7 +16,6 @@ package eorm
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 
 	"github.com/gotomicro/eorm/internal/errs"
@@ -106,10 +105,10 @@ func (i *Inserter[T]) Values(values ...*T) *Inserter[T] {
 }
 
 // Exec 发起查询
-func (i *Inserter[T]) Exec(ctx context.Context) (sql.Result, error) {
+func (i *Inserter[T]) Exec(ctx context.Context) Result {
 	query, err := i.Build()
 	if err != nil {
-		return nil, err
+		return Result{err: err}
 	}
 	return newQuerier[T](i.session, query).Exec(ctx)
 }
