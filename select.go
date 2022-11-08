@@ -34,7 +34,6 @@ type Selector[T any] struct {
 	orderBy  []OrderBy
 	offset   int
 	limit    int
-	ins      []any
 }
 
 // NewSelector 创建一个 Selector
