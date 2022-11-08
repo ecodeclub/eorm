@@ -120,6 +120,18 @@ func TestSelectable(t *testing.T) {
 			builder: NewSelector[TestModel](db).Select(Columns("Id"), Columns("FirstName"), Avg("Age").As("avg_age")).From(&TestModel{}).GroupBy("FirstName").Having(C("Invalid").LT(20)),
 			wantErr: errs.NewInvalidFieldError("Invalid"),
 		},
+		{
+			name:     "in",
+			builder:  NewSelector[TestModel](db).Select(Columns("Id")).From(&TestModel{}).Where(C("Id").In(1, 2, 3)),
+			wantSql:  "SELECT `id` FROM `test_model` WHERE `id` IN (?,?,?);",
+			wantArgs: []interface{}{1, 2, 3},
+		},
+		{
+			name:     "not in",
+			builder:  NewSelector[TestModel](db).Select(Columns("Id")).From(&TestModel{}).Where(C("Id").NotIn(1, 2, 3)),
+			wantSql:  "SELECT `id` FROM `test_model` WHERE `id` NOT IN (?,?,?);",
+			wantArgs: []interface{}{1, 2, 3},
+		},
 	}
 
 	for _, tc := range testCases {

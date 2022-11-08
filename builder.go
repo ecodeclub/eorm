@@ -179,6 +179,10 @@ func (b *builder) buildExpr(expr Expr) error {
 		if err := b.buildBinaryExpr(binaryExpr(e)); err != nil {
 			return err
 		}
+	case Ins:
+		if err := b.buildIns(e); err != nil {
+			return err
+		}
 	case nil:
 	default:
 		return errors.New("unsupported expr")
@@ -245,5 +249,18 @@ func (b *builder) buildSubExpr(subExpr Expr) error {
 			return err
 		}
 	}
+	return nil
+}
+
+func (b *builder) buildIns(is Ins) error {
+	b.buffer.WriteByte('(')
+	for idx, inVal := range is.ins {
+		if idx > 0 {
+			b.buffer.WriteByte(',')
+		}
+		b.args = append(b.args, inVal)
+		b.buffer.WriteByte('?')
+	}
+	b.buffer.WriteByte(')')
 	return nil
 }

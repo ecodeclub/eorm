@@ -141,3 +141,30 @@ func Columns(cs ...string) columns {
 		cs: cs,
 	}
 }
+
+func (c Column) In(ins ...any) Predicate {
+	return Predicate{
+		left: c,
+		op:   opIn,
+		right: Ins{
+			ins: ins,
+		},
+	}
+}
+func (c Column) NotIn(ins ...any) Predicate {
+	return Predicate{
+		left: c,
+		op:   opNotIN,
+		right: Ins{
+			ins: ins,
+		},
+	}
+}
+
+type Ins struct {
+	ins []any
+}
+
+func (i Ins) expr() (string, error) {
+	panic("implement me")
+}
