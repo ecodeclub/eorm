@@ -132,6 +132,25 @@ func TestSelectable(t *testing.T) {
 			wantSql:  "SELECT `id` FROM `test_model` WHERE `id` NOT IN (?,?,?);",
 			wantArgs: []interface{}{1, 2, 3},
 		},
+		{
+			// 传入的参数为切片
+			name:     "slice in",
+			builder:  NewSelector[TestModel](db).Select(Columns("Id")).From(&TestModel{}).Where(C("Id").In([]int{1, 2, 3})),
+			wantSql:  "SELECT `id` FROM `test_model` WHERE `id` IN (?);",
+			wantArgs: []interface{}{[]int{1, 2, 3}},
+		},
+		{
+			//in 后面没有值
+			name:    "no in",
+			builder: NewSelector[TestModel](db).Select(Columns("Id")).From(&TestModel{}).Where(C("Id").In()),
+			wantSql: "SELECT `id` FROM `test_model` WHERE false ;",
+		},
+		{
+			//Notin 后面没有值
+			name:    "no in",
+			builder: NewSelector[TestModel](db).Select(Columns("Id")).From(&TestModel{}).Where(C("Id").NotIn()),
+			wantSql: "SELECT `id` FROM `test_model` WHERE false ;",
+		},
 	}
 
 	for _, tc := range testCases {

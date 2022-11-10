@@ -17,7 +17,6 @@ package eorm
 import (
 	"context"
 	"errors"
-
 	"github.com/gotomicro/eorm/internal/errs"
 	"github.com/gotomicro/eorm/internal/model"
 	"github.com/valyala/bytebufferpool"
@@ -179,7 +178,7 @@ func (b *builder) buildExpr(expr Expr) error {
 		if err := b.buildBinaryExpr(binaryExpr(e)); err != nil {
 			return err
 		}
-	case Ins:
+	case values:
 		if err := b.buildIns(e); err != nil {
 			return err
 		}
@@ -252,14 +251,16 @@ func (b *builder) buildSubExpr(subExpr Expr) error {
 	return nil
 }
 
-func (b *builder) buildIns(is Ins) error {
+func (b *builder) buildIns(is values) error {
 	b.buffer.WriteByte('(')
 	for idx, inVal := range is.ins {
 		if idx > 0 {
 			b.buffer.WriteByte(',')
 		}
+	
 		b.args = append(b.args, inVal)
 		b.buffer.WriteByte('?')
+
 	}
 	b.buffer.WriteByte(')')
 	return nil

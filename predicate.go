@@ -36,6 +36,8 @@ var (
 	opNot   = op{symbol: "NOT", text: "NOT "}
 	opIn    = op{symbol: "IN", text: " IN "}
 	opNotIN = op{symbol: "NOT IN", text: " NOT IN "}
+	opTrue  = op{symbol: "true", text: "true "}
+	opFalse = op{symbol: "false", text: "false "}
 )
 
 // Predicate will be used in Where Or Having
