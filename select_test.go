@@ -151,6 +151,16 @@ func TestSelectable(t *testing.T) {
 			builder: NewSelector[TestModel](db).Select(Columns("Id")).From(&TestModel{}).Where(C("Id").NotIn()),
 			wantSql: "SELECT `id` FROM `test_model` WHERE FALSE;",
 		},
+		{
+			name:    "in empty slice",
+			builder: NewSelector[TestModel](db).Select(Columns("Id")).From(&TestModel{}).Where(C("Id").In([]any{}...)),
+			wantSql: "SELECT `id` FROM `test_model` WHERE FALSE;",
+		},
+		{
+			name:    "NOT In empty slice",
+			builder: NewSelector[TestModel](db).Select(Columns("Id")).From(&TestModel{}).Where(C("Id").NotIn([]any{}...)),
+			wantSql: "SELECT `id` FROM `test_model` WHERE FALSE;",
+		},
 	}
 
 	for _, tc := range testCases {

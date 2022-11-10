@@ -144,7 +144,7 @@ func Columns(cs ...string) columns {
 
 // In 方法没有元素传入，会被认为是false，被解释成where false这种形式
 func (c Column) In(data ...any) Predicate {
-	if data == nil {
+	if len(data) == 0 {
 		return Predicate{
 			op: opFalse,
 		}
@@ -161,7 +161,7 @@ func (c Column) In(data ...any) Predicate {
 
 // NotIn 方法没有元素传入，会被认为是false，被解释成where false这种形式
 func (c Column) NotIn(data ...any) Predicate {
-	if data == nil {
+	if len(data) == 0 {
 		return Predicate{
 			op: opFalse,
 		}
