@@ -252,16 +252,16 @@ func (b *builder) buildSubExpr(subExpr Expr) error {
 }
 
 func (b *builder) buildIns(is values) error {
-	b.buffer.WriteByte('(')
-	for idx, inVal := range is.ins {
+	_ = b.buffer.WriteByte('(')
+	for idx, inVal := range is.data {
 		if idx > 0 {
-			b.buffer.WriteByte(',')
+			_ = b.buffer.WriteByte(',')
 		}
-	
+
 		b.args = append(b.args, inVal)
-		b.buffer.WriteByte('?')
+		_ = b.buffer.WriteByte('?')
 
 	}
-	b.buffer.WriteByte(')')
+	_ = b.buffer.WriteByte(')')
 	return nil
 }

@@ -143,8 +143,8 @@ func Columns(cs ...string) columns {
 }
 
 // In 方法没有元素传入，会被认为是false，被解释成where false这种形式
-func (c Column) In(ins ...any) Predicate {
-	if ins == nil {
+func (c Column) In(data ...any) Predicate {
+	if data == nil {
 		return Predicate{
 			op: opFalse,
 		}
@@ -154,14 +154,14 @@ func (c Column) In(ins ...any) Predicate {
 		left: c,
 		op:   opIn,
 		right: values{
-			ins: ins,
+			data: data,
 		},
 	}
 }
 
 // NotIn 方法没有元素传入，会被认为是false，被解释成where false这种形式
-func (c Column) NotIn(ins ...any) Predicate {
-	if ins == nil {
+func (c Column) NotIn(data ...any) Predicate {
+	if data == nil {
 		return Predicate{
 			op: opFalse,
 		}
@@ -170,13 +170,13 @@ func (c Column) NotIn(ins ...any) Predicate {
 		left: c,
 		op:   opNotIN,
 		right: values{
-			ins: ins,
+			data: data,
 		},
 	}
 }
 
 type values struct {
-	ins []any
+	data []any
 }
 
 func (values) expr() (string, error) {

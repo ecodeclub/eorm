@@ -143,13 +143,13 @@ func TestSelectable(t *testing.T) {
 			// in 后面没有值
 			name:    "no in",
 			builder: NewSelector[TestModel](db).Select(Columns("Id")).From(&TestModel{}).Where(C("Id").In()),
-			wantSql: "SELECT `id` FROM `test_model` WHERE false ;",
+			wantSql: "SELECT `id` FROM `test_model` WHERE FALSE;",
 		},
 		{
 			// Notin 后面没有值
 			name:    "no in",
 			builder: NewSelector[TestModel](db).Select(Columns("Id")).From(&TestModel{}).Where(C("Id").NotIn()),
-			wantSql: "SELECT `id` FROM `test_model` WHERE false ;",
+			wantSql: "SELECT `id` FROM `test_model` WHERE FALSE;",
 		},
 	}
 
