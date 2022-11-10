@@ -142,7 +142,7 @@ func Columns(cs ...string) columns {
 	}
 }
 
-// In方法没有元素传入，会被认为是false，被解释成where false这种形式
+// In 方法没有元素传入，会被认为是false，被解释成where false这种形式
 func (c Column) In(ins ...any) Predicate {
 	if ins == nil {
 		return Predicate{
@@ -159,7 +159,7 @@ func (c Column) In(ins ...any) Predicate {
 	}
 }
 
-// NotIn方法没有元素传入，会被认为是false，被解释成where false这种形式
+// NotIn 方法没有元素传入，会被认为是false，被解释成where false这种形式
 func (c Column) NotIn(ins ...any) Predicate {
 	if ins == nil {
 		return Predicate{
