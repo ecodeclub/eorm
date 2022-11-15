@@ -136,6 +136,133 @@ func TestSelectable(t *testing.T) {
 	}
 }
 
+func TestSelectableCombination(t *testing.T) {
+	db := memoryDB()
+	testCases := []CommonTestCase{
+		{
+			name:    "simple",
+			builder: NewSelector[TestCombinedModel](db).From(&TestCombinedModel{}),
+			wantSql: "SELECT `create_time`,`update_time`,`id`,`first_name`,`age`,`last_name` FROM `test_combined_model`;",
+		},
+		{
+			name:    "columns",
+			builder: NewSelector[TestCombinedModel](db).Select(Columns("Id", "FirstName", "CreateTime")).From(&TestCombinedModel{}),
+			wantSql: "SELECT `id`,`first_name`,`create_time` FROM `test_combined_model`;",
+		},
+		{
+			name:    "alias",
+			builder: NewSelector[TestCombinedModel](db).Select(Columns("Id"), C("CreateTime").As("creation")).From(&TestCombinedModel{}),
+			wantSql: "SELECT `id`,`create_time` AS `creation` FROM `test_combined_model`;",
+		},
+		{
+			name:    "aggregate",
+			builder: NewSelector[TestCombinedModel](db).Select(Columns("Id"), Max("CreateTime").As("max_time")).From(&TestCombinedModel{}),
+			wantSql: "SELECT `id`,MAX(`create_time`) AS `max_time` FROM `test_combined_model`;",
+		},
+		{
+			name:    "raw",
+			builder: NewSelector[TestCombinedModel](db).Select(Columns("Id"), Raw("AVG(DISTINCT `create_time`)")).From(&TestCombinedModel{}),
+			wantSql: "SELECT `id`,AVG(DISTINCT `create_time`) FROM `test_combined_model`;",
+		},
+		{
+			name:    "invalid columns",
+			builder: NewSelector[TestCombinedModel](db).Select(Columns("Invalid"), Raw("AVG(DISTINCT `age`)")).From(&TestCombinedModel{}),
+			wantErr: errs.NewInvalidFieldError("Invalid"),
+		},
+		{
+			name:    "order by",
+			builder: NewSelector[TestCombinedModel](db).From(&TestCombinedModel{}).OrderBy(ASC("Age"), DESC("CreateTime")),
+			wantSql: "SELECT `create_time`,`update_time`,`id`,`first_name`,`age`,`last_name` FROM `test_combined_model` ORDER BY `age` ASC,`create_time` DESC;",
+		},
+		{
+			name:    "order by invalid column",
+			builder: NewSelector[TestCombinedModel](db).From(&TestCombinedModel{}).OrderBy(ASC("Invalid"), DESC("Id")),
+			wantErr: errs.NewInvalidFieldError("Invalid"),
+		},
+		{
+			name:    "group by",
+			builder: NewSelector[TestCombinedModel](db).From(&TestCombinedModel{}).GroupBy("CreateTime", "Id"),
+			wantSql: "SELECT `create_time`,`update_time`,`id`,`first_name`,`age`,`last_name` FROM `test_combined_model` GROUP BY `create_time`,`id`;",
+		},
+		{
+			name:    "group by invalid column",
+			builder: NewSelector[TestCombinedModel](db).From(&TestCombinedModel{}).GroupBy("Invalid", "Id"),
+			wantErr: errs.NewInvalidFieldError("Invalid"),
+		},
+		{
+			name:     "offset",
+			builder:  NewSelector[TestCombinedModel](db).From(&TestCombinedModel{}).OrderBy(ASC("Age"), DESC("CreateTime")).Offset(10),
+			wantSql:  "SELECT `create_time`,`update_time`,`id`,`first_name`,`age`,`last_name` FROM `test_combined_model` ORDER BY `age` ASC,`create_time` DESC OFFSET ?;",
+			wantArgs: []interface{}{10},
+		},
+		{
+			name:     "limit",
+			builder:  NewSelector[TestCombinedModel](db).From(&TestCombinedModel{}).OrderBy(ASC("Age"), DESC("CreateTime")).Offset(10).Limit(100),
+			wantSql:  "SELECT `create_time`,`update_time`,`id`,`first_name`,`age`,`last_name` FROM `test_combined_model` ORDER BY `age` ASC,`create_time` DESC OFFSET ? LIMIT ?;",
+			wantArgs: []interface{}{10, 100},
+		},
+		{
+			name:     "where",
+			builder:  NewSelector[TestCombinedModel](db).From(&TestCombinedModel{}).Where(C("Id").EQ(10).And(C("CreateTime").EQ(10))),
+			wantSql:  "SELECT `create_time`,`update_time`,`id`,`first_name`,`age`,`last_name` FROM `test_combined_model` WHERE (`id`=?) AND (`create_time`=?);",
+			wantArgs: []interface{}{10, 10},
+		},
+		{
+			name:    "no where",
+			builder: NewSelector[TestCombinedModel](db).From(&TestCombinedModel{}).Where(),
+			wantSql: "SELECT `create_time`,`update_time`,`id`,`first_name`,`age`,`last_name` FROM `test_combined_model`;",
+		},
+		{
+			name:     "having",
+			builder:  NewSelector[TestCombinedModel](db).From(&TestCombinedModel{}).GroupBy("FirstName").Having(Max("CreateTime").EQ(18)),
+			wantSql:  "SELECT `create_time`,`update_time`,`id`,`first_name`,`age`,`last_name` FROM `test_combined_model` GROUP BY `first_name` HAVING MAX(`create_time`)=?;",
+			wantArgs: []interface{}{18},
+		},
+		{
+			name:    "no having",
+			builder: NewSelector[TestCombinedModel](db).From(&TestCombinedModel{}).GroupBy("CreateTime").Having(),
+			wantSql: "SELECT `create_time`,`update_time`,`id`,`first_name`,`age`,`last_name` FROM `test_combined_model` GROUP BY `create_time`;",
+		},
+		{
+			name:     "alias in having",
+			builder:  NewSelector[TestCombinedModel](db).Select(Columns("Id"), Columns("FirstName"), Avg("CreateTime").As("create")).From(&TestCombinedModel{}).GroupBy("FirstName").Having(C("create").LT(20)),
+			wantSql:  "SELECT `id`,`first_name`,AVG(`create_time`) AS `create` FROM `test_combined_model` GROUP BY `first_name` HAVING `create`<?;",
+			wantArgs: []interface{}{20},
+		},
+		{
+			name:    "invalid alias in having",
+			builder: NewSelector[TestCombinedModel](db).Select(Columns("Id"), Columns("FirstName"), Avg("Age").As("avg_age")).From(&TestCombinedModel{}).GroupBy("FirstName").Having(C("Invalid").LT(20)),
+			wantErr: errs.NewInvalidFieldError("Invalid"),
+		},
+	}
+
+	for _, tc := range testCases {
+		c := tc
+		t.Run(c.name, func(t *testing.T) {
+			query, err := c.builder.Build()
+			assert.Equal(t, c.wantErr, err)
+			if err != nil {
+				return
+			}
+			assert.Equal(t, c.wantSql, query.SQL)
+			assert.Equal(t, c.wantArgs, query.Args)
+		})
+	}
+}
+
+type BaseEntity struct {
+	CreateTime uint64
+	UpdateTime uint64
+}
+
+type TestCombinedModel struct {
+	BaseEntity
+	Id        int64 `eorm:"auto_increment,primary_key"`
+	FirstName string
+	Age       int8
+	LastName  *string
+}
+
 func ExampleSelector_OrderBy() {
 	db := memoryDB()
 	query, _ := NewSelector[TestModel](db).From(&TestModel{}).OrderBy(ASC("Age")).Build()

@@ -170,6 +170,47 @@ func testSetColumn(t *testing.T, creator Creator) {
 		err = val.SetColumns(rows)
 		assert.Equal(t, errors.New("sql: Rows are closed"), err)
 	})
+
+	type BaseEntity struct {
+		Id         int64 `eorm:"auto_increment,primary_key"`
+		CreateTime uint64
+	}
+	type CombinedUser struct {
+		BaseEntity
+		FirstName string
+	}
+
+	// 测试使用组合的场景
+	t.Run("combination", func(t *testing.T) {
+		db, mock, err := sqlmock.New()
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = db.Close() }()
+
+		u := &CombinedUser{}
+		meta, err := r.Get(u)
+		if err != nil {
+			t.Fatal(err)
+		}
+		val := creator(u, meta)
+		// 多了一个列
+		mock.ExpectQuery("SELECT *").
+			WillReturnRows(sqlmock.NewRows([]string{"id", "create_time", "first_name"}).
+				AddRow(123, 100000, "Tom"))
+		rows, _ := db.Query("SELECT *")
+		rows.Next()
+		err = val.SetColumns(rows)
+		assert.NoError(t, err)
+		wantUser := &CombinedUser{
+			BaseEntity: BaseEntity{
+				Id:         123,
+				CreateTime: 100000,
+			},
+			FirstName: "Tom",
+		}
+		assert.Equal(t, wantUser, u)
+	})
 }
 
 func testValueField(t *testing.T, creator Creator) {
@@ -229,6 +270,53 @@ func testValueField(t *testing.T, creator Creator) {
 
 		val := NewUnsafeValue(&User{}, meta)
 		for _, tc := range invalidCases {
+			t.Run(tc.name, func(t *testing.T) {
+				v, err := val.Field(tc.field)
+				assert.Equal(t, tc.wantError, err)
+				if err != nil {
+					return
+				}
+				assert.Equal(t, tc.wantVal, v)
+			})
+		}
+	})
+
+	type BaseEntity struct {
+		Id         int64 `eorm:"auto_increment,primary_key"`
+		CreateTime uint64
+	}
+	type CombinedUser struct {
+		BaseEntity
+		FirstName string
+	}
+
+	cUser := &CombinedUser{}
+	testCases := []valueFieldTestCase{
+		{
+			name:    "id",
+			field:   "Id",
+			wantVal: cUser.Id,
+		},
+		{
+			name:    "CreateTime",
+			field:   "CreateTime",
+			wantVal: cUser.CreateTime,
+		},
+		{
+			name:    "FirstName",
+			field:   "FirstName",
+			wantVal: cUser.FirstName,
+		},
+	}
+	// 测试使用组合的场景
+	t.Run("combination cases", func(t *testing.T) {
+		meta, err = model.NewMetaRegistry().Get(cUser)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		val := NewUnsafeValue(cUser, meta)
+		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
 				v, err := val.Field(tc.field)
 				assert.Equal(t, tc.wantError, err)

@@ -93,6 +93,91 @@ func TestInserter_Values(t *testing.T) {
 	}
 }
 
+func TestInserter_ValuesForCombination(t *testing.T) {
+	type BaseEntity struct {
+		Id         int64 `eorm:"auto_increment,primary_key"`
+		CreateTime uint64
+	}
+	type User struct {
+		BaseEntity
+		FirstName string
+	}
+	n := uint64(1000)
+	u := &User{
+		FirstName: "Tom",
+		BaseEntity: BaseEntity{
+			Id:         12,
+			CreateTime: n,
+		},
+	}
+	u1 := &User{
+		FirstName: "Jerry",
+		BaseEntity: BaseEntity{
+			Id:         13,
+			CreateTime: n,
+		},
+	}
+	db := memoryDB()
+	testCases := []CommonTestCase{
+		{
+			name:    "no examples of values",
+			builder: NewInserter[User](db).Values(),
+			wantErr: errors.New("插入0行"),
+		},
+		{
+			name:     "single example of values",
+			builder:  NewInserter[User](db).Values(u),
+			wantSql:  "INSERT INTO `user`(`id`,`create_time`,`first_name`) VALUES(?,?,?);",
+			wantArgs: []interface{}{int64(12), n, "Tom"},
+		},
+
+		{
+			name:     "multiple values of same type",
+			builder:  NewInserter[User](db).Values(u, u1),
+			wantSql:  "INSERT INTO `user`(`id`,`create_time`,`first_name`) VALUES(?,?,?),(?,?,?);",
+			wantArgs: []interface{}{int64(12), n, "Tom", int64(13), n, "Jerry"},
+		},
+
+		{
+			name:     "no example of a whole columns",
+			builder:  NewInserter[User](db).Columns("Id", "FirstName").Values(u),
+			wantSql:  "INSERT INTO `user`(`id`,`first_name`) VALUES(?,?);",
+			wantArgs: []interface{}{int64(12), "Tom"},
+		},
+
+		{
+			name:     "no example of a whole columns2",
+			builder:  NewInserter[User](db).Columns("FirstName", "Id").Values(u),
+			wantSql:  "INSERT INTO `user`(`first_name`,`id`) VALUES(?,?);",
+			wantArgs: []interface{}{"Tom", int64(12)},
+		},
+		{
+			name:    "an example with invalid columns",
+			builder: NewInserter[User](db).Columns("id", "FirstName").Values(u),
+			wantErr: errors.New("eorm: 未知字段 id"),
+		},
+		{
+			name:     "no whole columns and multiple values of same type",
+			builder:  NewInserter[User](db).Columns("Id", "FirstName").Values(u, u1),
+			wantSql:  "INSERT INTO `user`(`id`,`first_name`) VALUES(?,?),(?,?);",
+			wantArgs: []interface{}{int64(12), "Tom", int64(13), "Jerry"},
+		},
+	}
+
+	for _, tc := range testCases {
+		c := tc
+		t.Run(tc.name, func(t *testing.T) {
+			q, err := c.builder.Build()
+			assert.Equal(t, c.wantErr, err)
+			if err != nil {
+				return
+			}
+			assert.Equal(t, c.wantSql, q.SQL)
+			assert.Equal(t, c.wantArgs, q.Args)
+		})
+	}
+}
+
 func TestInserter_Exec(t *testing.T) {
 	orm := memoryDB()
 	testCases := []struct {
