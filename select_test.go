@@ -120,6 +120,47 @@ func TestSelectable(t *testing.T) {
 			builder: NewSelector[TestModel](db).Select(Columns("Id"), Columns("FirstName"), Avg("Age").As("avg_age")).From(&TestModel{}).GroupBy("FirstName").Having(C("Invalid").LT(20)),
 			wantErr: errs.NewInvalidFieldError("Invalid"),
 		},
+		{
+			name:     "in",
+			builder:  NewSelector[TestModel](db).Select(Columns("Id")).From(&TestModel{}).Where(C("Id").In(1, 2, 3)),
+			wantSql:  "SELECT `id` FROM `test_model` WHERE `id` IN (?,?,?);",
+			wantArgs: []interface{}{1, 2, 3},
+		},
+		{
+			name:     "not in",
+			builder:  NewSelector[TestModel](db).Select(Columns("Id")).From(&TestModel{}).Where(C("Id").NotIn(1, 2, 3)),
+			wantSql:  "SELECT `id` FROM `test_model` WHERE `id` NOT IN (?,?,?);",
+			wantArgs: []interface{}{1, 2, 3},
+		},
+		{
+			// 传入的参数为切片
+			name:     "slice in",
+			builder:  NewSelector[TestModel](db).Select(Columns("Id")).From(&TestModel{}).Where(C("Id").In([]int{1, 2, 3})),
+			wantSql:  "SELECT `id` FROM `test_model` WHERE `id` IN (?);",
+			wantArgs: []interface{}{[]int{1, 2, 3}},
+		},
+		{
+			// in 后面没有值
+			name:    "no in",
+			builder: NewSelector[TestModel](db).Select(Columns("Id")).From(&TestModel{}).Where(C("Id").In()),
+			wantSql: "SELECT `id` FROM `test_model` WHERE FALSE;",
+		},
+		{
+			// Notin 后面没有值
+			name:    "no in",
+			builder: NewSelector[TestModel](db).Select(Columns("Id")).From(&TestModel{}).Where(C("Id").NotIn()),
+			wantSql: "SELECT `id` FROM `test_model` WHERE FALSE;",
+		},
+		{
+			name:    "in empty slice",
+			builder: NewSelector[TestModel](db).Select(Columns("Id")).From(&TestModel{}).Where(C("Id").In([]any{}...)),
+			wantSql: "SELECT `id` FROM `test_model` WHERE FALSE;",
+		},
+		{
+			name:    "NOT In empty slice",
+			builder: NewSelector[TestModel](db).Select(Columns("Id")).From(&TestModel{}).Where(C("Id").NotIn([]any{}...)),
+			wantSql: "SELECT `id` FROM `test_model` WHERE FALSE;",
+		},
 	}
 
 	for _, tc := range testCases {

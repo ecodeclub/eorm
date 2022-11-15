@@ -127,11 +127,11 @@ type columns struct {
 	cs []string
 }
 
-func (c columns) selected() {
+func (columns) selected() {
 	panic("implement me")
 }
 
-func (c columns) assign() {
+func (columns) assign() {
 	panic("implement me")
 }
 
@@ -140,4 +140,45 @@ func Columns(cs ...string) columns {
 	return columns{
 		cs: cs,
 	}
+}
+
+// In 方法没有元素传入，会被认为是false，被解释成where false这种形式
+func (c Column) In(data ...any) Predicate {
+	if len(data) == 0 {
+		return Predicate{
+			op: opFalse,
+		}
+	}
+
+	return Predicate{
+		left: c,
+		op:   opIn,
+		right: values{
+			data: data,
+		},
+	}
+}
+
+// NotIn 方法没有元素传入，会被认为是false，被解释成where false这种形式
+func (c Column) NotIn(data ...any) Predicate {
+	if len(data) == 0 {
+		return Predicate{
+			op: opFalse,
+		}
+	}
+	return Predicate{
+		left: c,
+		op:   opNotIN,
+		right: values{
+			data: data,
+		},
+	}
+}
+
+type values struct {
+	data []any
+}
+
+func (values) expr() (string, error) {
+	panic("implement me")
 }

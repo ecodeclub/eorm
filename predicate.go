@@ -31,9 +31,12 @@ var (
 	// opMinus = op{symbol:"-", text: "-"}
 	opMulti = op{symbol: "*", text: "*"}
 	// opDiv = op{symbol:"/", text: "/"}
-	opAnd = op{symbol: "AND", text: " AND "}
-	opOr  = op{symbol: "OR", text: " OR "}
-	opNot = op{symbol: "NOT", text: "NOT "}
+	opAnd   = op{symbol: "AND", text: " AND "}
+	opOr    = op{symbol: "OR", text: " OR "}
+	opNot   = op{symbol: "NOT", text: "NOT "}
+	opIn    = op{symbol: "IN", text: " IN "}
+	opNotIN = op{symbol: "NOT IN", text: " NOT IN "}
+	opFalse = op{symbol: "FALSE", text: "FALSE"}
 )
 
 // Predicate will be used in Where Or Having
