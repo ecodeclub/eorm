@@ -42,6 +42,17 @@ func TestDeleter_Build(t *testing.T) {
 			wantSql:  "DELETE FROM `test_model` WHERE `id`=?;",
 			wantArgs: []interface{}{16},
 		},
+		{
+			name:    "no where combination",
+			builder: NewDeleter[TestCombinedModel](memoryDB()).From(&TestCombinedModel{}),
+			wantSql: "DELETE FROM `test_combined_model`;",
+		},
+		{
+			name:     "where combination",
+			builder:  NewDeleter[TestCombinedModel](memoryDB()).Where(C("CreateTime").EQ(uint64(1000))),
+			wantSql:  "DELETE FROM `test_combined_model` WHERE `create_time`=?;",
+			wantArgs: []interface{}{uint64(1000)},
+		},
 	}
 
 	for _, tc := range testCases {
