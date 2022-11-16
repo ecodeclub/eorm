@@ -193,17 +193,39 @@ func AssignNotZeroColumns(entity interface{}) []Assignable {
 // If the returned value is true, this column will be updated.
 func AssignColumns(entity interface{}, filter func(typ reflect.StructField, val reflect.Value) bool) []Assignable {
 	val := reflect.ValueOf(entity).Elem()
-	typ := reflect.TypeOf(entity).Elem()
 	numField := val.NumField()
-	res := make([]Assignable, 0, numField)
-	for i := 0; i < numField; i++ {
-		fieldVal := val.Field(i)
-		fieldTyp := typ.Field(i)
+
+	fdTypes := make([]reflect.StructField, 0, numField)
+	fdValues := make([]reflect.Value, 0, numField)
+	flapFields(entity, &fdTypes, &fdValues)
+
+	res := make([]Assignable, 0, len(fdTypes))
+	for i := 0; i < len(fdTypes); i++ {
+		fieldVal := fdValues[i]
+		fieldTyp := fdTypes[i]
 		if filter(fieldTyp, fieldVal) {
 			res = append(res, Assign(fieldTyp.Name, fieldVal.Interface()))
 		}
 	}
 	return res
+}
+
+func flapFields(entity interface{}, fdTypes *[]reflect.StructField, fdValues *[]reflect.Value) {
+	typ := reflect.TypeOf(entity)
+	val := reflect.ValueOf(entity)
+	if typ.Kind() == reflect.Pointer {
+		typ = typ.Elem()
+		val = val.Elem()
+	}
+	numField := val.NumField()
+	for i := 0; i < numField; i++ {
+		if !typ.Field(i).Anonymous {
+			*fdTypes = append(*fdTypes, typ.Field(i))
+			*fdValues = append(*fdValues, val.Field(i))
+			continue
+		}
+		flapFields(val.Field(i).Interface(), fdTypes, fdValues)
+	}
 }
 
 // Exec sql
