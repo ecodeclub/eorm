@@ -161,6 +161,85 @@ func TestSelectable(t *testing.T) {
 			builder: NewSelector[TestModel](db).Select(Columns("Id")).From(&TestModel{}).Where(C("Id").NotIn([]any{}...)),
 			wantSql: "SELECT `id` FROM `test_model` WHERE FALSE;",
 		},
+		// 模糊查询
+		{
+			name:    "NOT In empty slice",
+			builder: NewSelector[TestModel](db).Select(Columns("Id")).From(&TestModel{}).Where(C("Id").NotIn([]any{}...)),
+			wantSql: "SELECT `id` FROM `test_model` WHERE FALSE;",
+		},
+		{
+			name:     "where not like %",
+			builder:  NewSelector[TestModel](db).From(&TestModel{}).Where(C("FirstName").NotLike("%ming")),
+			wantSql:  "SELECT `id`,`first_name`,`age`,`last_name` FROM `test_model` WHERE `first_name` NOT LIKE ?;",
+			wantArgs: []interface{}{"%ming"},
+		},
+		{
+			name:     "where like %",
+			builder:  NewSelector[TestModel](db).From(&TestModel{}).Where(C("FirstName").Like("zhang%")),
+			wantSql:  "SELECT `id`,`first_name`,`age`,`last_name` FROM `test_model` WHERE `first_name` LIKE ?;",
+			wantArgs: []interface{}{"zhang%"},
+		},
+		{
+			name:     "where not like _",
+			builder:  NewSelector[TestModel](db).From(&TestModel{}).Where(C("FirstName").NotLike("_三_")),
+			wantSql:  "SELECT `id`,`first_name`,`age`,`last_name` FROM `test_model` WHERE `first_name` NOT LIKE ?;",
+			wantArgs: []interface{}{"_三_"},
+		},
+		{
+			name:     "where like _",
+			builder:  NewSelector[TestModel](db).From(&TestModel{}).Where(C("FirstName").Like("_三_")),
+			wantSql:  "SELECT `id`,`first_name`,`age`,`last_name` FROM `test_model` WHERE `first_name` LIKE ?;",
+			wantArgs: []interface{}{"_三_"},
+		},
+		{
+			name:     "where not like []",
+			builder:  NewSelector[TestModel](db).From(&TestModel{}).Where(C("FirstName").NotLike("老[1-9]")),
+			wantSql:  "SELECT `id`,`first_name`,`age`,`last_name` FROM `test_model` WHERE `first_name` NOT LIKE ?;",
+			wantArgs: []interface{}{"老[1-9]"},
+		},
+		{
+			name:     "where like []",
+			builder:  NewSelector[TestModel](db).From(&TestModel{}).Where(C("FirstName").Like("老[1-9]")),
+			wantSql:  "SELECT `id`,`first_name`,`age`,`last_name` FROM `test_model` WHERE `first_name` LIKE ?;",
+			wantArgs: []interface{}{"老[1-9]"},
+		},
+		{
+			name:     "where not like [^ ]",
+			builder:  NewSelector[TestModel](db).From(&TestModel{}).Where(C("FirstName").NotLike("老[^1-4]")),
+			wantSql:  "SELECT `id`,`first_name`,`age`,`last_name` FROM `test_model` WHERE `first_name` NOT LIKE ?;",
+			wantArgs: []interface{}{"老[^1-4]"},
+		},
+		{
+			name:     "where like [^ ]",
+			builder:  NewSelector[TestModel](db).From(&TestModel{}).Where(C("FirstName").Like("老[^1-4]")),
+			wantSql:  "SELECT `id`,`first_name`,`age`,`last_name` FROM `test_model` WHERE `first_name` LIKE ?;",
+			wantArgs: []interface{}{"老[^1-4]"},
+		},
+
+		{
+			name:     "where not like int",
+			builder:  NewSelector[TestModel](db).From(&TestModel{}).Where(C("Age").NotLike(18)),
+			wantSql:  "SELECT `id`,`first_name`,`age`,`last_name` FROM `test_model` WHERE `age` NOT LIKE ?;",
+			wantArgs: []interface{}{18},
+		},
+		{
+			name:     "where like int",
+			builder:  NewSelector[TestModel](db).From(&TestModel{}).Where(C("Age").Like(22)),
+			wantSql:  "SELECT `id`,`first_name`,`age`,`last_name` FROM `test_model` WHERE `age` LIKE ?;",
+			wantArgs: []interface{}{22},
+		},
+		{
+			name:     "having like %",
+			builder:  NewSelector[TestModel](db).From(&TestModel{}).GroupBy("FirstName").Having(C("LastName").Like("%li")),
+			wantSql:  "SELECT `id`,`first_name`,`age`,`last_name` FROM `test_model` GROUP BY `first_name` HAVING `last_name` LIKE ?;",
+			wantArgs: []interface{}{"%li"},
+		},
+		{
+			name:     "having no like %",
+			builder:  NewSelector[TestModel](db).From(&TestModel{}).GroupBy("FirstName").Having(C("LastName").NotLike("%yy%")),
+			wantSql:  "SELECT `id`,`first_name`,`age`,`last_name` FROM `test_model` GROUP BY `first_name` HAVING `last_name` NOT LIKE ?;",
+			wantArgs: []interface{}{"%yy%"},
+		},
 	}
 
 	for _, tc := range testCases {
