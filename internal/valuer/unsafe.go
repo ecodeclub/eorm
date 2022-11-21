@@ -26,14 +26,17 @@ import (
 var _ Creator = NewUnsafeValue
 
 type unsafeValue struct {
+	val  reflect.Value
 	addr unsafe.Pointer
 	meta *model.TableMeta
 }
 
 func NewUnsafeValue(val interface{}, meta *model.TableMeta) Value {
+	refVal := reflect.ValueOf(val)
 	return unsafeValue{
-		addr: unsafe.Pointer(reflect.ValueOf(val).Pointer()),
 		meta: meta,
+		val:  refVal.Elem(),
+		addr: unsafe.Pointer(refVal.Pointer()),
 	}
 }
 
@@ -59,14 +62,20 @@ func (u unsafeValue) SetColumns(rows *sql.Rows) error {
 
 	// TODO 性能优化
 	colValues := make([]interface{}, len(cs))
-	for i, c := range cs {
-		cm, ok := u.meta.ColumnMap[c]
-		if !ok {
-			return errs.NewInvalidColumnError(c)
+	switch u.val.Kind() {
+	case reflect.Struct:
+		for i, c := range cs {
+			cm, ok := u.meta.ColumnMap[c]
+			if !ok {
+				return errs.NewInvalidColumnError(c)
+			}
+			ptr := unsafe.Pointer(uintptr(u.addr) + cm.Offset)
+			val := reflect.NewAt(cm.Typ, ptr)
+			colValues[i] = val.Interface()
 		}
-		ptr := unsafe.Pointer(uintptr(u.addr) + cm.Offset)
-		val := reflect.NewAt(cm.Typ, ptr)
-		colValues[i] = val.Interface()
+	default:
+		val := reflect.NewAt(u.val.Type(), u.addr)
+		colValues = append(colValues, val.Interface())
 	}
 	return rows.Scan(colValues...)
 }

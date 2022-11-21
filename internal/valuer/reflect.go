@@ -73,23 +73,37 @@ func (r reflectValue) SetColumns(rows *sql.Rows) error {
 	// colValues 和 colEleValues 实质上最终都指向同一个对象
 	colValues := make([]interface{}, len(cs))
 	colEleValues := make([]reflect.Value, len(cs))
-	for i, c := range cs {
-		cm, ok := r.meta.ColumnMap[c]
-		if !ok {
-			return errs.NewInvalidColumnError(c)
+
+	switch r.val.Kind() {
+	case reflect.Struct:
+		for i, c := range cs {
+			cm, ok := r.meta.ColumnMap[c]
+			if !ok {
+				return errs.NewInvalidColumnError(c)
+			}
+			val := reflect.New(cm.Typ)
+			colValues[i] = val.Interface()
+			colEleValues[i] = val.Elem()
 		}
-		val := reflect.New(cm.Typ)
-		colValues[i] = val.Interface()
-		colEleValues[i] = val.Elem()
+	default:
+		val := reflect.New(r.val.Type())
+		colEleValues = append(colEleValues, val.Elem())
+		colValues = append(colValues, val.Interface())
 	}
+
 	if err = rows.Scan(colValues...); err != nil {
 		return err
 	}
 
 	for i, c := range cs {
-		cm := r.meta.ColumnMap[c]
-		fd, _ := r.fieldByIndex(cm.FieldName)
-		fd.Set(colEleValues[i])
+		if r.val.Kind() == reflect.Struct {
+			cm := r.meta.ColumnMap[c]
+			fd, _ := r.fieldByIndex(cm.FieldName)
+			fd.Set(colEleValues[i])
+		} else {
+			r.val.Set(colEleValues[i])
+		}
+
 	}
 	return nil
 }
