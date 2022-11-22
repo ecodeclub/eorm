@@ -316,3 +316,12 @@ func DESC(fields ...string) OrderBy {
 type Selectable interface {
 	selected()
 }
+
+// Exec sql
+func (s *Selector[T]) Exec(ctx context.Context) Result {
+	query, err := s.Build()
+	if err != nil {
+		return Result{err: err}
+	}
+	return newQuerier[T](s.session, query).Exec(ctx)
+}

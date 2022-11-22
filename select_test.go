@@ -15,11 +15,14 @@
 package eorm
 
 import (
+	"context"
+	"database/sql"
 	"fmt"
-	"testing"
-
+	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/gotomicro/eorm/internal/errs"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"testing"
 )
 
 func TestSelectable(t *testing.T) {
@@ -381,6 +384,82 @@ type TestCombinedModel struct {
 	FirstName string
 	Age       int8
 	LastName  *string
+}
+
+func TestSelector_Exec(t *testing.T) {
+
+	testCases := []struct {
+		name      string
+		s         *Selector[TestModel]
+		selector  func(*DB, *testing.T) Result
+		wantErr   error
+		mockOrder func(mock sqlmock.Sqlmock)
+		wantVal   sql.Result
+	}{
+		{
+			name: "查找所有FirstName相同的",
+			selector: func(db *DB, t *testing.T) Result {
+				selector := NewSelector[TestModel](db).From(&TestModel{}).Where(C("FirstName").EQ("Tom"))
+				result := selector.Exec(context.Background())
+				return result
+			},
+			mockOrder: func(mock sqlmock.Sqlmock) {
+				mock.ExpectExec("SELECT `id`,`first_name`,`age`,`last_name` FROM `test_model` WHERE `first_name`=?").
+					WithArgs("Tom").WillReturnResult(sqlmock.NewResult(1, 2))
+			},
+			wantVal: sqlmock.NewResult(1, 2),
+		},
+		{
+			name: "查找所有年龄低于20的",
+			selector: func(db *DB, t *testing.T) Result {
+				selector := NewSelector[TestModel](db).Select(C("FirstName")).From(&TestModel{}).Where(C("Age").LT(20))
+				result := selector.Exec(context.Background())
+				return result
+			},
+			mockOrder: func(mock sqlmock.Sqlmock) {
+				mock.ExpectExec("SELECT `first_name` FROM `test_model` WHERE `age`<?").
+					WithArgs(20).WillReturnResult(sqlmock.NewResult(100, 20))
+			},
+			wantVal: sqlmock.NewResult(100, 20),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			mockDB, mock, err := sqlmock.New()
+			if err != nil {
+				t.Fatal(err)
+			}
+			orm, err := openDB("mysql", mockDB)
+			defer func(db *DB) { _ = db.Close() }(orm)
+			if err != nil {
+				t.Fatal(err)
+			}
+			tc.mockOrder(mock)
+
+			res := tc.selector(orm, t)
+			if res.Err() != nil {
+				assert.Equal(t, tc.wantErr, res.Err())
+				return
+			}
+			assert.Nil(t, tc.wantErr)
+			rowsAffectedExpect, err := tc.wantVal.RowsAffected()
+			require.NoError(t, err)
+			rowsAffected, err := res.RowsAffected()
+			require.NoError(t, err)
+
+			lastInsertIdExpected, err := tc.wantVal.LastInsertId()
+			require.NoError(t, err)
+			lastInsertId, err := res.LastInsertId()
+			require.NoError(t, err)
+			assert.Equal(t, lastInsertIdExpected, lastInsertId)
+			assert.Equal(t, rowsAffectedExpect, rowsAffected)
+
+			if err = mock.ExpectationsWereMet(); err != nil {
+				t.Error(err)
+			}
+		})
+	}
 }
 
 func ExampleSelector_OrderBy() {
