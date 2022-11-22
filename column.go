@@ -93,6 +93,24 @@ func (c Column) As(alias string) Selectable {
 	}
 }
 
+// Like -> LIKE %XXX 、_x_ 、xx[xx-xx] 、xx[^xx-xx]
+func (c Column) Like(val interface{}) Predicate {
+	return Predicate{
+		left:  c,
+		op:    opLike,
+		right: valueOf(val),
+	}
+}
+
+// NotLike -> NOT LIKE %XXX 、_x_ 、xx[xx-xx] 、xx[^xx-xx]
+func (c Column) NotLike(val interface{}) Predicate {
+	return Predicate{
+		left:  c,
+		op:    opNotLike,
+		right: valueOf(val),
+	}
+}
+
 // Add generate an additive expression
 func (c Column) Add(val interface{}) MathExpr {
 	return MathExpr{
