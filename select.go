@@ -316,3 +316,11 @@ func DESC(fields ...string) OrderBy {
 type Selectable interface {
 	selected()
 }
+
+func (s *Selector[T]) GetMulti(ctx context.Context) ([]*T, error) {
+	query, err := s.Build()
+	if err != nil {
+		return nil, err
+	}
+	return newQuerier[T](s.session, query).GetMulti(ctx)
+}

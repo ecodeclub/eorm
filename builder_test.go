@@ -232,3 +232,83 @@ func testQuerierGet(t *testing.T, c valuer.Creator) {
 		})
 	}
 }
+
+type QuerierTestSuiteMulti struct {
+	suite.Suite
+	orm *DB
+}
+
+func TestQuerier_GetMulti(t *testing.T) {
+	suite.Run(t, &QuerierTestSuiteMulti{})
+}
+
+func (q *QuerierTestSuiteMulti) SetupSuite() {
+	q.orm = memoryDBWithDB("querier_multi")
+	// 创建表
+	r := RawQuery[TestModel](q.orm, TestModel{}.CreateSQL()).Exec(context.Background())
+	if r.Err() != nil {
+		q.T().Fatal(r.Err())
+	}
+	// 准备数据
+	res := NewInserter[TestModel](q.orm).Values(
+		&TestModel{
+			Id:        1,
+			FirstName: "Jack",
+			Age:       20,
+			LastName:  &sql.NullString{String: "Rose", Valid: true},
+		}, &TestModel{
+			Id:        2,
+			FirstName: "Tom",
+			Age:       18,
+			LastName:  &sql.NullString{String: "Jerry", Valid: true},
+		}).Exec(context.Background())
+
+	if res.Err() != nil {
+		q.T().Fatal(res.Err())
+	}
+
+}
+
+func (q *QuerierTestSuiteMulti) TestGetMulti() {
+	t := q.T()
+	testCases := []struct {
+		name       string
+		s          *Selector[TestModel]
+		wantErr    error
+		wantResult []*TestModel
+	}{
+		{
+			name:       "not found",
+			s:          NewSelector[TestModel](q.orm).From(&TestModel{}).Where(C("Id").EQ(12)),
+			wantResult: []*TestModel{},
+		},
+		{
+			name: "found",
+			s:    NewSelector[TestModel](q.orm).From(&TestModel{}).Where(C("Id").LT(4)),
+			wantResult: []*TestModel{
+				&TestModel{
+					Id:        1,
+					FirstName: "Jack",
+					Age:       20,
+					LastName:  &sql.NullString{String: "Rose", Valid: true},
+				},
+				&TestModel{
+					Id:        2,
+					FirstName: "Tom",
+					Age:       18,
+					LastName:  &sql.NullString{String: "Jerry", Valid: true},
+				},
+			},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			res, err := tc.s.GetMulti(context.Background())
+			assert.Equal(t, tc.wantErr, err)
+			if err != nil {
+				return
+			}
+			assert.Equal(t, tc.wantResult, res)
+		})
+	}
+}

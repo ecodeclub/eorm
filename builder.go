@@ -266,3 +266,24 @@ func (b *builder) buildIns(is values) error {
 	_ = b.buffer.WriteByte(')')
 	return nil
 }
+
+func (q Querier[T]) GetMulti(ctx context.Context) ([]*T, error) {
+	rows, err := q.session.queryContext(ctx, q.q.SQL, q.q.Args...)
+	if err != nil {
+		return nil, err
+	}
+	res := make([]*T, 0, 16)
+	for rows.Next() {
+		tp := new(T)
+		meta, err := q.metaRegistry.Get(tp)
+		if err != nil {
+			return nil, err
+		}
+		val := q.valCreator(tp, meta)
+		if err = val.SetColumns(rows); err != nil {
+			return nil, err
+		}
+		res = append(res, tp)
+	}
+	return res, nil
+}
