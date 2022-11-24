@@ -315,10 +315,10 @@ func (q *QuerierTestSuiteMulti) TestGetMulti() {
 
 func TestQuerierGetMulti(t *testing.T) {
 	t.Run("unsafe", func(t *testing.T) {
-		testQuerierGetMulti(t, valuer.NewUnsafeValue)
+		testQuerier_GetMulti(t, valuer.NewUnsafeValue)
 	})
 	t.Run("reflect", func(t *testing.T) {
-		testQuerierGetMulti(t, valuer.NewUnsafeValue)
+		testQuerier_GetMulti(t, valuer.NewUnsafeValue)
 	})
 }
 
