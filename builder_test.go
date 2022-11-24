@@ -322,7 +322,7 @@ func TestQuerierGetMulti(t *testing.T) {
 	})
 }
 
-func testQuerierGetMulti(t *testing.T, c valuer.Creator) {
+func testQuerier_GetMulti(t *testing.T, c valuer.Creator) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
 		t.Fatal(err)
