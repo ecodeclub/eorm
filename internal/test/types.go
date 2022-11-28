@@ -178,3 +178,29 @@ func NewSimpleStruct(id uint64) *SimpleStruct {
 		},
 	}
 }
+
+type BaseEntity struct {
+	CreateTime uint64
+	UpdateTime uint64
+}
+
+type CombinedModel struct {
+	BaseEntity
+	Id        int64 `eorm:"auto_increment,primary_key"`
+	FirstName string
+	Age       int8
+	LastName  *string
+}
+
+func NewCombinedModel(id int64) *CombinedModel {
+	return &CombinedModel{
+		BaseEntity: BaseEntity{
+			CreateTime: 10000,
+			UpdateTime: 10000,
+		},
+		Id:        id,
+		FirstName: "Tom" + fmt.Sprintln(id),
+		Age:       20,
+		LastName:  ekit.ToPtr[string]("Jerry" + fmt.Sprintln(id)),
+	}
+}
