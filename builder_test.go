@@ -135,8 +135,7 @@ func testQuerierGet(t *testing.T, c valuer.Creator) {
 			exp.WillReturnRows(tc.mockRows)
 		}
 	}
-
-	orm.valCreator = c
+	DBWithValCreator(c)(orm)
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			res, err := RawQuery[TestModel](orm, tc.query).Get(context.Background())
@@ -232,7 +231,7 @@ func testQuerier_GetMulti(t *testing.T, c valuer.Creator) {
 			exp.WillReturnRows(tc.mockRows)
 		}
 	}
-	orm.valCreator = c
+	DBWithValCreator(c)(orm)
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			res, err := RawQuery[TestModel](orm, tc.query).GetMulti(context.Background())

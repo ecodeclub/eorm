@@ -82,5 +82,5 @@ func (d *Deleter[T]) Exec(ctx context.Context) Result {
 	if err != nil {
 		return Result{err: err}
 	}
-	return newQuerier[T](d.session, query).Exec(ctx)
+	return newQuerier[T](d.session, query, d.meta).Exec(ctx)
 }

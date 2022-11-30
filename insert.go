@@ -71,7 +71,7 @@ func (i *Inserter[T]) Build() (*Query, error) {
 			i.comma()
 		}
 		i.writeString("(")
-		refVal := i.valCreator(val, i.meta)
+		refVal := i.valCreator.NewBasicTypeValue(val, i.meta)
 		for j, v := range fields {
 			fdVal, err := refVal.Field(v.FieldName)
 			if err != nil {
@@ -110,7 +110,7 @@ func (i *Inserter[T]) Exec(ctx context.Context) Result {
 	if err != nil {
 		return Result{err: err}
 	}
-	return newQuerier[T](i.session, query).Exec(ctx)
+	return newQuerier[T](i.session, query, i.meta).Exec(ctx)
 }
 
 func (i *Inserter[T]) buildColumns() ([]*model.ColumnMeta, error) {

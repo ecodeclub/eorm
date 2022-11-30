@@ -62,20 +62,14 @@ func (u unsafeValue) SetColumns(rows *sql.Rows) error {
 
 	// TODO 性能优化
 	colValues := make([]interface{}, len(cs))
-	switch u.val.Kind() {
-	case reflect.Struct:
-		for i, c := range cs {
-			cm, ok := u.meta.ColumnMap[c]
-			if !ok {
-				return errs.NewInvalidColumnError(c)
-			}
-			ptr := unsafe.Pointer(uintptr(u.addr) + cm.Offset)
-			val := reflect.NewAt(cm.Typ, ptr)
-			colValues[i] = val.Interface()
+	for i, c := range cs {
+		cm, ok := u.meta.ColumnMap[c]
+		if !ok {
+			return errs.NewInvalidColumnError(c)
 		}
-	default:
-		val := reflect.NewAt(u.val.Type(), u.addr)
-		colValues = append(colValues, val.Interface())
+		ptr := unsafe.Pointer(uintptr(u.addr) + cm.Offset)
+		val := reflect.NewAt(cm.Typ, ptr)
+		colValues[i] = val.Interface()
 	}
 	return rows.Scan(colValues...)
 }

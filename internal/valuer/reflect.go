@@ -74,21 +74,14 @@ func (r reflectValue) SetColumns(rows *sql.Rows) error {
 	colValues := make([]interface{}, len(cs))
 	colEleValues := make([]reflect.Value, len(cs))
 
-	switch r.val.Kind() {
-	case reflect.Struct:
-		for i, c := range cs {
-			cm, ok := r.meta.ColumnMap[c]
-			if !ok {
-				return errs.NewInvalidColumnError(c)
-			}
-			val := reflect.New(cm.Typ)
-			colValues[i] = val.Interface()
-			colEleValues[i] = val.Elem()
+	for i, c := range cs {
+		cm, ok := r.meta.ColumnMap[c]
+		if !ok {
+			return errs.NewInvalidColumnError(c)
 		}
-	default:
-		val := reflect.New(r.val.Type())
-		colEleValues = append(colEleValues, val.Elem())
-		colValues = append(colValues, val.Interface())
+		val := reflect.New(cm.Typ)
+		colValues[i] = val.Interface()
+		colEleValues[i] = val.Elem()
 	}
 
 	if err = rows.Scan(colValues...); err != nil {
@@ -96,14 +89,9 @@ func (r reflectValue) SetColumns(rows *sql.Rows) error {
 	}
 
 	for i, c := range cs {
-		if r.val.Kind() == reflect.Struct {
-			cm := r.meta.ColumnMap[c]
-			fd, _ := r.fieldByIndex(cm.FieldName)
-			fd.Set(colEleValues[i])
-		} else {
-			r.val.Set(colEleValues[i])
-		}
-
+		cm := r.meta.ColumnMap[c]
+		fd, _ := r.fieldByIndex(cm.FieldName)
+		fd.Set(colEleValues[i])
 	}
 	return nil
 }

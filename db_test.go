@@ -165,7 +165,9 @@ func BenchmarkQuerier_Get(b *testing.B) {
 	}
 
 	b.Run("unsafe", func(b *testing.B) {
-		orm.valCreator = valuer.NewUnsafeValue
+		orm.valCreator = valuer.BasicTypeCreator{
+			Creator: valuer.NewUnsafeValue,
+		}
 		for i := 0; i < b.N; i++ {
 			_, err = NewSelector[TestModel](orm).From(&TestModel{}).Get(context.Background())
 			if err != nil {
@@ -175,7 +177,9 @@ func BenchmarkQuerier_Get(b *testing.B) {
 	})
 
 	b.Run("reflect", func(b *testing.B) {
-		orm.valCreator = valuer.NewReflectValue
+		orm.valCreator = valuer.BasicTypeCreator{
+			Creator: valuer.NewReflectValue,
+		}
 		for i := 0; i < b.N; i++ {
 			_, err = NewSelector[TestModel](orm).From(&TestModel{}).Get(context.Background())
 			if err != nil {
