@@ -15,8 +15,10 @@
 package valuer
 
 import (
+	"database/sql"
 	"database/sql/driver"
 	"testing"
+	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/gotomicro/eorm/internal/errs"
@@ -24,6 +26,127 @@ import (
 	"github.com/gotomicro/eorm/internal/test"
 	"github.com/stretchr/testify/assert"
 )
+
+func Test_basicTypeValue_Field(t *testing.T) {
+	testBasicValueField(t, BasicTypeCreator{Creator: NewUnsafeValue})
+	testBasicValueField(t, BasicTypeCreator{Creator: NewReflectValue})
+}
+
+func testBasicValueField(t *testing.T, creator BasicTypeCreator) {
+	meta, err := model.NewMetaRegistry().Get(&test.SimpleStruct{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Run("zero value", func(t *testing.T) {
+		entity := &test.SimpleStruct{}
+		testCases := newValueFieldTestCases(entity)
+		val := creator.NewBasicTypeValue(entity, meta)
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				v, err := val.Field(tc.field)
+				assert.Equal(t, tc.wantError, err)
+				if err != nil {
+					return
+				}
+				assert.Equal(t, tc.wantVal, v)
+			})
+		}
+	})
+	t.Run("normal value", func(t *testing.T) {
+		entity := test.NewSimpleStruct(1)
+		testCases := newValueFieldTestCases(entity)
+		val := creator.NewBasicTypeValue(entity, meta)
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				v, err := val.Field(tc.field)
+				assert.Equal(t, tc.wantError, err)
+				if err != nil {
+					return
+				}
+				assert.Equal(t, tc.wantVal, v)
+			})
+		}
+	})
+
+	type User struct {
+		CreateTime time.Time
+		Name       *string
+	}
+
+	invalidCases := []valueFieldTestCase{
+		{
+			// 不存在的字段
+			name:      "invalid field",
+			field:     "UpdateTime",
+			wantError: errs.NewInvalidFieldError("UpdateTime"),
+		},
+	}
+	t.Run("invalid cases", func(t *testing.T) {
+		meta, err := model.NewMetaRegistry().Get(&User{})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		val := creator.NewBasicTypeValue(&User{}, meta)
+		for _, tc := range invalidCases {
+			t.Run(tc.name, func(t *testing.T) {
+				v, err := val.Field(tc.field)
+				assert.Equal(t, tc.wantError, err)
+				if err != nil {
+					return
+				}
+				assert.Equal(t, tc.wantVal, v)
+			})
+		}
+	})
+
+	type BaseEntity struct {
+		Id         int64 `eorm:"auto_increment,primary_key"`
+		CreateTime uint64
+	}
+	type CombinedUser struct {
+		BaseEntity
+		FirstName string
+	}
+
+	cUser := &CombinedUser{}
+	testCases := []valueFieldTestCase{
+		{
+			name:    "id",
+			field:   "Id",
+			wantVal: cUser.Id,
+		},
+		{
+			name:    "CreateTime",
+			field:   "CreateTime",
+			wantVal: cUser.CreateTime,
+		},
+		{
+			name:    "FirstName",
+			field:   "FirstName",
+			wantVal: cUser.FirstName,
+		},
+	}
+	// 测试使用组合的场景
+	t.Run("combination cases", func(t *testing.T) {
+		meta, err = model.NewMetaRegistry().Get(cUser)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		val := creator.NewBasicTypeValue(cUser, meta)
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				v, err := val.Field(tc.field)
+				assert.Equal(t, tc.wantError, err)
+				if err != nil {
+					return
+				}
+				assert.Equal(t, tc.wantVal, v)
+			})
+		}
+	})
+}
 
 func Test_basicTypeValue_SetColumn(t *testing.T) {
 	testCases := []struct {
@@ -81,6 +204,15 @@ func Test_basicTypeValue_SetColumn(t *testing.T) {
 				val := true
 				return &val
 			}(),
+		},
+		{
+			name:       "sql.NullString",
+			valCreator: NewUnsafeValue,
+			cs: map[string][]byte{
+				"string": []byte("word"),
+			},
+			val:     &sql.NullString{},
+			wantVal: &sql.NullString{String: "word", Valid: true},
 		},
 		{
 			name:       "struct ptr value",
@@ -149,7 +281,7 @@ func Test_basicTypeValue_SetColumn(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer func() { _ = db.Close() }()
-			basicCreator := &BasicTypeCreator{Creator: tc.valCreator}
+			basicCreator := BasicTypeCreator{Creator: tc.valCreator}
 			val := basicCreator.NewBasicTypeValue(tc.val, meta)
 			cols := make([]string, 0, len(tc.cs))
 			colVals := make([]driver.Value, 0, len(tc.cs))

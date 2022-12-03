@@ -100,15 +100,6 @@ func (s *SelectTestSuite) TestSelectorGetBaseType() {
 			wantErr: eorm.ErrNoRows,
 		},
 		{
-			name: "res struct ptr",
-			queryRes: func() (any, error) {
-				queryer := eorm.NewSelector[test.SimpleStruct](s.orm).
-					Where(eorm.C("Id").EQ(1))
-				return queryer.Get(context.Background())
-			},
-			wantRes: test.NewSimpleStruct(1),
-		},
-		{
 			name: "res int",
 			queryRes: func() (any, error) {
 				queryer := eorm.NewSelector[int](s.orm).Select(eorm.C("Id")).

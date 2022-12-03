@@ -48,7 +48,7 @@ func NewSelector[T any](sess session) *Selector[T] {
 }
 
 // TableOf -> get selector table
-func (s *Selector[T]) TableOf() any {
+func (s *Selector[T]) tableOf() any {
 	if s.table != nil {
 		return s.table
 	} else {
@@ -60,7 +60,7 @@ func (s *Selector[T]) TableOf() any {
 func (s *Selector[T]) Build() (*Query, error) {
 	defer bytebufferpool.Put(s.buffer)
 	var err error
-	s.meta, err = s.metaRegistry.Get(s.TableOf())
+	s.meta, err = s.metaRegistry.Get(s.tableOf())
 	if err != nil {
 		return nil, err
 	}

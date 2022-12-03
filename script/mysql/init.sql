@@ -39,3 +39,16 @@ create table if not exists `integration_test`.`simple_struct`(
     json_column varchar(2048),
     primary key (`id`)
 );
+
+create table if not exists `integration_test`.`combined_model`
+(
+    `id`          bigint auto_increment
+        primary key,
+    `first_name`  varchar(128) null,
+    `age`         int          null,
+    `last_name`   varchar(128) null,
+    `create_time` bigint       null,
+    `update_time` bigint       null
+);
+
+
