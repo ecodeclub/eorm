@@ -53,7 +53,7 @@ type BasicTypeCreator struct {
 
 // NewBasicTypeValue 返回一个封装好的，基于支持基本类型实现的 Value
 // 输入 val 必须是一个指向结构体实例的指针，而不能是任何其它类型
-func (c BasicTypeCreator) NewBasicTypeValue(val any, meta *model.TableMeta) supportBasicTypeValue {
+func (c BasicTypeCreator) NewBasicTypeValue(val any, meta *model.TableMeta) Value {
 	return supportBasicTypeValue{
 		val:     val,
 		Value:   c.Creator(val, meta),

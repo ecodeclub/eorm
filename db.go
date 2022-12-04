@@ -35,9 +35,9 @@ type DB struct {
 	core
 }
 
-func DBWithValCreator(c valuer.Creator) DBOption {
+func UseReflection() DBOption {
 	return func(db *DB) {
-		db.valCreator = valuer.BasicTypeCreator{Creator: c}
+		db.valCreator = valuer.BasicTypeCreator{Creator: valuer.NewUnsafeValue}
 	}
 }
 

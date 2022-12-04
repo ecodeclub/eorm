@@ -94,14 +94,15 @@ func (q Querier[T]) Get(ctx context.Context) (*T, error) {
 	}
 
 	tp := new(T)
-	if q.meta == nil && reflect.TypeOf(tp).Elem().Kind() == reflect.Struct {
+	meta := q.meta
+	if meta == nil && reflect.TypeOf(tp).Elem().Kind() == reflect.Struct {
 		//  当通过 RawQuery 方法调用 Get ,如果 T 是 time.Time, sql.Scanner 的实现，
 		//  内置类型或者基本类型时， 在这里都会报错，但是这种情况我们认为是可以接受的
 		//  所以在此将报错忽略，因为基本类型取值用不到 meta 里的数据
-		q.meta, _ = q.metaRegistry.Get(tp)
+		meta, _ = q.metaRegistry.Get(tp)
 	}
 
-	val := q.valCreator.NewBasicTypeValue(tp, q.meta)
+	val := q.valCreator.NewBasicTypeValue(tp, meta)
 	if err = val.SetColumns(rows); err != nil {
 		return nil, err
 	}
@@ -283,18 +284,19 @@ func (q Querier[T]) GetMulti(ctx context.Context) ([]*T, error) {
 		return nil, err
 	}
 	res := make([]*T, 0, 16)
-	if q.meta == nil {
+	meta := q.meta
+	if meta == nil {
 		t := new(T)
 		if reflect.TypeOf(t).Elem().Kind() == reflect.Struct {
 			//  当通过 RawQuery 方法调用 Get ,如果 T 是 time.Time, sql.Scanner 的实现，
 			//  内置类型或者基本类型时， 在这里都会报错，但是这种情况我们认为是可以接受的
 			//  所以在此将报错忽略，因为基本类型取值用不到 meta 里的数据
-			q.meta, _ = q.metaRegistry.Get(t)
+			meta, _ = q.metaRegistry.Get(t)
 		}
 	}
 	for rows.Next() {
 		tp := new(T)
-		val := q.valCreator.NewBasicTypeValue(tp, q.meta)
+		val := q.valCreator.NewBasicTypeValue(tp, meta)
 		if err = val.SetColumns(rows); err != nil {
 			return nil, err
 		}
