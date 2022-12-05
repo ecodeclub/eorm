@@ -60,15 +60,15 @@ func (q Query) string() string {
 
 func TestQuerier_Get(t *testing.T) {
 	t.Run("unsafe", func(t *testing.T) {
-		testQuerierGet(t, valuer.NewUnsafeValue)
+		testQuerierGet(t, valuer.BasicTypeCreator{Creator: valuer.NewUnsafeValue})
 	})
 
 	t.Run("reflect", func(t *testing.T) {
-		testQuerierGet(t, valuer.NewReflectValue)
+		testQuerierGet(t, valuer.BasicTypeCreator{Creator: valuer.NewReflectValue})
 	})
 }
 
-func testQuerierGet(t *testing.T, c valuer.Creator) {
+func testQuerierGet(t *testing.T, creator valuer.BasicTypeCreator) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
 		t.Fatal(err)
@@ -135,8 +135,7 @@ func testQuerierGet(t *testing.T, c valuer.Creator) {
 			exp.WillReturnRows(tc.mockRows)
 		}
 	}
-
-	orm.valCreator = c
+	orm.valCreator = creator
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			res, err := RawQuery[TestModel](orm, tc.query).Get(context.Background())
@@ -151,14 +150,14 @@ func testQuerierGet(t *testing.T, c valuer.Creator) {
 
 func TestQuerierGetMulti(t *testing.T) {
 	t.Run("unsafe", func(t *testing.T) {
-		testQuerier_GetMulti(t, valuer.NewUnsafeValue)
+		testQuerier_GetMulti(t, valuer.BasicTypeCreator{Creator: valuer.NewUnsafeValue})
 	})
 	t.Run("reflect", func(t *testing.T) {
-		testQuerier_GetMulti(t, valuer.NewUnsafeValue)
+		testQuerier_GetMulti(t, valuer.BasicTypeCreator{Creator: valuer.NewReflectValue})
 	})
 }
 
-func testQuerier_GetMulti(t *testing.T, c valuer.Creator) {
+func testQuerier_GetMulti(t *testing.T, creator valuer.BasicTypeCreator) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
 		t.Fatal(err)
@@ -232,7 +231,7 @@ func testQuerier_GetMulti(t *testing.T, c valuer.Creator) {
 			exp.WillReturnRows(tc.mockRows)
 		}
 	}
-	orm.valCreator = c
+	orm.valCreator = creator
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			res, err := RawQuery[TestModel](orm, tc.query).GetMulti(context.Background())

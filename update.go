@@ -64,7 +64,7 @@ func (u *Updater[T]) Build() (*Query, error) {
 		return nil, err
 	}
 
-	u.val = u.valCreator(u.table, u.meta)
+	u.val = u.valCreator.NewBasicTypeValue(u.table, u.meta)
 	u.args = make([]interface{}, 0, len(u.meta.Columns))
 
 	u.writeString("UPDATE ")
@@ -234,5 +234,5 @@ func (u *Updater[T]) Exec(ctx context.Context) Result {
 	if err != nil {
 		return Result{err: err}
 	}
-	return newQuerier[T](u.session, query).Exec(ctx)
+	return newQuerier[T](u.session, query, u.meta).Exec(ctx)
 }

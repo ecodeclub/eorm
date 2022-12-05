@@ -17,6 +17,7 @@ package eorm
 import (
 	"context"
 	"errors"
+	"reflect"
 
 	"github.com/gotomicro/eorm/internal/errs"
 	"github.com/gotomicro/eorm/internal/model"
@@ -48,23 +49,29 @@ type Querier[T any] struct {
 	q *Query
 	core
 	session
+	meta *model.TableMeta
 }
 
 // RawQuery 创建一个 Querier 实例
 // 泛型参数 T 是目标类型。
 // 例如，如果查询 User 的数据，那么 T 就是 User
 func RawQuery[T any](sess session, sql string, args ...any) Querier[T] {
-	return newQuerier[T](sess, &Query{
-		SQL:  sql,
-		Args: args,
-	})
+	return Querier[T]{
+		q: &Query{
+			SQL:  sql,
+			Args: args,
+		},
+		core:    sess.getCore(),
+		session: sess,
+	}
 }
 
-func newQuerier[T any](sess session, q *Query) Querier[T] {
+func newQuerier[T any](sess session, q *Query, meta *model.TableMeta) Querier[T] {
 	return Querier[T]{
 		q:       q,
 		core:    sess.getCore(),
 		session: sess,
+		meta:    meta,
 	}
 }
 
@@ -87,16 +94,20 @@ func (q Querier[T]) Get(ctx context.Context) (*T, error) {
 	}
 
 	tp := new(T)
-	meta, err := q.metaRegistry.Get(tp)
-	if err != nil {
-		return nil, err
+	meta := q.meta
+	if meta == nil && reflect.TypeOf(tp).Elem().Kind() == reflect.Struct {
+		//  当通过 RawQuery 方法调用 Get ,如果 T 是 time.Time, sql.Scanner 的实现，
+		//  内置类型或者基本类型时， 在这里都会报错，但是这种情况我们认为是可以接受的
+		//  所以在此将报错忽略，因为基本类型取值用不到 meta 里的数据
+		meta, _ = q.metaRegistry.Get(tp)
 	}
 
-	val := q.valCreator(tp, meta)
+	val := q.valCreator.NewBasicTypeValue(tp, meta)
 	if err = val.SetColumns(rows); err != nil {
 		return nil, err
 	}
 	return tp, nil
+
 }
 
 type builder struct {
@@ -273,13 +284,19 @@ func (q Querier[T]) GetMulti(ctx context.Context) ([]*T, error) {
 		return nil, err
 	}
 	res := make([]*T, 0, 16)
+	meta := q.meta
+	if meta == nil {
+		t := new(T)
+		if reflect.TypeOf(t).Elem().Kind() == reflect.Struct {
+			//  当通过 RawQuery 方法调用 Get ,如果 T 是 time.Time, sql.Scanner 的实现，
+			//  内置类型或者基本类型时， 在这里都会报错，但是这种情况我们认为是可以接受的
+			//  所以在此将报错忽略，因为基本类型取值用不到 meta 里的数据
+			meta, _ = q.metaRegistry.Get(t)
+		}
+	}
 	for rows.Next() {
 		tp := new(T)
-		meta, err := q.metaRegistry.Get(tp)
-		if err != nil {
-			return nil, err
-		}
-		val := q.valCreator(tp, meta)
+		val := q.valCreator.NewBasicTypeValue(tp, meta)
 		if err = val.SetColumns(rows); err != nil {
 			return nil, err
 		}

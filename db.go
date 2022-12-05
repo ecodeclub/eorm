@@ -35,6 +35,12 @@ type DB struct {
 	core
 }
 
+func UseReflection() DBOption {
+	return func(db *DB) {
+		db.valCreator = valuer.BasicTypeCreator{Creator: valuer.NewUnsafeValue}
+	}
+}
+
 func (db *DB) queryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
 	return db.db.QueryContext(ctx, query, args...)
 }
@@ -62,7 +68,10 @@ func openDB(driver string, db *sql.DB, opts ...DBOption) (*DB, error) {
 		core: core{
 			metaRegistry: model.NewMetaRegistry(),
 			dialect:      dl,
-			valCreator:   valuer.NewUnsafeValue,
+			// 可以设为默认，因为原本这里也有默认
+			valCreator: valuer.BasicTypeCreator{
+				Creator: valuer.NewUnsafeValue,
+			},
 		},
 		db: db,
 	}

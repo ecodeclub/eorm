@@ -26,14 +26,17 @@ import (
 var _ Creator = NewUnsafeValue
 
 type unsafeValue struct {
+	val  reflect.Value
 	addr unsafe.Pointer
 	meta *model.TableMeta
 }
 
 func NewUnsafeValue(val interface{}, meta *model.TableMeta) Value {
+	refVal := reflect.ValueOf(val)
 	return unsafeValue{
-		addr: unsafe.Pointer(reflect.ValueOf(val).Pointer()),
 		meta: meta,
+		val:  refVal.Elem(),
+		addr: unsafe.Pointer(refVal.Pointer()),
 	}
 }
 

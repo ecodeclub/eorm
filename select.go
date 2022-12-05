@@ -47,11 +47,20 @@ func NewSelector[T any](sess session) *Selector[T] {
 	}
 }
 
+// TableOf -> get selector table
+func (s *Selector[T]) tableOf() any {
+	if s.table != nil {
+		return s.table
+	} else {
+		return new(T)
+	}
+}
+
 // Build returns Select Query
 func (s *Selector[T]) Build() (*Query, error) {
 	defer bytebufferpool.Put(s.buffer)
 	var err error
-	s.meta, err = s.metaRegistry.Get(s.table)
+	s.meta, err = s.metaRegistry.Get(s.tableOf())
 	if err != nil {
 		return nil, err
 	}
@@ -287,7 +296,7 @@ func (s *Selector[T]) Get(ctx context.Context) (*T, error) {
 	if err != nil {
 		return nil, err
 	}
-	return newQuerier[T](s.session, query).Get(ctx)
+	return newQuerier[T](s.session, query, s.meta).Get(ctx)
 }
 
 // OrderBy specify fields and ASC
@@ -322,5 +331,5 @@ func (s *Selector[T]) GetMulti(ctx context.Context) ([]*T, error) {
 	if err != nil {
 		return nil, err
 	}
-	return newQuerier[T](s.session, query).GetMulti(ctx)
+	return newQuerier[T](s.session, query, s.meta).GetMulti(ctx)
 }

@@ -73,6 +73,7 @@ func (r reflectValue) SetColumns(rows *sql.Rows) error {
 	// colValues 和 colEleValues 实质上最终都指向同一个对象
 	colValues := make([]interface{}, len(cs))
 	colEleValues := make([]reflect.Value, len(cs))
+
 	for i, c := range cs {
 		cm, ok := r.meta.ColumnMap[c]
 		if !ok {
@@ -82,6 +83,7 @@ func (r reflectValue) SetColumns(rows *sql.Rows) error {
 		colValues[i] = val.Interface()
 		colEleValues[i] = val.Elem()
 	}
+
 	if err = rows.Scan(colValues...); err != nil {
 		return err
 	}
