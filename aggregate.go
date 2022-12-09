@@ -16,9 +16,10 @@ package eorm
 
 // Aggregate represents aggregate expression, including AVG, MAX, MIN...
 type Aggregate struct {
-	fn    string
-	arg   string
-	alias string
+	fn       string
+	arg      string
+	alias    string
+	distinct bool
 }
 
 // As specifies the alias
@@ -68,6 +69,27 @@ func Sum(c string) Aggregate {
 		fn:  "SUM",
 		arg: c,
 	}
+}
+
+//CountDistinct represents COUNT(DISTINCT XXX)
+func CountDistinct(col string) Aggregate {
+	a := Count(col)
+	a.distinct = true
+	return a
+}
+
+//AvgDistinct represents AVG(DISTINCT XXX)
+func AvgDistinct(col string) Aggregate {
+	a := Avg(col)
+	a.distinct = true
+	return a
+}
+
+//SumDistinct represents SUM(DISTINCT XXX)
+func SumDistinct(col string) Aggregate {
+	a := Sum(col)
+	a.distinct = true
+	return a
 }
 
 func (a Aggregate) selected() {}

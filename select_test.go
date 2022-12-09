@@ -976,6 +976,22 @@ func TestSelectable(t *testing.T) {
 			wantSql:  "SELECT `id`,`first_name`,`age`,`last_name` FROM `test_model` GROUP BY `first_name` HAVING `last_name` NOT LIKE ?;",
 			wantArgs: []interface{}{"%yy%"},
 		},
+		{
+			name:    "distinct single row",
+			builder: NewSelector[TestModel](db).From(&TestModel{}).Distinct().Select(C("FirstName")),
+			wantSql: "SELECT DISTINCT `first_name` FROM `test_model`;",
+		},
+		{
+			name:    "count distinct",
+			builder: NewSelector[TestModel](db).From(&TestModel{}).Select(CountDistinct("FirstName")),
+			wantSql: "SELECT COUNT(DISTINCT `first_name`) FROM `test_model`;",
+		},
+		{
+			name:     "having count distinct",
+			builder:  NewSelector[TestModel](db).From(&TestModel{}).Select(C("FirstName")).GroupBy("FirstName").Having(CountDistinct("FirstName").EQ("jack")),
+			wantSql:  "SELECT `first_name` FROM `test_model` GROUP BY `first_name` HAVING COUNT(DISTINCT `first_name`)=?;",
+			wantArgs: []interface{}{"jack"},
+		},
 	}
 
 	for _, tc := range testCases {

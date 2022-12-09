@@ -65,6 +65,9 @@ func (s *Selector[T]) Build() (*Query, error) {
 		return nil, err
 	}
 	s.writeString("SELECT ")
+	if s.distinct {
+		s.writeString("DISTINCT ")
+	}
 	if len(s.columns) == 0 {
 		s.buildAllColumns()
 	} else {
@@ -201,7 +204,11 @@ func (s *Selector[T]) buildSelectedList() error {
 }
 func (s *Selector[T]) selectAggregate(aggregate Aggregate) error {
 	s.writeString(aggregate.fn)
+
 	s.writeByte('(')
+	if aggregate.distinct {
+		s.writeString("DISTINCT ")
+	}
 	cMeta, ok := s.meta.FieldMap[aggregate.arg]
 	s.aliases[aggregate.alias] = struct{}{}
 	if !ok {
