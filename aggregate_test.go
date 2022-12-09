@@ -49,6 +49,21 @@ func TestAggregate(t *testing.T) {
 			builder: NewSelector[TestModel](db).Select(Count("Age")).From(&TestModel{}),
 			wantSql: "SELECT COUNT(`age`) FROM `test_model`;",
 		},
+		{
+			name:    "count distinct",
+			builder: NewSelector[TestModel](db).From(&TestModel{}).Select(CountDistinct("FirstName")),
+			wantSql: "SELECT COUNT(DISTINCT `first_name`) FROM `test_model`;",
+		},
+		{
+			name:    "avg distinct",
+			builder: NewSelector[TestModel](db).From(&TestModel{}).Select(AvgDistinct("FirstName")),
+			wantSql: "SELECT AVG(DISTINCT `first_name`) FROM `test_model`;",
+		},
+		{
+			name:    "SUM distinct",
+			builder: NewSelector[TestModel](db).From(&TestModel{}).Select(SumDistinct("FirstName")),
+			wantSql: "SELECT SUM(DISTINCT `first_name`) FROM `test_model`;",
+		},
 	}
 
 	for _, tc := range testCases {
