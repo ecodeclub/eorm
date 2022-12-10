@@ -16,11 +16,12 @@ package eorm
 
 import (
 	"context"
+	"reflect"
+
 	"github.com/gotomicro/eorm/internal/dialect"
 	"github.com/gotomicro/eorm/internal/errs"
 	"github.com/gotomicro/eorm/internal/model"
 	"github.com/gotomicro/eorm/internal/valuer"
-	"reflect"
 )
 
 type core struct {

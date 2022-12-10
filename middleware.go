@@ -2,6 +2,7 @@ package eorm
 
 import (
 	"context"
+
 	"github.com/gotomicro/eorm/internal/model"
 )
 
