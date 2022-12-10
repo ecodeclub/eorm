@@ -16,6 +16,7 @@ package eorm
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"reflect"
 
@@ -79,6 +80,38 @@ func newQuerier[T any](sess session, q *Query, meta *model.TableMeta) Querier[T]
 func (q Querier[T]) Exec(ctx context.Context) Result {
 	res, err := q.session.execContext(ctx, q.q.SQL, q.q.Args...)
 	return Result{res: res, err: err}
+}
+
+func (q Querier[T]) exec(ctx context.Context, qc *QueryContext) Result {
+	var handler HandleFunc = func(ctx context.Context, qc *QueryContext) *QueryResult {
+		query, err := qc.Query()
+		if err != nil {
+			return &QueryResult{Err: err}
+		}
+		res, err := q.session.execContext(ctx, query.SQL, query.Args...)
+		return &QueryResult{Result: res, Err: err}
+	}
+
+	ms := q.ms
+	for i := len(ms) - 1; i >= 0; i-- {
+		handler = ms[i](handler)
+	}
+	qr := handler(ctx, qc)
+	var res sql.Result
+	if qr.Result != nil {
+		res = qr.Result.(sql.Result)
+	}
+	return Result{err: qr.Err, res: res}
+}
+
+func (q Querier[T]) get(ctx context.Context, qc *QueryContext) *QueryResult {
+	var handler HandleFunc = func(ctx context.Context, queryContext *QueryContext) *QueryResult {
+		return getHandler[T](ctx, q.session, q.core, qc)
+	}
+	for i := len(q.ms) - 1; i >= 0; i-- {
+		handler = q.ms[i](handler)
+	}
+	return handler(ctx, qc)
 }
 
 // Get 执行查询并且返回第一行数据

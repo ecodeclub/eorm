@@ -35,6 +35,13 @@ type DB struct {
 	core
 }
 
+// DBWithMiddleware Middleware for db
+func DBWithMiddleware(ms ...Middleware) DBOption {
+	return func(db *DB) {
+		db.ms = ms
+	}
+}
+
 func UseReflection() DBOption {
 	return func(db *DB) {
 		db.valCreator = valuer.BasicTypeCreator{Creator: valuer.NewUnsafeValue}
