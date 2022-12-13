@@ -26,19 +26,14 @@ import (
 
 type core struct {
 	ms           []Middleware
+	handler      HandleFunc
 	metaRegistry model.MetaRegistry
 	dialect      dialect.Dialect
 	valCreator   valuer.BasicTypeCreator
 }
 
 func getHandler[T any](ctx context.Context, sess session, c core, qc *QueryContext) *QueryResult {
-	q, err := qc.Query()
-	if err != nil {
-		return &QueryResult{
-			Err: err,
-		}
-	}
-	rows, err := sess.queryContext(ctx, q.SQL, q.Args...)
+	rows, err := sess.queryContext(ctx, qc.q.SQL, qc.q.Args...)
 	if err != nil {
 		return &QueryResult{Err: err}
 	}
@@ -60,4 +55,31 @@ func getHandler[T any](ctx context.Context, sess session, c core, qc *QueryConte
 		return &QueryResult{Err: err}
 	}
 	return &QueryResult{Result: tp}
+}
+
+func getMultiHandler[T any](ctx context.Context, sess session, c core, qc *QueryContext) *QueryResult {
+	rows, err := sess.queryContext(ctx, qc.q.SQL, qc.q.Args...)
+	if err != nil {
+		return &QueryResult{Err: err}
+	}
+	res := make([]*T, 0, 16)
+	meta := qc.meta
+	if meta == nil {
+		t := new(T)
+		if reflect.TypeOf(t).Elem().Kind() == reflect.Struct {
+			//  当通过 RawQuery 方法调用 Get ,如果 T 是 time.Time, sql.Scanner 的实现，
+			//  内置类型或者基本类型时， 在这里都会报错，但是这种情况我们认为是可以接受的
+			//  所以在此将报错忽略，因为基本类型取值用不到 meta 里的数据
+			meta, _ = c.metaRegistry.Get(t)
+		}
+	}
+	for rows.Next() {
+		tp := new(T)
+		val := c.valCreator.NewBasicTypeValue(tp, meta)
+		if err = val.SetColumns(rows); err != nil {
+			return &QueryResult{Err: err}
+		}
+		res = append(res, tp)
+	}
+	return &QueryResult{Result: res}
 }

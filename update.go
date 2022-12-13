@@ -234,13 +234,5 @@ func (u *Updater[T]) Exec(ctx context.Context) Result {
 	if err != nil {
 		return Result{err: err}
 	}
-	qc := &QueryContext{
-		Builder: u,
-		Type:    "Update",
-		meta:    u.meta,
-		q:       query,
-	}
-	// 这里可把 s.meta， query 从传参去掉了 然后在正式代码里 exec 将改为 Exec
-	return newQuerier[T](u.session, query, u.meta).exec(ctx, qc)
-	// return newQuerier[T](u.session, query, u.meta).Exec(ctx)
+	return newQuerier[T](u.session, query, u.meta, UPDATE).Exec(ctx)
 }

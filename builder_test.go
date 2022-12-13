@@ -33,7 +33,7 @@ func ExampleRawQuery() {
 	fmt.Printf(`
 SQL: %s
 Args: %v
-`, q.q.SQL, q.q.Args)
+`, q.qc.q.SQL, q.qc.q.Args)
 	// Output:
 	// SQL: SELECT * FROM user_tab WHERE id = ?;
 	// Args: [1]

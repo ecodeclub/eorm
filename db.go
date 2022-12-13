@@ -26,6 +26,14 @@ import (
 	"github.com/gotomicro/eorm/internal/valuer"
 )
 
+const (
+	SELECT = "SELECT"
+	DELETE = "DELETE"
+	UPDATE = "UPDATE"
+	INSERT = "INSERT"
+	RAW    = "RAW"
+)
+
 // DBOption configure DB
 type DBOption func(db *DB)
 

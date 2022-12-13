@@ -110,7 +110,7 @@ func (i *Inserter[T]) Exec(ctx context.Context) Result {
 	if err != nil {
 		return Result{err: err}
 	}
-	return newQuerier[T](i.session, query, i.meta).Exec(ctx)
+	return newQuerier[T](i.session, query, i.meta, INSERT).Exec(ctx)
 }
 
 func (i *Inserter[T]) buildColumns() ([]*model.ColumnMeta, error) {

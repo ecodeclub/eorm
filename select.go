@@ -296,19 +296,11 @@ func (s *Selector[T]) Get(ctx context.Context) (*T, error) {
 	if err != nil {
 		return nil, err
 	}
-	qc := &QueryContext{
-		Builder: s,
-		Type:    "SELECT",
-		meta:    s.meta,
-		q:       query,
-	}
-	// 这里可把 s.meta， query 从传参去掉了 然后在正式代码里 get 将改为 Get
-	res := newQuerier[T](s.session, query, s.meta).get(ctx, qc)
+	res := newQuerier[T](s.session, query, s.meta, SELECT).Get(ctx)
 	if res.Err != nil {
 		return nil, res.Err
 	}
 	return res.Result.(*T), nil
-	// return newQuerier[T](s.session, query, s.meta).Get(ctx)
 }
 
 // OrderBy specify fields and ASC
@@ -343,5 +335,9 @@ func (s *Selector[T]) GetMulti(ctx context.Context) ([]*T, error) {
 	if err != nil {
 		return nil, err
 	}
-	return newQuerier[T](s.session, query, s.meta).GetMulti(ctx)
+	res := newQuerier[T](s.session, query, s.meta, SELECT).GetMulti(ctx)
+	if res.Err != nil {
+		return nil, res.Err
+	}
+	return res.Result.([]*T), nil
 }
