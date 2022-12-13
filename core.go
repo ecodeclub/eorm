@@ -26,7 +26,6 @@ import (
 
 type core struct {
 	ms           []Middleware
-	handler      HandleFunc
 	metaRegistry model.MetaRegistry
 	dialect      dialect.Dialect
 	valCreator   valuer.BasicTypeCreator

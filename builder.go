@@ -104,12 +104,6 @@ func newQuerier[T any](sess session, q *Query, meta *model.TableMeta, typ string
 	}
 }
 
-//// Exec 执行 SQL
-//func (q Querier[T]) Exec(ctx context.Context) Result {
-//	res, err := q.session.execContext(ctx, q.q.SQL, q.q.Args...)
-//	return Result{res: res, err: err}
-//}
-
 // Exec 执行 SQL
 func (q Querier[T]) Exec(ctx context.Context) Result {
 	var handler HandleFunc = func(ctx context.Context, qc *QueryContext) *QueryResult {
@@ -142,35 +136,6 @@ func (q Querier[T]) Get(ctx context.Context) *QueryResult {
 	}
 	return handler(ctx, q.qc)
 }
-
-//// Get 执行查询并且返回第一行数据
-//// 注意在不同的数据库里面，排序可能会不同
-//// 在没有查找到数据的情况下，会返回 ErrNoRows
-//func (q Querier[T]) Get(ctx context.Context) (*T, error) {
-//	rows, err := q.session.queryContext(ctx, q.q.SQL, q.q.Args...)
-//	if err != nil {
-//		return nil, err
-//	}
-//	if !rows.Next() {
-//		return nil, errs.ErrNoRows
-//	}
-//
-//	tp := new(T)
-//	meta := q.meta
-//	if meta == nil && reflect.TypeOf(tp).Elem().Kind() == reflect.Struct {
-//		//  当通过 RawQuery 方法调用 Get ,如果 T 是 time.Time, sql.Scanner 的实现，
-//		//  内置类型或者基本类型时， 在这里都会报错，但是这种情况我们认为是可以接受的
-//		//  所以在此将报错忽略，因为基本类型取值用不到 meta 里的数据
-//		meta, _ = q.metaRegistry.Get(tp)
-//	}
-//
-//	val := q.valCreator.NewBasicTypeValue(tp, meta)
-//	if err = val.SetColumns(rows); err != nil {
-//		return nil, err
-//	}
-//	return tp, nil
-//
-//}
 
 type builder struct {
 	core
@@ -350,30 +315,3 @@ func (q Querier[T]) GetMulti(ctx context.Context) *QueryResult {
 	}
 	return handler(ctx, q.qc)
 }
-
-//func (q Querier[T]) GetMulti(ctx context.Context) ([]*T, error) {
-//	rows, err := q.session.queryContext(ctx, q.q.SQL, q.q.Args...)
-//	if err != nil {
-//		return nil, err
-//	}
-//	res := make([]*T, 0, 16)
-//	meta := q.meta
-//	if meta == nil {
-//		t := new(T)
-//		if reflect.TypeOf(t).Elem().Kind() == reflect.Struct {
-//			//  当通过 RawQuery 方法调用 Get ,如果 T 是 time.Time, sql.Scanner 的实现，
-//			//  内置类型或者基本类型时， 在这里都会报错，但是这种情况我们认为是可以接受的
-//			//  所以在此将报错忽略，因为基本类型取值用不到 meta 里的数据
-//			meta, _ = q.metaRegistry.Get(t)
-//		}
-//	}
-//	for rows.Next() {
-//		tp := new(T)
-//		val := q.valCreator.NewBasicTypeValue(tp, meta)
-//		if err = val.SetColumns(rows); err != nil {
-//			return nil, err
-//		}
-//		res = append(res, tp)
-//	}
-//	return res, nil
-//}
