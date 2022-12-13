@@ -1211,3 +1211,31 @@ func ExampleSelector_Select() {
 	// SQL: SELECT COUNT(DISTINCT `age`) AS `age_cnt` FROM `test_model`;
 	// Args: []interface {}(nil)
 }
+
+func ExampleSelector_Distinct() {
+	db := memoryDB()
+	tm := &TestModel{}
+	cases := []*Selector[TestModel]{
+		// case0: disinct column
+		NewSelector[TestModel](db).From(tm).Distinct().Select(C("FirstName")),
+		// case1: aggregation function using distinct
+		NewSelector[TestModel](db).From(tm).Select(CountDistinct("FirstName")),
+		// case2: having using distinct
+		NewSelector[TestModel](db).From(tm).Select(C("FirstName")).GroupBy("FirstName").Having(CountDistinct("FirstName").EQ("jack")),
+	}
+
+	for index, tc := range cases {
+		query, _ := tc.Build()
+		fmt.Printf("case%d:\n%s", index, query.string())
+	}
+	// Output:
+	// case0:
+	// SQL: SELECT DISTINCT `first_name` FROM `test_model`;
+	// Args: []interface {}(nil)
+	// case1:
+	// SQL: SELECT COUNT(DISTINCT `first_name`) FROM `test_model`;
+	// Args: []interface {}(nil)
+	// case2:
+	// SQL: SELECT `first_name` FROM `test_model` GROUP BY `first_name` HAVING COUNT(DISTINCT `first_name`)=?;
+	// Args: []interface {}{"jack"}
+}
