@@ -296,11 +296,7 @@ func (s *Selector[T]) Get(ctx context.Context) (*T, error) {
 	if err != nil {
 		return nil, err
 	}
-	res := newQuerier[T](s.session, query, s.meta, SELECT).Get(ctx)
-	if res.Err != nil {
-		return nil, res.Err
-	}
-	return res.Result.(*T), nil
+	return newQuerier[T](s.session, query, s.meta, SELECT).Get(ctx)
 }
 
 // OrderBy specify fields and ASC
@@ -335,9 +331,5 @@ func (s *Selector[T]) GetMulti(ctx context.Context) ([]*T, error) {
 	if err != nil {
 		return nil, err
 	}
-	res := newQuerier[T](s.session, query, s.meta, SELECT).GetMulti(ctx)
-	if res.Err != nil {
-		return nil, res.Err
-	}
-	return res.Result.([]*T), nil
+	return newQuerier[T](s.session, query, s.meta, SELECT).GetMulti(ctx)
 }

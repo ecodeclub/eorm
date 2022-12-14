@@ -51,45 +51,21 @@ type Querier[T any] struct {
 	qc *QueryContext
 }
 
-type RawQuerier[T any] struct {
-	Querier[T]
-	typ string
-}
-
 // RawQuery 创建一个 Querier 实例
 // 泛型参数 T 是目标类型。
 // 例如，如果查询 User 的数据，那么 T 就是 User
-func RawQuery[T any](sess session, sql string, args ...any) RawQuerier[T] {
-	querier := Querier[T]{
+func RawQuery[T any](sess session, sql string, args ...any) Querier[T] {
+	return Querier[T]{
+		core:    sess.getCore(),
+		session: sess,
 		qc: &QueryContext{
 			q: &Query{
 				SQL:  sql,
 				Args: args,
 			},
+			Type: RAW,
 		},
-		core:    sess.getCore(),
-		session: sess,
 	}
-	return RawQuerier[T]{
-		Querier: querier,
-		typ:     RAW,
-	}
-}
-
-func (q RawQuerier[T]) Get(ctx context.Context) (*T, error) {
-	res := q.Querier.Get(ctx)
-	if res.Err != nil {
-		return nil, res.Err
-	}
-	return res.Result.(*T), nil
-}
-
-func (q RawQuerier[T]) GetMulti(ctx context.Context) ([]*T, error) {
-	res := q.Querier.GetMulti(ctx)
-	if res.Err != nil {
-		return nil, res.Err
-	}
-	return res.Result.([]*T), nil
 }
 
 func newQuerier[T any](sess session, q *Query, meta *model.TableMeta, typ string) Querier[T] {
@@ -126,15 +102,12 @@ func (q Querier[T]) Exec(ctx context.Context) Result {
 // Get 执行查询并且返回第一行数据
 // 注意在不同的数据库里面，排序可能会不同
 // 在没有查找到数据的情况下，会返回 ErrNoRows
-func (q Querier[T]) Get(ctx context.Context) *QueryResult {
-	var handler HandleFunc = func(ctx context.Context, queryContext *QueryContext) *QueryResult {
-		return getHandler[T](ctx, q.session, q.core, queryContext)
+func (q Querier[T]) Get(ctx context.Context) (*T, error) {
+	res := get[T](ctx, q.session, q.core, q.qc)
+	if res.Err != nil {
+		return nil, res.Err
 	}
-	ms := q.ms
-	for i := len(ms) - 1; i >= 0; i-- {
-		handler = ms[i](handler)
-	}
-	return handler(ctx, q.qc)
+	return res.Result.(*T), nil
 }
 
 type builder struct {
@@ -305,13 +278,10 @@ func (b *builder) buildIns(is values) error {
 	return nil
 }
 
-func (q Querier[T]) GetMulti(ctx context.Context) *QueryResult {
-	var handler HandleFunc = func(ctx context.Context, queryContext *QueryContext) *QueryResult {
-		return getMultiHandler[T](ctx, q.session, q.core, queryContext)
+func (q Querier[T]) GetMulti(ctx context.Context) ([]*T, error) {
+	res := getMulti[T](ctx, q.session, q.core, q.qc)
+	if res.Err != nil {
+		return nil, res.Err
 	}
-	ms := q.ms
-	for i := len(ms) - 1; i >= 0; i-- {
-		handler = ms[i](handler)
-	}
-	return handler(ctx, q.qc)
+	return res.Result.([]*T), nil
 }

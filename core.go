@@ -56,6 +56,17 @@ func getHandler[T any](ctx context.Context, sess session, c core, qc *QueryConte
 	return &QueryResult{Result: tp}
 }
 
+func get[T any](ctx context.Context, sess session, core core, qc *QueryContext) *QueryResult {
+	var handler HandleFunc = func(ctx context.Context, queryContext *QueryContext) *QueryResult {
+		return getHandler[T](ctx, sess, core, queryContext)
+	}
+	ms := core.ms
+	for i := len(ms) - 1; i >= 0; i-- {
+		handler = ms[i](handler)
+	}
+	return handler(ctx, qc)
+}
+
 func getMultiHandler[T any](ctx context.Context, sess session, c core, qc *QueryContext) *QueryResult {
 	rows, err := sess.queryContext(ctx, qc.q.SQL, qc.q.Args...)
 	if err != nil {
@@ -81,4 +92,15 @@ func getMultiHandler[T any](ctx context.Context, sess session, c core, qc *Query
 		res = append(res, tp)
 	}
 	return &QueryResult{Result: res}
+}
+
+func getMulti[T any](ctx context.Context, sess session, core core, qc *QueryContext) *QueryResult {
+	var handler HandleFunc = func(ctx context.Context, queryContext *QueryContext) *QueryResult {
+		return getMultiHandler[T](ctx, sess, core, queryContext)
+	}
+	ms := core.ms
+	for i := len(ms) - 1; i >= 0; i-- {
+		handler = ms[i](handler)
+	}
+	return handler(ctx, qc)
 }
