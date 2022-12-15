@@ -211,7 +211,11 @@ func (b *builder) buildPredicates(predicates []Predicate) error {
 
 func (b *builder) buildHavingAggregate(aggregate Aggregate) error {
 	_, _ = b.buffer.WriteString(aggregate.fn)
+
 	_ = b.buffer.WriteByte('(')
+	if aggregate.distinct {
+		_, _ = b.buffer.WriteString("DISTINCT ")
+	}
 	cMeta, ok := b.meta.FieldMap[aggregate.arg]
 	if !ok {
 		return errs.NewInvalidFieldError(aggregate.arg)
