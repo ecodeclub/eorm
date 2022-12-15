@@ -701,3 +701,61 @@ func (s *SelectTestSuiteGetMulti) TestRawQueryGetMultiBaseType() {
 		})
 	}
 }
+
+func (s *SelectTestSuiteGetMulti) TestSelectorDistinct() {
+
+	testcases := []struct {
+		name    string
+		s       func() (any, error)
+		wantErr error
+		wantRes any
+	}{
+		{
+			name: "distinct col",
+			s: func() (any, error) {
+				return eorm.NewSelector[test.SimpleStruct](s.orm).From(&test.SimpleStruct{}).Select(eorm.C("Int")).Distinct().GetMulti(context.Background())
+
+			},
+			wantRes: []*test.SimpleStruct{
+				&test.SimpleStruct{
+					Int: 12,
+				},
+			},
+		},
+		{
+			name: "count distinct",
+			s: func() (any, error) {
+				return eorm.NewSelector[int](s.orm).Select(eorm.CountDistinct("Bool")).From(&test.SimpleStruct{}).GetMulti(context.Background())
+			},
+			wantRes: func() []*int {
+				val := 1
+				return []*int{&val}
+			}(),
+		},
+		{
+			name: "having count distinct",
+			s: func() (any, error) {
+				return eorm.NewSelector[test.SimpleStruct](s.orm).From(&test.SimpleStruct{}).Select(eorm.C("JsonColumn")).GroupBy("JsonColumn").Having(eorm.CountDistinct("JsonColumn").EQ(1)).GetMulti(context.Background())
+			},
+			wantRes: []*test.SimpleStruct{
+				&test.SimpleStruct{
+					JsonColumn: &test.JsonColumn{
+						Val:   test.User{Name: "Tom"},
+						Valid: true,
+					},
+				},
+			},
+		},
+	}
+	for _, tc := range testcases {
+		s.T().Run(tc.name, func(t *testing.T) {
+			res, err := tc.s()
+			assert.Equal(t, tc.wantErr, err)
+			if err != nil {
+				return
+			}
+			assert.Equal(t, tc.wantRes, res)
+		})
+	}
+
+}
