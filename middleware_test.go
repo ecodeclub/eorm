@@ -16,6 +16,8 @@ package eorm
 
 import (
 	"context"
+	"errors"
+	"github.com/stretchr/testify/require"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -71,39 +73,40 @@ func Test_Middleware(t *testing.T) {
 }
 
 func Test_Middleware_order(t *testing.T) {
-	testCases := []struct {
-		name string
-		mdls []Middleware
-	}{
-		{
-			name: "many middleware order",
-			mdls: func() []Middleware {
-				return []Middleware{func(next HandleFunc) HandleFunc {
-					return func(ctx context.Context, queryContext *QueryContext) *QueryResult {
-						return &QueryResult{Result: "mdl1"}
-					}
-				}, func(next HandleFunc) HandleFunc {
-					return func(ctx context.Context, queryContext *QueryContext) *QueryResult {
-						return &QueryResult{Result: "mdl2"}
-					}
-				}}
-			}(),
-		},
+	var res []byte
+	var mdl1 Middleware = func(next HandleFunc) HandleFunc {
+		return func(ctx context.Context, qc *QueryContext) *QueryResult {
+			res = append(res, '1')
+			return next(ctx, qc)
+		}
 	}
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			orm, err := Open("sqlite3", "file:test.db?cache=shared&mode=memory",
-				DBWithMiddleware(tc.mdls...))
-			if err != nil {
-				t.Error(err)
-			}
-			defer func() {
-				_ = orm.Close()
-			}()
-			for i := 0; i < len(tc.mdls); i++ {
-				assert.EqualValues(t, &tc.mdls[i], &orm.ms[i])
-			}
-		})
+	var mdl2 Middleware = func(next HandleFunc) HandleFunc {
+		return func(ctx context.Context, qc *QueryContext) *QueryResult {
+			res = append(res, '2')
+			return next(ctx, qc)
+		}
 	}
+
+	var mdl3 Middleware = func(next HandleFunc) HandleFunc {
+		return func(ctx context.Context, qc *QueryContext) *QueryResult {
+			res = append(res, '3')
+			return next(ctx, qc)
+		}
+	}
+	var last Middleware = func(next HandleFunc) HandleFunc {
+		return func(ctx context.Context, qc *QueryContext) *QueryResult {
+			return &QueryResult{
+				Err: errors.New("mock error"),
+			}
+		}
+	}
+
+	db, err := Open("sqlite3", "file:test.db?cache=shared&mode=memory",
+		DBWithMiddleware(mdl1, mdl2, mdl3, last))
+	require.NoError(t, err)
+
+	_, err = NewSelector[TestModel](db).Get(context.Background())
+	assert.Equal(t, errors.New("mock error"), err)
+	assert.Equal(t, "123", string(res))
 
 }
