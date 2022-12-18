@@ -33,7 +33,7 @@ func Assign(column string, value interface{}) Assignment {
 	return Assignment{left: C(column), op: opEQ, right: expr}
 }
 
-func (a Assignment) assign() {
+func (Assignment) assign() {
 	panic("implement me")
 }
 
