@@ -66,6 +66,25 @@ func TestDB_Wait(t *testing.T) {
 	assert.Nil(t, err)
 }
 
+func ExampleMiddleware() {
+	db, _ := Open("sqlite3", "file:test.db?cache=shared&mode=memory",
+		DBWithMiddleware(func(next HandleFunc) HandleFunc {
+			return func(ctx context.Context, queryContext *QueryContext) *QueryResult {
+				return &QueryResult{Result: "mdl1"}
+			}
+		}, func(next HandleFunc) HandleFunc {
+			return func(ctx context.Context, queryContext *QueryContext) *QueryResult {
+				return &QueryResult{Result: "mdl2"}
+			}
+		}))
+	defer func() {
+		_ = db.Close()
+	}()
+	fmt.Println(len(db.ms))
+	// Output:
+	// 2
+}
+
 func ExampleDB_BeginTx() {
 	db, _ := Open("sqlite3", "file:test.db?cache=shared&mode=memory")
 	defer func() {

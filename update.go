@@ -234,5 +234,5 @@ func (u *Updater[T]) Exec(ctx context.Context) Result {
 	if err != nil {
 		return Result{err: err}
 	}
-	return newQuerier[T](u.session, query, u.meta).Exec(ctx)
+	return newQuerier[T](u.session, query, u.meta, UPDATE).Exec(ctx)
 }

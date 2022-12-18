@@ -15,13 +15,92 @@
 package eorm
 
 import (
+	"context"
+	"reflect"
+
 	"github.com/gotomicro/eorm/internal/dialect"
+	"github.com/gotomicro/eorm/internal/errs"
 	"github.com/gotomicro/eorm/internal/model"
 	"github.com/gotomicro/eorm/internal/valuer"
 )
 
 type core struct {
+	ms           []Middleware
 	metaRegistry model.MetaRegistry
 	dialect      dialect.Dialect
 	valCreator   valuer.BasicTypeCreator
+}
+
+func getHandler[T any](ctx context.Context, sess session, c core, qc *QueryContext) *QueryResult {
+	rows, err := sess.queryContext(ctx, qc.q.SQL, qc.q.Args...)
+	if err != nil {
+		return &QueryResult{Err: err}
+	}
+	if !rows.Next() {
+		return &QueryResult{Err: errs.ErrNoRows}
+	}
+
+	tp := new(T)
+	meta := qc.meta
+	if meta == nil && reflect.TypeOf(tp).Elem().Kind() == reflect.Struct {
+		//  当通过 RawQuery 方法调用 Get ,如果 T 是 time.Time, sql.Scanner 的实现，
+		//  内置类型或者基本类型时， 在这里都会报错，但是这种情况我们认为是可以接受的
+		//  所以在此将报错忽略，因为基本类型取值用不到 meta 里的数据
+		meta, _ = c.metaRegistry.Get(tp)
+	}
+
+	val := c.valCreator.NewBasicTypeValue(tp, meta)
+	if err = val.SetColumns(rows); err != nil {
+		return &QueryResult{Err: err}
+	}
+	return &QueryResult{Result: tp}
+}
+
+func get[T any](ctx context.Context, sess session, core core, qc *QueryContext) *QueryResult {
+	var handler HandleFunc = func(ctx context.Context, queryContext *QueryContext) *QueryResult {
+		return getHandler[T](ctx, sess, core, queryContext)
+	}
+	ms := core.ms
+	for i := len(ms) - 1; i >= 0; i-- {
+		handler = ms[i](handler)
+	}
+	return handler(ctx, qc)
+}
+
+func getMultiHandler[T any](ctx context.Context, sess session, c core, qc *QueryContext) *QueryResult {
+	rows, err := sess.queryContext(ctx, qc.q.SQL, qc.q.Args...)
+	if err != nil {
+		return &QueryResult{Err: err}
+	}
+	res := make([]*T, 0, 16)
+	meta := qc.meta
+	if meta == nil {
+		t := new(T)
+		if reflect.TypeOf(t).Elem().Kind() == reflect.Struct {
+			//  当通过 RawQuery 方法调用 Get ,如果 T 是 time.Time, sql.Scanner 的实现，
+			//  内置类型或者基本类型时， 在这里都会报错，但是这种情况我们认为是可以接受的
+			//  所以在此将报错忽略，因为基本类型取值用不到 meta 里的数据
+			meta, _ = c.metaRegistry.Get(t)
+		}
+	}
+	for rows.Next() {
+		tp := new(T)
+		val := c.valCreator.NewBasicTypeValue(tp, meta)
+		if err = val.SetColumns(rows); err != nil {
+			return &QueryResult{Err: err}
+		}
+		res = append(res, tp)
+	}
+	return &QueryResult{Result: res}
+}
+
+func getMulti[T any](ctx context.Context, sess session, core core, qc *QueryContext) *QueryResult {
+	var handler HandleFunc = func(ctx context.Context, queryContext *QueryContext) *QueryResult {
+		return getMultiHandler[T](ctx, sess, core, queryContext)
+	}
+	ms := core.ms
+	for i := len(ms) - 1; i >= 0; i-- {
+		handler = ms[i](handler)
+	}
+	return handler(ctx, qc)
 }

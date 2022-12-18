@@ -26,6 +26,14 @@ import (
 	"github.com/gotomicro/eorm/internal/valuer"
 )
 
+const (
+	SELECT = "SELECT"
+	DELETE = "DELETE"
+	UPDATE = "UPDATE"
+	INSERT = "INSERT"
+	RAW    = "RAW"
+)
+
 // DBOption configure DB
 type DBOption func(db *DB)
 
@@ -33,6 +41,13 @@ type DBOption func(db *DB)
 type DB struct {
 	db *sql.DB
 	core
+}
+
+// DBWithMiddleware 为 db 配置 Middleware
+func DBWithMiddleware(ms ...Middleware) DBOption {
+	return func(db *DB) {
+		db.ms = ms
+	}
 }
 
 func UseReflection() DBOption {

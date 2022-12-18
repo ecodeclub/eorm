@@ -14,33 +14,23 @@
 
 package eorm
 
-// Assignable represents that something could be used as "assignment" statement
-type Assignable interface {
-	assign()
+import (
+	"context"
+
+	"github.com/gotomicro/eorm/internal/model"
+)
+
+type QueryContext struct {
+	Type string
+	meta *model.TableMeta
+	q    *Query
 }
 
-// Assignment represents assignment statement
-type Assignment binaryExpr
-
-func Assign(column string, value interface{}) Assignment {
-	var expr Expr
-	switch v := value.(type) {
-	case Expr:
-		expr = v
-	default:
-		expr = valueExpr{val: v}
-	}
-	return Assignment{left: C(column), op: opEQ, right: expr}
+type QueryResult struct {
+	Result any
+	Err    error
 }
 
-func (Assignment) assign() {
-	panic("implement me")
-}
+type Middleware func(next HandleFunc) HandleFunc
 
-type valueExpr struct {
-	val interface{}
-}
-
-func (valueExpr) expr() (string, error) {
-	return "", nil
-}
+type HandleFunc func(ctx context.Context, queryContext *QueryContext) *QueryResult

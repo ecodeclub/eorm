@@ -16,8 +16,8 @@ package eorm
 
 import (
 	"context"
+	"database/sql"
 	"errors"
-	"reflect"
 
 	"github.com/gotomicro/eorm/internal/errs"
 	"github.com/gotomicro/eorm/internal/model"
@@ -46,10 +46,9 @@ type Query struct {
 
 // Querier 查询器，代表最基本的查询
 type Querier[T any] struct {
-	q *Query
 	core
 	session
-	meta *model.TableMeta
+	qc *QueryContext
 }
 
 // RawQuery 创建一个 Querier 实例
@@ -57,57 +56,58 @@ type Querier[T any] struct {
 // 例如，如果查询 User 的数据，那么 T 就是 User
 func RawQuery[T any](sess session, sql string, args ...any) Querier[T] {
 	return Querier[T]{
-		q: &Query{
-			SQL:  sql,
-			Args: args,
-		},
 		core:    sess.getCore(),
 		session: sess,
+		qc: &QueryContext{
+			q: &Query{
+				SQL:  sql,
+				Args: args,
+			},
+			Type: RAW,
+		},
 	}
 }
 
-func newQuerier[T any](sess session, q *Query, meta *model.TableMeta) Querier[T] {
+func newQuerier[T any](sess session, q *Query, meta *model.TableMeta, typ string) Querier[T] {
 	return Querier[T]{
-		q:       q,
 		core:    sess.getCore(),
 		session: sess,
-		meta:    meta,
+		qc: &QueryContext{
+			q:    q,
+			meta: meta,
+			Type: typ,
+		},
 	}
 }
 
 // Exec 执行 SQL
 func (q Querier[T]) Exec(ctx context.Context) Result {
-	res, err := q.session.execContext(ctx, q.q.SQL, q.q.Args...)
-	return Result{res: res, err: err}
+	var handler HandleFunc = func(ctx context.Context, qc *QueryContext) *QueryResult {
+		res, err := q.session.execContext(ctx, qc.q.SQL, qc.q.Args...)
+		return &QueryResult{Result: res, Err: err}
+	}
+
+	ms := q.ms
+	for i := len(ms) - 1; i >= 0; i-- {
+		handler = ms[i](handler)
+	}
+	qr := handler(ctx, q.qc)
+	var res sql.Result
+	if qr.Result != nil {
+		res = qr.Result.(sql.Result)
+	}
+	return Result{err: qr.Err, res: res}
 }
 
 // Get 执行查询并且返回第一行数据
 // 注意在不同的数据库里面，排序可能会不同
 // 在没有查找到数据的情况下，会返回 ErrNoRows
 func (q Querier[T]) Get(ctx context.Context) (*T, error) {
-	rows, err := q.session.queryContext(ctx, q.q.SQL, q.q.Args...)
-	if err != nil {
-		return nil, err
+	res := get[T](ctx, q.session, q.core, q.qc)
+	if res.Err != nil {
+		return nil, res.Err
 	}
-	if !rows.Next() {
-		return nil, errs.ErrNoRows
-	}
-
-	tp := new(T)
-	meta := q.meta
-	if meta == nil && reflect.TypeOf(tp).Elem().Kind() == reflect.Struct {
-		//  当通过 RawQuery 方法调用 Get ,如果 T 是 time.Time, sql.Scanner 的实现，
-		//  内置类型或者基本类型时， 在这里都会报错，但是这种情况我们认为是可以接受的
-		//  所以在此将报错忽略，因为基本类型取值用不到 meta 里的数据
-		meta, _ = q.metaRegistry.Get(tp)
-	}
-
-	val := q.valCreator.NewBasicTypeValue(tp, meta)
-	if err = val.SetColumns(rows); err != nil {
-		return nil, err
-	}
-	return tp, nil
-
+	return res.Result.(*T), nil
 }
 
 type builder struct {
@@ -283,28 +283,9 @@ func (b *builder) buildIns(is values) error {
 }
 
 func (q Querier[T]) GetMulti(ctx context.Context) ([]*T, error) {
-	rows, err := q.session.queryContext(ctx, q.q.SQL, q.q.Args...)
-	if err != nil {
-		return nil, err
+	res := getMulti[T](ctx, q.session, q.core, q.qc)
+	if res.Err != nil {
+		return nil, res.Err
 	}
-	res := make([]*T, 0, 16)
-	meta := q.meta
-	if meta == nil {
-		t := new(T)
-		if reflect.TypeOf(t).Elem().Kind() == reflect.Struct {
-			//  当通过 RawQuery 方法调用 Get ,如果 T 是 time.Time, sql.Scanner 的实现，
-			//  内置类型或者基本类型时， 在这里都会报错，但是这种情况我们认为是可以接受的
-			//  所以在此将报错忽略，因为基本类型取值用不到 meta 里的数据
-			meta, _ = q.metaRegistry.Get(t)
-		}
-	}
-	for rows.Next() {
-		tp := new(T)
-		val := q.valCreator.NewBasicTypeValue(tp, meta)
-		if err = val.SetColumns(rows); err != nil {
-			return nil, err
-		}
-		res = append(res, tp)
-	}
-	return res, nil
+	return res.Result.([]*T), nil
 }
