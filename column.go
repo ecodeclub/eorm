@@ -20,6 +20,7 @@ package eorm
 // 1. specify the column in query
 // 2. it's the start point of building complex expression
 type Column struct {
+	table TableReference
 	name  string
 	alias string
 }

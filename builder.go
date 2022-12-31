@@ -166,11 +166,7 @@ func (b *builder) buildExpr(expr Expr) error {
 				b.quote(e.name)
 				return nil
 			}
-			cm, ok := b.meta.FieldMap[e.name]
-			if !ok {
-				return errs.NewInvalidFieldError(e.name)
-			}
-			b.quote(cm.ColumnName)
+			return b.buildColumn(e)
 		}
 	case Aggregate:
 		if err := b.buildHavingAggregate(e); err != nil {
@@ -288,4 +284,41 @@ func (q Querier[T]) GetMulti(ctx context.Context) ([]*T, error) {
 		return nil, res.Err
 	}
 	return res.Result.([]*T), nil
+}
+
+func (b *builder) buildColumn(c Column) error {
+	switch table := c.table.(type) {
+	case nil:
+		fd, ok := b.meta.FieldMap[c.name]
+		// 字段不对，或者说列不对
+		if !ok {
+			return errs.NewErrUnknownField(c.name)
+		}
+		b.quote(fd.ColumnName)
+		if c.alias != "" {
+			b.writeString(" AS ")
+			b.quote(c.alias)
+		}
+	case Table:
+		m, err := b.metaRegistry.Get(table.entity)
+		if err != nil {
+			return err
+		}
+		fd, ok := m.FieldMap[c.name]
+		if !ok {
+			return errs.NewErrUnknownField(c.name)
+		}
+		if table.alias != "" {
+			b.quote(table.alias)
+			b.writeByte('.')
+		}
+		b.quote(fd.ColumnName)
+		if c.alias != "" {
+			b.writeString(" AS ")
+			b.quote(c.alias)
+		}
+	default:
+		return errs.NewErrUnsupportedTable(table)
+	}
+	return nil
 }

@@ -26,7 +26,7 @@ type Selector[T any] struct {
 	builder
 	session
 	columns  []Selectable
-	table    interface{}
+	table    TableReference
 	where    []Predicate
 	distinct bool
 	having   []Predicate
@@ -50,6 +50,12 @@ func NewSelector[T any](sess session) *Selector[T] {
 // TableOf -> get selector table
 func (s *Selector[T]) tableOf() any {
 	if s.table != nil {
+		switch tb := s.table.(type) {
+		case Table:
+			return tb.entity
+		default:
+			return new(T)
+		}
 		return s.table
 	} else {
 		return new(T)
@@ -77,7 +83,11 @@ func (s *Selector[T]) Build() (*Query, error) {
 		}
 	}
 	s.writeString(" FROM ")
-	s.quote(s.meta.TableName)
+
+	if err = s.buildTable(s.table); err != nil {
+		return nil, err
+	}
+
 	if len(s.where) > 0 {
 		s.writeString(" WHERE ")
 		err = s.buildPredicates(s.where)
@@ -124,6 +134,61 @@ func (s *Selector[T]) Build() (*Query, error) {
 	return &Query{SQL: s.buffer.String(), Args: s.args}, nil
 }
 
+func (s *Selector[T]) buildTable(table TableReference) error {
+	switch t := table.(type) {
+	case nil:
+		s.quote(s.meta.TableName)
+	case Table:
+		m, err := s.metaRegistry.Get(t.entity)
+		if err != nil {
+			return err
+		}
+		s.quote(m.TableName)
+		if t.alias != "" {
+			s.writeString(" AS ")
+			s.quote(t.alias)
+		}
+	case Join:
+		s.writeByte('(')
+		err := s.buildTable(t.left)
+		if err != nil {
+			return err
+		}
+		s.space()
+		s.writeString(t.typ)
+		s.space()
+		err = s.buildTable(t.right)
+		if err != nil {
+			return err
+		}
+
+		if len(t.using) > 0 {
+			s.writeString(" USING (")
+			for i, col := range t.using {
+				if i > 0 {
+					s.comma()
+				}
+				err = s.buildColumn(col, "")
+				if err != nil {
+					return err
+				}
+			}
+			s.writeByte(')')
+		}
+
+		if len(t.on) > 0 {
+			s.writeString(" ON ")
+			if err = s.buildPredicates(t.on); err != nil {
+				return err
+			}
+		}
+
+		s.writeByte(')')
+	default:
+		return errs.NewErrUnsupportedTable(table)
+	}
+	return nil
+}
 func (s *Selector[T]) buildOrderBy() error {
 	s.writeString(" ORDER BY ")
 	for i, ob := range s.orderBy {
@@ -247,8 +312,8 @@ func (s *Selector[T]) Select(columns ...Selectable) *Selector[T] {
 }
 
 // From specifies the table which must be pointer of structure
-func (s *Selector[T]) From(table interface{}) *Selector[T] {
-	s.table = table
+func (s *Selector[T]) From(tbl TableReference) *Selector[T] {
+	s.table = tbl
 	return s
 }
 
