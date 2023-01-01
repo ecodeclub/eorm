@@ -60,7 +60,7 @@ func Test_Middleware(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			orm, err := Open("sqlite3", "file:test.db?cache=shared&mode=memory",
-				DBWithMiddleware(tc.mdls...))
+				DBWithMiddlewares(tc.mdls...))
 			if err != nil {
 				t.Error(err)
 			}
@@ -102,7 +102,7 @@ func Test_Middleware_order(t *testing.T) {
 	}
 
 	db, err := Open("sqlite3", "file:test.db?cache=shared&mode=memory",
-		DBWithMiddleware(mdl1, mdl2, mdl3, last))
+		DBWithMiddlewares(mdl1, mdl2, mdl3, last))
 	require.NoError(t, err)
 
 	_, err = NewSelector[TestModel](db).Get(context.Background())
