@@ -1,31 +1,37 @@
+// Copyright 2021 gotomicro
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package querylog
 
 import (
 	"context"
-	"github.com/gotomicro/eorm"
 	"log"
+
+	"github.com/gotomicro/eorm"
 )
 
 type MiddlewareBuilder struct {
-	outputArgs bool
-	logFunc    func(sql string, args ...any)
+	logFunc func(sql string, args ...any)
 }
 
 func NewBuilder() *MiddlewareBuilder {
-	res := &MiddlewareBuilder{}
-	res.logFunc = func(sql string, args ...any) {
-		if res.outputArgs {
-			log.Println(sql, args)
-		} else {
+	return &MiddlewareBuilder{
+		logFunc: func(sql string, args ...any) {
 			log.Println(sql)
-		}
+		},
 	}
-	return res
-}
 
-func (b *MiddlewareBuilder) OutputArgs(outputArgs bool) *MiddlewareBuilder {
-	b.outputArgs = outputArgs
-	return b
 }
 
 func (b *MiddlewareBuilder) LogFunc(logFunc func(sql string, args ...any)) *MiddlewareBuilder {
@@ -37,11 +43,7 @@ func (b *MiddlewareBuilder) Build() eorm.Middleware {
 	return func(next eorm.HandleFunc) eorm.HandleFunc {
 		return func(ctx context.Context, queryContext *eorm.QueryContext) *eorm.QueryResult {
 			query := queryContext.GetQuery()
-			if b.outputArgs {
-				b.logFunc(query.SQL, query.Args...)
-			} else {
-				b.logFunc(query.SQL)
-			}
+			b.logFunc(query.SQL, query.Args...)
 			return next(ctx, queryContext)
 		}
 	}
