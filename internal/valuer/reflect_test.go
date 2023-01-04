@@ -117,7 +117,8 @@ func BenchmarkReflectValue_fieldByIndexes_VS_FieldByName(b *testing.B) {
 	in, ok := ins.(reflectValue)
 	assert.True(b, ok)
 	fieldName, unknownFieldName := "Int64", "XXXX"
-	fieldValue, unknownValue := int64(13), reflect.Value{}
+	unknownValue := int64(13)
+	var fieldValue reflect.Value
 	b.Run("fieldByIndex found", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			val, ok := in.fieldByIndex(fieldName)
