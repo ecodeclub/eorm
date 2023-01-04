@@ -36,8 +36,10 @@ func TestMiddlewareBuilder_Build(t *testing.T) {
 			builder: NewBuilder(),
 		},
 		{
-			name:    "output args",
-			builder: NewBuilder().OutputArgs(true),
+			name: "output args",
+			builder: NewBuilder().LogFunc(func(sql string, args ...any) {
+				fmt.Println(sql, args)
+			}),
 		},
 		{
 			name: "log func",
