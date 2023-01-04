@@ -11,17 +11,21 @@ type MiddlewareBuilder struct {
 	logFunc    func(sql string, args ...any)
 }
 
-func NewBuilder(outputArgs bool) *MiddlewareBuilder {
-	return &MiddlewareBuilder{
-		outputArgs: outputArgs,
-		logFunc: func(sql string, args ...any) {
-			if outputArgs {
-				log.Println(sql, args)
-			} else {
-				log.Println(sql)
-			}
-		},
+func NewBuilder() *MiddlewareBuilder {
+	res := &MiddlewareBuilder{}
+	res.logFunc = func(sql string, args ...any) {
+		if res.outputArgs {
+			log.Println(sql, args)
+		} else {
+			log.Println(sql)
+		}
 	}
+	return res
+}
+
+func (b *MiddlewareBuilder) OutputArgs(outputArgs bool) *MiddlewareBuilder {
+	b.outputArgs = outputArgs
+	return b
 }
 
 func (b *MiddlewareBuilder) LogFunc(logFunc func(sql string, args ...any)) *MiddlewareBuilder {

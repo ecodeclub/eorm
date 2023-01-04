@@ -18,16 +18,16 @@ func TestMiddlewareBuilder_Build(t *testing.T) {
 	}{
 		{
 			name:    "not args",
-			builder: NewBuilder(false),
+			builder: NewBuilder(),
 		},
 		{
 			name:    "output args",
-			builder: NewBuilder(true),
+			builder: NewBuilder().OutputArgs(true),
 		},
 		{
 			name: "log func",
 			builder: func() *MiddlewareBuilder {
-				builder := &MiddlewareBuilder{}
+				builder := NewBuilder()
 				builder.LogFunc(func(sql string, args ...any) {
 					fmt.Println(sql)
 				})
