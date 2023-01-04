@@ -8,7 +8,7 @@
 
 丑话说前头。
 
-- [eorm 支持的字段类型](https://github.com/gotomicro/eorm/discussions/71)：这是指在 Go 语言层面上支持的类型，eorm 本身并不关心数据库表里面定义的类型；
+- 目前来说，它还没有达到一个稳定的状态，在正式发布 v1.0.0 之前，你可以认为它都处于一种实验和学习状态。在这个状态下，我们并不会对 API 的稳定性做任何承诺。从这个角度来说，我们也不建议你将它用在一些核心项目里面
 
 ### Go 版本
 
@@ -38,22 +38,4 @@
 我想要的社区是大家统一在 github 下，利用 issue 和 discussion 来讨论问题。这样别的用户都可以搜索到所有的讨论。
 
 ## 加入我们
-- [贡献指南](.docs/contribution.md)
-
-我们欢迎任何人给我们提合并请求，但是我们希望合并请求能够做到：
-- 一个合并请求一个 Commit ID
-- 自己要先确保合并请求能够通过 CI
-- 我们使用 uber 的[代码风格](https://github.com/uber-go/guide/blob/master/style.md)
-
-我们尤其欢迎两类人：
-- 新特性试用者
-- 长期稳定贡献者
-
-### 设置开发环境
-
-如果你是 Windows 用户，那么我们建议你使用 WSL，因为这个仓库会使用到一个 Unix 命令来帮助构建、测试等。
-
-#### 安装 golangci-lint
-参考 [Install golangci-lint](https://golangci-lint.run/usage/install/)
-#### 设置 pre-push github hook
-将`.github/pre-push` 复制到本仓库的 `.git` 目录下
+- [贡献指南](https://ekit.gocn.vip/contribution/#%E8%AE%BE%E7%BD%AE%E5%BC%80%E5%8F%91%E7%8E%AF%E5%A2%83)
