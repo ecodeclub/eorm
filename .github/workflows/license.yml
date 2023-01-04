@@ -17,7 +17,7 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, labeled, unlabeled]
     branches:
-      - develop
+      - dev
       - main
 jobs:
   check-license-lines:
