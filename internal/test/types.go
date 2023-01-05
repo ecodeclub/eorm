@@ -204,3 +204,20 @@ func NewCombinedModel(id int64) *CombinedModel {
 		LastName:  ekit.ToPtr[string]("Jerry" + fmt.Sprintln(id)),
 	}
 }
+
+type Order struct {
+	Id        int
+	UsingCol1 string
+	UsingCol2 string
+}
+
+type OrderDetail struct {
+	OrderId   int
+	ItemId    int
+	UsingCol1 string
+	UsingCol2 string
+}
+
+type Item struct {
+	Id int
+}
