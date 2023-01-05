@@ -130,6 +130,13 @@ func (b *builder) space() {
 	_ = b.buffer.WriteByte(' ')
 }
 
+func (b *builder) pointStar() {
+	_, _ = b.buffer.WriteString(".*")
+}
+func (b *builder) point() {
+	_ = b.buffer.WriteByte('.')
+}
+
 func (b *builder) writeString(val string) {
 	_, _ = b.buffer.WriteString(val)
 }
@@ -160,13 +167,21 @@ func (b *builder) buildExpr(expr Expr) error {
 	case RawExpr:
 		b.buildRawExpr(e)
 	case Column:
+		if _, ok := e.table.(Table); ok {
+			return b.buildColumn(e)
+		}
 		if e.name != "" {
 			_, ok := b.aliases[e.name]
 			if ok {
 				b.quote(e.name)
 				return nil
 			}
-			return b.buildColumn(e)
+			cm, ok := b.meta.FieldMap[e.name]
+			if !ok {
+				return errs.NewInvalidFieldError(e.name)
+			}
+			b.quote(cm.ColumnName)
+
 		}
 	case Aggregate:
 		if err := b.buildHavingAggregate(e); err != nil {
@@ -292,7 +307,7 @@ func (b *builder) buildColumn(c Column) error {
 		fd, ok := b.meta.FieldMap[c.name]
 		// 字段不对，或者说列不对
 		if !ok {
-			return errs.NewErrUnknownField(c.name)
+			return errs.NewInvalidColumnError(c.name)
 		}
 		b.quote(fd.ColumnName)
 		if c.alias != "" {
@@ -306,7 +321,7 @@ func (b *builder) buildColumn(c Column) error {
 		}
 		fd, ok := m.FieldMap[c.name]
 		if !ok {
-			return errs.NewErrUnknownField(c.name)
+			return errs.NewInvalidColumnError(c.name)
 		}
 		if table.alias != "" {
 			b.quote(table.alias)
