@@ -89,6 +89,7 @@ func (c Column) GTEQ(val interface{}) Predicate {
 // As means alias
 func (c Column) As(alias string) Selectable {
 	return Column{
+		table: c.table,
 		name:  c.name,
 		alias: alias,
 	}
