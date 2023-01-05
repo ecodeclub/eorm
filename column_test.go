@@ -18,7 +18,7 @@ import "fmt"
 
 func ExampleC() {
 	db := memoryDB()
-	tm := &TestModel{}
+	tm := TableOf(&TestModel{})
 	query, _ := NewSelector[TestModel](db).Select(C("Id")).From(tm).Where(C("Id").EQ(18)).Build()
 	fmt.Printf(`
 SQL: %s
@@ -31,7 +31,7 @@ Args: %v
 
 func ExampleColumn_EQ() {
 	db := memoryDB()
-	tm := &TestModel{}
+	tm := TableOf(&TestModel{})
 	query, _ := NewSelector[TestModel](db).Select(C("Id")).From(tm).Where(C("Id").EQ(18)).Build()
 	fmt.Printf(`
 SQL: %s
@@ -57,7 +57,7 @@ Args: %v
 
 func ExampleColumn_As() {
 	db := memoryDB()
-	tm := &TestModel{}
+	tm := TableOf(&TestModel{})
 	query, _ := NewSelector[TestModel](db).Select(C("Id").As("my_id")).From(tm).Build()
 	fmt.Printf(`
 SQL: %s
@@ -70,7 +70,7 @@ Args: %v
 
 func ExampleColumn_GT() {
 	db := memoryDB()
-	tm := &TestModel{}
+	tm := TableOf(&TestModel{})
 	query, _ := NewSelector[TestModel](db).Select(C("Id")).From(tm).Where(C("Id").GT(18)).Build()
 	fmt.Printf(`
 SQL: %s
@@ -83,7 +83,7 @@ Args: %v
 
 func ExampleColumn_GTEQ() {
 	db := memoryDB()
-	tm := &TestModel{}
+	tm := TableOf(&TestModel{})
 	query, _ := NewSelector[TestModel](db).Select(C("Id")).From(tm).Where(C("Id").GTEQ(18)).Build()
 	fmt.Printf(`
 SQL: %s
@@ -96,7 +96,7 @@ Args: %v
 
 func ExampleColumn_LT() {
 	db := memoryDB()
-	tm := &TestModel{}
+	tm := TableOf(&TestModel{})
 	query, _ := NewSelector[TestModel](db).Select(C("Id")).From(tm).Where(C("Id").LT(18)).Build()
 	fmt.Printf(`
 SQL: %s
@@ -109,7 +109,7 @@ Args: %v
 
 func ExampleColumn_LTEQ() {
 	db := memoryDB()
-	tm := &TestModel{}
+	tm := TableOf(&TestModel{})
 	query, _ := NewSelector[TestModel](db).Select(C("Id")).From(tm).Where(C("Id").LTEQ(18)).Build()
 	fmt.Printf(`
 SQL: %s
@@ -135,7 +135,7 @@ Args: %v
 
 func ExampleColumn_NEQ() {
 	db := memoryDB()
-	tm := &TestModel{}
+	tm := TableOf(&TestModel{})
 	query, _ := NewSelector[TestModel](db).Select(C("Id")).From(tm).Where(C("Id").NEQ(18)).Build()
 	fmt.Printf(`
 SQL: %s
@@ -148,7 +148,7 @@ Args: %v
 
 func ExampleColumns() {
 	db := memoryDB()
-	tm := &TestModel{}
+	tm := TableOf(&TestModel{})
 	query, _ := NewSelector[TestModel](db).Select(Columns("Id", "Age")).From(tm).Build()
 	fmt.Printf(`
 SQL: %s

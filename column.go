@@ -20,6 +20,7 @@ package eorm
 // 1. specify the column in query
 // 2. it's the start point of building complex expression
 type Column struct {
+	table TableReference
 	name  string
 	alias string
 }
@@ -145,12 +146,36 @@ type columns struct {
 	cs []string
 }
 
+func (c columns) fieldName() string {
+	panic("implement me")
+}
+
+func (c columns) selectedTable() TableReference {
+	panic("implement me")
+}
+
+func (c columns) selectedAlias() string {
+	panic("implement me")
+}
+
 func (columns) selected() {
 	panic("implement me")
 }
 
 func (columns) assign() {
 	panic("implement me")
+}
+
+func (c Column) selectedAlias() string {
+	return c.alias
+}
+
+func (c Column) fieldName() string {
+	return c.name
+}
+
+func (c Column) selectedTable() TableReference {
+	return c.table
 }
 
 // Columns specify columns
@@ -160,20 +185,29 @@ func Columns(cs ...string) columns {
 	}
 }
 
-// In 方法没有元素传入，会被认为是false，被解释成where false这种形式
+// In 方法没有元素传入，会被认为是false，被解释成where false这种形式。
+// 支持 Subquery 子查詢
 func (c Column) In(data ...any) Predicate {
 	if len(data) == 0 {
 		return Predicate{
 			op: opFalse,
 		}
 	}
-
-	return Predicate{
-		left: c,
-		op:   opIn,
-		right: values{
-			data: data,
-		},
+	switch data[0].(type) {
+	case Subquery:
+		return Predicate{
+			left:  c,
+			op:    opIn,
+			right: data[0].(Subquery),
+		}
+	default:
+		return Predicate{
+			left: c,
+			op:   opIn,
+			right: values{
+				data: data,
+			},
+		}
 	}
 }
 

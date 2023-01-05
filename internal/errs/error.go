@@ -63,3 +63,8 @@ func NewUnsupportedTypeError(typ reflect.Type) error {
 func NewUnsupportedDriverError(driver string) error {
 	return fmt.Errorf("eorm: 不支持driver类型 %s", driver)
 }
+
+// NewErrUnsupportedExpressionType 不支持表達式類型
+func NewErrUnsupportedExpressionType(exp any) error {
+	return fmt.Errorf("orm: 不支持表達式 %v", exp)
+}

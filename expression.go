@@ -25,6 +25,18 @@ type RawExpr struct {
 	args []interface{}
 }
 
+func (r RawExpr) fieldName() string {
+	return ""
+}
+
+func (r RawExpr) selectedTable() TableReference {
+	return nil
+}
+
+func (r RawExpr) selectedAlias() string {
+	return ""
+}
+
 // Raw just take expr as Expr
 func Raw(expr string, args ...interface{}) RawExpr {
 	return RawExpr{
@@ -85,5 +97,36 @@ func valueOf(val interface{}) Expr {
 		return v
 	default:
 		return valueExpr{val: val}
+	}
+}
+
+type SubqueryExpr struct {
+	s Subquery
+	// 謂詞： ALL、ANY、SOME
+	pred string
+}
+
+func (s SubqueryExpr) expr() (string, error) {
+	panic("implement me")
+}
+
+func Any(sub Subquery) SubqueryExpr {
+	return SubqueryExpr{
+		s:    sub,
+		pred: "ANY",
+	}
+}
+
+func All(sub Subquery) SubqueryExpr {
+	return SubqueryExpr{
+		s:    sub,
+		pred: "ALL",
+	}
+}
+
+func Some(sub Subquery) SubqueryExpr {
+	return SubqueryExpr{
+		s:    sub,
+		pred: "SOME",
 	}
 }

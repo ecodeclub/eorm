@@ -22,6 +22,18 @@ type Aggregate struct {
 	distinct bool
 }
 
+func (a Aggregate) selectedAlias() string {
+	return a.alias
+}
+
+func (a Aggregate) selectedTable() TableReference {
+	panic("implement me")
+}
+
+func (a Aggregate) fieldName() string {
+	return a.arg
+}
+
 // As specifies the alias
 func (a Aggregate) As(alias string) Selectable {
 	return Aggregate{

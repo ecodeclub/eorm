@@ -16,9 +16,10 @@ package eorm
 
 import (
 	"context"
-
 	"github.com/gotomicro/eorm/internal/errs"
+	"github.com/gotomicro/eorm/internal/model"
 	"github.com/valyala/bytebufferpool"
+	"reflect"
 )
 
 // Selector represents a select query
@@ -26,7 +27,7 @@ type Selector[T any] struct {
 	builder
 	session
 	columns  []Selectable
-	table    interface{}
+	table    TableReference
 	where    []Predicate
 	distinct bool
 	having   []Predicate
@@ -49,18 +50,34 @@ func NewSelector[T any](sess session) *Selector[T] {
 
 // TableOf -> get selector table
 func (s *Selector[T]) tableOf() any {
-	if s.table != nil {
-		return s.table
-	} else {
+	if s.table == nil {
 		return new(T)
 	}
+	return s.table
+}
+func (s *Selector[T]) TableGet() (*model.TableMeta, error) {
+	// 基本型態時候，一定會有 FROM 參與
+	if s.table != nil {
+		typ := reflect.TypeOf(new(T))
+		// NewSelector[T]進來時，為指針型態，再判斷是否為結構體，不是則使用 FROM 拿到的字段
+		// e.g. NewSelector[int](db).Select(C("Age")).From(TableOf(&TestModel{}))
+		if typ.Kind() == reflect.Pointer {
+			//  NewSelector[sql.NullString]
+			if typ.Elem().Kind() != reflect.Struct || typ.Elem().Name() == "NullString" {
+				return s.metaRegistry.Get(s.table.(Table).entity)
+			}
+		}
+	}
+	return s.metaRegistry.Get(new(T))
 }
 
 // Build returns Select Query
 func (s *Selector[T]) Build() (*Query, error) {
 	defer bytebufferpool.Put(s.buffer)
 	var err error
-	s.meta, err = s.metaRegistry.Get(s.tableOf())
+	//s.meta, err = s.metaRegistry.Get(s.tableOf())
+	//s.meta, err = s.metaRegistry.Get(new(T))
+	s.meta, err = s.TableGet()
 	if err != nil {
 		return nil, err
 	}
@@ -77,7 +94,9 @@ func (s *Selector[T]) Build() (*Query, error) {
 		}
 	}
 	s.writeString(" FROM ")
-	s.quote(s.meta.TableName)
+	if err = s.buildTable(s.table); err != nil {
+		return nil, err
+	}
 	if len(s.where) > 0 {
 		s.writeString(" WHERE ")
 		err = s.buildPredicates(s.where)
@@ -122,6 +141,28 @@ func (s *Selector[T]) Build() (*Query, error) {
 	}
 	s.end()
 	return &Query{SQL: s.buffer.String(), Args: s.args}, nil
+}
+
+func (s *Selector[T]) buildTable(table any) error {
+	switch tab := table.(type) {
+	case nil:
+		s.quote(s.meta.TableName)
+	case Table:
+		model, err := s.metaRegistry.Get(tab.entity)
+		if err != nil {
+			return err
+		}
+		s.quote(model.TableName)
+		if tab.alias != "" {
+			_, _ = s.buffer.WriteString(" AS ")
+			s.quote(tab.alias)
+		}
+	case Subquery:
+		return s.buildSubquery(tab, true)
+	default:
+		return errs.NewErrUnsupportedExpressionType(tab)
+	}
+	return nil
 }
 
 func (s *Selector[T]) buildOrderBy() error {
@@ -247,7 +288,7 @@ func (s *Selector[T]) Select(columns ...Selectable) *Selector[T] {
 }
 
 // From specifies the table which must be pointer of structure
-func (s *Selector[T]) From(table interface{}) *Selector[T] {
+func (s *Selector[T]) From(table TableReference) *Selector[T] {
 	s.table = table
 	return s
 }
@@ -294,6 +335,19 @@ func (s *Selector[T]) Offset(offset int) *Selector[T] {
 	return s
 }
 
+func (s *Selector[T]) AsSubquery(alias string) Subquery {
+	var table TableReference
+	if s.table == nil {
+		table = TableOf(new(T))
+	}
+	return Subquery{
+		entity:  table,
+		q:       s,
+		alias:   alias,
+		columns: s.columns,
+	}
+}
+
 // Get 方法会执行查询，并且返回一条数据
 // 注意，在不同的数据库情况下，第一条数据可能是按照不同的列来排序的
 // 而且要注意，这个方法会强制设置 Limit 1
@@ -330,7 +384,10 @@ func DESC(fields ...string) OrderBy {
 
 // Selectable is a tag interface which represents SELECT XXX
 type Selectable interface {
-	selected()
+	//selected()
+	fieldName() string
+	selectedTable() TableReference
+	selectedAlias() string
 }
 
 func (s *Selector[T]) GetMulti(ctx context.Context) ([]*T, error) {

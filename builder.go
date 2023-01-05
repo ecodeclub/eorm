@@ -17,8 +17,6 @@ package eorm
 import (
 	"context"
 	"database/sql"
-	"errors"
-
 	"github.com/gotomicro/eorm/internal/errs"
 	"github.com/gotomicro/eorm/internal/model"
 	"github.com/valyala/bytebufferpool"
@@ -156,21 +154,15 @@ func (b *builder) parameter(arg interface{}) {
 }
 
 func (b *builder) buildExpr(expr Expr) error {
+	if expr == nil {
+		return nil
+	}
 	switch e := expr.(type) {
 	case RawExpr:
 		b.buildRawExpr(e)
 	case Column:
-		if e.name != "" {
-			_, ok := b.aliases[e.name]
-			if ok {
-				b.quote(e.name)
-				return nil
-			}
-			cm, ok := b.meta.FieldMap[e.name]
-			if !ok {
-				return errs.NewInvalidFieldError(e.name)
-			}
-			b.quote(cm.ColumnName)
+		if err := b.buildColumn(e.table, e.name); err != nil {
+			return err
 		}
 	case Aggregate:
 		if err := b.buildHavingAggregate(e); err != nil {
@@ -194,9 +186,14 @@ func (b *builder) buildExpr(expr Expr) error {
 		if err := b.buildIns(e); err != nil {
 			return err
 		}
-	case nil:
+	case Subquery:
+		return b.buildSubquery(e, false)
+	case SubqueryExpr:
+		_, _ = b.buffer.WriteString(e.pred)
+		_ = b.buffer.WriteByte(' ')
+		return b.buildSubquery(e.s, false)
 	default:
-		return errors.New("unsupported expr")
+		return errs.NewErrUnsupportedExpressionType(e)
 	}
 	return nil
 }
@@ -209,12 +206,74 @@ func (b *builder) buildPredicates(predicates []Predicate) error {
 	return b.buildExpr(p)
 }
 
+func (b *builder) buildColumn(table TableReference, name string) error {
+	var alias string
+	if table != nil {
+		alias = table.tableAlias()
+	}
+	if alias != "" {
+		b.quote(alias)
+		_ = b.buffer.WriteByte('.')
+	}
+	colName, err := b.colName(table, name)
+	if err != nil {
+		return err
+	}
+	b.quote(colName)
+	return nil
+}
+
+func (b *builder) colName(table TableReference, field string) (string, error) {
+	switch tab := table.(type) {
+	case nil:
+		// 檢查是否聚合有使用別名，有的話直接採用別名
+		if _, ok := b.aliases[field]; ok {
+			return field, nil
+		}
+		fdMeta, ok := b.meta.FieldMap[field]
+		if !ok {
+			return "", errs.NewInvalidFieldError(field)
+		}
+		return fdMeta.ColumnName, nil
+	case Table:
+		m, err := b.metaRegistry.Get(tab.entity)
+		if err != nil {
+			return "", err
+		}
+		fdMeta, ok := m.FieldMap[field]
+		if !ok {
+			return "", errs.NewInvalidFieldError(field)
+		}
+		return fdMeta.ColumnName, nil
+	case Subquery:
+		if len(tab.columns) > 0 {
+			for _, c := range tab.columns {
+				// 如果 column 有別名與字段相等，直接採用字段
+				if c.selectedAlias() == field {
+					return field, nil
+				}
+				if c.fieldName() == field {
+					return b.colName(c.selectedTable(), field)
+				}
+			}
+			return "", errs.NewInvalidFieldError(field)
+		}
+		return b.colName(tab.entity, field)
+	default:
+		return "", errs.NewErrUnsupportedExpressionType(tab)
+	}
+}
+
 func (b *builder) buildHavingAggregate(aggregate Aggregate) error {
 	_, _ = b.buffer.WriteString(aggregate.fn)
 
 	_ = b.buffer.WriteByte('(')
 	if aggregate.distinct {
 		_, _ = b.buffer.WriteString("DISTINCT ")
+	}
+	if aggregate.selectedAlias() != "" {
+		b.quote(aggregate.selectedAlias())
+		return nil
 	}
 	cMeta, ok := b.meta.FieldMap[aggregate.arg]
 	if !ok {
@@ -288,4 +347,33 @@ func (q Querier[T]) GetMulti(ctx context.Context) ([]*T, error) {
 		return nil, res.Err
 	}
 	return res.Result.([]*T), nil
+}
+
+// buildSubquery 構建子查詢 SQL，
+// useAlias 決定是否顯示別名，即使有別名
+func (b *builder) buildSubquery(sub Subquery, useAlias bool) error {
+	query, err := sub.q.Build()
+	if err != nil {
+		return err
+	}
+	_ = b.buffer.WriteByte('(')
+	// 拿掉最後 ';'
+	_, _ = b.buffer.WriteString(query.SQL[:len(query.SQL)-1])
+	// 因為有 build() ，所以理應 args 也需要跟 SQL 一起處理
+	if len(query.Args) > 0 {
+		b.addArgs(query.Args...)
+	}
+	_ = b.buffer.WriteByte(')')
+	if useAlias {
+		_, _ = b.buffer.WriteString(" AS ")
+		b.quote(sub.alias)
+	}
+	return nil
+}
+
+func (b *builder) addArgs(args ...any) {
+	if b.args == nil {
+		b.args = make([]any, 0, 8)
+	}
+	b.args = append(b.args, args...)
 }

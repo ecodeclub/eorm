@@ -102,7 +102,21 @@ func (t *tagMetaRegistry) Get(table interface{}) (*TableMeta, error) {
 // Register function generates a metadata for each column and places it in a thread-safe mapping to facilitate direct access to the metadata.
 // And the metadata can be modified by user-defined methods opts
 func (t *tagMetaRegistry) Register(table interface{}, opts ...TableMetaOption) (*TableMeta, error) {
+	tableMeta, err := t.parseMeta(table)
+	if err != nil {
+		return nil, err
+	}
+	for _, o := range opts {
+		o(tableMeta)
+	}
 	rtype := reflect.TypeOf(table)
+	t.metas.Store(rtype, tableMeta)
+	return tableMeta, nil
+
+}
+
+func (t *tagMetaRegistry) parseMeta(val any) (*TableMeta, error) {
+	rtype := reflect.TypeOf(val)
 	v := rtype.Elem()
 	lens := v.NumField()
 	columnMetas := make([]*ColumnMeta, 0, lens)
@@ -117,19 +131,13 @@ func (t *tagMetaRegistry) Register(table interface{}, opts ...TableMetaOption) (
 		columnMap[columnMeta.ColumnName] = columnMeta
 	}
 
-	tableMeta := &TableMeta{
+	return &TableMeta{
 		Columns:   columnMetas,
 		TableName: underscoreName(v.Name()),
 		Typ:       rtype,
 		FieldMap:  fieldMap,
 		ColumnMap: columnMap,
-	}
-	for _, o := range opts {
-		o(tableMeta)
-	}
-	t.metas.Store(rtype, tableMeta)
-	return tableMeta, nil
-
+	}, nil
 }
 
 func (t *tagMetaRegistry) parseFields(v reflect.Type, fieldIndexes []int,
