@@ -28,7 +28,7 @@ type MiddlewareBuilder struct {
 func NewBuilder() *MiddlewareBuilder {
 	return &MiddlewareBuilder{
 		logFunc: func(sql string, args ...any) {
-			log.Println(sql)
+			log.Println(sql, args)
 		},
 	}
 

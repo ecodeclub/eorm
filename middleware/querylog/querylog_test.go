@@ -17,7 +17,9 @@ package querylog
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/gotomicro/eorm"
@@ -28,36 +30,76 @@ import (
 func TestMiddlewareBuilder_Build(t *testing.T) {
 	testCases := []struct {
 		name    string
-		builder *MiddlewareBuilder
-		wantVal any
+		mdls    []eorm.Middleware
+		builder *testMiddlewareBuilder
+		wantVal string
+		wantErr error
 	}{
 		{
-			name:    "not args",
-			builder: NewBuilder(),
+			name: "default",
+			builder: &testMiddlewareBuilder{
+				MiddlewareBuilder: NewBuilder(),
+				printVal:          strings.Builder{},
+			},
+			mdls: []eorm.Middleware{},
 		},
 		{
 			name: "output args",
-			builder: NewBuilder().LogFunc(func(sql string, args ...any) {
-				fmt.Println(sql, args)
-			}),
+			builder: func() *testMiddlewareBuilder {
+				b := &testMiddlewareBuilder{
+					MiddlewareBuilder: NewBuilder(),
+					printVal:          strings.Builder{},
+				}
+				logfunc := func(sql string, args ...any) {
+					fmt.Println(sql, args)
+					b.printVal.WriteString(sql)
+				}
+				b.LogFunc(logfunc)
+				return b
+			}(),
+			mdls:    []eorm.Middleware{},
+			wantVal: "SELECT `id`,`first_name`,`age`,`last_name` FROM `test_model` LIMIT ?;",
 		},
 		{
-			name: "log func",
-			builder: func() *MiddlewareBuilder {
-				builder := NewBuilder()
-				builder.LogFunc(func(sql string, args ...any) {
+			name: "not args",
+			builder: &testMiddlewareBuilder{
+				printVal: strings.Builder{},
+				MiddlewareBuilder: NewBuilder().LogFunc(func(sql string, args ...any) {
 					fmt.Println(sql)
-				})
-				return builder
+				}),
+			},
+			mdls:    []eorm.Middleware{},
+			wantVal: "SELECT `id`,`first_name`,`age`,`last_name` FROM `test_model` LIMIT ?;",
+		},
+		{
+			name: "interrupt err",
+			builder: &testMiddlewareBuilder{
+				printVal: strings.Builder{},
+				MiddlewareBuilder: NewBuilder().LogFunc(func(sql string, args ...any) {
+					fmt.Println(sql)
+				}),
+			},
+			mdls: func() []eorm.Middleware {
+				var interrupt eorm.Middleware = func(next eorm.HandleFunc) eorm.HandleFunc {
+					return func(ctx context.Context, qc *eorm.QueryContext) *eorm.QueryResult {
+						return &eorm.QueryResult{
+							Err: errors.New("interrupt execution"),
+						}
+					}
+				}
+				return []eorm.Middleware{interrupt}
 			}(),
+			wantErr: errors.New("interrupt execution"),
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			mdls := tc.mdls
+			mdls = append(mdls, tc.builder.Build())
 			db, err := eorm.Open("sqlite3",
 				"file:test.db?cache=shared&mode=memory", eorm.DBWithMiddlewares(
-					tc.builder.Build()))
+					mdls...))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -65,10 +107,22 @@ func TestMiddlewareBuilder_Build(t *testing.T) {
 				_ = db.Close()
 			}()
 			_, err = eorm.NewSelector[TestModel](db).Get(context.Background())
-			assert.NotNil(t, err)
+			if err.Error() == "no such table: test_model" {
+				return
+			}
+			if err != nil {
+				assert.Equal(t, tc.wantErr, err)
+				return
+			}
+			assert.Equal(t, tc.wantVal, tc.builder.printVal.String())
 		})
 	}
 
+}
+
+type testMiddlewareBuilder struct {
+	*MiddlewareBuilder
+	printVal strings.Builder
 }
 
 type TestModel struct {
