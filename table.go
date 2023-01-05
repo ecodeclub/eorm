@@ -52,6 +52,54 @@ func (t Table) C(name string) Column {
 		table: t,
 	}
 }
+func (t Table) selected() {
+	panic("implement me")
+}
+
+// Max represents MAX
+func (t Table) Max(c string) Aggregate {
+	return Aggregate{
+		fn:    "MAX",
+		arg:   c,
+		table: t,
+	}
+}
+
+// Max represents MAX
+func (t Table) Avg(c string) Aggregate {
+	return Aggregate{
+		fn:    "AVG",
+		arg:   c,
+		table: t,
+	}
+}
+
+// Min represents MIN
+func (t Table) Min(c string) Aggregate {
+	return Aggregate{
+		fn:    "MIN",
+		arg:   c,
+		table: t,
+	}
+}
+
+// Count represents COUNT
+func (t Table) Count(c string) Aggregate {
+	return Aggregate{
+		fn:    "COUNT",
+		arg:   c,
+		table: t,
+	}
+}
+
+// Sum represents SUM
+func (t Table) Sum(c string) Aggregate {
+	return Aggregate{
+		fn:    "SUM",
+		arg:   c,
+		table: t,
+	}
+}
 
 type Join struct {
 	left  TableReference
