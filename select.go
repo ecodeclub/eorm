@@ -16,7 +16,6 @@ package eorm
 
 import (
 	"context"
-
 	"github.com/gotomicro/eorm/internal/errs"
 	"github.com/valyala/bytebufferpool"
 )
@@ -49,15 +48,10 @@ func NewSelector[T any](sess session) *Selector[T] {
 
 // TableOf -> get selector table
 func (s *Selector[T]) tableOf() any {
-	if s.table != nil {
-		switch tb := s.table.(type) {
-		case Table:
-			return tb.entity
-		default:
-			return new(T)
-		}
-		return s.table
-	} else {
+	switch tb := s.table.(type) {
+	case Table:
+		return tb.entity
+	default:
 		return new(T)
 	}
 }
@@ -133,7 +127,30 @@ func (s *Selector[T]) Build() (*Query, error) {
 	s.end()
 	return &Query{SQL: s.buffer.String(), Args: s.args}, nil
 }
-
+func (s *Selector[T]) AllColumns(table TableReference) error {
+	switch t := table.(type) {
+	case nil:
+		s.quote(s.meta.TableName)
+	case Table:
+		m, err := s.metaRegistry.Get(t.entity)
+		if err != nil {
+			return err
+		}
+		if t.alias != "" {
+			s.quote(t.alias)
+			return nil
+		}
+		s.quote(m.TableName)
+	case Join:
+		err := s.AllColumns(t.left)
+		if err != nil {
+			return err
+		}
+	default:
+		return errs.NewErrUnsupportedTable(table)
+	}
+	return nil
+}
 func (s *Selector[T]) buildTable(table TableReference) error {
 	switch t := table.(type) {
 	case nil:
@@ -224,6 +241,15 @@ func (s *Selector[T]) buildGroupBy() error {
 }
 
 func (s *Selector[T]) buildAllColumns() {
+	if s.table != nil {
+		if _, ok := s.table.(Table); !ok {
+			if err := s.AllColumns(s.table); err != nil {
+				return
+			}
+			s.pointStar()
+			return
+		}
+	}
 	for i, cMeta := range s.meta.Columns {
 		if i > 0 {
 			s.comma()
@@ -242,6 +268,20 @@ func (s *Selector[T]) buildSelectedList() error {
 		}
 		switch expr := selectable.(type) {
 		case Column:
+			if expr.table != nil {
+				if t, ok := expr.table.(Table); ok {
+					if t.alias != "" {
+						s.quote(t.alias)
+					} else {
+						meta, err := s.metaRegistry.Get(t.entity)
+						if err != nil {
+							return err
+						}
+						s.quote(meta.TableName)
+					}
+					s.point()
+				}
+			}
 			err := s.buildColumn(expr.name, expr.alias)
 			if err != nil {
 				return err
@@ -279,11 +319,24 @@ func (s *Selector[T]) selectAggregate(aggregate Aggregate) error {
 	if !ok {
 		return errs.NewInvalidFieldError(aggregate.arg)
 	}
+	if aggregate.table != nil {
+		if t, ok := aggregate.table.(Table); ok {
+			if t.alias != "" {
+				s.quote(t.alias)
+				s.point()
+			}
+		}
+	}
 	s.quote(cMeta.ColumnName)
 	s.writeByte(')')
 	if aggregate.alias != "" {
 		if _, ok := s.aliases[aggregate.alias]; ok {
 			s.writeString(" AS ")
+			//m, okay := s.meta.FieldMap[aggregate.alias]
+			//if !okay {
+			//	return errs.NewInvalidFieldError(aggregate.alias)
+			//}
+			//s.quote(m.ColumnName)
 			s.quote(aggregate.alias)
 		}
 	}
