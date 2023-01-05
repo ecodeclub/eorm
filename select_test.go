@@ -18,6 +18,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"github.com/gotomicro/eorm/internal/test"
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
@@ -1290,7 +1291,64 @@ func TestSelector_Join(t *testing.T) {
 				return NewSelector[Order](db).From(t3)
 			}(),
 			wantQuery: &Query{
-				SQL: "SELECT `id`,`using_col1`,`using_col2` FROM (`order` JOIN `order_detail` USING (`using_col1`,`using_col2`));",
+				SQL: "SELECT `order`.* FROM (`order` JOIN `order_detail` USING (`using_col1`,`using_col2`));",
+			},
+		},
+		{
+			name: "join-using-cols",
+			s: func() QueryBuilder {
+				t1 := TableOf(&Order{})
+				t2 := TableOf(&OrderDetail{})
+				t3 := t1.Join(t2).Using("UsingCol1", "UsingCol2")
+				return NewSelector[Order](db).From(t3).Select(t1.C("UsingCol1"), t2.C("UsingCol1"))
+			}(),
+			wantQuery: &Query{
+				SQL: "SELECT `order`.`using_col1`,`order_detail`.`using_col1` FROM (`order` JOIN `order_detail` USING (`using_col1`,`using_col2`));",
+			},
+		},
+		{
+			name: "join-using-cols-invalid",
+			s: func() QueryBuilder {
+				t1 := TableOf(&Order{})
+				t2 := TableOf(&OrderDetail{})
+				t3 := t1.Join(t2).Using("invalid", "invalid2")
+				return NewSelector[Order](db).From(t3).Select(t1.C("UsingCol2"))
+			}(),
+			wantErr: errs.NewInvalidFieldError("invalid"),
+		},
+		{
+			name: "join-using-cols-Avg",
+			s: func() QueryBuilder {
+				t1 := TableOf(&Order{}).As("t1")
+				t2 := TableOf(&OrderDetail{})
+				t3 := t1.Join(t2).Using("UsingCol1", "UsingCol2")
+				return NewSelector[Order](db).From(t3).Select(t1.Avg("UsingCol1").As("UsingCol1"))
+			}(),
+			wantQuery: &Query{
+				SQL: "SELECT AVG(`t1`.`using_col1`) AS `UsingCol1` FROM (`order` AS `t1` JOIN `order_detail` USING (`using_col1`,`using_col2`));",
+			},
+		},
+		{
+			name: "join-using-Avg-invalid",
+			s: func() QueryBuilder {
+				t1 := TableOf(&Order{}).As("t1")
+				t2 := TableOf(&OrderDetail{})
+				t3 := t1.Join(t2).Using("UsingCol1", "UsingCol2")
+				return NewSelector[Order](db).From(t3).Select(t1.Avg("invalid"))
+			}(),
+			wantErr: errs.NewInvalidFieldError("invalid"),
+		},
+		{
+			name: "join-using-where",
+			s: func() QueryBuilder {
+				t1 := TableOf(&Order{})
+				t2 := TableOf(&OrderDetail{})
+				t3 := t1.Join(t2).Using("UsingCol1", "UsingCol2")
+				return NewSelector[Order](db).From(t3).Where(C("UsingCol1").EQ(10).And(C("UsingCol2").EQ(10)))
+			}(),
+			wantQuery: &Query{
+				SQL:  "SELECT `order`.* FROM (`order` JOIN `order_detail` USING (`using_col1`,`using_col2`)) WHERE (`using_col1`=?) AND (`using_col2`=?);",
+				Args: []interface{}{10, 10},
 			},
 		},
 		{
@@ -1302,7 +1360,7 @@ func TestSelector_Join(t *testing.T) {
 				return NewSelector[Order](db).From(t3)
 			}(),
 			wantQuery: &Query{
-				SQL: "SELECT `id`,`using_col1`,`using_col2` FROM (`order` LEFT JOIN `order_detail` USING (`using_col1`,`using_col2`));",
+				SQL: "SELECT `order`.* FROM (`order` LEFT JOIN `order_detail` USING (`using_col1`,`using_col2`));",
 			},
 		},
 		{
@@ -1314,7 +1372,7 @@ func TestSelector_Join(t *testing.T) {
 				return NewSelector[Order](db).From(t3)
 			}(),
 			wantQuery: &Query{
-				SQL: "SELECT `id`,`using_col1`,`using_col2` FROM (`order` RIGHT JOIN `order_detail` USING (`using_col1`,`using_col2`));",
+				SQL: "SELECT `order`.* FROM (`order` RIGHT JOIN `order_detail` USING (`using_col1`,`using_col2`));",
 			},
 		},
 		{
@@ -1326,8 +1384,54 @@ func TestSelector_Join(t *testing.T) {
 				return NewSelector[Order](db).From(t3)
 			}(),
 			wantQuery: &Query{
-				SQL: "SELECT `id`,`using_col1`,`using_col2` FROM (`order` AS `t1` JOIN `order_detail` AS `t2` ON `t1`.`id`=`t2`.`order_id`);",
+				SQL: "SELECT `t1`.* FROM (`order` AS `t1` JOIN `order_detail` AS `t2` ON `t1`.`id`=`t2`.`order_id`);",
 			},
+		},
+		{
+			name: "join-on-where",
+			s: func() QueryBuilder {
+				t1 := TableOf(&Order{}).As("t1")
+				t2 := TableOf(&OrderDetail{}).As("t2")
+				t3 := t1.Join(t2).On(t1.C("Id").EQ(t2.C("OrderId")))
+				return NewSelector[Order](db).From(t3).Where(C("UsingCol1").EQ(10).And(C("UsingCol2").EQ(10)))
+			}(),
+			wantQuery: &Query{
+				SQL:  "SELECT `t1`.* FROM (`order` AS `t1` JOIN `order_detail` AS `t2` ON `t1`.`id`=`t2`.`order_id`) WHERE (`using_col1`=?) AND (`using_col2`=?);",
+				Args: []interface{}{10, 10},
+			},
+		},
+		{
+			name: "join-on-where-invalid-clos",
+			s: func() QueryBuilder {
+				t1 := TableOf(&Order{}).As("t1")
+				t2 := TableOf(&OrderDetail{}).As("t2")
+				t3 := t1.Join(t2).On(t1.C("Id").EQ(t2.C("OrderId")))
+				return NewSelector[Order](db).From(t3).Select(t1.C("invalid")).Where(C("invalid").EQ(10).And(C("UsingCol2").EQ(10)))
+			}(),
+			wantErr: errs.NewInvalidFieldError("invalid"),
+		},
+		{
+			name: "join-on-where-invalid-Min-clos",
+			s: func() QueryBuilder {
+				t1 := TableOf(&Order{}).As("t1")
+				t2 := TableOf(&OrderDetail{}).As("t2")
+				t3 := t1.Join(t2).On(t1.C("Id").EQ(t2.C("OrderId")))
+				return NewSelector[Order](db).From(t3).Select(t1.Min("invalid"), t1.C("invalid")).Where(C("invalid").EQ(10).And(C("UsingCol2").EQ(10)))
+			}(),
+			wantErr: errs.NewInvalidFieldError("invalid"),
+		},
+		{
+			// SELECT MAX(t1.xxx), t2.xxx
+			name: "join-on-where-Max-clos",
+			s: func() QueryBuilder {
+				t1 := TableOf(&Order{}).As("t1")
+				t2 := TableOf(&OrderDetail{}).As("t2")
+				t3 := t1.LeftJoin(t2).On(t1.C("Id").EQ(t2.C("OrderId")))
+				return NewSelector[Order](db).From(t3).Select(t1.Max("UsingCol1").As("UsingCol1"), t1.C("UsingCol2")).Where(t1.C("UsingCol2").EQ("UsingCol2_1").And(t1.C("UsingCol2").EQ("UsingCol2_2")))
+			}(),
+			wantQuery: &Query{
+				SQL:  "SELECT MAX(`t1`.`using_col1`) AS `UsingCol1`,`t1`.`using_col2` FROM (`order` AS `t1` LEFT JOIN `order_detail` AS `t2` ON `t1`.`id`=`t2`.`order_id`) WHERE (`t1`.`using_col2`=?) AND (`t1`.`using_col2`=?);",
+				Args: []interface{}{"UsingCol2_1", "UsingCol2_2"}},
 		},
 		{
 			name: "join table",
@@ -1340,13 +1444,99 @@ func TestSelector_Join(t *testing.T) {
 				return NewSelector[Order](db).From(t5)
 			}(),
 			wantQuery: &Query{
-				SQL: "SELECT `id`,`using_col1`,`using_col2` FROM " +
+				SQL: "SELECT `t1`.* FROM " +
 					"((`order` AS `t1` JOIN `order_detail` AS `t2` ON `t1`.`id`=`t2`.`order_id`) " +
 					"JOIN `item` AS `t4` ON `t2`.`item_id`=`t4`.`id`);",
 			},
 		},
 		{
-			name: "table join ",
+			name: "join table-right",
+			s: func() QueryBuilder {
+				t1 := TableOf(&Order{}).As("t1")
+				t2 := TableOf(&OrderDetail{}).As("t2")
+				t3 := t1.Join(t2).On(t1.C("Id").EQ(t2.C("OrderId")))
+				t4 := TableOf(&Item{}).As("t4")
+				t5 := t3.RightJoin(t4).On(t2.C("ItemId").EQ(t4.C("Id")))
+				return NewSelector[Order](db).From(t5)
+			}(),
+			wantQuery: &Query{
+				SQL: "SELECT `t1`.* FROM ((`order` AS `t1` JOIN `order_detail` AS `t2` ON `t1`.`id`=`t2`.`order_id`) RIGHT JOIN `item` AS `t4` ON `t2`.`item_id`=`t4`.`id`);",
+			},
+		},
+		{
+			name: "join table-left",
+			s: func() QueryBuilder {
+				t1 := TableOf(&Order{}).As("t1")
+				t2 := TableOf(&OrderDetail{}).As("t2")
+				t3 := t1.Join(t2).On(t1.C("Id").EQ(t2.C("OrderId")))
+				t4 := TableOf(&Item{}).As("t4")
+				t5 := t3.LeftJoin(t4).On(t2.C("ItemId").EQ(t4.C("Id")))
+				return NewSelector[Order](db).From(t5)
+			}(),
+			wantQuery: &Query{
+				SQL: "SELECT `t1`.* FROM ((`order` AS `t1` JOIN `order_detail` AS `t2` ON `t1`.`id`=`t2`.`order_id`) LEFT JOIN `item` AS `t4` ON `t2`.`item_id`=`t4`.`id`);",
+			},
+		},
+		{
+			// SELECT AVG(t1.xxx), AVG(t2.xxx)
+			name: "join table AVG-AVG ",
+			s: func() QueryBuilder {
+				t1 := TableOf(&Order{}).As("t1")
+				t2 := TableOf(&OrderDetail{}).As("t2")
+				t3 := t1.Join(t2).On(t1.C("Id").EQ(t2.C("OrderId")))
+				t4 := TableOf(&Item{}).As("t4")
+				t5 := t3.Join(t4).On(t2.C("ItemId").EQ(t4.C("Id")))
+				return NewSelector[Order](db).From(t5).Select(t1.Avg("UsingCol1").As("UsingCol1"), t1.Avg("UsingCol2").As("UsingCol2"))
+			}(),
+			wantQuery: &Query{
+				SQL: "SELECT AVG(`t1`.`using_col1`) AS `UsingCol1`,AVG(`t1`.`using_col2`) AS `UsingCol2` FROM ((`order` AS `t1` JOIN `order_detail` AS `t2` ON `t1`.`id`=`t2`.`order_id`) JOIN `item` AS `t4` ON `t2`.`item_id`=`t4`.`id`);",
+			},
+		},
+		{
+			// SELECT AVG(t1.xxx), AVG(t2.xxx)
+			name: "join table AVG-AVG invalid ",
+			s: func() QueryBuilder {
+				t1 := TableOf(&Order{}).As("t1")
+				t2 := TableOf(&OrderDetail{}).As("t2")
+				t3 := t1.Join(t2).On(t1.C("Id").EQ(t2.C("OrderId")))
+				t4 := TableOf(&Item{}).As("t4")
+				t5 := t3.Join(t4).On(t2.C("ItemId").EQ(t4.C("Id")))
+				return NewSelector[Order](db).From(t5).Select(t1.Avg("invalid"), t1.Avg("invalid"))
+			}(),
+			wantErr: errs.NewInvalidFieldError("invalid"),
+		},
+		{
+			// SELECT t1.xxx, t2.xxx
+			name: "join table C-C ",
+			s: func() QueryBuilder {
+				t1 := TableOf(&Order{}).As("t1")
+				t2 := TableOf(&OrderDetail{}).As("t2")
+				t3 := t1.Join(t2).On(t1.C("Id").EQ(t2.C("OrderId")))
+				t4 := TableOf(&Item{}).As("t4")
+				t5 := t3.Join(t4).On(t2.C("ItemId").EQ(t4.C("Id")))
+				return NewSelector[Order](db).From(t5).Select(t1.C("UsingCol1"), t1.C("UsingCol2"))
+			}(),
+			wantQuery: &Query{
+				SQL: "SELECT `t1`.`using_col1`,`t1`.`using_col2` FROM " +
+					"((`order` AS `t1` JOIN `order_detail` AS `t2` ON `t1`.`id`=`t2`.`order_id`) " +
+					"JOIN `item` AS `t4` ON `t2`.`item_id`=`t4`.`id`);",
+			},
+		},
+		{
+			// SELECT t1.xxx, t2.xxx
+			name: "join table C-C invalid",
+			s: func() QueryBuilder {
+				t1 := TableOf(&Order{}).As("t1")
+				t2 := TableOf(&OrderDetail{}).As("t2")
+				t3 := t1.Join(t2).On(t1.C("Id").EQ(t2.C("OrderId")))
+				t4 := TableOf(&Item{}).As("t4")
+				t5 := t3.Join(t4).On(t2.C("ItemId").EQ(t4.C("Id")))
+				return NewSelector[Order](db).From(t5).Select(t1.C("invalid"), t1.C("invalid"))
+			}(),
+			wantErr: errs.NewInvalidFieldError("invalid"),
+		},
+		{
+			name: "table join",
 			s: func() QueryBuilder {
 				t1 := TableOf(&Order{}).As("t1")
 				t2 := TableOf(&OrderDetail{}).As("t2")
@@ -1356,7 +1546,33 @@ func TestSelector_Join(t *testing.T) {
 				return NewSelector[Order](db).From(t5)
 			}(),
 			wantQuery: &Query{
-				SQL: "SELECT `id`,`using_col1`,`using_col2` FROM (`item` AS `t4` JOIN (`order` AS `t1` JOIN `order_detail` AS `t2` ON `t1`.`id`=`t2`.`order_id`) ON `t2`.`item_id`=`t4`.`id`);",
+				SQL: "SELECT `t4`.* FROM (`item` AS `t4` JOIN (`order` AS `t1` JOIN `order_detail` AS `t2` ON `t1`.`id`=`t2`.`order_id`) ON `t2`.`item_id`=`t4`.`id`);",
+			},
+		},
+		{
+			name: "table join on Sum",
+			s: func() QueryBuilder {
+				t1 := TableOf(&Order{}).As("t1")
+				t2 := TableOf(&OrderDetail{}).As("t2")
+				t3 := t1.Join(t2).On(t1.C("Id").EQ(t2.C("OrderId")))
+				t4 := TableOf(&Item{}).As("t4")
+				t5 := t4.Join(t3).On(t2.C("ItemId").EQ(t4.C("Id")))
+				return NewSelector[Order](db).From(t5).Select(t4.Sum("Id").As("Id"), t4.Min("Id").As("Id"), t4.Max("Id").As("Id"), t4.Sum("Id").As("Id"), t4.Count("Id").As("Id"))
+			}(),
+			wantQuery: &Query{
+				SQL: "SELECT SUM(`t4`.`id`) AS `Id`,MIN(`t4`.`id`) AS `Id`,MAX(`t4`.`id`) AS `Id`,SUM(`t4`.`id`) AS `Id`,COUNT(`t4`.`id`) AS `Id` FROM (`item` AS `t4` JOIN (`order` AS `t1` JOIN `order_detail` AS `t2` ON `t1`.`id`=`t2`.`order_id`) ON `t2`.`item_id`=`t4`.`id`);",
+			},
+		},
+		{
+			name: "table join----",
+			s: func() QueryBuilder {
+				t1 := TableOf(&test.Order{}).As("t1")
+				t2 := TableOf(&test.OrderDetail{}).As("t2")
+				t3 := t1.Join(t2).On(t1.C("Id").EQ(t2.C("OrderId")))
+				return NewSelector[test.Order](db).From(t3).Select(t1.Avg("UsingCol1").As("UsingCol1"))
+			}(),
+			wantQuery: &Query{
+				SQL: "SELECT AVG(`t1`.`using_col1`) AS `UsingCol1` FROM (`order` AS `t1` JOIN `order_detail` AS `t2` ON `t1`.`id`=`t2`.`order_id`);",
 			},
 		},
 	}
