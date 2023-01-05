@@ -138,10 +138,6 @@ func (Column) expr() (string, error) {
 	panic("implement me")
 }
 
-func (Column) selected() {
-	panic("implement me")
-}
-
 type columns struct {
 	cs []string
 }
@@ -155,10 +151,6 @@ func (c columns) selectedTable() TableReference {
 }
 
 func (c columns) selectedAlias() string {
-	panic("implement me")
-}
-
-func (columns) selected() {
 	panic("implement me")
 }
 

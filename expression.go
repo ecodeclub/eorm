@@ -57,8 +57,6 @@ func (r RawExpr) AsPredicate() Predicate {
 	}
 }
 
-func (RawExpr) selected() {}
-
 type binaryExpr struct {
 	left  Expr
 	op    op

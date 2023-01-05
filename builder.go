@@ -17,6 +17,7 @@ package eorm
 import (
 	"context"
 	"database/sql"
+
 	"github.com/gotomicro/eorm/internal/errs"
 	"github.com/gotomicro/eorm/internal/model"
 	"github.com/valyala/bytebufferpool"

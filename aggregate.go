@@ -104,8 +104,6 @@ func SumDistinct(col string) Aggregate {
 	return a
 }
 
-func (Aggregate) selected() {}
-
 func (a Aggregate) EQ(val interface{}) Predicate {
 	return Predicate{
 		left:  a,

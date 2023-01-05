@@ -16,10 +16,11 @@ package eorm
 
 import (
 	"context"
+	"reflect"
+
 	"github.com/gotomicro/eorm/internal/errs"
 	"github.com/gotomicro/eorm/internal/model"
 	"github.com/valyala/bytebufferpool"
-	"reflect"
 )
 
 // Selector represents a select query
@@ -48,13 +49,7 @@ func NewSelector[T any](sess session) *Selector[T] {
 	}
 }
 
-// TableOf -> get selector table
-func (s *Selector[T]) tableOf() any {
-	if s.table == nil {
-		return new(T)
-	}
-	return s.table
-}
+// TableGet -> get selector table
 func (s *Selector[T]) TableGet() (*model.TableMeta, error) {
 	// 基本型態時候，一定會有 FROM 參與
 	if s.table != nil {
