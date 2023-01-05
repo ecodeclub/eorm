@@ -16,6 +16,7 @@ package eorm
 
 // Aggregate represents aggregate expression, including AVG, MAX, MIN...
 type Aggregate struct {
+	table    TableReference
 	fn       string
 	arg      string
 	alias    string
@@ -28,6 +29,7 @@ func (a Aggregate) As(alias string) Selectable {
 		fn:    a.fn,
 		arg:   a.arg,
 		alias: alias,
+		table: a.table,
 	}
 }
 
