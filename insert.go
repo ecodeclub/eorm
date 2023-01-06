@@ -43,6 +43,21 @@ func NewInserter[T any](sess session) *Inserter[T] {
 	}
 }
 
+func (i *Inserter[T]) NonPKColumns(entity any) (cols []string, err error) {
+	i.meta, err = i.metaRegistry.Get(entity)
+	if err != nil {
+		return
+	}
+	for _, column := range i.meta.Columns {
+		if column.IsPrimaryKey {
+			continue
+		}
+		cols = append(cols, column.FieldName)
+	}
+	return
+
+}
+
 // Build function build the query
 // notes:
 // - All the values from function Values should have the same type.
@@ -54,9 +69,11 @@ func (i *Inserter[T]) Build() (*Query, error) {
 		return &Query{}, errors.New("插入0行")
 	}
 	i.writeString("INSERT INTO ")
-	i.meta, err = i.metaRegistry.Get(i.values[0])
-	if err != nil {
-		return &Query{}, err
+	if i.meta == nil {
+		i.meta, err = i.metaRegistry.Get(i.values[0])
+		if err != nil {
+			return &Query{}, err
+		}
 	}
 	i.quote(i.meta.TableName)
 	i.writeString("(")
