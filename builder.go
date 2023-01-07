@@ -350,6 +350,13 @@ func (q Querier[T]) GetMulti(ctx context.Context) ([]*T, error) {
 	return res.Result.([]*T), nil
 }
 
+func (b *builder) buildAs(alias string) {
+	if alias != "" {
+		_, _ = b.buffer.WriteString(" AS ")
+		b.quote(alias)
+	}
+}
+
 // buildSubquery 構建子查詢 SQL，
 // useAlias 決定是否顯示別名，即使有別名
 func (b *builder) buildSubquery(sub Subquery, useAlias bool) error {
@@ -366,8 +373,7 @@ func (b *builder) buildSubquery(sub Subquery, useAlias bool) error {
 	}
 	_ = b.buffer.WriteByte(')')
 	if useAlias {
-		_, _ = b.buffer.WriteString(" AS ")
-		b.quote(sub.alias)
+		b.buildAs(sub.alias)
 	}
 	return nil
 }

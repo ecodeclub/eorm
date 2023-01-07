@@ -206,9 +206,12 @@ func (s *Selector[T]) buildSelectedList() error {
 		}
 		switch expr := selectable.(type) {
 		case Column:
-			err := s.buildColumn(expr.name, expr.alias)
+			err := s.builder.buildColumn(expr.table, expr.name)
 			if err != nil {
 				return err
+			}
+			if expr.alias != "" {
+				s.buildAs(expr.alias)
 			}
 		case columns:
 			for j, c := range expr.cs {
