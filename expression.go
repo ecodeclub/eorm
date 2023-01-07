@@ -25,15 +25,15 @@ type RawExpr struct {
 	args []interface{}
 }
 
-func (r RawExpr) fieldName() string {
+func (RawExpr) fieldName() string {
 	return ""
 }
 
-func (r RawExpr) selectedTable() TableReference {
+func (RawExpr) selectedTable() TableReference {
 	return nil
 }
 
-func (r RawExpr) selectedAlias() string {
+func (RawExpr) selectedAlias() string {
 	return ""
 }
 
@@ -104,7 +104,7 @@ type SubqueryExpr struct {
 	pred string
 }
 
-func (s SubqueryExpr) expr() (string, error) {
+func (SubqueryExpr) expr() (string, error) {
 	panic("implement me")
 }
 

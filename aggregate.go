@@ -26,7 +26,7 @@ func (a Aggregate) selectedAlias() string {
 	return a.alias
 }
 
-func (a Aggregate) selectedTable() TableReference {
+func (Aggregate) selectedTable() TableReference {
 	panic("implement me")
 }
 

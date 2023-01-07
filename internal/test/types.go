@@ -124,7 +124,7 @@ func (j *JsonColumn) Scan(src any) error {
 }
 
 // Value 参考 sql.NullXXX 类型定义的
-func (j JsonColumn) Value() (driver.Value, error) {
+func (j *JsonColumn) Value() (driver.Value, error) {
 	if !j.Valid {
 		return nil, nil
 	}
@@ -203,4 +203,18 @@ func NewCombinedModel(id int64) *CombinedModel {
 		Age:       20,
 		LastName:  ekit.ToPtr[string]("Jerry" + fmt.Sprintln(id)),
 	}
+}
+
+type Order struct {
+	Id        int
+	UsingCol1 string
+	UsingCol2 string
+}
+
+type OrderDetail struct {
+	OrderId int
+	ItemId  int
+
+	UsingCol1 string
+	UsingCol2 string
 }

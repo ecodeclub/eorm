@@ -142,15 +142,15 @@ type columns struct {
 	cs []string
 }
 
-func (c columns) fieldName() string {
+func (columns) fieldName() string {
 	panic("implement me")
 }
 
-func (c columns) selectedTable() TableReference {
+func (columns) selectedTable() TableReference {
 	panic("implement me")
 }
 
-func (c columns) selectedAlias() string {
+func (columns) selectedAlias() string {
 	panic("implement me")
 }
 

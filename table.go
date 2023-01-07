@@ -15,7 +15,7 @@ func TableOf(entity any) Table {
 	}
 }
 
-func (t Table) C(name string) Column {
+func (Table) C(name string) Column {
 	return Column{
 		name:  name,
 		alias: "",
@@ -40,7 +40,9 @@ type Subquery struct {
 	columns []Selectable
 }
 
-func (s Subquery) expr() (string, error) {
+var _ TableReference = Subquery{}
+
+func (Subquery) expr() (string, error) {
 	panic("implement me")
 }
 func (s Subquery) tableAlias() string {

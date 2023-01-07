@@ -16,6 +16,7 @@ package eorm
 
 import (
 	"context"
+
 	"github.com/gotomicro/eorm/internal/errs"
 	"github.com/gotomicro/eorm/internal/model"
 	"github.com/valyala/bytebufferpool"
@@ -252,16 +253,6 @@ func (s *Selector[T]) selectAggregate(aggregate Aggregate) error {
 }
 
 func (s *Selector[T]) buildColumn(field, alias string) error {
-	//err := s.builder.buildColumn(s.table, field)
-	//if err != nil {
-	//	return err
-	//}
-	//if alias != "" {
-	//	s.aliases[alias] = struct{}{}
-	//	s.writeString(" AS ")
-	//	s.quote(alias)
-	//}
-	//return nil
 	cMeta, ok := s.meta.FieldMap[field]
 	if !ok {
 		return errs.NewInvalidFieldError(field)
