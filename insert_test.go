@@ -17,6 +17,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/stretchr/testify/require"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -24,7 +25,7 @@ import (
 
 func TestInserter_Values(t *testing.T) {
 	type User struct {
-		Id        int64
+		Id        int64 `eorm:"auto_increment,primary_key"`
 		FirstName string
 		Ctime     uint64
 	}
@@ -76,6 +77,30 @@ func TestInserter_Values(t *testing.T) {
 			builder:  NewInserter[User](db).Columns("Id", "FirstName").Values(u, u1),
 			wantSql:  "INSERT INTO `user`(`id`,`first_name`) VALUES(?,?),(?,?);",
 			wantArgs: []interface{}{int64(12), "Tom", int64(13), "Jerry"},
+		},
+		{
+			name: "ignore pk",
+			builder: func() *Inserter[User] {
+				res := NewInserter[User](db)
+				cols, err := res.NonPKColumns(&User{})
+				require.NoError(t, err)
+				res.Columns(cols...).Values(u)
+				return res
+			}(),
+			wantSql:  "INSERT INTO `user`(`first_name`,`ctime`) VALUES(?,?);",
+			wantArgs: []interface{}{"Tom", uint64(1000)},
+		},
+		{
+			name: "ignore pk multi",
+			builder: func() *Inserter[User] {
+				res := NewInserter[User](db)
+				cols, err := res.NonPKColumns(&User{})
+				require.NoError(t, err)
+				res.Columns(cols...).Values(u, u1)
+				return res
+			}(),
+			wantSql:  "INSERT INTO `user`(`first_name`,`ctime`) VALUES(?,?),(?,?);",
+			wantArgs: []interface{}{"Tom", uint64(1000), "Jerry", uint64(1000)},
 		},
 	}
 
