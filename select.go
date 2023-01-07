@@ -129,7 +129,7 @@ func (s *Selector[T]) Build() (*Query, error) {
 	return &Query{SQL: s.buffer.String(), Args: s.args}, nil
 }
 
-func (s *Selector[T]) buildTable(table any) error {
+func (s *Selector[T]) buildTable(table TableReference) error {
 	switch tab := table.(type) {
 	case nil:
 		s.quote(s.meta.TableName)
@@ -143,6 +143,8 @@ func (s *Selector[T]) buildTable(table any) error {
 			_, _ = s.buffer.WriteString(" AS ")
 			s.quote(tab.alias)
 		}
+	case Join:
+		return s.buildJoin(tab)
 	case Subquery:
 		return s.buildSubquery(tab, true)
 	default:
@@ -263,6 +265,39 @@ func (s *Selector[T]) buildColumn(field, alias string) error {
 		s.writeString(" AS ")
 		s.quote(alias)
 	}
+	return nil
+}
+
+func (s *Selector[T]) buildJoin(tab Join) error {
+	_ = s.buffer.WriteByte('(')
+	if err := s.buildTable(tab.left); err != nil {
+		return err
+	}
+	_ = s.buffer.WriteByte(' ')
+	_, _ = s.buffer.WriteString(tab.typ)
+	_ = s.buffer.WriteByte(' ')
+	if err := s.buildTable(tab.right); err != nil {
+		return err
+	}
+	if len(tab.using) > 0 {
+		_, _ = s.buffer.WriteString(" USING (")
+		for i, col := range tab.using {
+			if i > 0 {
+				_ = s.buffer.WriteByte(',')
+			}
+			if err := s.buildColumn(col, ""); err != nil {
+				return err
+			}
+		}
+		_ = s.buffer.WriteByte(')')
+	}
+	if len(tab.on) > 0 {
+		_, _ = s.buffer.WriteString(" ON ")
+		if err := s.buildPredicates(tab.on); err != nil {
+			return err
+		}
+	}
+	_ = s.buffer.WriteByte(')')
 	return nil
 }
 

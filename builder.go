@@ -227,7 +227,7 @@ func (b *builder) buildColumn(table TableReference, name string) error {
 func (b *builder) colName(table TableReference, field string) (string, error) {
 	switch tab := table.(type) {
 	case nil:
-		// 檢查是否聚合有使用別名，有的話直接採用別名
+		// 檢查是否有使用別名，有的話直接採用別名
 		if _, ok := b.aliases[field]; ok {
 			return field, nil
 		}

@@ -764,6 +764,9 @@ func TestSelectable(t *testing.T) {
 		UserId int64
 		Phone  int64
 	}
+	type TestModel3 struct {
+		Id int64
+	}
 	testCases := []CommonTestCase{
 		{
 			name:    "simple",
@@ -1044,6 +1047,59 @@ func TestSelectable(t *testing.T) {
 				return NewSelector[TestModel](db).Where(Not(Exist(sub)))
 			}(),
 			wantSql: "SELECT `id`,`first_name`,`age`,`last_name` FROM `test_model` WHERE NOT (EXIST (SELECT `user_id` FROM `test_model2`));",
+		},
+		// join 查詢
+		{
+			name: "join",
+			builder: func() QueryBuilder {
+				t1 := TableOf(&TestModel{}).As("t1")
+				t2 := TableOf(&TestModel2{})
+				return NewSelector[TestModel](db).From(t1.Join(t2).On(t1.C("Id").EQ(t2.C("UserId"))))
+			}(),
+			wantSql: "SELECT `id`,`first_name`,`age`,`last_name` FROM (`test_model` AS `t1` JOIN `test_model2` ON `t1`.`id`=`user_id`);",
+		},
+		{
+			name: "multiple join",
+			builder: func() QueryBuilder {
+				t1 := TableOf(&TestModel{}).As("t1")
+				t2 := TableOf(&TestModel2{}).As("t2")
+				t3 := TableOf(&TestModel3{}).As("t3")
+				return NewSelector[TestModel](db).
+					From(t1.Join(t2).On(t1.C("Id").EQ(t2.C("UserId"))).Join(t3).On(t2.C("UserId").EQ(t3.C("Id"))))
+			}(),
+			wantSql: "SELECT `id`,`first_name`,`age`,`last_name` FROM ((`test_model` AS `t1` JOIN `test_model2` AS `t2` ON `t1`.`id`=`t2`.`user_id`) JOIN `test_model3` AS `t3` ON `t2`.`user_id`=`t3`.`id`);",
+		},
+		{
+			name: "left multiple join",
+			builder: func() QueryBuilder {
+				t1 := TableOf(&TestModel{}).As("t1")
+				t2 := TableOf(&TestModel2{}).As("t2")
+				t3 := TableOf(&TestModel3{}).As("t3")
+				return NewSelector[TestModel](db).
+					From(t1.LeftJoin(t2).On(t1.C("Id").EQ(t2.C("UserId"))).LeftJoin(t3).On(t2.C("UserId").EQ(t3.C("Id"))))
+			}(),
+			wantSql: "SELECT `id`,`first_name`,`age`,`last_name` FROM ((`test_model` AS `t1` LEFT JOIN `test_model2` AS `t2` ON `t1`.`id`=`t2`.`user_id`) LEFT JOIN `test_model3` AS `t3` ON `t2`.`user_id`=`t3`.`id`);",
+		},
+		{
+			name: "right multiple join",
+			builder: func() QueryBuilder {
+				t1 := TableOf(&TestModel{}).As("t1")
+				t2 := TableOf(&TestModel2{}).As("t2")
+				t3 := TableOf(&TestModel3{}).As("t3")
+				return NewSelector[TestModel](db).
+					From(t1.RightJoin(t2).On(t1.C("Id").EQ(t2.C("UserId"))).RightJoin(t3).On(t2.C("UserId").EQ(t3.C("Id"))))
+			}(),
+			wantSql: "SELECT `id`,`first_name`,`age`,`last_name` FROM ((`test_model` AS `t1` RIGHT JOIN `test_model2` AS `t2` ON `t1`.`id`=`t2`.`user_id`) RIGHT JOIN `test_model3` AS `t3` ON `t2`.`user_id`=`t3`.`id`);",
+		},
+		{
+			name: "join using",
+			builder: func() QueryBuilder {
+				t1 := TableOf(&TestModel{}).As("t1")
+				t2 := TableOf(&TestModel2{})
+				return NewSelector[TestModel](db).
+					From(t1.Join(t2).Using("FirstName", "LastName"))
+			}(),
+			wantSql: "SELECT `id`,`first_name`,`age`,`last_name` FROM (`test_model` AS `t1` JOIN `test_model2` USING (`first_name`,`last_name`));",
 		},
 	}
 
