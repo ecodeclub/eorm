@@ -16,8 +16,6 @@ package eorm
 
 import (
 	"context"
-	"reflect"
-
 	"github.com/gotomicro/eorm/internal/errs"
 	"github.com/gotomicro/eorm/internal/model"
 	"github.com/valyala/bytebufferpool"
@@ -51,27 +49,19 @@ func NewSelector[T any](sess session) *Selector[T] {
 
 // TableGet -> get selector table
 func (s *Selector[T]) TableGet() (*model.TableMeta, error) {
-	// 基本型態時候，一定會有 FROM 參與
-	if s.table != nil {
-		typ := reflect.TypeOf(new(T))
-		// NewSelector[T]進來時，為指針型態，再判斷是否為結構體，不是則使用 FROM 拿到的字段
-		// e.g. NewSelector[int](db).Select(C("Age")).From(TableOf(&TestModel{}))
-		if typ.Kind() == reflect.Pointer {
-			//  NewSelector[sql.NullString]
-			if typ.Elem().Kind() != reflect.Struct || typ.Elem().Name() == "NullString" {
-				return s.metaRegistry.Get(s.table.(Table).entity)
-			}
-		}
+	// 判斷是否為 Table
+	switch tb := s.table.(type) {
+	case Table:
+		return s.metaRegistry.Get(tb.entity)
+	default:
+		return s.metaRegistry.Get(new(T))
 	}
-	return s.metaRegistry.Get(new(T))
 }
 
 // Build returns Select Query
 func (s *Selector[T]) Build() (*Query, error) {
 	defer bytebufferpool.Put(s.buffer)
 	var err error
-	//s.meta, err = s.metaRegistry.Get(s.tableOf())
-	//s.meta, err = s.metaRegistry.Get(new(T))
 	s.meta, err = s.TableGet()
 	if err != nil {
 		return nil, err
@@ -143,11 +133,11 @@ func (s *Selector[T]) buildTable(table any) error {
 	case nil:
 		s.quote(s.meta.TableName)
 	case Table:
-		model, err := s.metaRegistry.Get(tab.entity)
+		m, err := s.metaRegistry.Get(tab.entity)
 		if err != nil {
 			return err
 		}
-		s.quote(model.TableName)
+		s.quote(m.TableName)
 		if tab.alias != "" {
 			_, _ = s.buffer.WriteString(" AS ")
 			s.quote(tab.alias)
@@ -262,6 +252,16 @@ func (s *Selector[T]) selectAggregate(aggregate Aggregate) error {
 }
 
 func (s *Selector[T]) buildColumn(field, alias string) error {
+	//err := s.builder.buildColumn(s.table, field)
+	//if err != nil {
+	//	return err
+	//}
+	//if alias != "" {
+	//	s.aliases[alias] = struct{}{}
+	//	s.writeString(" AS ")
+	//	s.quote(alias)
+	//}
+	//return nil
 	cMeta, ok := s.meta.FieldMap[field]
 	if !ok {
 		return errs.NewInvalidFieldError(field)
@@ -379,7 +379,6 @@ func DESC(fields ...string) OrderBy {
 
 // Selectable is a tag interface which represents SELECT XXX
 type Selectable interface {
-	//selected()
 	fieldName() string
 	selectedTable() TableReference
 	selectedAlias() string
