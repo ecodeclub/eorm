@@ -1092,7 +1092,7 @@ func TestSelectable(t *testing.T) {
 			wantSql: "SELECT `id`,`first_name`,`age`,`last_name` FROM ((`test_model` AS `t1` RIGHT JOIN `test_model2` AS `t2` ON `t1`.`id`=`t2`.`user_id`) RIGHT JOIN `test_model3` AS `t3` ON `t2`.`user_id`=`t3`.`id`);",
 		},
 		{
-			name: "join using",
+			name: "join & using",
 			builder: func() QueryBuilder {
 				t1 := TableOf(&TestModel{}).As("t1")
 				t2 := TableOf(&TestModel2{})
@@ -1100,6 +1100,89 @@ func TestSelectable(t *testing.T) {
 					From(t1.Join(t2).Using("FirstName", "LastName"))
 			}(),
 			wantSql: "SELECT `id`,`first_name`,`age`,`last_name` FROM (`test_model` AS `t1` JOIN `test_model2` USING (`first_name`,`last_name`));",
+		},
+		// Join 與 Subquery 一起使用測試
+		{
+			name: "join & subquery",
+			builder: func() QueryBuilder {
+				t1 := TableOf(&TestModel{})
+				sub := NewSelector[TestModel2](db).AsSubquery("sub")
+				return NewSelector[TestModel](db).Select(sub.C("UserId")).From(t1.Join(sub).On(t1.C("Id").EQ(sub.C("UserId")))).Where()
+			}(),
+			wantSql: "SELECT `sub`.`user_id` FROM (`test_model` JOIN (SELECT `user_id`,`phone` FROM `test_model2`) AS `sub` ON `id`=`sub`.`user_id`);",
+		},
+		{
+			name: "left join & subquery",
+			builder: func() QueryBuilder {
+				t1 := TableOf(&TestModel{})
+				sub := NewSelector[TestModel2](db).AsSubquery("sub")
+				return NewSelector[TestModel](db).Select(sub.C("UserId")).From(t1.LeftJoin(sub).On(t1.C("Id").EQ(sub.C("UserId")))).Where()
+			}(),
+			wantSql: "SELECT `sub`.`user_id` FROM (`test_model` LEFT JOIN (SELECT `user_id`,`phone` FROM `test_model2`) AS `sub` ON `id`=`sub`.`user_id`);",
+		},
+		{
+			name: "right join & subquery",
+			builder: func() QueryBuilder {
+				t1 := TableOf(&TestModel{})
+				sub := NewSelector[TestModel2](db).AsSubquery("sub")
+				return NewSelector[TestModel](db).Select(sub.C("UserId")).From(t1.RightJoin(sub).On(t1.C("Id").EQ(sub.C("UserId")))).Where()
+			}(),
+			wantSql: "SELECT `sub`.`user_id` FROM (`test_model` RIGHT JOIN (SELECT `user_id`,`phone` FROM `test_model2`) AS `sub` ON `id`=`sub`.`user_id`);",
+		},
+		{
+			name: "right join & subquery & using",
+			builder: func() QueryBuilder {
+				sub1 := NewSelector[TestModel2](db).AsSubquery("sub1")
+				sub2 := NewSelector[TestModel2](db).AsSubquery("sub2")
+				return NewSelector[TestModel](db).Select(sub1.C("UserId")).From(sub1.RightJoin(sub2).Using("Id")).Where()
+			}(),
+			wantSql: "SELECT `sub1`.`user_id` FROM ((SELECT `user_id`,`phone` FROM `test_model2`) AS `sub1` RIGHT JOIN (SELECT `user_id`,`phone` FROM `test_model2`) AS `sub2` USING (`id`));",
+		},
+		{
+			name: "join & subquery & using",
+			builder: func() QueryBuilder {
+				sub1 := NewSelector[TestModel2](db).AsSubquery("sub1")
+				sub2 := NewSelector[TestModel2](db).From(sub1).AsSubquery("sub2")
+				t1 := TableOf(&TestModel{}).As("o1")
+				return NewSelector[TestModel](db).From(sub2.Join(t1).Using("Id")).Where()
+			}(),
+			wantSql: "SELECT `id`,`first_name`,`age`,`last_name` FROM ((SELECT `user_id`,`phone` FROM (SELECT `user_id`,`phone` FROM `test_model2`) AS `sub1`) AS `sub2` JOIN `test_model` AS `o1` USING (`id`));",
+		},
+		{
+			name: "invalid field",
+			builder: func() QueryBuilder {
+				t1 := TableOf(&TestModel{})
+				sub := NewSelector[TestModel2](db).AsSubquery("sub")
+				return NewSelector[TestModel](db).Select(sub.C("Invalid")).From(t1.Join(sub).On(t1.C("Id").EQ(sub.C("UserId")))).Where()
+			}(),
+			wantErr: errs.NewInvalidFieldError("Invalid"),
+		},
+		{
+			name: "invalid field in predicates",
+			builder: func() QueryBuilder {
+				t1 := TableOf(&TestModel{})
+				sub := NewSelector[TestModel2](db).AsSubquery("sub")
+				return NewSelector[TestModel](db).Select(sub.C("ItemId")).From(t1.Join(sub).On(t1.C("Id").EQ(sub.C("Invalid")))).Where()
+			}(),
+			wantErr: errs.NewInvalidFieldError("ItemId"),
+		},
+		{
+			name: "invalid field in predicates with columns",
+			builder: func() QueryBuilder {
+				t1 := TableOf(&TestModel{})
+				sub := NewSelector[TestModel2](db).Select(C("UserId")).AsSubquery("sub")
+				return NewSelector[TestModel](db).Select(sub.C("ItemId")).From(t1.Join(sub).On(t1.C("Id").EQ(sub.C("UserId")))).Where()
+			}(),
+			wantErr: errs.NewInvalidFieldError("ItemId"),
+		},
+		{
+			name: "invalid field in aggregate function",
+			builder: func() QueryBuilder {
+				t1 := TableOf(&TestModel{})
+				sub := NewSelector[TestModel2](db).AsSubquery("sub")
+				return NewSelector[TestModel](db).Select(Max("Invalid")).From(t1.Join(sub).On(t1.C("Id").EQ(sub.C("UserId")))).Where()
+			}(),
+			wantErr: errs.NewInvalidFieldError("Invalid"),
 		},
 	}
 
