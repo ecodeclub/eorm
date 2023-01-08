@@ -166,41 +166,10 @@ func (s *Selector[T]) buildTable(table TableReference) error {
 			s.quote(t.alias)
 		}
 	case Join:
-		s.writeByte('(')
-		err := s.buildTable(t.left)
-		if err != nil {
-			return err
-		}
-		s.space()
-		s.writeString(t.typ)
-		s.space()
-		err = s.buildTable(t.right)
-		if err != nil {
+		if err := s.buildJoin(t); err != nil {
 			return err
 		}
 
-		if len(t.using) > 0 {
-			s.writeString(" USING (")
-			for i, col := range t.using {
-				if i > 0 {
-					s.comma()
-				}
-				err = s.buildColumn(col, "")
-				if err != nil {
-					return err
-				}
-			}
-			s.writeByte(')')
-		}
-
-		if len(t.on) > 0 {
-			s.writeString(" ON ")
-			if err = s.buildPredicates(t.on); err != nil {
-				return err
-			}
-		}
-
-		s.writeByte(')')
 	default:
 		return errs.NewErrUnsupportedTable(table)
 	}
@@ -356,6 +325,20 @@ func (s *Selector[T]) buildColumn(field, alias string) error {
 	}
 	return nil
 }
+func (s *Selector[T]) buildUsing(using []string) error {
+	s.writeString(" USING (")
+	for i, col := range using {
+		if i > 0 {
+			s.comma()
+		}
+		err := s.buildColumn(col, "")
+		if err != nil {
+			return err
+		}
+	}
+	s.writeByte(')')
+	return nil
+}
 
 // Select 指定查询的列。
 // 列可以是物理列，也可以是聚合函数，或者 RawExpr
@@ -457,4 +440,30 @@ func (s *Selector[T]) GetMulti(ctx context.Context) ([]*T, error) {
 		return nil, err
 	}
 	return newQuerier[T](s.session, query, s.meta, SELECT).GetMulti(ctx)
+}
+
+func (s *Selector[T]) buildJoin(t Join) error {
+	s.writeByte('(')
+	if err := s.buildTable(t.left); err != nil {
+		return err
+	}
+	s.space()
+	s.writeString(t.typ)
+	s.space()
+	if err := s.buildTable(t.right); err != nil {
+		return err
+	}
+	if len(t.using) > 0 {
+		if err := s.buildUsing(t.using); err != nil {
+			return err
+		}
+	}
+	if len(t.on) > 0 {
+		s.writeString(" ON ")
+		if err := s.buildPredicates(t.on); err != nil {
+			return err
+		}
+	}
+	s.writeByte(')')
+	return nil
 }
