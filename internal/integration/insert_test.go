@@ -56,6 +56,17 @@ func (i *InsertTestSuite) TestInsert() {
 			i:            eorm.NewInserter[test.SimpleStruct](i.orm).Values(test.NewSimpleStruct(2)),
 			rowsAffected: 1,
 		},
+		{
+			name: "ignore pk",
+			i: func() *eorm.Inserter[test.SimpleStruct] {
+				res := eorm.NewInserter[test.SimpleStruct](i.orm)
+				cols, err := res.NonPKColumns(&test.SimpleStruct{})
+				require.NoError(i.T(), err)
+				res.Columns(cols...).Values(test.NewSimpleStruct(3))
+				return res
+			}(),
+			rowsAffected: 1,
+		},
 	}
 	for _, tc := range testCases {
 		i.T().Run(tc.name, func(t *testing.T) {

@@ -188,6 +188,30 @@ func TestInserter_ValuesForCombination(t *testing.T) {
 			wantSql:  "INSERT INTO `user`(`id`,`first_name`) VALUES(?,?),(?,?);",
 			wantArgs: []interface{}{int64(12), "Tom", int64(13), "Jerry"},
 		},
+		{
+			name: "ignore pk",
+			builder: func() *Inserter[User] {
+				res := NewInserter[User](db)
+				cols, err := res.NonPKColumns(&User{})
+				require.NoError(t, err)
+				res.Columns(cols...).Values(u)
+				return res
+			}(),
+			wantSql:  "INSERT INTO `user`(`create_time`,`first_name`) VALUES(?,?);",
+			wantArgs: []interface{}{uint64(1000), "Tom"},
+		},
+		{
+			name: "ignore pk multi",
+			builder: func() *Inserter[User] {
+				res := NewInserter[User](db)
+				cols, err := res.NonPKColumns(&User{})
+				require.NoError(t, err)
+				res.Columns(cols...).Values(u, u1)
+				return res
+			}(),
+			wantSql:  "INSERT INTO `user`(`create_time`,`first_name`) VALUES(?,?),(?,?);",
+			wantArgs: []interface{}{uint64(1000), "Tom", uint64(1000), "Jerry"},
+		},
 	}
 
 	for _, tc := range testCases {
