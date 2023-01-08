@@ -122,7 +122,7 @@ type Join struct {
 
 var _ TableReference = Join{}
 
-func (j Join) tableAlias() string {
+func (Join) tableAlias() string {
 	return ""
 }
 
