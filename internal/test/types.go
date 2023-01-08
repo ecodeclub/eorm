@@ -218,3 +218,29 @@ type OrderDetail struct {
 	UsingCol1 string
 	UsingCol2 string
 }
+type Item struct {
+	Id int
+}
+
+func NewOrderModel(id int) *Order {
+	return &Order{
+		Id:        id,
+		UsingCol1: "col1",
+		UsingCol2: "col2",
+	}
+}
+
+func NewOrderDetailModel(id int) *OrderDetail {
+	return &OrderDetail{
+		OrderId:   id,
+		ItemId:    id + 1,
+		UsingCol1: "col1",
+		UsingCol2: "col2",
+	}
+}
+
+func NewItemModel(id int) *Item {
+	return &Item{
+		Id: id,
+	}
+}

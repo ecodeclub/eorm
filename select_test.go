@@ -1041,6 +1041,22 @@ func TestSelectable(t *testing.T) {
 			wantSql: "SELECT `id`,`first_name`,`age`,`last_name` FROM `test_model` WHERE EXIST (SELECT `user_id` FROM `test_model2`);",
 		},
 		{
+			name: "aggregate",
+			builder: func() QueryBuilder {
+				sub := NewSelector[TestModel2](db).Select(C("UserId")).AsSubquery("sub")
+				return NewSelector[TestModel](db).Select(Max("Id")).Where(Exist(sub))
+			}(),
+			wantSql: "SELECT MAX(`id`) FROM `test_model` WHERE EXIST (SELECT `user_id` FROM `test_model2`);",
+		},
+		{
+			name: "invalid column",
+			builder: func() QueryBuilder {
+				sub := NewSelector[TestModel2](db).Select(C("UserId")).AsSubquery("sub")
+				return NewSelector[TestModel](db).Select(Max("invalid")).Where(Exist(sub))
+			}(),
+			wantErr: errs.NewInvalidFieldError("invalid"),
+		},
+		{
 			name: "not exist",
 			builder: func() QueryBuilder {
 				sub := NewSelector[TestModel2](db).Select(C("UserId")).AsSubquery("sub")

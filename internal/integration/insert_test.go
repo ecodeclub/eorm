@@ -48,7 +48,7 @@ func (i *InsertTestSuite) TestInsert() {
 	}{
 		{
 			name:         "id only",
-			i:            eorm.NewInserter[test.SimpleStruct](i.orm).Values(&test.SimpleStruct{Id: 1}),
+			i:            eorm.NewInserter[test.SimpleStruct](i.orm).Values(test.NewSimpleStruct(1)),
 			rowsAffected: 1,
 		},
 		{
