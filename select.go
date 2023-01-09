@@ -220,11 +220,8 @@ func (s *Selector[T]) buildAllColumns() {
 		}
 	}
 	for i, cMeta := range s.meta.Columns {
-		if i > 0 {
-			s.comma()
-		}
 		// it should never return error, we can safely ignore it
-		_ = s.buildColumn(cMeta.FieldName, "")
+		_ = s.buildColumns(i, cMeta.FieldName, "")
 	}
 }
 
@@ -237,30 +234,13 @@ func (s *Selector[T]) buildSelectedList() error {
 		}
 		switch expr := selectable.(type) {
 		case Column:
-			if expr.table != nil {
-				if t, ok := expr.table.(Table); ok {
-					if t.alias != "" {
-						s.quote(t.alias)
-					} else {
-						meta, err := s.metaRegistry.Get(t.entity)
-						if err != nil {
-							return err
-						}
-						s.quote(meta.TableName)
-					}
-					s.point()
-				}
-			}
-			err := s.buildColumn(expr.name, expr.alias)
+			err := s.buildColumn(expr)
 			if err != nil {
 				return err
 			}
 		case columns:
 			for j, c := range expr.cs {
-				if j > 0 {
-					s.comma()
-				}
-				err := s.buildColumn(c, "")
+				err := s.buildColumns(j, c, "")
 				if err != nil {
 					return err
 				}
@@ -301,21 +281,46 @@ func (s *Selector[T]) selectAggregate(aggregate Aggregate) error {
 	if aggregate.alias != "" {
 		if _, ok := s.aliases[aggregate.alias]; ok {
 			s.writeString(" AS ")
-			//m, okay := s.meta.FieldMap[aggregate.alias]
-			//if !okay {
-			//	return errs.NewInvalidFieldError(aggregate.alias)
-			//}
-			//s.quote(m.ColumnName)
 			s.quote(aggregate.alias)
 		}
 	}
 	return nil
 }
 
-func (s *Selector[T]) buildColumn(field, alias string) error {
-	cMeta, ok := s.meta.FieldMap[field]
+func (s *Selector[T]) buildColumn(column Column) error {
+	if column.table != nil {
+		if t, ok := column.table.(Table); ok {
+			if t.alias != "" {
+				s.quote(t.alias)
+			} else {
+				meta, err := s.metaRegistry.Get(t.entity)
+				if err != nil {
+					return err
+				}
+				s.quote(meta.TableName)
+			}
+			s.point()
+		}
+	}
+	cMeta, ok := s.meta.FieldMap[column.name]
 	if !ok {
-		return errs.NewInvalidFieldError(field)
+		return errs.NewInvalidFieldError(column.name)
+	}
+	s.quote(cMeta.ColumnName)
+	if column.alias != "" {
+		s.aliases[column.alias] = struct{}{}
+		s.writeString(" AS ")
+		s.quote(column.alias)
+	}
+	return nil
+}
+func (s *Selector[T]) buildColumns(index int, name, alias string) error {
+	if index > 0 {
+		s.comma()
+	}
+	cMeta, ok := s.meta.FieldMap[name]
+	if !ok {
+		return errs.NewInvalidFieldError(name)
 	}
 	s.quote(cMeta.ColumnName)
 	if alias != "" {
@@ -325,13 +330,11 @@ func (s *Selector[T]) buildColumn(field, alias string) error {
 	}
 	return nil
 }
+
 func (s *Selector[T]) buildUsing(using []string) error {
 	s.writeString(" USING (")
 	for i, col := range using {
-		if i > 0 {
-			s.comma()
-		}
-		err := s.buildColumn(col, "")
+		err := s.buildColumns(i, col, "")
 		if err != nil {
 			return err
 		}
