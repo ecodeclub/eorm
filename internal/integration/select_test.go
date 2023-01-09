@@ -19,8 +19,8 @@ package integration
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"github.com/gotomicro/eorm/internal/errs"
+	"github.com/stretchr/testify/require"
 	"testing"
 
 	"github.com/gotomicro/eorm"
@@ -31,7 +31,6 @@ import (
 
 type SelectTestSuite struct {
 	Suite
-	Op
 	data *test.SimpleStruct
 }
 
@@ -41,6 +40,7 @@ func (s *SelectTestSuite) SetupSuite() {
 	res := eorm.NewInserter[test.SimpleStruct](s.orm).Values(s.data).Exec(context.Background())
 	if res.Err() != nil {
 		s.T().Fatal(res.Err())
+		s.T()
 	}
 }
 
@@ -780,6 +780,7 @@ func (s *SelectTestSuiteGetMulti) TestSelectorDistinct() {
 	}
 
 }
+
 func TestMySQL8SelectJoin(t *testing.T) {
 	suite.Run(t, &SelectTestSuiteJoin{
 		Suite: Suite{
@@ -808,16 +809,16 @@ type SelectTestSuiteJoin struct {
 
 func (s *SelectTestSuiteJoin) SetupSuite() {
 	s.Suite.SetupSuite()
-	initSql(s.orm)
+	initSql(s.orm, s.T())
 }
 
 func (s *SelectTestSuiteJoin) TearDownSuite() {
 	res := eorm.RawQuery[any](s.orm, "DELETE FROM `order`").Exec(context.Background())
+	require.NoError(s.T(), res.Err())
 	res = eorm.RawQuery[any](s.orm, "DELETE FROM `order_detail`").Exec(context.Background())
+	require.NoError(s.T(), res.Err())
 	res = eorm.RawQuery[any](s.orm, "DELETE FROM `item`").Exec(context.Background())
-	if res.Err() != nil {
-		s.T().Fatal(res.Err())
-	}
+	require.NoError(s.T(), res.Err())
 }
 func (s *SelectTestSuiteJoin) TestSelectorJoin() {
 	testCases := []struct {
@@ -929,16 +930,16 @@ type SelectTestSuiteLeftJoin struct {
 
 func (s *SelectTestSuiteLeftJoin) SetupSuite() {
 	s.Suite.SetupSuite()
-	initSql(s.orm)
+	initSql(s.orm, s.T())
 }
 
 func (s *SelectTestSuiteLeftJoin) TearDownSuite() {
 	res := eorm.RawQuery[any](s.orm, "DELETE FROM `order`").Exec(context.Background())
+	require.NoError(s.T(), res.Err())
 	res = eorm.RawQuery[any](s.orm, "DELETE FROM `order_detail`").Exec(context.Background())
+	require.NoError(s.T(), res.Err())
 	res = eorm.RawQuery[any](s.orm, "DELETE FROM `item`").Exec(context.Background())
-	if res.Err() != nil {
-		s.T().Fatal(res.Err())
-	}
+	require.NoError(s.T(), res.Err())
 }
 
 func (s *SelectTestSuiteLeftJoin) TestSelectorLeftJoin() {
@@ -1039,16 +1040,16 @@ type SelectTestSuiteRightJoin struct {
 
 func (s *SelectTestSuiteRightJoin) SetupSuite() {
 	s.Suite.SetupSuite()
-	initSql(s.orm)
+	initSql(s.orm, s.T())
 }
 
 func (s *SelectTestSuiteRightJoin) TearDownSuite() {
 	res := eorm.RawQuery[any](s.orm, "DELETE FROM `order`").Exec(context.Background())
+	require.NoError(s.T(), res.Err())
 	res = eorm.RawQuery[any](s.orm, "DELETE FROM `order_detail`").Exec(context.Background())
+	require.NoError(s.T(), res.Err())
 	res = eorm.RawQuery[any](s.orm, "DELETE FROM `item`").Exec(context.Background())
-	if res.Err() != nil {
-		s.T().Fatal(res.Err())
-	}
+	require.NoError(s.T(), res.Err())
 }
 
 func (s *SelectTestSuiteRightJoin) TestSelectorRightJoin() {
@@ -1142,27 +1143,21 @@ func (s *SelectTestSuiteRightJoin) TestSelectorRightJoin() {
 	}
 }
 
-func initSql(orm *eorm.DB) {
-	Orderres1 := eorm.NewInserter[test.Order](orm).Values(&test.Order{Id: 1, UsingCol1: "usingcoa1_1", UsingCol2: "usingcoa1_2"}).Exec(context.Background())
-	fmt.Print(Orderres1.Err(), "\n")
-	Orderres2 := eorm.NewInserter[test.Order](orm).Values(&test.Order{Id: 2, UsingCol1: "usingcoa1_8", UsingCol2: "usingcoa1_2"}).Exec(context.Background())
-	fmt.Print(Orderres2.Err(), "\n")
-	Orderres3 := eorm.NewInserter[test.Order](orm).Values(&test.Order{Id: 3, UsingCol1: "usingcoa1_2", UsingCol2: "usingcoa1_2"}).Exec(context.Background())
-	fmt.Print(Orderres3.Err(), "\n")
-	Orderres4 := eorm.NewInserter[test.Order](orm).Values(&test.Order{Id: 4, UsingCol1: "usingcoa1_5", UsingCol2: "usingcoa1_2"}).Exec(context.Background())
-	fmt.Print(Orderres4.Err(), "\n")
+func initSql(orm *eorm.DB, t *testing.T) {
+	orderRes := eorm.NewInserter[test.Order](orm).Values(&test.Order{Id: 1, UsingCol1: "usingcoa1_1", UsingCol2: "usingcoa1_2"},
+		&test.Order{Id: 2, UsingCol1: "usingcoa1_8", UsingCol2: "usingcoa1_2"},
+		&test.Order{Id: 3, UsingCol1: "usingcoa1_2", UsingCol2: "usingcoa1_2"},
+		&test.Order{Id: 4, UsingCol1: "usingcoa1_5", UsingCol2: "usingcoa1_2"},
+	).Exec(context.Background())
+	require.NoError(t, orderRes.Err())
+	orderDetailRes := eorm.NewInserter[test.OrderDetail](orm).Values(&test.OrderDetail{OrderId: 1, ItemId: 1, UsingCol1: "usingcoa1_1", UsingCol2: "usingcoa1_2"},
+		&test.OrderDetail{OrderId: 2, ItemId: 1, UsingCol1: "usingcoa1_1", UsingCol2: "usingcoa1_2"},
+		&test.OrderDetail{OrderId: 3, ItemId: 2, UsingCol1: "usingcoa1_1", UsingCol2: "usingcoa1_2"},
+		&test.OrderDetail{OrderId: 4, ItemId: 2, UsingCol1: "usingcoa1_1", UsingCol2: "usingcoa1_2"},
+	).Exec(context.Background())
+	require.NoError(t, orderDetailRes.Err())
 
-	OrderDetailres1 := eorm.NewInserter[test.OrderDetail](orm).Values(&test.OrderDetail{OrderId: 1, ItemId: 1, UsingCol1: "usingcoa1_1", UsingCol2: "usingcoa1_2"}).Exec(context.Background())
-	fmt.Print(OrderDetailres1.Err(), "\n")
-	OrderDetailres2 := eorm.NewInserter[test.OrderDetail](orm).Values(&test.OrderDetail{OrderId: 2, ItemId: 1, UsingCol1: "usingcoa1_1", UsingCol2: "usingcoa1_2"}).Exec(context.Background())
-	fmt.Print(OrderDetailres2.Err(), "\n")
-	OrderDetailres3 := eorm.NewInserter[test.OrderDetail](orm).Values(&test.OrderDetail{OrderId: 3, ItemId: 2, UsingCol1: "usingcoa1_1", UsingCol2: "usingcoa1_2"}).Exec(context.Background())
-	fmt.Print(OrderDetailres3.Err(), "\n")
-	OrderDetailres4 := eorm.NewInserter[test.OrderDetail](orm).Values(&test.OrderDetail{OrderId: 4, ItemId: 2, UsingCol1: "usingcoa1_1", UsingCol2: "usingcoa1_2"}).Exec(context.Background())
-	fmt.Print(OrderDetailres4.Err(), "\n")
+	itemRes := eorm.NewInserter[test.Item](orm).Values(&test.Item{Id: 1}, &test.Item{Id: 2}, &test.Item{Id: 3}).Exec(context.Background())
+	require.NoError(t, itemRes.Err())
 
-	Itemres1 := eorm.NewInserter[test.Item](orm).Values(&test.Item{Id: 1}).Exec(context.Background())
-	fmt.Print(Itemres1.Err(), "\n")
-	Itemres2 := eorm.NewInserter[test.Item](orm).Values(&test.Item{Id: 2}).Exec(context.Background())
-	fmt.Print(Itemres2.Err(), "\n")
 }
