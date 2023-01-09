@@ -167,6 +167,7 @@ func (b *builder) buildExpr(expr Expr) error {
 	case RawExpr:
 		b.buildRawExpr(e)
 	case Column:
+		//b.buildColumn(e)
 		if _, ok := e.table.(Table); ok {
 			return b.buildColumn(e)
 		}
@@ -181,7 +182,6 @@ func (b *builder) buildExpr(expr Expr) error {
 				return errs.NewInvalidFieldError(e.name)
 			}
 			b.quote(cm.ColumnName)
-
 		}
 	case Aggregate:
 		if err := b.buildHavingAggregate(e); err != nil {

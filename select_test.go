@@ -1329,6 +1329,18 @@ func TestSelector_Join(t *testing.T) {
 			},
 		},
 		{
+			name: "join-using-cols-all",
+			s: func() QueryBuilder {
+				t1 := TableOf(&Order{}).As("t1")
+				t2 := TableOf(&OrderDetail{})
+				t3 := t1.Join(t2).Using("UsingCol1", "UsingCol2")
+				return NewSelector[Order](db).From(t3).Select(t1.AllColumns(), t2.AllColumns())
+			}(),
+			wantQuery: &Query{
+				SQL: "SELECT `t1`.*,`order_detail`.* FROM (`order` AS `t1` JOIN `order_detail` USING (`using_col1`,`using_col2`));",
+			},
+		},
+		{
 			name: "join-using-Avg-invalid",
 			s: func() QueryBuilder {
 				t1 := TableOf(&Order{}).As("t1")

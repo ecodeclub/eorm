@@ -132,15 +132,11 @@ func (s *Selector[T]) AllColumns(table TableReference) error {
 	case nil:
 		s.quote(s.meta.TableName)
 	case Table:
-		m, err := s.metaRegistry.Get(t.entity)
-		if err != nil {
+		t.builder = s.builder
+		if err := t.buildTable(); err != nil {
 			return err
 		}
-		if t.alias != "" {
-			s.quote(t.alias)
-			return nil
-		}
-		s.quote(m.TableName)
+
 	case Join:
 		err := s.AllColumns(t.left)
 		if err != nil {

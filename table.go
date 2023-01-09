@@ -1,10 +1,13 @@
 package eorm
 
+import "github.com/gotomicro/eorm/internal/model"
+
 type TableReference interface {
 }
 
 // Table 普通表
 type Table struct {
+	builder
 	entity any
 	alias  string
 }
@@ -99,6 +102,36 @@ func (t Table) Sum(c string) Aggregate {
 		arg:   c,
 		table: t,
 	}
+}
+
+func (t Table) AllColumns() RawExpr {
+	if t.alias != "" {
+		return Raw("`" + t.alias + "`.*")
+	}
+	// 硬塞一个core。。
+	t.core = core{metaRegistry: model.NewMetaRegistry()}
+	meta, err := t.metaRegistry.Get(t.entity)
+	if err != nil {
+		// 不好处理错误
+		panic("eorm:Table 获取不到meta")
+	}
+	//t.quote(meta.TableName)
+	//_, _ = t.buffer.WriteString("`" + meta.TableName + "`" + ".*")
+	//t.pointStar()
+	return Raw("`" + meta.TableName + "`.*")
+}
+
+func (t Table) buildTable() error {
+	m, err := t.metaRegistry.Get(t.entity)
+	if err != nil {
+		return err
+	}
+	if t.alias != "" {
+		t.quote(t.alias)
+		return nil
+	}
+	t.quote(m.TableName)
+	return nil
 }
 
 type Join struct {
