@@ -19,7 +19,6 @@ type TableReference interface {
 
 // Table 普通表
 type Table struct {
-	builder
 	entity any
 	alias  string
 }
@@ -115,19 +114,6 @@ func (t Table) Sum(c string) Aggregate {
 
 func (t Table) AllColumns() RawExpr {
 	return Raw("`" + t.alias + "`.*")
-}
-
-func (t Table) buildTable() error {
-	m, err := t.metaRegistry.Get(t.entity)
-	if err != nil {
-		return err
-	}
-	if t.alias != "" {
-		t.quote(t.alias)
-		return nil
-	}
-	t.quote(m.TableName)
-	return nil
 }
 
 type Join struct {
