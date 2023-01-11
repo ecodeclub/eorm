@@ -14,8 +14,6 @@
 
 package eorm
 
-import "github.com/gotomicro/eorm/internal/model"
-
 type TableReference interface {
 }
 
@@ -69,9 +67,6 @@ func (t Table) C(name string) Column {
 		table: t,
 	}
 }
-func (t Table) selected() {
-	panic("implement me")
-}
 
 // Max represents MAX
 func (t Table) Max(c string) Aggregate {
@@ -82,7 +77,7 @@ func (t Table) Max(c string) Aggregate {
 	}
 }
 
-// Max represents MAX
+// Avg represents AVG
 func (t Table) Avg(c string) Aggregate {
 	return Aggregate{
 		fn:    "AVG",
@@ -119,20 +114,7 @@ func (t Table) Sum(c string) Aggregate {
 }
 
 func (t Table) AllColumns() RawExpr {
-	if t.alias != "" {
-		return Raw("`" + t.alias + "`.*")
-	}
-	// 硬塞一个core。。
-	t.core = core{metaRegistry: model.NewMetaRegistry()}
-	meta, err := t.metaRegistry.Get(t.entity)
-	if err != nil {
-		// 不好处理错误
-		panic("eorm:Table 获取不到meta")
-	}
-	//t.quote(meta.TableName)
-	//_, _ = t.buffer.WriteString("`" + meta.TableName + "`" + ".*")
-	//t.pointStar()
-	return Raw("`" + meta.TableName + "`.*")
+	return Raw("`" + t.alias + "`.*")
 }
 
 func (t Table) buildTable() error {
