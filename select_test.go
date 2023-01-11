@@ -1283,7 +1283,47 @@ func TestSelector_Join(t *testing.T) {
 			},
 		},
 		{
-			name: "join-using",
+			name: "only NewSelector",
+			s:    NewSelector[Order](db),
+			wantQuery: &Query{
+				SQL: "SELECT `id`,`using_col1`,`using_col2` FROM `order`;",
+			},
+		},
+		{
+			name: "no from no As",
+			s: func() QueryBuilder {
+				t1 := TableOf(&Order{})
+				t2 := TableOf(&OrderDetail{})
+				return NewSelector[Order](db).Select(t1.C("UsingCol1"), t2.C("UsingCol1"))
+			}(),
+			wantQuery: &Query{
+				SQL: "SELECT `using_col1`,`using_col1` FROM `order`;",
+			},
+		},
+		{
+			name: "no from one As",
+			s: func() QueryBuilder {
+				t1 := TableOf(&Order{}).As("t1")
+				t2 := TableOf(&OrderDetail{})
+				return NewSelector[Order](db).Select(t1.C("UsingCol1"), t2.C("UsingCol1"))
+			}(),
+			wantQuery: &Query{
+				SQL: "SELECT `t1`.`using_col1`,`using_col1` FROM `order`;",
+			},
+		},
+		{
+			name: "no from all As",
+			s: func() QueryBuilder {
+				t1 := TableOf(&Order{}).As("t1")
+				t2 := TableOf(&OrderDetail{}).As("t2")
+				return NewSelector[Order](db).Select(t1.C("UsingCol1"), t2.C("UsingCol1"))
+			}(),
+			wantQuery: &Query{
+				SQL: "SELECT `t1`.`using_col1`,`t2`.`using_col1` FROM `order`;",
+			},
+		},
+		{
+			name: "join-using no As",
 			s: func() QueryBuilder {
 				t1 := TableOf(&Order{})
 				t2 := TableOf(&OrderDetail{})
@@ -1291,7 +1331,19 @@ func TestSelector_Join(t *testing.T) {
 				return NewSelector[Order](db).From(t3)
 			}(),
 			wantQuery: &Query{
-				SQL: "SELECT `order`.* FROM (`order` JOIN `order_detail` USING (`using_col1`,`using_col2`));",
+				SQL: "SELECT * FROM (`order` JOIN `order_detail` USING (`using_col1`,`using_col2`));",
+			},
+		},
+		{
+			name: "join-using As",
+			s: func() QueryBuilder {
+				t1 := TableOf(&Order{}).As("t1")
+				t2 := TableOf(&OrderDetail{}).As("t2")
+				t3 := t1.Join(t2).Using("UsingCol1", "UsingCol2")
+				return NewSelector[Order](db).From(t3)
+			}(),
+			wantQuery: &Query{
+				SQL: "SELECT `t1`.* FROM (`order` AS `t1` JOIN `order_detail` AS `t2` USING (`using_col1`,`using_col2`));",
 			},
 		},
 		{
@@ -1303,7 +1355,7 @@ func TestSelector_Join(t *testing.T) {
 				return NewSelector[Order](db).From(t3).Select(t1.C("UsingCol1"), t2.C("UsingCol1"))
 			}(),
 			wantQuery: &Query{
-				SQL: "SELECT `order`.`using_col1`,`order_detail`.`using_col1` FROM (`order` JOIN `order_detail` USING (`using_col1`,`using_col2`));",
+				SQL: "SELECT `using_col1`,`using_col1` FROM (`order` JOIN `order_detail` USING (`using_col1`,`using_col2`));",
 			},
 		},
 		{
@@ -1329,7 +1381,7 @@ func TestSelector_Join(t *testing.T) {
 			},
 		},
 		{
-			name: "join-using-cols-all",
+			name: "join-using-cols-all empty As ",
 			s: func() QueryBuilder {
 				t1 := TableOf(&Order{}).As("t1")
 				t2 := TableOf(&OrderDetail{})
@@ -1337,7 +1389,7 @@ func TestSelector_Join(t *testing.T) {
 				return NewSelector[Order](db).From(t3).Select(t1.AllColumns(), t2.AllColumns())
 			}(),
 			wantQuery: &Query{
-				SQL: "SELECT `t1`.*,`order_detail`.* FROM (`order` AS `t1` JOIN `order_detail` USING (`using_col1`,`using_col2`));",
+				SQL: "SELECT `t1`.*,``.* FROM (`order` AS `t1` JOIN `order_detail` USING (`using_col1`,`using_col2`));",
 			},
 		},
 		{
@@ -1351,7 +1403,7 @@ func TestSelector_Join(t *testing.T) {
 			wantErr: errs.NewInvalidFieldError("invalid"),
 		},
 		{
-			name: "join-using-where",
+			name: "join-using-where no As",
 			s: func() QueryBuilder {
 				t1 := TableOf(&Order{})
 				t2 := TableOf(&OrderDetail{})
@@ -1359,12 +1411,25 @@ func TestSelector_Join(t *testing.T) {
 				return NewSelector[Order](db).From(t3).Where(C("UsingCol1").EQ(10).And(C("UsingCol2").EQ(10)))
 			}(),
 			wantQuery: &Query{
-				SQL:  "SELECT `order`.* FROM (`order` JOIN `order_detail` USING (`using_col1`,`using_col2`)) WHERE (`using_col1`=?) AND (`using_col2`=?);",
+				SQL:  "SELECT * FROM (`order` JOIN `order_detail` USING (`using_col1`,`using_col2`)) WHERE (`using_col1`=?) AND (`using_col2`=?);",
 				Args: []interface{}{10, 10},
 			},
 		},
 		{
-			name: "left join",
+			name: "join-using-where As",
+			s: func() QueryBuilder {
+				t1 := TableOf(&Order{}).As("t1")
+				t2 := TableOf(&OrderDetail{})
+				t3 := t1.Join(t2).Using("UsingCol1", "UsingCol2")
+				return NewSelector[Order](db).From(t3).Where(C("UsingCol1").EQ(10).And(C("UsingCol2").EQ(10)))
+			}(),
+			wantQuery: &Query{
+				SQL:  "SELECT `t1`.* FROM (`order` AS `t1` JOIN `order_detail` USING (`using_col1`,`using_col2`)) WHERE (`using_col1`=?) AND (`using_col2`=?);",
+				Args: []interface{}{10, 10},
+			},
+		},
+		{
+			name: "left join no As",
 			s: func() QueryBuilder {
 				t1 := TableOf(&Order{})
 				t2 := TableOf(&OrderDetail{})
@@ -1372,11 +1437,11 @@ func TestSelector_Join(t *testing.T) {
 				return NewSelector[Order](db).From(t3)
 			}(),
 			wantQuery: &Query{
-				SQL: "SELECT `order`.* FROM (`order` LEFT JOIN `order_detail` USING (`using_col1`,`using_col2`));",
+				SQL: "SELECT * FROM (`order` LEFT JOIN `order_detail` USING (`using_col1`,`using_col2`));",
 			},
 		},
 		{
-			name: "right join",
+			name: "right join no As",
 			s: func() QueryBuilder {
 				t1 := TableOf(&Order{})
 				t2 := TableOf(&OrderDetail{})
@@ -1384,7 +1449,7 @@ func TestSelector_Join(t *testing.T) {
 				return NewSelector[Order](db).From(t3)
 			}(),
 			wantQuery: &Query{
-				SQL: "SELECT `order`.* FROM (`order` RIGHT JOIN `order_detail` USING (`using_col1`,`using_col2`));",
+				SQL: "SELECT * FROM (`order` RIGHT JOIN `order_detail` USING (`using_col1`,`using_col2`));",
 			},
 		},
 		{
@@ -1400,7 +1465,7 @@ func TestSelector_Join(t *testing.T) {
 			},
 		},
 		{
-			name: "join-on-where",
+			name: "join-on-where As",
 			s: func() QueryBuilder {
 				t1 := TableOf(&Order{}).As("t1")
 				t2 := TableOf(&OrderDetail{}).As("t2")
@@ -1576,7 +1641,7 @@ func TestSelector_Join(t *testing.T) {
 			},
 		},
 		{
-			name: "table join----",
+			name: "table join col",
 			s: func() QueryBuilder {
 				t1 := TableOf(&test.Order{}).As("t1")
 				t2 := TableOf(&test.OrderDetail{}).As("t2")
