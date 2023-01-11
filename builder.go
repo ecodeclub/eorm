@@ -167,7 +167,6 @@ func (b *builder) buildExpr(expr Expr) error {
 	case RawExpr:
 		b.buildRawExpr(e)
 	case Column:
-		//b.buildColumn(e)
 		if _, ok := e.table.(Table); ok {
 			return b.buildColumn(e)
 		}
