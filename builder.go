@@ -130,9 +130,10 @@ func (b *builder) space() {
 	_ = b.buffer.WriteByte(' ')
 }
 
-func (b *builder) pointStar() {
-	_, _ = b.buffer.WriteString(".*")
+func (b *builder) star() {
+	_, _ = b.buffer.WriteString("*")
 }
+
 func (b *builder) point() {
 	_ = b.buffer.WriteByte('.')
 }
@@ -333,6 +334,25 @@ func (b *builder) buildColumn(c Column) error {
 		}
 	default:
 		return errs.NewErrUnsupportedTable(table)
+	}
+	return nil
+}
+
+func (b *builder) buildTableAs(reference TableReference) error {
+	switch t := reference.(type) {
+	case Table:
+		if t.alias != "" {
+			b.quote(t.alias)
+			b.point()
+		}
+	case Join:
+		// 遍历t.left，默认取t.left的别名
+		err := b.buildTableAs(t.left)
+		if err != nil {
+			return err
+		}
+	default:
+		return errs.NewErrUnsupportedTable(t)
 	}
 	return nil
 }
