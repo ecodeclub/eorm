@@ -69,7 +69,9 @@ func (s *Selector[T]) Build() (*Query, error) {
 		s.writeString("DISTINCT ")
 	}
 	if len(s.columns) == 0 {
-		s.buildAllColumns()
+		if err := s.buildAllColumns(); err != nil {
+			return nil, err
+		}
 	} else {
 		err = s.buildSelectedList()
 		if err != nil {
@@ -127,26 +129,7 @@ func (s *Selector[T]) Build() (*Query, error) {
 	s.end()
 	return &Query{SQL: s.buffer.String(), Args: s.args}, nil
 }
-func (s *Selector[T]) AllColumns(table TableReference) error {
-	switch t := table.(type) {
-	case nil:
-		s.quote(s.meta.TableName)
-	case Table:
-		t.builder = s.builder
-		if err := t.buildTable(); err != nil {
-			return err
-		}
 
-	case Join:
-		err := s.AllColumns(t.left)
-		if err != nil {
-			return err
-		}
-	default:
-		return errs.NewErrUnsupportedTable(table)
-	}
-	return nil
-}
 func (s *Selector[T]) buildTable(table TableReference) error {
 	switch t := table.(type) {
 	case nil:
@@ -205,20 +188,22 @@ func (s *Selector[T]) buildGroupBy() error {
 	return nil
 }
 
-func (s *Selector[T]) buildAllColumns() {
+func (s *Selector[T]) buildAllColumns() error {
 	if s.table != nil {
 		if _, ok := s.table.(Table); !ok {
-			if err := s.AllColumns(s.table); err != nil {
-				return
+			err := s.buildTableAs(s.table)
+			if err != nil {
+				return err
 			}
-			s.pointStar()
-			return
+			s.star()
+			return nil
 		}
 	}
 	for i, cMeta := range s.meta.Columns {
 		// it should never return error, we can safely ignore it
-		_ = s.buildColumns(i, cMeta.FieldName, "")
+		_ = s.buildColumns(i, cMeta.FieldName)
 	}
+	return nil
 }
 
 // buildSelectedList users specify columns
@@ -236,7 +221,7 @@ func (s *Selector[T]) buildSelectedList() error {
 			}
 		case columns:
 			for j, c := range expr.cs {
-				err := s.buildColumns(j, c, "")
+				err := s.buildColumns(j, c)
 				if err != nil {
 					return err
 				}
@@ -288,14 +273,8 @@ func (s *Selector[T]) buildColumn(column Column) error {
 		if t, ok := column.table.(Table); ok {
 			if t.alias != "" {
 				s.quote(t.alias)
-			} else {
-				meta, err := s.metaRegistry.Get(t.entity)
-				if err != nil {
-					return err
-				}
-				s.quote(meta.TableName)
+				s.point()
 			}
-			s.point()
 		}
 	}
 	cMeta, ok := s.meta.FieldMap[column.name]
@@ -310,7 +289,7 @@ func (s *Selector[T]) buildColumn(column Column) error {
 	}
 	return nil
 }
-func (s *Selector[T]) buildColumns(index int, name, alias string) error {
+func (s *Selector[T]) buildColumns(index int, name string) error {
 	if index > 0 {
 		s.comma()
 	}
@@ -319,18 +298,13 @@ func (s *Selector[T]) buildColumns(index int, name, alias string) error {
 		return errs.NewInvalidFieldError(name)
 	}
 	s.quote(cMeta.ColumnName)
-	if alias != "" {
-		s.aliases[alias] = struct{}{}
-		s.writeString(" AS ")
-		s.quote(alias)
-	}
 	return nil
 }
 
 func (s *Selector[T]) buildUsing(using []string) error {
 	s.writeString(" USING (")
 	for i, col := range using {
-		err := s.buildColumns(i, col, "")
+		err := s.buildColumns(i, col)
 		if err != nil {
 			return err
 		}
