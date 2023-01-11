@@ -28,8 +28,9 @@ import (
 type Inserter[T any] struct {
 	builder
 	session
-	columns []string
-	values  []*T
+	columns  []string
+	values   []*T
+	ignorePK bool
 }
 
 // NewInserter 开始构建一个 INSERT 查询
@@ -41,6 +42,11 @@ func NewInserter[T any](sess session) *Inserter[T] {
 		},
 		session: sess,
 	}
+}
+
+func (i *Inserter[T]) SkipPK() *Inserter[T] {
+	i.ignorePK = true
+	return i
 }
 
 func (i *Inserter[T]) NonPKColumns(entity any) (cols []string, err error) {
@@ -90,6 +96,9 @@ func (i *Inserter[T]) Build() (*Query, error) {
 		i.writeString("(")
 		refVal := i.valCreator.NewBasicTypeValue(val, i.meta)
 		for j, v := range fields {
+			if i.ignorePK && v.IsPrimaryKey {
+				continue
+			}
 			fdVal, err := refVal.Field(v.FieldName)
 			if err != nil {
 				return nil, err
@@ -139,6 +148,9 @@ func (i *Inserter[T]) buildColumns() ([]*model.ColumnMeta, error) {
 			if !isOk {
 				return cs, errs.NewInvalidFieldError(c)
 			}
+			if i.ignorePK && v.IsPrimaryKey {
+				continue
+			}
 			i.quote(v.ColumnName)
 			if index != len(i.columns)-1 {
 				i.comma()
@@ -147,6 +159,9 @@ func (i *Inserter[T]) buildColumns() ([]*model.ColumnMeta, error) {
 		}
 	} else {
 		for index, val := range i.meta.Columns {
+			if i.ignorePK && val.IsPrimaryKey {
+				continue
+			}
 			i.quote(val.ColumnName)
 			if index != len(cs)-1 {
 				i.comma()

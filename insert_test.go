@@ -19,8 +19,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/stretchr/testify/assert"
 )
 
@@ -80,26 +78,26 @@ func TestInserter_Values(t *testing.T) {
 			wantArgs: []interface{}{int64(12), "Tom", int64(13), "Jerry"},
 		},
 		{
-			name: "ignore pk",
-			builder: func() *Inserter[User] {
-				res := NewInserter[User](db)
-				cols, err := res.NonPKColumns(&User{})
-				require.NoError(t, err)
-				res.Columns(cols...).Values(u)
-				return res
-			}(),
+			name:     "ignore pk default",
+			builder:  NewInserter[User](db).SkipPK().Values(u),
 			wantSql:  "INSERT INTO `user`(`first_name`,`ctime`) VALUES(?,?);",
 			wantArgs: []interface{}{"Tom", uint64(1000)},
 		},
 		{
-			name: "ignore pk multi",
-			builder: func() *Inserter[User] {
-				res := NewInserter[User](db)
-				cols, err := res.NonPKColumns(&User{})
-				require.NoError(t, err)
-				res.Columns(cols...).Values(u, u1)
-				return res
-			}(),
+			name:     "ignore pk",
+			builder:  NewInserter[User](db).SkipPK().Columns("Id", "FirstName").Values(u),
+			wantSql:  "INSERT INTO `user`(`first_name`) VALUES(?);",
+			wantArgs: []interface{}{"Tom"},
+		},
+		{
+			name:     "ignore pk multi default",
+			builder:  NewInserter[User](db).SkipPK().Values(u, u1),
+			wantSql:  "INSERT INTO `user`(`first_name`,`ctime`) VALUES(?,?),(?,?);",
+			wantArgs: []interface{}{"Tom", uint64(1000), "Jerry", uint64(1000)},
+		},
+		{
+			name:     "ignore pk multi",
+			builder:  NewInserter[User](db).SkipPK().Columns("Id", "FirstName", "Ctime").Values(u, u1),
 			wantSql:  "INSERT INTO `user`(`first_name`,`ctime`) VALUES(?,?),(?,?);",
 			wantArgs: []interface{}{"Tom", uint64(1000), "Jerry", uint64(1000)},
 		},
@@ -189,26 +187,26 @@ func TestInserter_ValuesForCombination(t *testing.T) {
 			wantArgs: []interface{}{int64(12), "Tom", int64(13), "Jerry"},
 		},
 		{
-			name: "ignore pk",
-			builder: func() *Inserter[User] {
-				res := NewInserter[User](db)
-				cols, err := res.NonPKColumns(&User{})
-				require.NoError(t, err)
-				res.Columns(cols...).Values(u)
-				return res
-			}(),
+			name:     "ignore pk default",
+			builder:  NewInserter[User](db).SkipPK().Values(u),
 			wantSql:  "INSERT INTO `user`(`create_time`,`first_name`) VALUES(?,?);",
 			wantArgs: []interface{}{uint64(1000), "Tom"},
 		},
 		{
-			name: "ignore pk multi",
-			builder: func() *Inserter[User] {
-				res := NewInserter[User](db)
-				cols, err := res.NonPKColumns(&User{})
-				require.NoError(t, err)
-				res.Columns(cols...).Values(u, u1)
-				return res
-			}(),
+			name:     "ignore pk",
+			builder:  NewInserter[User](db).SkipPK().Columns("Id", "CreateTime", "FirstName").Values(u),
+			wantSql:  "INSERT INTO `user`(`create_time`,`first_name`) VALUES(?,?);",
+			wantArgs: []interface{}{uint64(1000), "Tom"},
+		},
+		{
+			name:     "ignore pk multi default",
+			builder:  NewInserter[User](db).SkipPK().Values(u, u1),
+			wantSql:  "INSERT INTO `user`(`create_time`,`first_name`) VALUES(?,?),(?,?);",
+			wantArgs: []interface{}{uint64(1000), "Tom", uint64(1000), "Jerry"},
+		},
+		{
+			name:     "ignore pk multi",
+			builder:  NewInserter[User](db).SkipPK().Columns("Id", "CreateTime", "FirstName").Values(u, u1),
 			wantSql:  "INSERT INTO `user`(`create_time`,`first_name`) VALUES(?,?),(?,?);",
 			wantArgs: []interface{}{uint64(1000), "Tom", uint64(1000), "Jerry"},
 		},

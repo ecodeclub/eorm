@@ -57,14 +57,8 @@ func (i *InsertTestSuite) TestInsert() {
 			rowsAffected: 1,
 		},
 		{
-			name: "ignore pk",
-			i: func() *eorm.Inserter[test.SimpleStruct] {
-				res := eorm.NewInserter[test.SimpleStruct](i.orm)
-				cols, err := res.NonPKColumns(&test.SimpleStruct{})
-				require.NoError(i.T(), err)
-				res.Columns(cols...).Values(test.NewSimpleStruct(3))
-				return res
-			}(),
+			name:         "ignore pk",
+			i:            eorm.NewInserter[test.SimpleStruct](i.orm).SkipPK().Values(test.NewSimpleStruct(3)),
 			rowsAffected: 1,
 		},
 	}
