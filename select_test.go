@@ -18,14 +18,12 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"github.com/gotomicro/eorm/internal/test"
-	"testing"
-
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/stretchr/testify/require"
-
 	"github.com/gotomicro/eorm/internal/errs"
+	"github.com/gotomicro/eorm/internal/test"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"testing"
 )
 
 func TestRawQuery_Get_baseType(t *testing.T) {
