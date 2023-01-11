@@ -29,6 +29,7 @@ func TableOf(entity any) Table {
 	}
 }
 
+// Join 查询
 func (t Table) Join(right TableReference) *JoinBuilder {
 	return &JoinBuilder{
 		left:  t,

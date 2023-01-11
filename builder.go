@@ -53,7 +53,7 @@ type Querier[T any] struct {
 
 // RawQuery 创建一个 Querier 实例
 // 泛型参数 T 是目标类型。
-// 例如，如果查询 User 的数据，那么 T 就是 User
+// 例如，如果查询 User 的数据， 那么 T 就是 User
 func RawQuery[T any](sess session, sql string, args ...any) Querier[T] {
 	return Querier[T]{
 		core:    sess.getCore(),

@@ -148,7 +148,6 @@ func (s *Selector[T]) buildTable(table TableReference) error {
 		if err := s.buildJoin(t); err != nil {
 			return err
 		}
-
 	default:
 		return errs.NewErrUnsupportedTable(table)
 	}
