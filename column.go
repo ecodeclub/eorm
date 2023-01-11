@@ -20,6 +20,7 @@ package eorm
 // 1. specify the column in query
 // 2. it's the start point of building complex expression
 type Column struct {
+	table TableReference
 	name  string
 	alias string
 }
@@ -88,6 +89,7 @@ func (c Column) GTEQ(val interface{}) Predicate {
 // As means alias
 func (c Column) As(alias string) Selectable {
 	return Column{
+		table: c.table,
 		name:  c.name,
 		alias: alias,
 	}

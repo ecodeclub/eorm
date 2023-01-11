@@ -103,6 +103,9 @@ func (t *tagMetaRegistry) Get(table interface{}) (*TableMeta, error) {
 // And the metadata can be modified by user-defined methods opts
 func (t *tagMetaRegistry) Register(table interface{}, opts ...TableMetaOption) (*TableMeta, error) {
 	rtype := reflect.TypeOf(table)
+	if rtype.Kind() != reflect.Ptr || rtype.Elem().Kind() != reflect.Struct {
+		return nil, errs.ErrPointerOnly
+	}
 	v := rtype.Elem()
 	lens := v.NumField()
 	columnMetas := make([]*ColumnMeta, 0, lens)
