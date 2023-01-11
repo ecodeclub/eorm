@@ -68,7 +68,7 @@ func TestDB_Wait(t *testing.T) {
 
 func ExampleMiddleware() {
 	db, _ := Open("sqlite3", "file:test.db?cache=shared&mode=memory",
-		DBWithMiddleware(func(next HandleFunc) HandleFunc {
+		DBWithMiddlewares(func(next HandleFunc) HandleFunc {
 			return func(ctx context.Context, queryContext *QueryContext) *QueryResult {
 				return &QueryResult{Result: "mdl1"}
 			}
