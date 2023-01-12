@@ -55,17 +55,13 @@ func (s *SelectCombinationTestSuite) TestGet() {
 		wantRes *test.CombinedModel
 	}{
 		{
-			name: "not found",
-			s: eorm.NewSelector[test.CombinedModel](s.orm).
-				From(&test.CombinedModel{}).
-				Where(eorm.C("Id").EQ(9)),
+			name:    "not found",
+			s:       eorm.NewSelector[test.CombinedModel](s.orm).Where(eorm.C("Id").EQ(9)),
 			wantErr: eorm.ErrNoRows,
 		},
 		{
-			name: "found",
-			s: eorm.NewSelector[test.CombinedModel](s.orm).
-				From(&test.CombinedModel{}).
-				Where(eorm.C("Id").EQ(1)),
+			name:    "found",
+			s:       eorm.NewSelector[test.CombinedModel](s.orm).Where(eorm.C("Id").EQ(1)),
 			wantRes: s.data,
 		},
 	}

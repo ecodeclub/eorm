@@ -15,6 +15,7 @@
 package eorm
 
 type TableReference interface {
+	getAlias() string
 }
 
 // Table 普通表
@@ -23,10 +24,18 @@ type Table struct {
 	alias  string
 }
 
-func TableOf(entity any) Table {
+// TableOf 创建一个 Table 代表一个表
+// alias 是指该表的别名
+// 例如 SELECT * FROM user_tab AS t1，t1 就是别名
+func TableOf(entity any, alias string) Table {
 	return Table{
 		entity: entity,
+		alias:  alias,
 	}
+}
+
+func (t Table) getAlias() string {
+	return t.alias
 }
 
 // Join 查询
@@ -51,13 +60,6 @@ func (t Table) RightJoin(right TableReference) *JoinBuilder {
 		left:  t,
 		right: right,
 		typ:   "RIGHT JOIN",
-	}
-}
-
-func (t Table) As(alias string) Table {
-	return Table{
-		entity: t.entity,
-		alias:  alias,
 	}
 }
 
@@ -123,6 +125,10 @@ type Join struct {
 	on    []Predicate
 	using []string
 	typ   string
+}
+
+func (Join) getAlias() string {
+	return ""
 }
 
 func (j Join) Join(reference TableReference) *JoinBuilder {

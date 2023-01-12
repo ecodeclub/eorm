@@ -26,42 +26,42 @@ func TestAggregate(t *testing.T) {
 	testCases := []CommonTestCase{
 		{
 			name:    "avg",
-			builder: NewSelector[TestModel](db).Select(Avg("Age")).From(TableOf(&TestModel{})),
+			builder: NewSelector[TestModel](db).Select(Avg("Age")),
 			wantSql: "SELECT AVG(`age`) FROM `test_model`;",
 		},
 		{
 			name:    "max",
-			builder: NewSelector[TestModel](db).Select(Max("Age")).From(TableOf(&TestModel{})),
+			builder: NewSelector[TestModel](db).Select(Max("Age")),
 			wantSql: "SELECT MAX(`age`) FROM `test_model`;",
 		},
 		{
 			name:    "min",
-			builder: NewSelector[TestModel](db).Select(Min("Age").As("min_age")).From(TableOf(&TestModel{})),
+			builder: NewSelector[TestModel](db).Select(Min("Age").As("min_age")),
 			wantSql: "SELECT MIN(`age`) AS `min_age` FROM `test_model`;",
 		},
 		{
 			name:    "sum",
-			builder: NewSelector[TestModel](db).Select(Sum("Age")).From(TableOf(&TestModel{})),
+			builder: NewSelector[TestModel](db).Select(Sum("Age")),
 			wantSql: "SELECT SUM(`age`) FROM `test_model`;",
 		},
 		{
 			name:    "count",
-			builder: NewSelector[TestModel](db).Select(Count("Age")).From(TableOf(&TestModel{})),
+			builder: NewSelector[TestModel](db).Select(Count("Age")),
 			wantSql: "SELECT COUNT(`age`) FROM `test_model`;",
 		},
 		{
 			name:    "count distinct",
-			builder: NewSelector[TestModel](db).From(TableOf(&TestModel{})).Select(CountDistinct("FirstName")),
+			builder: NewSelector[TestModel](db).Select(CountDistinct("FirstName")),
 			wantSql: "SELECT COUNT(DISTINCT `first_name`) FROM `test_model`;",
 		},
 		{
 			name:    "avg distinct",
-			builder: NewSelector[TestModel](db).From(TableOf(&TestModel{})).Select(AvgDistinct("FirstName")),
+			builder: NewSelector[TestModel](db).Select(AvgDistinct("FirstName")),
 			wantSql: "SELECT AVG(DISTINCT `first_name`) FROM `test_model`;",
 		},
 		{
 			name:    "SUM distinct",
-			builder: NewSelector[TestModel](db).From(TableOf(&TestModel{})).Select(SumDistinct("FirstName")),
+			builder: NewSelector[TestModel](db).Select(SumDistinct("FirstName")),
 			wantSql: "SELECT SUM(DISTINCT `first_name`) FROM `test_model`;",
 		},
 	}
@@ -82,42 +82,42 @@ func TestAggregate(t *testing.T) {
 
 func ExampleAggregate_As() {
 	db := memoryDB()
-	query, _ := NewSelector[TestModel](db).Select(Avg("Age").As("avg_age")).From(TableOf(&TestModel{})).Build()
+	query, _ := NewSelector[TestModel](db).Select(Avg("Age").As("avg_age")).Build()
 	fmt.Println(query.SQL)
 	// Output: SELECT AVG(`age`) AS `avg_age` FROM `test_model`;
 }
 
 func ExampleAvg() {
 	db := memoryDB()
-	query, _ := NewSelector[TestModel](db).Select(Avg("Age").As("avg_age")).From(TableOf(&TestModel{})).Build()
+	query, _ := NewSelector[TestModel](db).Select(Avg("Age").As("avg_age")).Build()
 	fmt.Println(query.SQL)
 	// Output: SELECT AVG(`age`) AS `avg_age` FROM `test_model`;
 }
 
 func ExampleCount() {
 	db := memoryDB()
-	query, _ := NewSelector[TestModel](db).Select(Count("Age")).From(TableOf(&TestModel{})).Build()
+	query, _ := NewSelector[TestModel](db).Select(Count("Age")).Build()
 	fmt.Println(query.SQL)
 	// Output: SELECT COUNT(`age`) FROM `test_model`;
 }
 
 func ExampleMax() {
 	db := memoryDB()
-	query, _ := NewSelector[TestModel](db).Select(Max("Age")).From(TableOf(&TestModel{})).Build()
+	query, _ := NewSelector[TestModel](db).Select(Max("Age")).Build()
 	fmt.Println(query.SQL)
 	// Output: SELECT MAX(`age`) FROM `test_model`;
 }
 
 func ExampleMin() {
 	db := memoryDB()
-	query, _ := NewSelector[TestModel](db).Select(Min("Age")).From(TableOf(&TestModel{})).Build()
+	query, _ := NewSelector[TestModel](db).Select(Min("Age")).Build()
 	fmt.Println(query.SQL)
 	// Output: SELECT MIN(`age`) FROM `test_model`;
 }
 
 func ExampleSum() {
 	db := memoryDB()
-	query, _ := NewSelector[TestModel](db).Select(Sum("Age")).From(TableOf(&TestModel{})).Build()
+	query, _ := NewSelector[TestModel](db).Select(Sum("Age")).Build()
 	fmt.Println(query.SQL)
 	// Output: SELECT SUM(`age`) FROM `test_model`;
 }
