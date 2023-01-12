@@ -21,6 +21,7 @@ import (
 )
 
 var (
+	ErrPointerOnly = errors.New("eorm: 只支持指向结构体的一级指针")
 	errValueNotSet = errors.New("eorm: 值未设置")
 	ErrNoRows      = errors.New("eorm: 未找到数据")
 	// ErrTooManyColumns 过多列
@@ -62,4 +63,13 @@ func NewUnsupportedTypeError(typ reflect.Type) error {
 // NewUnsupportedDriverError 不支持驱动类型
 func NewUnsupportedDriverError(driver string) error {
 	return fmt.Errorf("eorm: 不支持driver类型 %s", driver)
+}
+
+// NewErrUnsupportedTable 不支持的TableReference类型
+func NewErrUnsupportedTable(table any) error {
+	return fmt.Errorf("eorm: 不支持的TableReference类型 %v", table)
+}
+
+func NewErrUnknownField(name string) error {
+	return fmt.Errorf("eorm: 未知字段 %s", name)
 }

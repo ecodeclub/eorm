@@ -53,7 +53,7 @@ type Querier[T any] struct {
 
 // RawQuery 创建一个 Querier 实例
 // 泛型参数 T 是目标类型。
-// 例如，如果查询 User 的数据，那么 T 就是 User
+// 例如，如果查询 User 的数据， 那么 T 就是 User
 func RawQuery[T any](sess session, sql string, args ...any) Querier[T] {
 	return Querier[T]{
 		core:    sess.getCore(),
@@ -130,6 +130,14 @@ func (b *builder) space() {
 	_ = b.buffer.WriteByte(' ')
 }
 
+func (b *builder) star() {
+	_, _ = b.buffer.WriteString("*")
+}
+
+func (b *builder) point() {
+	_ = b.buffer.WriteByte('.')
+}
+
 func (b *builder) writeString(val string) {
 	_, _ = b.buffer.WriteString(val)
 }
@@ -160,6 +168,9 @@ func (b *builder) buildExpr(expr Expr) error {
 	case RawExpr:
 		b.buildRawExpr(e)
 	case Column:
+		if _, ok := e.table.(Table); ok {
+			return b.buildColumn(e)
+		}
 		if e.name != "" {
 			_, ok := b.aliases[e.name]
 			if ok {
@@ -288,4 +299,60 @@ func (q Querier[T]) GetMulti(ctx context.Context) ([]*T, error) {
 		return nil, res.Err
 	}
 	return res.Result.([]*T), nil
+}
+
+func (b *builder) buildColumn(c Column) error {
+	switch table := c.table.(type) {
+	case nil:
+		fd, ok := b.meta.FieldMap[c.name]
+		// 字段不对，或者说列不对
+		if !ok {
+			return errs.NewInvalidColumnError(c.name)
+		}
+		b.quote(fd.ColumnName)
+		if c.alias != "" {
+			b.writeString(" AS ")
+			b.quote(c.alias)
+		}
+	case Table:
+		m, err := b.metaRegistry.Get(table.entity)
+		if err != nil {
+			return err
+		}
+		fd, ok := m.FieldMap[c.name]
+		if !ok {
+			return errs.NewInvalidColumnError(c.name)
+		}
+		if table.alias != "" {
+			b.quote(table.alias)
+			b.writeByte('.')
+		}
+		b.quote(fd.ColumnName)
+		if c.alias != "" {
+			b.writeString(" AS ")
+			b.quote(c.alias)
+		}
+	default:
+		return errs.NewErrUnsupportedTable(table)
+	}
+	return nil
+}
+
+func (b *builder) buildTableAs(reference TableReference) error {
+	switch t := reference.(type) {
+	case Table:
+		if t.alias != "" {
+			b.quote(t.alias)
+			b.point()
+		}
+	case Join:
+		// 遍历t.left，默认取t.left的别名
+		err := b.buildTableAs(t.left)
+		if err != nil {
+			return err
+		}
+	default:
+		return errs.NewErrUnsupportedTable(t)
+	}
+	return nil
 }

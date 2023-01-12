@@ -16,7 +16,6 @@ package eorm
 
 import (
 	"context"
-
 	"github.com/gotomicro/eorm/internal/errs"
 	"github.com/valyala/bytebufferpool"
 )
@@ -26,7 +25,7 @@ type Selector[T any] struct {
 	builder
 	session
 	columns  []Selectable
-	table    interface{}
+	table    TableReference
 	where    []Predicate
 	distinct bool
 	having   []Predicate
@@ -49,9 +48,10 @@ func NewSelector[T any](sess session) *Selector[T] {
 
 // TableOf -> get selector table
 func (s *Selector[T]) tableOf() any {
-	if s.table != nil {
-		return s.table
-	} else {
+	switch tb := s.table.(type) {
+	case Table:
+		return tb.entity
+	default:
 		return new(T)
 	}
 }
@@ -69,7 +69,9 @@ func (s *Selector[T]) Build() (*Query, error) {
 		s.writeString("DISTINCT ")
 	}
 	if len(s.columns) == 0 {
-		s.buildAllColumns()
+		if err := s.buildAllColumns(); err != nil {
+			return nil, err
+		}
 	} else {
 		err = s.buildSelectedList()
 		if err != nil {
@@ -77,7 +79,11 @@ func (s *Selector[T]) Build() (*Query, error) {
 		}
 	}
 	s.writeString(" FROM ")
-	s.quote(s.meta.TableName)
+
+	if err = s.buildTable(s.table); err != nil {
+		return nil, err
+	}
+
 	if len(s.where) > 0 {
 		s.writeString(" WHERE ")
 		err = s.buildPredicates(s.where)
@@ -124,6 +130,29 @@ func (s *Selector[T]) Build() (*Query, error) {
 	return &Query{SQL: s.buffer.String(), Args: s.args}, nil
 }
 
+func (s *Selector[T]) buildTable(table TableReference) error {
+	switch t := table.(type) {
+	case nil:
+		s.quote(s.meta.TableName)
+	case Table:
+		m, err := s.metaRegistry.Get(t.entity)
+		if err != nil {
+			return err
+		}
+		s.quote(m.TableName)
+		if t.alias != "" {
+			s.writeString(" AS ")
+			s.quote(t.alias)
+		}
+	case Join:
+		if err := s.buildJoin(t); err != nil {
+			return err
+		}
+	default:
+		return errs.NewErrUnsupportedTable(table)
+	}
+	return nil
+}
 func (s *Selector[T]) buildOrderBy() error {
 	s.writeString(" ORDER BY ")
 	for i, ob := range s.orderBy {
@@ -158,14 +187,22 @@ func (s *Selector[T]) buildGroupBy() error {
 	return nil
 }
 
-func (s *Selector[T]) buildAllColumns() {
-	for i, cMeta := range s.meta.Columns {
-		if i > 0 {
-			s.comma()
+func (s *Selector[T]) buildAllColumns() error {
+	if s.table != nil {
+		if _, ok := s.table.(Table); !ok {
+			err := s.buildTableAs(s.table)
+			if err != nil {
+				return err
+			}
+			s.star()
+			return nil
 		}
-		// it should never return error, we can safely ignore it
-		_ = s.buildColumn(cMeta.FieldName, "")
 	}
+	for i, cMeta := range s.meta.Columns {
+		// it should never return error, we can safely ignore it
+		_ = s.buildColumns(i, cMeta.FieldName)
+	}
+	return nil
 }
 
 // buildSelectedList users specify columns
@@ -177,16 +214,13 @@ func (s *Selector[T]) buildSelectedList() error {
 		}
 		switch expr := selectable.(type) {
 		case Column:
-			err := s.buildColumn(expr.name, expr.alias)
+			err := s.buildColumn(expr)
 			if err != nil {
 				return err
 			}
 		case columns:
 			for j, c := range expr.cs {
-				if j > 0 {
-					s.comma()
-				}
-				err := s.buildColumn(c, "")
+				err := s.buildColumns(j, c)
 				if err != nil {
 					return err
 				}
@@ -214,6 +248,14 @@ func (s *Selector[T]) selectAggregate(aggregate Aggregate) error {
 	if !ok {
 		return errs.NewInvalidFieldError(aggregate.arg)
 	}
+	if aggregate.table != nil {
+		if t, ok := aggregate.table.(Table); ok {
+			if t.alias != "" {
+				s.quote(t.alias)
+				s.point()
+			}
+		}
+	}
 	s.quote(cMeta.ColumnName)
 	s.writeByte(')')
 	if aggregate.alias != "" {
@@ -225,17 +267,48 @@ func (s *Selector[T]) selectAggregate(aggregate Aggregate) error {
 	return nil
 }
 
-func (s *Selector[T]) buildColumn(field, alias string) error {
-	cMeta, ok := s.meta.FieldMap[field]
+func (s *Selector[T]) buildColumn(column Column) error {
+	if column.table != nil {
+		if t, ok := column.table.(Table); ok {
+			if t.alias != "" {
+				s.quote(t.alias)
+				s.point()
+			}
+		}
+	}
+	cMeta, ok := s.meta.FieldMap[column.name]
 	if !ok {
-		return errs.NewInvalidFieldError(field)
+		return errs.NewInvalidFieldError(column.name)
 	}
 	s.quote(cMeta.ColumnName)
-	if alias != "" {
-		s.aliases[alias] = struct{}{}
+	if column.alias != "" {
+		s.aliases[column.alias] = struct{}{}
 		s.writeString(" AS ")
-		s.quote(alias)
+		s.quote(column.alias)
 	}
+	return nil
+}
+func (s *Selector[T]) buildColumns(index int, name string) error {
+	if index > 0 {
+		s.comma()
+	}
+	cMeta, ok := s.meta.FieldMap[name]
+	if !ok {
+		return errs.NewInvalidFieldError(name)
+	}
+	s.quote(cMeta.ColumnName)
+	return nil
+}
+
+func (s *Selector[T]) buildUsing(using []string) error {
+	s.writeString(" USING (")
+	for i, col := range using {
+		err := s.buildColumns(i, col)
+		if err != nil {
+			return err
+		}
+	}
+	s.writeByte(')')
 	return nil
 }
 
@@ -247,8 +320,8 @@ func (s *Selector[T]) Select(columns ...Selectable) *Selector[T] {
 }
 
 // From specifies the table which must be pointer of structure
-func (s *Selector[T]) From(table interface{}) *Selector[T] {
-	s.table = table
+func (s *Selector[T]) From(tbl TableReference) *Selector[T] {
+	s.table = tbl
 	return s
 }
 
@@ -339,4 +412,30 @@ func (s *Selector[T]) GetMulti(ctx context.Context) ([]*T, error) {
 		return nil, err
 	}
 	return newQuerier[T](s.session, query, s.meta, SELECT).GetMulti(ctx)
+}
+
+func (s *Selector[T]) buildJoin(t Join) error {
+	s.writeByte('(')
+	if err := s.buildTable(t.left); err != nil {
+		return err
+	}
+	s.space()
+	s.writeString(t.typ)
+	s.space()
+	if err := s.buildTable(t.right); err != nil {
+		return err
+	}
+	if len(t.using) > 0 {
+		if err := s.buildUsing(t.using); err != nil {
+			return err
+		}
+	}
+	if len(t.on) > 0 {
+		s.writeString(" ON ")
+		if err := s.buildPredicates(t.on); err != nil {
+			return err
+		}
+	}
+	s.writeByte(')')
+	return nil
 }

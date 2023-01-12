@@ -29,4 +29,3 @@ enabled = true
 [[analyzers]]
 name = "sql"
 enabled = true
-
