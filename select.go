@@ -16,6 +16,7 @@ package eorm
 
 import (
 	"context"
+
 	"github.com/gotomicro/eorm/internal/errs"
 	"github.com/valyala/bytebufferpool"
 )

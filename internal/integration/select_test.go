@@ -19,9 +19,10 @@ package integration
 import (
 	"context"
 	"database/sql"
+	"testing"
+
 	"github.com/gotomicro/eorm/internal/errs"
 	"github.com/stretchr/testify/require"
-	"testing"
 
 	"github.com/gotomicro/eorm"
 	"github.com/gotomicro/eorm/internal/test"
