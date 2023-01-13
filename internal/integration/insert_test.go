@@ -61,6 +61,12 @@ func (i *InsertTestSuite) TestInsert() {
 			i:            eorm.NewInserter[test.SimpleStruct](i.orm).SkipPK().Values(test.NewSimpleStruct(3)),
 			rowsAffected: 1,
 		},
+		{
+			name: "ignore pk multi",
+			i: eorm.NewInserter[test.SimpleStruct](i.orm).
+				SkipPK().Values(test.NewSimpleStruct(4), test.NewSimpleStruct(5)),
+			rowsAffected: 2,
+		},
 	}
 	for _, tc := range testCases {
 		i.T().Run(tc.name, func(t *testing.T) {
