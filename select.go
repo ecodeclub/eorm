@@ -155,6 +155,8 @@ func (s *Selector[T]) buildTable(table TableReference) error {
 		if err := s.buildJoin(t); err != nil {
 			return err
 		}
+	case Subquery:
+		return s.buildSubquery(t, true)
 	default:
 		return errs.NewUnsupportedTableReferenceError(table)
 	}
@@ -263,21 +265,24 @@ func (s *Selector[T]) selectAggregate(aggregate Aggregate) error {
 }
 
 func (s *Selector[T]) buildColumn(column Column) error {
-	if column.table != nil {
-		if alias := column.table.getAlias(); alias != "" {
-			s.quote(alias)
-			s.point()
-		}
-	}
-	cMeta, ok := s.meta.FieldMap[column.name]
-	if !ok {
+	//if column.table != nil {
+	//	if alias := column.table.getAlias(); alias != "" {
+	//		s.quote(alias)
+	//		s.point()
+	//	}
+	//}
+	//cMeta, ok := s.meta.FieldMap[column.name]
+	//if !ok {
+	//	return errs.NewInvalidFieldError(column.name)
+	//}
+	//s.quote(cMeta.ColumnName)
+	//if column.alias != "" {
+	//	s.aliases[column.alias] = struct{}{}
+	//	s.writeString(" AS ")
+	//	s.quote(column.alias)
+	//}
+	if err := s.builder.buildColumn(column); err != nil {
 		return errs.NewInvalidFieldError(column.name)
-	}
-	s.quote(cMeta.ColumnName)
-	if column.alias != "" {
-		s.aliases[column.alias] = struct{}{}
-		s.writeString(" AS ")
-		s.quote(column.alias)
 	}
 	return nil
 }
@@ -358,6 +363,19 @@ func (s *Selector[T]) Limit(limit int) *Selector[T] {
 func (s *Selector[T]) Offset(offset int) *Selector[T] {
 	s.offset = offset
 	return s
+}
+
+func (s *Selector[T]) AsSubquery(alias string) Subquery {
+	var table TableReference
+	if s.table == nil {
+		table = TableOf(new(T), alias)
+	}
+	return Subquery{
+		entity:  table,
+		q:       s,
+		alias:   alias,
+		columns: s.columns,
+	}
 }
 
 // Get 方法会执行查询，并且返回一条数据

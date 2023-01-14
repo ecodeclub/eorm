@@ -17,7 +17,6 @@ package eorm
 import (
 	"context"
 	"database/sql"
-	"errors"
 
 	"github.com/gotomicro/eorm/internal/errs"
 	"github.com/gotomicro/eorm/internal/model"
@@ -161,6 +160,7 @@ func (b *builder) parameter(arg interface{}) {
 
 func (b *builder) buildExpr(expr Expr) error {
 	switch e := expr.(type) {
+	case nil:
 	case RawExpr:
 		b.buildRawExpr(e)
 	case Column:
@@ -188,9 +188,14 @@ func (b *builder) buildExpr(expr Expr) error {
 		if err := b.buildIns(e); err != nil {
 			return err
 		}
-	case nil:
+	case Subquery:
+		return b.buildSubquery(e, false)
+	case SubqueryExpr:
+		b.writeString(e.pred)
+		b.writeByte(' ')
+		return b.buildSubquery(e.s, false)
 	default:
-		return errors.New("unsupported expr")
+		return errs.NewErrUnsupportedExpressionType()
 	}
 	return nil
 }
@@ -204,11 +209,11 @@ func (b *builder) buildPredicates(predicates []Predicate) error {
 }
 
 func (b *builder) buildHavingAggregate(aggregate Aggregate) error {
-	_, _ = b.buffer.WriteString(aggregate.fn)
+	b.writeString(aggregate.fn)
 
 	_ = b.buffer.WriteByte('(')
 	if aggregate.distinct {
-		_, _ = b.buffer.WriteString("DISTINCT ")
+		b.writeString("DISTINCT ")
 	}
 	cMeta, ok := b.meta.FieldMap[aggregate.arg]
 	if !ok {
@@ -224,12 +229,12 @@ func (b *builder) buildBinaryExpr(e binaryExpr) error {
 	if err != nil {
 		return err
 	}
-	_, _ = b.buffer.WriteString(e.op.text)
+	b.writeString(e.op.text)
 	return b.buildSubExpr(e.right)
 }
 
 func (b *builder) buildRawExpr(e RawExpr) {
-	_, _ = b.buffer.WriteString(e.raw)
+	b.writeString(e.raw)
 	b.args = append(b.args, e.args...)
 }
 
@@ -281,6 +286,11 @@ func (q Querier[T]) GetMulti(ctx context.Context) ([]*T, error) {
 func (b *builder) buildColumn(c Column) error {
 	switch table := c.table.(type) {
 	case nil:
+		// 檢查是否有使用別名，有的話直接採用別名
+		if _, ok := b.aliases[c.name]; ok {
+			b.quote(c.name)
+			return nil
+		}
 		fd, ok := b.meta.FieldMap[c.name]
 		// 字段不对，或者说列不对
 		if !ok {
@@ -288,6 +298,7 @@ func (b *builder) buildColumn(c Column) error {
 		}
 		b.quote(fd.ColumnName)
 		if c.alias != "" {
+			b.aliases[c.alias] = struct{}{}
 			b.writeString(" AS ")
 			b.quote(c.alias)
 		}
@@ -302,15 +313,54 @@ func (b *builder) buildColumn(c Column) error {
 		}
 		if table.alias != "" {
 			b.quote(table.alias)
-			b.writeByte('.')
+			b.point()
 		}
 		b.quote(fd.ColumnName)
 		if c.alias != "" {
 			b.writeString(" AS ")
 			b.quote(c.alias)
 		}
+	case Subquery:
+		if table.alias != "" {
+			b.quote(table.alias)
+			b.point()
+		}
+		b.quote(c.name)
+		if table.getAlias() == c.name {
+			b.quote(c.name)
+		}
+		//return b.buildColumn(c)
 	default:
 		return errs.NewUnsupportedTableReferenceError(table)
 	}
 	return nil
+}
+
+// buildSubquery 構建子查詢 SQL，
+// useAlias 決定是否顯示別名，即使有別名
+func (b *builder) buildSubquery(sub Subquery, useAlias bool) error {
+	query, err := sub.q.Build()
+	if err != nil {
+		return err
+	}
+	b.writeByte('(')
+	// 拿掉最後 ';'
+	b.writeString(query.SQL[:len(query.SQL)-1])
+	// 因為有 build() ，所以理應 args 也需要跟 SQL 一起處理
+	if len(query.Args) > 0 {
+		b.addArgs(query.Args...)
+	}
+	b.writeByte(')')
+	if useAlias {
+		b.writeString(" AS ")
+		b.quote(sub.alias)
+	}
+	return nil
+}
+
+func (b *builder) addArgs(args ...any) {
+	if b.args == nil {
+		b.args = make([]any, 0, 8)
+	}
+	b.args = append(b.args, args...)
 }

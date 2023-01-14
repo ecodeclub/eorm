@@ -63,6 +63,10 @@ func NewUnsupportedTableReferenceError(table any) error {
 	return fmt.Errorf("eorm: 不支持的TableReference类型 %v", table)
 }
 
+func NewErrUnsupportedExpressionType() error {
+	return fmt.Errorf("eorm: 不支持 Expression")
+}
+
 func NewMustSpecifyColumnsError() error {
 	return fmt.Errorf("eorm: 复合查询如 JOIN 查询、子查询必须指定要查找的列，即指定 SELECT xxx 部分")
 }
