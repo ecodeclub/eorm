@@ -130,10 +130,6 @@ func (b *builder) space() {
 	_ = b.buffer.WriteByte(' ')
 }
 
-func (b *builder) star() {
-	_, _ = b.buffer.WriteString("*")
-}
-
 func (b *builder) point() {
 	_ = b.buffer.WriteByte('.')
 }
@@ -168,31 +164,18 @@ func (b *builder) buildExpr(expr Expr) error {
 	case RawExpr:
 		b.buildRawExpr(e)
 	case Column:
-		if _, ok := e.table.(Table); ok {
-			return b.buildColumn(e)
+		_, ok := b.aliases[e.name]
+		if ok {
+			b.quote(e.name)
+			return nil
 		}
-		if e.name != "" {
-			_, ok := b.aliases[e.name]
-			if ok {
-				b.quote(e.name)
-				return nil
-			}
-			cm, ok := b.meta.FieldMap[e.name]
-			if !ok {
-				return errs.NewInvalidFieldError(e.name)
-			}
-			b.quote(cm.ColumnName)
-		}
+		return b.buildColumn(e)
 	case Aggregate:
 		if err := b.buildHavingAggregate(e); err != nil {
 			return err
 		}
 	case valueExpr:
 		b.parameter(e.val)
-	case MathExpr:
-		if err := b.buildBinaryExpr(binaryExpr(e)); err != nil {
-			return err
-		}
 	case binaryExpr:
 		if err := b.buildBinaryExpr(e); err != nil {
 			return err
@@ -258,12 +241,6 @@ func (b *builder) buildSubExpr(subExpr Expr) error {
 			return err
 		}
 		_ = b.buffer.WriteByte(')')
-	case binaryExpr:
-		_ = b.buffer.WriteByte('(')
-		if err := b.buildBinaryExpr(r); err != nil {
-			return err
-		}
-		_ = b.buffer.WriteByte(')')
 	case Predicate:
 		_ = b.buffer.WriteByte('(')
 		if err := b.buildBinaryExpr(binaryExpr(r)); err != nil {
@@ -307,7 +284,7 @@ func (b *builder) buildColumn(c Column) error {
 		fd, ok := b.meta.FieldMap[c.name]
 		// 字段不对，或者说列不对
 		if !ok {
-			return errs.NewInvalidColumnError(c.name)
+			return errs.NewInvalidFieldError(c.name)
 		}
 		b.quote(fd.ColumnName)
 		if c.alias != "" {
@@ -321,7 +298,7 @@ func (b *builder) buildColumn(c Column) error {
 		}
 		fd, ok := m.FieldMap[c.name]
 		if !ok {
-			return errs.NewInvalidColumnError(c.name)
+			return errs.NewInvalidFieldError(c.name)
 		}
 		if table.alias != "" {
 			b.quote(table.alias)
@@ -333,26 +310,7 @@ func (b *builder) buildColumn(c Column) error {
 			b.quote(c.alias)
 		}
 	default:
-		return errs.NewErrUnsupportedTable(table)
-	}
-	return nil
-}
-
-func (b *builder) buildTableAs(reference TableReference) error {
-	switch t := reference.(type) {
-	case Table:
-		if t.alias != "" {
-			b.quote(t.alias)
-			b.point()
-		}
-	case Join:
-		// 遍历t.left，默认取t.left的别名
-		err := b.buildTableAs(t.left)
-		if err != nil {
-			return err
-		}
-	default:
-		return errs.NewErrUnsupportedTable(t)
+		return errs.NewUnsupportedTableReferenceError(table)
 	}
 	return nil
 }

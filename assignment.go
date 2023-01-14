@@ -14,7 +14,7 @@
 
 package eorm
 
-// Assignable represents that something could be used as "assignment" statement
+// Assignable represents that something could be used alias "assignment" statement
 type Assignable interface {
 	assign()
 }

@@ -99,10 +99,10 @@ func TestUpdater_Set(t *testing.T) {
 			wantArgs: []interface{}{"Tom", 10},
 		},
 		{
-			name:     "set age=id+(age*100)",
-			builder:  NewUpdater[TestModel](orm).Update(tm).Set(C("FirstName"), Assign("Age", C("Id").Add(C("Age").Multi(100)))),
-			wantSql:  "UPDATE `test_model` SET `first_name`=?,`age`=(`id`+(`age`*?));",
-			wantArgs: []interface{}{"Tom", 100},
+			name:     "set age=id+(age*100)+10",
+			builder:  NewUpdater[TestModel](orm).Update(tm).Set(C("FirstName"), Assign("Age", C("Id").Add(C("Age").Multi(100)).Add(10))),
+			wantSql:  "UPDATE `test_model` SET `first_name`=?,`age`=((`id`+(`age`*?))+?);",
+			wantArgs: []interface{}{"Tom", 100, 10},
 		},
 		{
 			name:     "set age=(id+(age*100))*110",
