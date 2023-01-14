@@ -79,9 +79,6 @@ func (i *Inserter[T]) Build() (*Query, error) {
 		i.writeString("(")
 		refVal := i.valCreator.NewBasicTypeValue(val, i.meta)
 		for j, v := range fields {
-			if i.ignorePK && v.IsPrimaryKey {
-				continue
-			}
 			fdVal, err := refVal.Field(v.FieldName)
 			if err != nil {
 				return nil, err
@@ -123,16 +120,12 @@ func (i *Inserter[T]) Exec(ctx context.Context) Result {
 }
 
 func (i *Inserter[T]) buildColumns() ([]*model.ColumnMeta, error) {
-	cs := i.meta.Columns
+	cs := make([]*model.ColumnMeta, 0, len(i.columns))
 	if len(i.columns) != 0 {
-		cs = make([]*model.ColumnMeta, 0, len(i.columns))
 		for index, c := range i.columns {
 			v, isOk := i.meta.FieldMap[c]
 			if !isOk {
 				return cs, errs.NewInvalidFieldError(c)
-			}
-			if i.ignorePK && v.IsPrimaryKey {
-				continue
 			}
 			i.quote(v.ColumnName)
 			if index != len(i.columns)-1 {
@@ -146,9 +139,10 @@ func (i *Inserter[T]) buildColumns() ([]*model.ColumnMeta, error) {
 				continue
 			}
 			i.quote(val.ColumnName)
-			if index != len(cs)-1 {
+			if index != len(i.meta.Columns)-1 {
 				i.comma()
 			}
+			cs = append(cs, val)
 		}
 	}
 	return cs, nil
