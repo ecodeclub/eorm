@@ -19,13 +19,13 @@ type Expr interface {
 	expr() (string, error)
 }
 
-// RawExpr uses string as Expr
+// RawExpr uses string alias Expr
 type RawExpr struct {
 	raw  string
 	args []interface{}
 }
 
-// Raw just take expr as Expr
+// Raw just take expr alias Expr
 func Raw(expr string, args ...interface{}) RawExpr {
 	return RawExpr{
 		raw:  expr,

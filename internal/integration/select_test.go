@@ -62,14 +62,12 @@ func (s *SelectTestSuite) TestSelectorGet() {
 		{
 			name: "not found",
 			s: eorm.NewSelector[test.SimpleStruct](s.orm).
-				From(eorm.TableOf(&test.SimpleStruct{})).
 				Where(eorm.C("Id").EQ(9)),
 			wantErr: eorm.ErrNoRows,
 		},
 		{
 			name: "found",
 			s: eorm.NewSelector[test.SimpleStruct](s.orm).
-				From(eorm.TableOf(&test.SimpleStruct{})).
 				Where(eorm.C("Id").EQ(1)),
 			wantRes: s.data,
 		},
@@ -107,7 +105,8 @@ func (s *SelectTestSuite) TestSelectorGetBaseType() {
 			name: "res int",
 			queryRes: func() (any, error) {
 				queryer := eorm.NewSelector[int](s.orm).Select(eorm.C("Id")).
-					From(eorm.TableOf(&test.SimpleStruct{})).Where(eorm.C("Id").EQ(1))
+					From(eorm.TableOf(&test.SimpleStruct{}, "t1")).
+					Where(eorm.C("Id").EQ(1))
 				return queryer.Get(context.Background())
 			},
 			wantRes: func() *int {
@@ -119,7 +118,8 @@ func (s *SelectTestSuite) TestSelectorGetBaseType() {
 			name: "res string",
 			queryRes: func() (any, error) {
 				queryer := eorm.NewSelector[string](s.orm).Select(eorm.C("String")).
-					From(eorm.TableOf(&test.SimpleStruct{})).Where(eorm.C("Id").EQ(1))
+					From(eorm.TableOf(&test.SimpleStruct{}, "t1")).
+					Where(eorm.C("Id").EQ(1))
 				return queryer.Get(context.Background())
 			},
 			wantRes: func() *string {
@@ -131,7 +131,8 @@ func (s *SelectTestSuite) TestSelectorGetBaseType() {
 			name: "res bytes",
 			queryRes: func() (any, error) {
 				queryer := eorm.NewSelector[[]byte](s.orm).Select(eorm.C("ByteArray")).
-					From(eorm.TableOf(&test.SimpleStruct{})).Where(eorm.C("Id").EQ(1))
+					From(eorm.TableOf(&test.SimpleStruct{}, "t1")).
+					Where(eorm.C("Id").EQ(1))
 				return queryer.Get(context.Background())
 			},
 			wantRes: func() *[]byte {
@@ -143,7 +144,8 @@ func (s *SelectTestSuite) TestSelectorGetBaseType() {
 			name: "res bool",
 			queryRes: func() (any, error) {
 				queryer := eorm.NewSelector[bool](s.orm).Select(eorm.C("Bool")).
-					From(eorm.TableOf(&test.SimpleStruct{})).Where(eorm.C("Id").EQ(1))
+					From(eorm.TableOf(&test.SimpleStruct{}, "t1")).
+					Where(eorm.C("Id").EQ(1))
 				return queryer.Get(context.Background())
 			},
 			wantRes: func() *bool {
@@ -155,7 +157,8 @@ func (s *SelectTestSuite) TestSelectorGetBaseType() {
 			name: "res null string ptr",
 			queryRes: func() (any, error) {
 				queryer := eorm.NewSelector[sql.NullString](s.orm).Select(eorm.C("NullStringPtr")).
-					From(eorm.TableOf(&test.SimpleStruct{})).Where(eorm.C("Id").EQ(1))
+					From(eorm.TableOf(&test.SimpleStruct{}, "t1")).
+					Where(eorm.C("Id").EQ(1))
 				return queryer.Get(context.Background())
 			},
 			wantRes: func() *sql.NullString {
@@ -167,7 +170,8 @@ func (s *SelectTestSuite) TestSelectorGetBaseType() {
 			name: "res null int32 ptr",
 			queryRes: func() (any, error) {
 				queryer := eorm.NewSelector[sql.NullInt32](s.orm).Select(eorm.C("NullInt32Ptr")).
-					From(eorm.TableOf(&test.SimpleStruct{})).Where(eorm.C("Id").EQ(1))
+					From(eorm.TableOf(&test.SimpleStruct{}, "t1")).
+					Where(eorm.C("Id").EQ(1))
 				return queryer.Get(context.Background())
 			},
 			wantRes: func() *sql.NullInt32 {
@@ -179,7 +183,8 @@ func (s *SelectTestSuite) TestSelectorGetBaseType() {
 			name: "res null bool ptr",
 			queryRes: func() (any, error) {
 				queryer := eorm.NewSelector[sql.NullBool](s.orm).Select(eorm.C("NullBoolPtr")).
-					From(eorm.TableOf(&test.SimpleStruct{})).Where(eorm.C("Id").EQ(1))
+					From(eorm.TableOf(&test.SimpleStruct{}, "t1")).
+					Where(eorm.C("Id").EQ(1))
 				return queryer.Get(context.Background())
 			},
 			wantRes: func() *sql.NullBool {
@@ -191,7 +196,8 @@ func (s *SelectTestSuite) TestSelectorGetBaseType() {
 			name: "res null float64 ptr",
 			queryRes: func() (any, error) {
 				queryer := eorm.NewSelector[sql.NullFloat64](s.orm).Select(eorm.C("NullFloat64Ptr")).
-					From(eorm.TableOf(&test.SimpleStruct{})).Where(eorm.C("Id").EQ(1))
+					From(eorm.TableOf(&test.SimpleStruct{}, "t1")).
+					Where(eorm.C("Id").EQ(1))
 				return queryer.Get(context.Background())
 			},
 			wantRes: func() *sql.NullFloat64 {
@@ -432,14 +438,12 @@ func (s *SelectTestSuiteGetMulti) TestSelectorGetMulti() {
 		{
 			name: "not found",
 			s: eorm.NewSelector[test.SimpleStruct](s.orm).
-				From(eorm.TableOf(&test.SimpleStruct{})).
 				Where(eorm.C("Id").EQ(9)),
 			wantRes: []*test.SimpleStruct{},
 		},
 		{
 			name: "found",
 			s: eorm.NewSelector[test.SimpleStruct](s.orm).
-				From(eorm.TableOf(&test.SimpleStruct{})).
 				Where(eorm.C("Id").LT(4)),
 			wantRes: s.data,
 		},
@@ -467,8 +471,7 @@ func (s *SelectTestSuiteGetMulti) TestSelectorGetMultiBaseType() {
 		{
 			name: "res int",
 			queryRes: func() (any, error) {
-				queryer := eorm.NewSelector[int](s.orm).Select(eorm.C("Id")).
-					From(eorm.TableOf(&test.SimpleStruct{}))
+				queryer := eorm.NewSelector[int](s.orm).Select(eorm.C("Id")).From(eorm.TableOf(&test.SimpleStruct{}, "t1"))
 				return queryer.GetMulti(context.Background())
 			},
 			wantRes: func() (res []*int) {
@@ -482,8 +485,7 @@ func (s *SelectTestSuiteGetMulti) TestSelectorGetMultiBaseType() {
 		{
 			name: "res string",
 			queryRes: func() (any, error) {
-				queryer := eorm.NewSelector[string](s.orm).Select(eorm.C("String")).
-					From(eorm.TableOf(&test.SimpleStruct{}))
+				queryer := eorm.NewSelector[string](s.orm).Select(eorm.C("String")).From(eorm.TableOf(&test.SimpleStruct{}, "t1"))
 				return queryer.GetMulti(context.Background())
 			},
 			wantRes: func() (res []*string) {
@@ -497,8 +499,7 @@ func (s *SelectTestSuiteGetMulti) TestSelectorGetMultiBaseType() {
 		{
 			name: "res bytes",
 			queryRes: func() (any, error) {
-				queryer := eorm.NewSelector[[]byte](s.orm).Select(eorm.C("ByteArray")).
-					From(eorm.TableOf(&test.SimpleStruct{}))
+				queryer := eorm.NewSelector[[]byte](s.orm).Select(eorm.C("ByteArray")).From(eorm.TableOf(&test.SimpleStruct{}, "t1"))
 				return queryer.GetMulti(context.Background())
 			},
 			wantRes: func() (res []*[]byte) {
@@ -512,8 +513,7 @@ func (s *SelectTestSuiteGetMulti) TestSelectorGetMultiBaseType() {
 		{
 			name: "res bool",
 			queryRes: func() (any, error) {
-				queryer := eorm.NewSelector[bool](s.orm).Select(eorm.C("Bool")).
-					From(eorm.TableOf(&test.SimpleStruct{}))
+				queryer := eorm.NewSelector[bool](s.orm).Select(eorm.C("Bool")).From(eorm.TableOf(&test.SimpleStruct{}, "t1"))
 				return queryer.GetMulti(context.Background())
 			},
 			wantRes: func() (res []*bool) {
@@ -527,8 +527,7 @@ func (s *SelectTestSuiteGetMulti) TestSelectorGetMultiBaseType() {
 		{
 			name: "res null string ptr",
 			queryRes: func() (any, error) {
-				queryer := eorm.NewSelector[sql.NullString](s.orm).Select(eorm.C("NullStringPtr")).
-					From(eorm.TableOf(&test.SimpleStruct{}))
+				queryer := eorm.NewSelector[sql.NullString](s.orm).Select(eorm.C("NullStringPtr")).From(eorm.TableOf(&test.SimpleStruct{}, "t1"))
 				return queryer.GetMulti(context.Background())
 			},
 			wantRes: []*sql.NullString{
@@ -549,8 +548,7 @@ func (s *SelectTestSuiteGetMulti) TestSelectorGetMultiBaseType() {
 		{
 			name: "res null int32 ptr",
 			queryRes: func() (any, error) {
-				queryer := eorm.NewSelector[sql.NullInt32](s.orm).Select(eorm.C("NullInt32Ptr")).
-					From(eorm.TableOf(&test.SimpleStruct{}))
+				queryer := eorm.NewSelector[sql.NullInt32](s.orm).Select(eorm.C("NullInt32Ptr")).From(eorm.TableOf(&test.SimpleStruct{}, "t1"))
 				return queryer.GetMulti(context.Background())
 			},
 			wantRes: []*sql.NullInt32{
@@ -571,8 +569,7 @@ func (s *SelectTestSuiteGetMulti) TestSelectorGetMultiBaseType() {
 		{
 			name: "res null bool ptr",
 			queryRes: func() (any, error) {
-				queryer := eorm.NewSelector[sql.NullBool](s.orm).Select(eorm.C("NullBoolPtr")).
-					From(eorm.TableOf(&test.SimpleStruct{}))
+				queryer := eorm.NewSelector[sql.NullBool](s.orm).Select(eorm.C("NullBoolPtr")).From(eorm.TableOf(&test.SimpleStruct{}, "t1"))
 				return queryer.GetMulti(context.Background())
 			},
 			wantRes: []*sql.NullBool{
@@ -593,8 +590,7 @@ func (s *SelectTestSuiteGetMulti) TestSelectorGetMultiBaseType() {
 		{
 			name: "res null float64 ptr",
 			queryRes: func() (any, error) {
-				queryer := eorm.NewSelector[sql.NullFloat64](s.orm).Select(eorm.C("NullFloat64Ptr")).
-					From(eorm.TableOf(&test.SimpleStruct{}))
+				queryer := eorm.NewSelector[sql.NullFloat64](s.orm).Select(eorm.C("NullFloat64Ptr")).From(eorm.TableOf(&test.SimpleStruct{}, "t1"))
 				return queryer.GetMulti(context.Background())
 			},
 			wantRes: []*sql.NullFloat64{
@@ -735,7 +731,7 @@ func (s *SelectTestSuiteGetMulti) TestSelectorDistinct() {
 		{
 			name: "distinct col",
 			s: func() (any, error) {
-				return eorm.NewSelector[test.SimpleStruct](s.orm).From(eorm.TableOf(&test.SimpleStruct{})).Select(eorm.C("Int")).Distinct().GetMulti(context.Background())
+				return eorm.NewSelector[test.SimpleStruct](s.orm).Select(eorm.C("Int")).Distinct().GetMulti(context.Background())
 
 			},
 			wantRes: []*test.SimpleStruct{
@@ -747,7 +743,8 @@ func (s *SelectTestSuiteGetMulti) TestSelectorDistinct() {
 		{
 			name: "count distinct",
 			s: func() (any, error) {
-				return eorm.NewSelector[int](s.orm).Select(eorm.CountDistinct("Bool")).From(eorm.TableOf(&test.SimpleStruct{})).GetMulti(context.Background())
+				return eorm.NewSelector[int](s.orm).Select(eorm.CountDistinct("Bool")).
+					From(eorm.TableOf(&test.SimpleStruct{}, "t1")).GetMulti(context.Background())
 			},
 			wantRes: func() []*int {
 				val := 1
@@ -757,7 +754,7 @@ func (s *SelectTestSuiteGetMulti) TestSelectorDistinct() {
 		{
 			name: "having count distinct",
 			s: func() (any, error) {
-				return eorm.NewSelector[test.SimpleStruct](s.orm).From(eorm.TableOf(&test.SimpleStruct{})).Select(eorm.C("JsonColumn")).GroupBy("JsonColumn").Having(eorm.CountDistinct("JsonColumn").EQ(1)).GetMulti(context.Background())
+				return eorm.NewSelector[test.SimpleStruct](s.orm).Select(eorm.C("JsonColumn")).GroupBy("JsonColumn").Having(eorm.CountDistinct("JsonColumn").EQ(1)).GetMulti(context.Background())
 			},
 			wantRes: []*test.SimpleStruct{
 				&test.SimpleStruct{
@@ -831,48 +828,48 @@ func (s *SelectTestSuiteJoin) TestSelectorJoin() {
 		{
 			name: "join",
 			s: func() (any, error) {
-				t1 := eorm.TableOf(&test.Order{})
-				t2 := eorm.TableOf(&test.OrderDetail{})
+				t1 := eorm.TableOf(&test.Order{}, "t1")
+				t2 := eorm.TableOf(&test.OrderDetail{}, "t2")
 				t3 := t1.LeftJoin(t2).Using("UsingCol1", "UsingCol2")
-				return eorm.NewSelector[test.Order](s.orm).From(t3).Get(context.Background())
+				return eorm.NewSelector[test.Order](s.orm).Select(t1.AllColumns()).From(t3).Get(context.Background())
 			},
 			wantRes: &test.Order{Id: 1, UsingCol1: "usingcoa1_1", UsingCol2: "usingcoa1_2"},
 		},
 		{
 			name: "join As",
 			s: func() (any, error) {
-				t1 := eorm.TableOf(&test.Order{}).As("t1")
-				t2 := eorm.TableOf(&test.OrderDetail{}).As("t2")
+				t1 := eorm.TableOf(&test.Order{}, "t1")
+				t2 := eorm.TableOf(&test.OrderDetail{}, "t2")
 				t3 := t1.Join(t2).On(t1.C("Id").EQ(t2.C("OrderId")))
-				return eorm.NewSelector[test.Order](s.orm).From(t3).Get(context.Background())
+				return eorm.NewSelector[test.Order](s.orm).Select(t1.AllColumns()).From(t3).Get(context.Background())
 			},
 			wantRes: &test.Order{Id: 1, UsingCol1: "usingcoa1_1", UsingCol2: "usingcoa1_2"},
 		},
 		{
 			name: "join using col",
 			s: func() (any, error) {
-				t1 := eorm.TableOf(&test.Order{})
-				t2 := eorm.TableOf(&test.OrderDetail{})
+				t1 := eorm.TableOf(&test.Order{}, "t1")
+				t2 := eorm.TableOf(&test.OrderDetail{}, "t2")
 				t3 := t1.Join(t2).Using("UsingCol1", "UsingCol2")
-				return eorm.NewSelector[test.Order](s.orm).From(t3).Get(context.Background())
+				return eorm.NewSelector[test.Order](s.orm).Select(t1.AllColumns()).From(t3).Get(context.Background())
 			},
 			wantRes: &test.Order{Id: 1, UsingCol1: "usingcoa1_1", UsingCol2: "usingcoa1_2"},
 		},
 		{
 			name: "join using invalid col",
 			s: func() (any, error) {
-				t1 := eorm.TableOf(&test.Order{})
-				t2 := eorm.TableOf(&test.OrderDetail{})
+				t1 := eorm.TableOf(&test.Order{}, "t1")
+				t2 := eorm.TableOf(&test.OrderDetail{}, "t2")
 				t3 := t1.Join(t2).Using("invalid", "UsingCol2")
-				return eorm.NewSelector[test.Order](s.orm).From(t3).Get(context.Background())
+				return eorm.NewSelector[test.Order](s.orm).Select(t1.AllColumns()).From(t3).Get(context.Background())
 			},
 			wantErr: errs.NewInvalidFieldError("invalid"),
 		},
 		{
 			name: "join Avg",
 			s: func() (any, error) {
-				t1 := eorm.TableOf(&test.Order{}).As("t1")
-				t2 := eorm.TableOf(&test.OrderDetail{}).As("t2")
+				t1 := eorm.TableOf(&test.Order{}, "t1")
+				t2 := eorm.TableOf(&test.OrderDetail{}, "t2")
 				t3 := t1.Join(t2).On(t1.C("Id").EQ(t2.C("OrderId")))
 				return eorm.NewSelector[test.Order](s.orm).From(t3).Select(t1.Avg("UsingCol1").As("using_col1"), t1.Avg("UsingCol2").As("using_col2")).Get(context.Background())
 			},
@@ -881,8 +878,8 @@ func (s *SelectTestSuiteJoin) TestSelectorJoin() {
 		{
 			name: "join Avg invalid",
 			s: func() (any, error) {
-				t1 := eorm.TableOf(&test.Order{}).As("t1")
-				t2 := eorm.TableOf(&test.OrderDetail{}).As("t2")
+				t1 := eorm.TableOf(&test.Order{}, "t1")
+				t2 := eorm.TableOf(&test.OrderDetail{}, "t2")
 				t3 := t1.Join(t2).On(t1.C("Id").EQ(t2.C("OrderId")))
 				return eorm.NewSelector[test.Order](s.orm).From(t3).Select(t1.Avg("invalid").As("using_col1"), t1.Avg("UsingCol2").As("using_col2")).Get(context.Background())
 			},
@@ -891,8 +888,8 @@ func (s *SelectTestSuiteJoin) TestSelectorJoin() {
 		{
 			name: "join col",
 			s: func() (any, error) {
-				t1 := eorm.TableOf(&test.Order{}).As("t1")
-				t2 := eorm.TableOf(&test.OrderDetail{}).As("t2")
+				t1 := eorm.TableOf(&test.Order{}, "t1")
+				t2 := eorm.TableOf(&test.OrderDetail{}, "t2")
 				t3 := t1.Join(t2).On(t1.C("Id").EQ(t2.C("OrderId")))
 				return eorm.NewSelector[test.Order](s.orm).From(t3).Select(t1.C("UsingCol1"), t2.C("UsingCol2")).Get(context.Background())
 			},
@@ -901,8 +898,8 @@ func (s *SelectTestSuiteJoin) TestSelectorJoin() {
 		{
 			name: "join col invalid",
 			s: func() (any, error) {
-				t1 := eorm.TableOf(&test.Order{}).As("t1")
-				t2 := eorm.TableOf(&test.OrderDetail{}).As("t2")
+				t1 := eorm.TableOf(&test.Order{}, "t1")
+				t2 := eorm.TableOf(&test.OrderDetail{}, "t2")
 				t3 := t1.Join(t2).On(t1.C("Id").EQ(t2.C("OrderId")))
 				return eorm.NewSelector[test.Order](s.orm).From(t3).Select(t1.C("invalid"), t2.C("UsingCol2")).Get(context.Background())
 			},
@@ -953,18 +950,18 @@ func (s *SelectTestSuiteLeftJoin) TestSelectorLeftJoin() {
 		{
 			name: "left join",
 			s: func() (any, error) {
-				t1 := eorm.TableOf(&test.Order{})
-				t2 := eorm.TableOf(&test.OrderDetail{})
+				t1 := eorm.TableOf(&test.Order{}, "t1")
+				t2 := eorm.TableOf(&test.OrderDetail{}, "t2")
 				t3 := t1.LeftJoin(t2).Using("UsingCol1", "UsingCol2")
-				return eorm.NewSelector[test.Order](s.orm).From(t3).Get(context.Background())
+				return eorm.NewSelector[test.Order](s.orm).Select(t1.AllColumns()).From(t3).Get(context.Background())
 			},
 			wantRes: &test.Order{Id: 1, UsingCol1: "usingcoa1_1", UsingCol2: "usingcoa1_2"},
 		},
 		{
 			name: "left join col",
 			s: func() (any, error) {
-				t1 := eorm.TableOf(&test.Order{})
-				t2 := eorm.TableOf(&test.OrderDetail{})
+				t1 := eorm.TableOf(&test.Order{}, "t1")
+				t2 := eorm.TableOf(&test.OrderDetail{}, "t2")
 				t3 := t1.LeftJoin(t2).On(t1.C("Id").EQ(t2.C("OrderId")))
 				return eorm.NewSelector[test.Order](s.orm).From(t3).Select(t1.C("UsingCol1")).Get(context.Background())
 			},
@@ -973,8 +970,8 @@ func (s *SelectTestSuiteLeftJoin) TestSelectorLeftJoin() {
 		{
 			name: "left join invalid col",
 			s: func() (any, error) {
-				t1 := eorm.TableOf(&test.Order{})
-				t2 := eorm.TableOf(&test.OrderDetail{})
+				t1 := eorm.TableOf(&test.Order{}, "t1")
+				t2 := eorm.TableOf(&test.OrderDetail{}, "t2")
 				t3 := t1.LeftJoin(t2).On(t1.C("Id").EQ(t2.C("OrderId")))
 				return eorm.NewSelector[test.Order](s.orm).From(t3).Select(t1.C("invalid")).Get(context.Background())
 			},
@@ -983,28 +980,28 @@ func (s *SelectTestSuiteLeftJoin) TestSelectorLeftJoin() {
 		{
 			name: "left join using col",
 			s: func() (any, error) {
-				t1 := eorm.TableOf(&test.Order{})
-				t2 := eorm.TableOf(&test.OrderDetail{})
+				t1 := eorm.TableOf(&test.Order{}, "t1")
+				t2 := eorm.TableOf(&test.OrderDetail{}, "t2")
 				t3 := t1.LeftJoin(t2).Using("UsingCol1", "UsingCol2")
-				return eorm.NewSelector[test.Order](s.orm).From(t3).Get(context.Background())
+				return eorm.NewSelector[test.Order](s.orm).Select(t1.AllColumns()).From(t3).Get(context.Background())
 			},
 			wantRes: &test.Order{Id: 1, UsingCol1: "usingcoa1_1", UsingCol2: "usingcoa1_2"},
 		},
 		{
 			name: "left join using invalid col",
 			s: func() (any, error) {
-				t1 := eorm.TableOf(&test.Order{})
-				t2 := eorm.TableOf(&test.OrderDetail{})
+				t1 := eorm.TableOf(&test.Order{}, "t1")
+				t2 := eorm.TableOf(&test.OrderDetail{}, "t2")
 				t3 := t1.LeftJoin(t2).Using("invalid", "UsingCol2")
-				return eorm.NewSelector[test.Order](s.orm).From(t3).Get(context.Background())
+				return eorm.NewSelector[test.Order](s.orm).Select(t1.AllColumns()).From(t3).Get(context.Background())
 			},
 			wantErr: errs.NewInvalidFieldError("invalid"),
 		},
 		{
 			name: "left join Avg ",
 			s: func() (any, error) {
-				t1 := eorm.TableOf(&test.Order{})
-				t2 := eorm.TableOf(&test.OrderDetail{})
+				t1 := eorm.TableOf(&test.Order{}, "t1")
+				t2 := eorm.TableOf(&test.OrderDetail{}, "t2")
 				t3 := t1.LeftJoin(t2).Using("UsingCol1", "UsingCol2")
 				return eorm.NewSelector[test.Order](s.orm).From(t3).Select(t1.Avg("UsingCol1").As("using_col1")).Get(context.Background())
 			},
@@ -1013,8 +1010,8 @@ func (s *SelectTestSuiteLeftJoin) TestSelectorLeftJoin() {
 		{
 			name: "left join Avg invalid",
 			s: func() (any, error) {
-				t1 := eorm.TableOf(&test.Order{})
-				t2 := eorm.TableOf(&test.OrderDetail{})
+				t1 := eorm.TableOf(&test.Order{}, "t1")
+				t2 := eorm.TableOf(&test.OrderDetail{}, "t2")
 				t3 := t1.LeftJoin(t2).Using("UsingCol1", "UsingCol2")
 				return eorm.NewSelector[test.Order](s.orm).From(t3).Select(t1.Avg("invalid").As("using_col1")).Get(context.Background())
 			},
@@ -1063,18 +1060,18 @@ func (s *SelectTestSuiteRightJoin) TestSelectorRightJoin() {
 		{
 			name: "Right join",
 			s: func() (any, error) {
-				t1 := eorm.TableOf(&test.Order{})
-				t2 := eorm.TableOf(&test.OrderDetail{})
+				t1 := eorm.TableOf(&test.Order{}, "t1")
+				t2 := eorm.TableOf(&test.OrderDetail{}, "t2")
 				t3 := t1.RightJoin(t2).Using("UsingCol1", "UsingCol2")
-				return eorm.NewSelector[test.Order](s.orm).From(t3).Get(context.Background())
+				return eorm.NewSelector[test.Order](s.orm).Select(t1.AllColumns()).From(t3).Get(context.Background())
 			},
 			wantRes: &test.Order{Id: 1, UsingCol1: "usingcoa1_1", UsingCol2: "usingcoa1_2"},
 		},
 		{
 			name: "right join col",
 			s: func() (any, error) {
-				t1 := eorm.TableOf(&test.Order{})
-				t2 := eorm.TableOf(&test.OrderDetail{})
+				t1 := eorm.TableOf(&test.Order{}, "t1")
+				t2 := eorm.TableOf(&test.OrderDetail{}, "t2")
 				t3 := t1.RightJoin(t2).On(t1.C("Id").EQ(t2.C("OrderId")))
 				return eorm.NewSelector[test.Order](s.orm).From(t3).Select(t1.C("UsingCol1")).Get(context.Background())
 			},
@@ -1083,8 +1080,8 @@ func (s *SelectTestSuiteRightJoin) TestSelectorRightJoin() {
 		{
 			name: "right join invalid col",
 			s: func() (any, error) {
-				t1 := eorm.TableOf(&test.Order{})
-				t2 := eorm.TableOf(&test.OrderDetail{})
+				t1 := eorm.TableOf(&test.Order{}, "t1")
+				t2 := eorm.TableOf(&test.OrderDetail{}, "t2")
 				t3 := t1.RightJoin(t2).Using("UsingCol1", "UsingCol2")
 				return eorm.NewSelector[test.Order](s.orm).From(t3).Select(t1.C("invalid")).Get(context.Background())
 			},
@@ -1093,28 +1090,28 @@ func (s *SelectTestSuiteRightJoin) TestSelectorRightJoin() {
 		{
 			name: "right join using col",
 			s: func() (any, error) {
-				t1 := eorm.TableOf(&test.Order{})
-				t2 := eorm.TableOf(&test.OrderDetail{})
+				t1 := eorm.TableOf(&test.Order{}, "t1")
+				t2 := eorm.TableOf(&test.OrderDetail{}, "t2")
 				t3 := t1.RightJoin(t2).Using("UsingCol1", "UsingCol2")
-				return eorm.NewSelector[test.Order](s.orm).From(t3).Get(context.Background())
+				return eorm.NewSelector[test.Order](s.orm).Select(t1.AllColumns()).From(t3).Get(context.Background())
 			},
 			wantRes: &test.Order{Id: 1, UsingCol1: "usingcoa1_1", UsingCol2: "usingcoa1_2"},
 		},
 		{
 			name: "right join using invalid col",
 			s: func() (any, error) {
-				t1 := eorm.TableOf(&test.Order{})
-				t2 := eorm.TableOf(&test.OrderDetail{})
+				t1 := eorm.TableOf(&test.Order{}, "t1")
+				t2 := eorm.TableOf(&test.OrderDetail{}, "t2")
 				t3 := t1.RightJoin(t2).Using("invalid", "UsingCol2")
-				return eorm.NewSelector[test.Order](s.orm).From(t3).Get(context.Background())
+				return eorm.NewSelector[test.Order](s.orm).Select(t1.AllColumns()).From(t3).Get(context.Background())
 			},
 			wantErr: errs.NewInvalidFieldError("invalid"),
 		},
 		{
 			name: "right join Avg",
 			s: func() (any, error) {
-				t1 := eorm.TableOf(&test.Order{})
-				t2 := eorm.TableOf(&test.OrderDetail{})
+				t1 := eorm.TableOf(&test.Order{}, "t1")
+				t2 := eorm.TableOf(&test.OrderDetail{}, "t2")
 				t3 := t1.RightJoin(t2).Using("UsingCol1", "UsingCol2")
 				return eorm.NewSelector[test.Order](s.orm).From(t3).Select(t1.Avg("UsingCol1").As("using_col1")).Get(context.Background())
 			},
@@ -1123,8 +1120,8 @@ func (s *SelectTestSuiteRightJoin) TestSelectorRightJoin() {
 		{
 			name: "right join Avg invalid",
 			s: func() (any, error) {
-				t1 := eorm.TableOf(&test.Order{})
-				t2 := eorm.TableOf(&test.OrderDetail{})
+				t1 := eorm.TableOf(&test.Order{}, "t1")
+				t2 := eorm.TableOf(&test.OrderDetail{}, "t2")
 				t3 := t1.RightJoin(t2).Using("UsingCol1", "UsingCol2")
 				return eorm.NewSelector[test.Order](s.orm).From(t3).Select(t1.Avg("invalid").As("using_col1")).Get(context.Background())
 			},

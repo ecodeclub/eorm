@@ -125,7 +125,7 @@ func (j *JsonColumn) Scan(src any) error {
 
 // Value 参考 sql.NullXXX 类型定义的
 func (j *JsonColumn) Value() (driver.Value, error) {
-	if !j.Valid {
+	if j == nil || !j.Valid {
 		return nil, nil
 	}
 	bs, err := json.Marshal(j.Val)

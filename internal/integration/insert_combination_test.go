@@ -65,7 +65,7 @@ func (i *InsertCompositionTestSuite) TestInsert() {
 			name: "ignore pk multi",
 			i: eorm.NewInserter[test.CombinedModel](i.orm).SkipPK().
 				Values(test.NewCombinedModel(4), test.NewCombinedModel(5)),
-			rowsAffected: 1,
+			rowsAffected: 2,
 		},
 	}
 	for _, tc := range testCases {

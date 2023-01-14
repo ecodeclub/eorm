@@ -47,13 +47,14 @@ func NewSelector[T any](sess session) *Selector[T] {
 	}
 }
 
-// TableOf -> get selector table
+// tableOf -> get selector table
 func (s *Selector[T]) tableOf() any {
 	switch tb := s.table.(type) {
 	case Table:
 		return tb.entity
 	default:
-		return new(T)
+		// 不使用 new(T) 来规避内存分配
+		return (*T)(nil)
 	}
 }
 
@@ -70,8 +71,13 @@ func (s *Selector[T]) Build() (*Query, error) {
 		s.writeString("DISTINCT ")
 	}
 	if len(s.columns) == 0 {
-		if err := s.buildAllColumns(); err != nil {
-			return nil, err
+		switch s.table.(type) {
+		case Table, nil:
+			if err = s.buildAllColumns(); err != nil {
+				return nil, err
+			}
+		default:
+			return nil, errs.NewMustSpecifyColumnsError()
 		}
 	} else {
 		err = s.buildSelectedList()
@@ -150,7 +156,7 @@ func (s *Selector[T]) buildTable(table TableReference) error {
 			return err
 		}
 	default:
-		return errs.NewErrUnsupportedTable(table)
+		return errs.NewUnsupportedTableReferenceError(table)
 	}
 	return nil
 }
@@ -189,18 +195,8 @@ func (s *Selector[T]) buildGroupBy() error {
 }
 
 func (s *Selector[T]) buildAllColumns() error {
-	if s.table != nil {
-		if _, ok := s.table.(Table); !ok {
-			err := s.buildTableAs(s.table)
-			if err != nil {
-				return err
-			}
-			s.star()
-			return nil
-		}
-	}
 	for i, cMeta := range s.meta.Columns {
-		// it should never return error, we can safely ignore it
+		// 永远不会返回 error
 		_ = s.buildColumns(i, cMeta.FieldName)
 	}
 	return nil
@@ -250,11 +246,9 @@ func (s *Selector[T]) selectAggregate(aggregate Aggregate) error {
 		return errs.NewInvalidFieldError(aggregate.arg)
 	}
 	if aggregate.table != nil {
-		if t, ok := aggregate.table.(Table); ok {
-			if t.alias != "" {
-				s.quote(t.alias)
-				s.point()
-			}
+		if alias := aggregate.table.getAlias(); alias != "" {
+			s.quote(alias)
+			s.point()
 		}
 	}
 	s.quote(cMeta.ColumnName)
@@ -270,11 +264,9 @@ func (s *Selector[T]) selectAggregate(aggregate Aggregate) error {
 
 func (s *Selector[T]) buildColumn(column Column) error {
 	if column.table != nil {
-		if t, ok := column.table.(Table); ok {
-			if t.alias != "" {
-				s.quote(t.alias)
-				s.point()
-			}
+		if alias := column.table.getAlias(); alias != "" {
+			s.quote(alias)
+			s.point()
 		}
 	}
 	cMeta, ok := s.meta.FieldMap[column.name]

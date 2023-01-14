@@ -17,7 +17,6 @@ package errs
 import (
 	"errors"
 	"fmt"
-	"reflect"
 )
 
 var (
@@ -54,22 +53,16 @@ func NewValueNotSetError() error {
 	return errValueNotSet
 }
 
-// NewUnsupportedTypeError 不支持的字段类型
-// 请参阅 https://github.com/gotomicro/eorm/discussions/71
-func NewUnsupportedTypeError(typ reflect.Type) error {
-	return fmt.Errorf("eorm: 不支持字段类型 %s, %s", typ.PkgPath(), typ.Name())
-}
-
 // NewUnsupportedDriverError 不支持驱动类型
 func NewUnsupportedDriverError(driver string) error {
 	return fmt.Errorf("eorm: 不支持driver类型 %s", driver)
 }
 
-// NewErrUnsupportedTable 不支持的TableReference类型
-func NewErrUnsupportedTable(table any) error {
+// NewUnsupportedTableReferenceError 不支持的TableReference类型
+func NewUnsupportedTableReferenceError(table any) error {
 	return fmt.Errorf("eorm: 不支持的TableReference类型 %v", table)
 }
 
-func NewErrUnknownField(name string) error {
-	return fmt.Errorf("eorm: 未知字段 %s", name)
+func NewMustSpecifyColumnsError() error {
+	return fmt.Errorf("eorm: 复合查询如 JOIN 查询、子查询必须指定要查找的列，即指定 SELECT xxx 部分")
 }
