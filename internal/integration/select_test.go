@@ -1149,7 +1149,7 @@ func (s *SelectTestSuiteRightJoin) TestSelectorRightJoin() {
 					From(sub).
 					Where().Get(context.Background())
 			},
-			wantRes: &test.Order{Id: 0, UsingCol1: "usingcoa1_1make", UsingCol2: ""},
+			wantRes: &test.Order{Id: 0, UsingCol1: "usingcoa1_1", UsingCol2: ""},
 		},
 		{
 			name: "in",

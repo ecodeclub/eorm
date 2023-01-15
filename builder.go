@@ -286,11 +286,6 @@ func (q Querier[T]) GetMulti(ctx context.Context) ([]*T, error) {
 func (b *builder) buildColumn(c Column) error {
 	switch table := c.table.(type) {
 	case nil:
-		// 檢查是否有使用別名，有的話直接採用別名
-		if _, ok := b.aliases[c.name]; ok {
-			b.quote(c.name)
-			return nil
-		}
 		fd, ok := b.meta.FieldMap[c.name]
 		// 字段不对，或者说列不对
 		if !ok {
@@ -329,7 +324,6 @@ func (b *builder) buildColumn(c Column) error {
 		if table.getAlias() == c.name {
 			b.quote(c.name)
 		}
-		//return b.buildColumn(c)
 	default:
 		return errs.NewUnsupportedTableReferenceError(table)
 	}

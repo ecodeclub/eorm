@@ -265,22 +265,6 @@ func (s *Selector[T]) selectAggregate(aggregate Aggregate) error {
 }
 
 func (s *Selector[T]) buildColumn(column Column) error {
-	//if column.table != nil {
-	//	if alias := column.table.getAlias(); alias != "" {
-	//		s.quote(alias)
-	//		s.point()
-	//	}
-	//}
-	//cMeta, ok := s.meta.FieldMap[column.name]
-	//if !ok {
-	//	return errs.NewInvalidFieldError(column.name)
-	//}
-	//s.quote(cMeta.ColumnName)
-	//if column.alias != "" {
-	//	s.aliases[column.alias] = struct{}{}
-	//	s.writeString(" AS ")
-	//	s.quote(column.alias)
-	//}
 	if err := s.builder.buildColumn(column); err != nil {
 		return errs.NewInvalidFieldError(column.name)
 	}
