@@ -1606,29 +1606,32 @@ func TestSelector_Subquery(t *testing.T) {
 		{
 			name: "in",
 			s: func() QueryBuilder {
+				o1 := TableOf(&Order{}, "o1")
 				sub := NewSelector[OrderDetail](db).Select(C("OrderId")).AsSubquery("sub")
-				return NewSelector[Order](db).Select(Columns("Id")).Where(C("Id").In(sub))
+				return NewSelector[Order](db).Select(o1.C("Id")).From(o1).Where(o1.C("Id").In(sub))
 			}(),
 			wantQuery: &Query{
-				SQL: "SELECT `id` FROM `order` WHERE `id` IN (SELECT `order_id` FROM `order_detail`);"},
+				SQL: "SELECT `o1`.`id` FROM `order` AS `o1` WHERE `o1`.`id` IN (SELECT `order_id` FROM `order_detail`);"},
 		},
 		{
 			name: "all",
 			s: func() QueryBuilder {
+				o1 := TableOf(&Order{}, "o1")
 				sub := NewSelector[OrderDetail](db).Select(C("OrderId")).AsSubquery("sub")
-				return NewSelector[Order](db).Where(C("Id").GT(All(sub)))
+				return NewSelector[Order](db).Select(o1.C("Id"), o1.C("UsingCol1"), o1.C("UsingCol2")).From(o1).Where(o1.C("Id").GT(All(sub)))
 			}(),
 			wantQuery: &Query{
-				SQL: "SELECT `id`,`using_col1`,`using_col2` FROM `order` WHERE `id`>ALL (SELECT `order_id` FROM `order_detail`);"},
+				SQL: "SELECT `o1`.`id`,`o1`.`using_col1`,`o1`.`using_col2` FROM `order` AS `o1` WHERE `o1`.`id`>ALL (SELECT `order_id` FROM `order_detail`);"},
 		},
 		{
 			name: "some and any",
 			s: func() QueryBuilder {
+				o1 := TableOf(&Order{}, "o1")
 				sub := NewSelector[OrderDetail](db).Select(C("OrderId")).AsSubquery("sub")
-				return NewSelector[Order](db).Where(C("Id").GT(Some(sub)), C("Id").LT(Any(sub)))
+				return NewSelector[Order](db).From(o1).Where(o1.C("Id").GT(Some(sub)), o1.C("Id").LT(Any(sub)))
 			}(),
 			wantQuery: &Query{
-				SQL: "SELECT `id`,`using_col1`,`using_col2` FROM `order` WHERE (`id`>SOME (SELECT `order_id` FROM `order_detail`)) AND (`id`<ANY (SELECT `order_id` FROM `order_detail`));"},
+				SQL: "SELECT `id`,`using_col1`,`using_col2` FROM `order` AS `o1` WHERE (`o1`.`id`>SOME (SELECT `order_id` FROM `order_detail`)) AND (`o1`.`id`<ANY (SELECT `order_id` FROM `order_detail`));"},
 		},
 		{
 			name: "exist",

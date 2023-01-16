@@ -213,9 +213,9 @@ func (s *Selector[T]) buildSelectedList() error {
 		}
 		switch expr := selectable.(type) {
 		case Column:
-			err := s.buildColumn(expr)
+			err := s.builder.buildColumn(expr)
 			if err != nil {
-				return err
+				return errs.NewInvalidFieldError(expr.name)
 			}
 		case columns:
 			for j, c := range expr.cs {
@@ -264,12 +264,6 @@ func (s *Selector[T]) selectAggregate(aggregate Aggregate) error {
 	return nil
 }
 
-func (s *Selector[T]) buildColumn(column Column) error {
-	if err := s.builder.buildColumn(column); err != nil {
-		return errs.NewInvalidFieldError(column.name)
-	}
-	return nil
-}
 func (s *Selector[T]) buildColumns(index int, name string) error {
 	if index > 0 {
 		s.comma()

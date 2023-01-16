@@ -163,7 +163,7 @@ func Columns(cs ...string) columns {
 }
 
 // In 方法没有元素传入，会被认为是false，被解释成where false这种形式
-// 支持 Subquery 子查詢
+// 支持一個 Subquery 子查詢
 func (c Column) In(data ...any) Predicate {
 	if len(data) == 0 {
 		return Predicate{

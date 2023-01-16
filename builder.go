@@ -315,15 +315,6 @@ func (b *builder) buildColumn(c Column) error {
 			b.writeString(" AS ")
 			b.quote(c.alias)
 		}
-	case Subquery:
-		if table.alias != "" {
-			b.quote(table.alias)
-			b.point()
-		}
-		b.quote(c.name)
-		if table.getAlias() == c.name {
-			b.quote(c.name)
-		}
 	default:
 		return errs.NewUnsupportedTableReferenceError(table)
 	}
