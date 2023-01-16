@@ -56,6 +56,17 @@ func (i *InsertCompositionTestSuite) TestInsert() {
 			i:            eorm.NewInserter[test.CombinedModel](i.orm).Values(test.NewCombinedModel(2)),
 			rowsAffected: 1,
 		},
+		{
+			name:         "ignore pk",
+			i:            eorm.NewInserter[test.CombinedModel](i.orm).SkipPK().Values(test.NewCombinedModel(3)),
+			rowsAffected: 1,
+		},
+		{
+			name: "ignore pk multi",
+			i: eorm.NewInserter[test.CombinedModel](i.orm).SkipPK().
+				Values(test.NewCombinedModel(4), test.NewCombinedModel(5)),
+			rowsAffected: 2,
+		},
 	}
 	for _, tc := range testCases {
 		i.T().Run(tc.name, func(t *testing.T) {

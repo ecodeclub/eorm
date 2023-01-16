@@ -24,7 +24,7 @@ import (
 
 func TestInserter_Values(t *testing.T) {
 	type User struct {
-		Id        int64
+		Id        int64 `eorm:"auto_increment,primary_key"`
 		FirstName string
 		Ctime     uint64
 	}
@@ -77,6 +77,30 @@ func TestInserter_Values(t *testing.T) {
 			wantSql:  "INSERT INTO `user`(`id`,`first_name`) VALUES(?,?),(?,?);",
 			wantArgs: []interface{}{int64(12), "Tom", int64(13), "Jerry"},
 		},
+		{
+			name:     "ignore pk default",
+			builder:  NewInserter[User](db).SkipPK().Values(u),
+			wantSql:  "INSERT INTO `user`(`first_name`,`ctime`) VALUES(?,?);",
+			wantArgs: []interface{}{"Tom", uint64(1000)},
+		},
+		{
+			name:     "ignore pk",
+			builder:  NewInserter[User](db).SkipPK().Columns("Id", "FirstName").Values(u),
+			wantSql:  "INSERT INTO `user`(`id`,`first_name`) VALUES(?,?);",
+			wantArgs: []interface{}{int64(12), "Tom"},
+		},
+		{
+			name:     "ignore pk multi default",
+			builder:  NewInserter[User](db).SkipPK().Values(u, u1),
+			wantSql:  "INSERT INTO `user`(`first_name`,`ctime`) VALUES(?,?),(?,?);",
+			wantArgs: []interface{}{"Tom", uint64(1000), "Jerry", uint64(1000)},
+		},
+		{
+			name:     "ignore pk multi",
+			builder:  NewInserter[User](db).SkipPK().Columns("Id", "FirstName", "Ctime").Values(u, u1),
+			wantSql:  "INSERT INTO `user`(`id`,`first_name`,`ctime`) VALUES(?,?,?),(?,?,?);",
+			wantArgs: []interface{}{int64(12), "Tom", uint64(1000), int64(13), "Jerry", uint64(1000)},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -88,7 +112,7 @@ func TestInserter_Values(t *testing.T) {
 				return
 			}
 			assert.Equal(t, c.wantSql, q.SQL)
-			assert.Equal(t, c.wantArgs, q.Args)
+			assert.EqualValues(t, c.wantArgs, q.Args)
 		})
 	}
 }
@@ -102,7 +126,29 @@ func TestInserter_ValuesForCombination(t *testing.T) {
 		BaseEntity
 		FirstName string
 	}
+	type Profile struct {
+		BaseEntity
+		IdCard    int64 `eorm:"auto_increment,primary_key"`
+		FirstName string
+	}
 	n := uint64(1000)
+	idCard := int64(123456)
+	p := &Profile{
+		FirstName: "Tom",
+		BaseEntity: BaseEntity{
+			Id:         12,
+			CreateTime: n,
+		},
+		IdCard: idCard,
+	}
+	p1 := &Profile{
+		FirstName: "Jerry",
+		BaseEntity: BaseEntity{
+			Id:         13,
+			CreateTime: n,
+		},
+		IdCard: idCard,
+	}
 	u := &User{
 		FirstName: "Tom",
 		BaseEntity: BaseEntity{
@@ -161,6 +207,56 @@ func TestInserter_ValuesForCombination(t *testing.T) {
 			builder:  NewInserter[User](db).Columns("Id", "FirstName").Values(u, u1),
 			wantSql:  "INSERT INTO `user`(`id`,`first_name`) VALUES(?,?),(?,?);",
 			wantArgs: []interface{}{int64(12), "Tom", int64(13), "Jerry"},
+		},
+		{
+			name:     "ignore pk default",
+			builder:  NewInserter[User](db).SkipPK().Values(u),
+			wantSql:  "INSERT INTO `user`(`create_time`,`first_name`) VALUES(?,?);",
+			wantArgs: []interface{}{uint64(1000), "Tom"},
+		},
+		{
+			name:     "ignore pk",
+			builder:  NewInserter[User](db).SkipPK().Columns("Id", "CreateTime", "FirstName").Values(u),
+			wantSql:  "INSERT INTO `user`(`id`,`create_time`,`first_name`) VALUES(?,?,?);",
+			wantArgs: []interface{}{int64(12), uint64(1000), "Tom"},
+		},
+		{
+			name:     "ignore pk multi default",
+			builder:  NewInserter[User](db).SkipPK().Values(u, u1),
+			wantSql:  "INSERT INTO `user`(`create_time`,`first_name`) VALUES(?,?),(?,?);",
+			wantArgs: []interface{}{uint64(1000), "Tom", uint64(1000), "Jerry"},
+		},
+		{
+			name:     "ignore pk multi",
+			builder:  NewInserter[User](db).SkipPK().Columns("Id", "CreateTime", "FirstName").Values(u, u1),
+			wantSql:  "INSERT INTO `user`(`id`,`create_time`,`first_name`) VALUES(?,?,?),(?,?,?);",
+			wantArgs: []interface{}{int64(12), uint64(1000), "Tom", int64(13), uint64(1000), "Jerry"},
+		},
+
+		{
+			name:     "ignore multi pk default",
+			builder:  NewInserter[Profile](db).SkipPK().Values(p),
+			wantSql:  "INSERT INTO `profile`(`create_time`,`first_name`) VALUES(?,?);",
+			wantArgs: []interface{}{uint64(1000), "Tom"},
+		},
+		{
+			name:     "ignore multi pk multi data default",
+			builder:  NewInserter[Profile](db).SkipPK().Values(p, p1),
+			wantSql:  "INSERT INTO `profile`(`create_time`,`first_name`) VALUES(?,?),(?,?);",
+			wantArgs: []interface{}{uint64(1000), "Tom", uint64(1000), "Jerry"},
+		},
+
+		{
+			name:     "ignore multi pk",
+			builder:  NewInserter[Profile](db).SkipPK().Columns("Id", "CreateTime", "FirstName", "IdCard").Values(p),
+			wantSql:  "INSERT INTO `profile`(`id`,`create_time`,`first_name`,`id_card`) VALUES(?,?,?,?);",
+			wantArgs: []interface{}{int64(12), uint64(1000), "Tom", int64(123456)},
+		},
+		{
+			name:     "ignore multi pk multi data",
+			builder:  NewInserter[Profile](db).SkipPK().Columns("Id", "CreateTime", "FirstName", "IdCard").Values(p, p1),
+			wantSql:  "INSERT INTO `profile`(`id`,`create_time`,`first_name`,`id_card`) VALUES(?,?,?,?),(?,?,?,?);",
+			wantArgs: []interface{}{int64(12), uint64(1000), "Tom", int64(123456), int64(13), uint64(1000), "Jerry", int64(123456)},
 		},
 	}
 
