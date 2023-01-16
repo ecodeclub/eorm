@@ -28,8 +28,9 @@ import (
 type Inserter[T any] struct {
 	builder
 	session
-	columns []string
-	values  []*T
+	columns  []string
+	values   []*T
+	ignorePK bool
 }
 
 // NewInserter 开始构建一个 INSERT 查询
@@ -41,6 +42,11 @@ func NewInserter[T any](sess session) *Inserter[T] {
 		},
 		session: sess,
 	}
+}
+
+func (i *Inserter[T]) SkipPK() *Inserter[T] {
+	i.ignorePK = true
+	return i
 }
 
 // Build function build the query
@@ -114,9 +120,8 @@ func (i *Inserter[T]) Exec(ctx context.Context) Result {
 }
 
 func (i *Inserter[T]) buildColumns() ([]*model.ColumnMeta, error) {
-	cs := i.meta.Columns
+	cs := make([]*model.ColumnMeta, 0, len(i.columns))
 	if len(i.columns) != 0 {
-		cs = make([]*model.ColumnMeta, 0, len(i.columns))
 		for index, c := range i.columns {
 			v, isOk := i.meta.FieldMap[c]
 			if !isOk {
@@ -130,10 +135,14 @@ func (i *Inserter[T]) buildColumns() ([]*model.ColumnMeta, error) {
 		}
 	} else {
 		for index, val := range i.meta.Columns {
+			if i.ignorePK && val.IsPrimaryKey {
+				continue
+			}
 			i.quote(val.ColumnName)
-			if index != len(cs)-1 {
+			if index != len(i.meta.Columns)-1 {
 				i.comma()
 			}
+			cs = append(cs, val)
 		}
 	}
 	return cs, nil

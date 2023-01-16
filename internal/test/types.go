@@ -33,7 +33,7 @@ type SimpleStruct struct {
 	Int    int
 	IntPtr *int
 
-	Int8    int8 `eorm:"primary_key,column=int8_c"`
+	Int8    int8
 	Int8Ptr *int8
 
 	Int16    int16
