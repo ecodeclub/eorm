@@ -1604,6 +1604,19 @@ func TestSelector_Subquery(t *testing.T) {
 				SQL: "SELECT * FROM (SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail`) AS `sub`;"},
 		},
 		{
+			name: "from & where",
+			s: func() QueryBuilder {
+				o1 := TableOf(&OrderDetail{}, "o1")
+				sub := NewSelector[OrderDetail](db).From(o1).Where(o1.C("OrderId").GT(18)).AsSubquery("sub")
+				return NewSelector[Order](db).Select(Raw("*")).From(sub)
+			}(),
+
+			wantQuery: &Query{
+				SQL:  "SELECT * FROM (SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail` AS `o1` WHERE `o1`.`order_id`>?) AS `sub`;",
+				Args: []any{18},
+			},
+		},
+		{
 			name: "in",
 			s: func() QueryBuilder {
 				o1 := TableOf(&Order{}, "o1")
@@ -1672,32 +1685,32 @@ func TestSelector_Subquery(t *testing.T) {
 		{
 			name: "join & subquery",
 			s: func() QueryBuilder {
-				t1 := TableOf(&Order{}, "")
+				sub1 := NewSelector[Order](db).AsSubquery("sub1")
 				sub := NewSelector[OrderDetail](db).AsSubquery("sub")
-				return NewSelector[Order](db).Select(sub.C("OrderId")).From(t1.Join(sub).On(t1.C("Id").EQ(sub.C("OrderId")))).Where()
+				return NewSelector[Order](db).Select(sub.C("OrderId")).From(sub1.Join(sub).On(sub1.C("Id").EQ(sub.C("OrderId")))).Where()
 			}(),
 			wantQuery: &Query{
-				SQL: "SELECT `sub`.`order_id` FROM (`order` JOIN (SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail`) AS `sub` ON `id`=`sub`.`order_id`);"},
+				SQL: "SELECT `sub`.`order_id` FROM ((SELECT `id`,`using_col1`,`using_col2` FROM `order`) AS `sub1` JOIN (SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail`) AS `sub` ON `sub1`.`id`=`sub`.`order_id`);"},
 		},
 		{
 			name: "left join & subquery",
 			s: func() QueryBuilder {
-				t1 := TableOf(&Order{}, "")
+				sub1 := NewSelector[Order](db).AsSubquery("sub1")
 				sub := NewSelector[OrderDetail](db).AsSubquery("sub")
-				return NewSelector[Order](db).Select(sub.C("OrderId")).From(t1.LeftJoin(sub).On(t1.C("Id").EQ(sub.C("OrderId")))).Where()
+				return NewSelector[Order](db).Select(sub.C("OrderId")).From(sub1.LeftJoin(sub).On(sub1.C("Id").EQ(sub.C("OrderId")))).Where()
 			}(),
 			wantQuery: &Query{
-				SQL: "SELECT `sub`.`order_id` FROM (`order` LEFT JOIN (SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail`) AS `sub` ON `id`=`sub`.`order_id`);"},
+				SQL: "SELECT `sub`.`order_id` FROM ((SELECT `id`,`using_col1`,`using_col2` FROM `order`) AS `sub1` LEFT JOIN (SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail`) AS `sub` ON `sub1`.`id`=`sub`.`order_id`);"},
 		},
 		{
-			name: "left join & subquery",
+			name: "right join & subquery",
 			s: func() QueryBuilder {
-				t1 := TableOf(&Order{}, "")
+				sub1 := NewSelector[Order](db).AsSubquery("sub1")
 				sub := NewSelector[OrderDetail](db).AsSubquery("sub")
-				return NewSelector[Order](db).Select(sub.C("OrderId")).From(t1.RightJoin(sub).On(t1.C("Id").EQ(sub.C("OrderId")))).Where()
+				return NewSelector[Order](db).Select(sub.C("OrderId")).From(sub1.RightJoin(sub).On(sub1.C("Id").EQ(sub.C("OrderId")))).Where()
 			}(),
 			wantQuery: &Query{
-				SQL: "SELECT `sub`.`order_id` FROM (`order` RIGHT JOIN (SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail`) AS `sub` ON `id`=`sub`.`order_id`);"},
+				SQL: "SELECT `sub`.`order_id` FROM ((SELECT `id`,`using_col1`,`using_col2` FROM `order`) AS `sub1` RIGHT JOIN (SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail`) AS `sub` ON `sub1`.`id`=`sub`.`order_id`);"},
 		},
 		{
 			name: "right join & subquery & using",

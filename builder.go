@@ -120,17 +120,17 @@ type builder struct {
 }
 
 func (b *builder) quote(val string) {
-	_ = b.buffer.WriteByte(b.dialect.Quote)
-	_, _ = b.buffer.WriteString(val)
-	_ = b.buffer.WriteByte(b.dialect.Quote)
+	b.writeByte(b.dialect.Quote)
+	b.writeString(val)
+	b.writeByte(b.dialect.Quote)
 }
 
 func (b *builder) space() {
-	_ = b.buffer.WriteByte(' ')
+	b.writeByte(' ')
 }
 
 func (b *builder) point() {
-	_ = b.buffer.WriteByte('.')
+	b.writeByte('.')
 }
 
 func (b *builder) writeString(val string) {
@@ -142,11 +142,11 @@ func (b *builder) writeByte(c byte) {
 }
 
 func (b *builder) end() {
-	_ = b.buffer.WriteByte(';')
+	b.writeByte(';')
 }
 
 func (b *builder) comma() {
-	_ = b.buffer.WriteByte(',')
+	b.writeByte(',')
 }
 
 func (b *builder) parameter(arg interface{}) {
@@ -154,7 +154,7 @@ func (b *builder) parameter(arg interface{}) {
 		// TODO 4 may be not a good number
 		b.args = make([]interface{}, 0, 4)
 	}
-	_ = b.buffer.WriteByte('?')
+	b.writeByte('?')
 	b.args = append(b.args, arg)
 }
 
@@ -211,7 +211,7 @@ func (b *builder) buildPredicates(predicates []Predicate) error {
 func (b *builder) buildHavingAggregate(aggregate Aggregate) error {
 	b.writeString(aggregate.fn)
 
-	_ = b.buffer.WriteByte('(')
+	b.writeByte('(')
 	if aggregate.distinct {
 		b.writeString("DISTINCT ")
 	}
@@ -220,7 +220,7 @@ func (b *builder) buildHavingAggregate(aggregate Aggregate) error {
 		return errs.NewInvalidFieldError(aggregate.arg)
 	}
 	b.quote(cMeta.ColumnName)
-	_ = b.buffer.WriteByte(')')
+	b.writeByte(')')
 	return nil
 }
 
@@ -241,17 +241,17 @@ func (b *builder) buildRawExpr(e RawExpr) {
 func (b *builder) buildSubExpr(subExpr Expr) error {
 	switch r := subExpr.(type) {
 	case MathExpr:
-		_ = b.buffer.WriteByte('(')
+		b.writeByte('(')
 		if err := b.buildBinaryExpr(binaryExpr(r)); err != nil {
 			return err
 		}
-		_ = b.buffer.WriteByte(')')
+		b.writeByte(')')
 	case Predicate:
-		_ = b.buffer.WriteByte('(')
+		b.writeByte('(')
 		if err := b.buildBinaryExpr(binaryExpr(r)); err != nil {
 			return err
 		}
-		_ = b.buffer.WriteByte(')')
+		b.writeByte(')')
 	default:
 		if err := b.buildExpr(r); err != nil {
 			return err
@@ -261,17 +261,17 @@ func (b *builder) buildSubExpr(subExpr Expr) error {
 }
 
 func (b *builder) buildIns(is values) error {
-	_ = b.buffer.WriteByte('(')
+	b.writeByte('(')
 	for idx, inVal := range is.data {
 		if idx > 0 {
-			_ = b.buffer.WriteByte(',')
+			b.writeByte(',')
 		}
 
 		b.args = append(b.args, inVal)
-		_ = b.buffer.WriteByte('?')
+		b.writeByte('?')
 
 	}
-	_ = b.buffer.WriteByte(')')
+	b.writeByte(')')
 	return nil
 }
 
@@ -338,7 +338,7 @@ func (b *builder) buildSubquery(sub Subquery, useAlias bool) error {
 	b.writeByte(')')
 	if useAlias {
 		b.writeString(" AS ")
-		b.quote(sub.alias)
+		b.quote(sub.getAlias())
 	}
 	return nil
 }
