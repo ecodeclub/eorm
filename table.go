@@ -178,3 +178,51 @@ func (j *JoinBuilder) Using(cols ...string) Join {
 		using: cols,
 	}
 }
+
+type Subquery struct {
+	entity  TableReference
+	q       QueryBuilder
+	alias   string
+	columns []Selectable
+}
+
+var _ TableReference = Subquery{}
+
+func (s Subquery) getAlias() string {
+	return s.alias
+}
+
+func (Subquery) expr() (string, error) {
+	panic("implement me")
+}
+
+func (s Subquery) C(name string) Column {
+	return Column{
+		table: s.entity,
+		name:  name,
+	}
+}
+
+func (s Subquery) Join(target TableReference) *JoinBuilder {
+	return &JoinBuilder{
+		left:  s,
+		right: target,
+		typ:   "JOIN",
+	}
+}
+
+func (s Subquery) LeftJoin(target TableReference) *JoinBuilder {
+	return &JoinBuilder{
+		left:  s,
+		right: target,
+		typ:   "LEFT JOIN",
+	}
+}
+
+func (s Subquery) RightJoin(target TableReference) *JoinBuilder {
+	return &JoinBuilder{
+		left:  s,
+		right: target,
+		typ:   "RIGHT JOIN",
+	}
+}

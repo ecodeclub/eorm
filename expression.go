@@ -87,3 +87,34 @@ func valueOf(val interface{}) Expr {
 		return valueExpr{val: val}
 	}
 }
+
+type SubqueryExpr struct {
+	s Subquery
+	// 謂詞： ALL、ANY、SOME
+	pred string
+}
+
+func (SubqueryExpr) expr() (string, error) {
+	panic("implement me")
+}
+
+func Any(sub Subquery) SubqueryExpr {
+	return SubqueryExpr{
+		s:    sub,
+		pred: "ANY",
+	}
+}
+
+func All(sub Subquery) SubqueryExpr {
+	return SubqueryExpr{
+		s:    sub,
+		pred: "ALL",
+	}
+}
+
+func Some(sub Subquery) SubqueryExpr {
+	return SubqueryExpr{
+		s:    sub,
+		pred: "SOME",
+	}
+}

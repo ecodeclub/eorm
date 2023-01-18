@@ -1127,6 +1127,51 @@ func (s *SelectTestSuiteRightJoin) TestSelectorRightJoin() {
 			},
 			wantErr: errs.NewInvalidFieldError("invalid"),
 		},
+		// 子查詢
+		{
+			name: "join & subquery",
+			s: func() (any, error) {
+				t1 := eorm.TableOf(&test.Order{}, "t1")
+				sub := eorm.NewSelector[test.OrderDetail](s.orm).AsSubquery("sub")
+				return eorm.NewSelector[test.Order](s.orm).
+					Select(eorm.C("Id"), sub.C("UsingCol1")).
+					From(t1.Join(sub).On(t1.C("Id").EQ(sub.C("OrderId")))).
+					Get(context.Background())
+			},
+			wantRes: &test.Order{Id: 1, UsingCol1: "usingcoa1_1", UsingCol2: ""},
+		},
+		{
+			name: "from",
+			s: func() (any, error) {
+				sub := eorm.NewSelector[test.OrderDetail](s.orm).AsSubquery("sub")
+				return eorm.NewSelector[test.Order](s.orm).
+					Select(sub.C("UsingCol1")).
+					From(sub).
+					Where().Get(context.Background())
+			},
+			wantRes: &test.Order{Id: 0, UsingCol1: "usingcoa1_1", UsingCol2: ""},
+		},
+		{
+			name: "in",
+			s: func() (any, error) {
+				sub := eorm.NewSelector[test.OrderDetail](s.orm).Select(eorm.C("OrderId")).AsSubquery("sub")
+				return eorm.NewSelector[test.Order](s.orm).
+					Select(eorm.Columns("Id")).Where(eorm.C("Id").In(sub)).
+					Get(context.Background())
+			},
+			wantRes: &test.Order{Id: 1, UsingCol1: "", UsingCol2: ""},
+		},
+		{
+			name: "all",
+			s: func() (any, error) {
+				sub := eorm.NewSelector[test.OrderDetail](s.orm).Select(eorm.C("OrderId")).AsSubquery("sub")
+				return eorm.NewSelector[test.Order](s.orm).
+					Select(eorm.Columns("Id")).
+					Where(eorm.C("Id").GT(eorm.All(sub))).
+					Get(context.Background())
+			},
+			wantErr: eorm.ErrNoRows,
+		},
 	}
 
 	for _, tc := range testCases {

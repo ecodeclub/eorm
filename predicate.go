@@ -39,6 +39,7 @@ var (
 	opFalse   = op{symbol: "FALSE", text: "FALSE"}
 	opLike    = op{symbol: "LIKE", text: " LIKE "}
 	opNotLike = op{symbol: "NOT LIKE", text: " NOT LIKE "}
+	opExist   = op{symbol: "EXIST", text: "EXIST "}
 )
 
 // Predicate will be used in Where Or Having
@@ -46,6 +47,14 @@ type Predicate binaryExpr
 
 func (Predicate) expr() (string, error) {
 	return "", nil
+}
+
+// Exist indicates "Exist"
+func Exist(sub Subquery) Predicate {
+	return Predicate{
+		op:    opExist,
+		right: sub,
+	}
 }
 
 // Not indicates "NOT"
