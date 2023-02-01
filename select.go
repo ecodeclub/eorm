@@ -206,7 +206,6 @@ func (s *Selector[T]) buildAllColumns() error {
 
 // buildSelectedList users specify columns
 func (s *Selector[T]) buildSelectedList() error {
-	s.aliases = make(map[string]struct{})
 	for i, selectable := range s.columns {
 		if i > 0 {
 			s.comma()
@@ -243,7 +242,6 @@ func (s *Selector[T]) selectAggregate(aggregate Aggregate) error {
 		s.writeString("DISTINCT ")
 	}
 	cMeta, ok := s.meta.FieldMap[aggregate.arg]
-	s.aliases[aggregate.alias] = struct{}{}
 	if !ok {
 		return errs.NewInvalidFieldError(aggregate.arg)
 	}
@@ -255,12 +253,6 @@ func (s *Selector[T]) selectAggregate(aggregate Aggregate) error {
 	}
 	s.quote(cMeta.ColumnName)
 	s.writeByte(')')
-	if aggregate.alias != "" {
-		if _, ok := s.aliases[aggregate.alias]; ok {
-			s.writeString(" AS ")
-			s.quote(aggregate.alias)
-		}
-	}
 	return nil
 }
 
