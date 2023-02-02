@@ -29,10 +29,12 @@ import (
 type Updater[T any] struct {
 	builder
 	session
-	table   interface{}
-	val     valuer.Value
-	where   []Predicate
-	assigns []Assignable
+	table         interface{}
+	val           valuer.Value
+	where         []Predicate
+	assigns       []Assignable
+	ignoreNilVal  bool
+	ignoreZeroCol bool
 }
 
 // NewUpdater 开始构建一个 UPDATE 查询
@@ -143,8 +145,18 @@ func (u *Updater[T]) buildAssigns() error {
 
 func (u *Updater[T]) buildDefaultColumns() error {
 	has := false
+	refVal := reflect.Value{}
 	for _, c := range u.meta.Columns {
 		val, _ := u.val.Field(c.FieldName)
+		if u.ignoreZeroCol || u.ignoreNilVal {
+			refVal = reflect.ValueOf(val)
+		}
+		if u.ignoreNilVal && isNilValue(refVal) {
+			continue
+		}
+		if u.ignoreZeroCol && isZeroValue(refVal) {
+			continue
+		}
 		if has {
 			_ = u.buffer.WriteByte(',')
 		}
@@ -171,61 +183,28 @@ func (u *Updater[T]) Where(predicates ...Predicate) *Updater[T] {
 	return u
 }
 
-// AssignNotNilColumns uses the non-nil value to construct the Assignable instances.
-func AssignNotNilColumns(entity interface{}) []Assignable {
-	return AssignColumns(entity, func(typ reflect.StructField, val reflect.Value) bool {
-		switch val.Kind() {
-		case reflect.Chan, reflect.Func, reflect.Map, reflect.Ptr, reflect.UnsafePointer, reflect.Interface, reflect.Slice:
-			return !val.IsNil()
-		}
-		return true
-	})
+// SkipNilValue uses the non-nil value to construct the Assignable instances.
+func (u *Updater[T]) SkipNilValue() *Updater[T] {
+	u.ignoreNilVal = true
+	return u
 }
 
-// AssignNotZeroColumns uses the non-zero value to construct the Assignable instances.
-func AssignNotZeroColumns(entity interface{}) []Assignable {
-	return AssignColumns(entity, func(typ reflect.StructField, val reflect.Value) bool {
-		return !val.IsZero()
-	})
+func isNilValue(val reflect.Value) bool {
+	switch val.Kind() {
+	case reflect.Chan, reflect.Func, reflect.Map, reflect.Ptr, reflect.UnsafePointer, reflect.Interface, reflect.Slice:
+		return val.IsNil()
+	}
+	return false
 }
 
-// AssignColumns will check all columns and then apply the filter function.
-// If the returned value is true, this column will be updated.
-func AssignColumns(entity interface{}, filter func(typ reflect.StructField, val reflect.Value) bool) []Assignable {
-	val := reflect.ValueOf(entity).Elem()
-	numField := val.NumField()
-
-	fdTypes := make([]reflect.StructField, 0, numField)
-	fdValues := make([]reflect.Value, 0, numField)
-	flapFields(entity, &fdTypes, &fdValues)
-
-	res := make([]Assignable, 0, len(fdTypes))
-	for i := 0; i < len(fdTypes); i++ {
-		fieldVal := fdValues[i]
-		fieldTyp := fdTypes[i]
-		if filter(fieldTyp, fieldVal) {
-			res = append(res, Assign(fieldTyp.Name, fieldVal.Interface()))
-		}
-	}
-	return res
+// SkipZeroValue uses the non-zero value to construct the Assignable instances.
+func (u *Updater[T]) SkipZeroValue() *Updater[T] {
+	u.ignoreZeroCol = true
+	return u
 }
 
-func flapFields(entity interface{}, fdTypes *[]reflect.StructField, fdValues *[]reflect.Value) {
-	typ := reflect.TypeOf(entity)
-	val := reflect.ValueOf(entity)
-	if typ.Kind() == reflect.Pointer {
-		typ = typ.Elem()
-		val = val.Elem()
-	}
-	numField := val.NumField()
-	for i := 0; i < numField; i++ {
-		if !typ.Field(i).Anonymous {
-			*fdTypes = append(*fdTypes, typ.Field(i))
-			*fdValues = append(*fdValues, val.Field(i))
-			continue
-		}
-		flapFields(val.Field(i).Interface(), fdTypes, fdValues)
-	}
+func isZeroValue(val reflect.Value) bool {
+	return val.IsZero()
 }
 
 // Exec sql

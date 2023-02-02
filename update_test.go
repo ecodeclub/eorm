@@ -112,13 +112,13 @@ func TestUpdater_Set(t *testing.T) {
 		},
 		{
 			name:     "not nil columns",
-			builder:  NewUpdater[TestModel](orm).Update(&TestModel{}).Set(AssignNotNilColumns(&TestModel{Id: 13})...),
+			builder:  NewUpdater[TestModel](orm).Update(&TestModel{Id: 13}).SkipNilValue(),
 			wantSql:  "UPDATE `test_model` SET `id`=?,`first_name`=?,`age`=?;",
 			wantArgs: []interface{}{int64(13), "", int8(0)},
 		},
 		{
 			name:     "not zero columns",
-			builder:  NewUpdater[TestModel](orm).Update(&TestModel{}).Set(AssignNotZeroColumns(&TestModel{Id: 13})...),
+			builder:  NewUpdater[TestModel](orm).Update(&TestModel{Id: 13}).SkipZeroValue(),
 			wantSql:  "UPDATE `test_model` SET `id`=?;",
 			wantArgs: []interface{}{int64(13)},
 		},
@@ -225,13 +225,13 @@ func TestUpdater_SetForCombination(t *testing.T) {
 		},
 		{
 			name:     "not nil columns",
-			builder:  NewUpdater[User](orm).Update(u).Set(AssignNotNilColumns(&User{Id: 13})...),
+			builder:  NewUpdater[User](orm).Update(&User{Id: 13}).SkipNilValue(),
 			wantSql:  "UPDATE `user` SET `id`=?,`first_name`=?,`age`=?;",
 			wantArgs: []interface{}{int64(13), "", int8(0)},
 		},
 		{
 			name:     "not zero columns",
-			builder:  NewUpdater[User](orm).Update(u).Set(AssignNotZeroColumns(&User{Id: 13})...),
+			builder:  NewUpdater[User](orm).Update(&User{Id: 13}).SkipZeroValue(),
 			wantSql:  "UPDATE `user` SET `id`=?;",
 			wantArgs: []interface{}{int64(13)},
 		},
@@ -334,18 +334,18 @@ func TestUpdater_Exec(t *testing.T) {
 	}
 }
 
-func ExampleAssignNotNilColumns() {
+func ExampleSkipNilColumns() {
 	db := memoryDB()
-	query, _ := NewUpdater[TestModel](db).Set(AssignNotNilColumns(&TestModel{Id: 13})...).Build()
+	query, _ := NewUpdater[TestModel](db).Update(&TestModel{Id: 13}).SkipNilValue().Build()
 	fmt.Println(query.string())
 	// Output:
 	// SQL: UPDATE `test_model` SET `id`=?,`first_name`=?,`age`=?;
 	// Args: []interface {}{13, "", 0}
 }
 
-func ExampleAssignNotZeroColumns() {
+func ExampleSkipZeroColumns() {
 	db := memoryDB()
-	query, _ := NewUpdater[TestModel](db).Set(AssignNotZeroColumns(&TestModel{Id: 13})...).Build()
+	query, _ := NewUpdater[TestModel](db).Update(&TestModel{Id: 13}).SkipZeroValue().Build()
 	fmt.Println(query.string())
 	// Output:
 	// SQL: UPDATE `test_model` SET `id`=?;
