@@ -36,8 +36,8 @@ func TestAggregate(t *testing.T) {
 		},
 		{
 			name:    "min",
-			builder: NewSelector[TestModel](db).Select(Min("Age").As("min_age")),
-			wantSql: "SELECT MIN(`age`) AS `min_age` FROM `test_model`;",
+			builder: NewSelector[TestModel](db).Select(Min("Age")),
+			wantSql: "SELECT MIN(`age`) FROM `test_model`;",
 		},
 		{
 			name:    "sum",
@@ -82,16 +82,16 @@ func TestAggregate(t *testing.T) {
 
 func ExampleAggregate_As() {
 	db := memoryDB()
-	query, _ := NewSelector[TestModel](db).Select(Avg("Age").As("avg_age")).Build()
+	query, _ := NewSelector[TestModel](db).Select(Avg("Age")).Build()
 	fmt.Println(query.SQL)
-	// Output: SELECT AVG(`age`) AS `avg_age` FROM `test_model`;
+	// Output: SELECT AVG(`age`) FROM `test_model`;
 }
 
 func ExampleAvg() {
 	db := memoryDB()
-	query, _ := NewSelector[TestModel](db).Select(Avg("Age").As("avg_age")).Build()
+	query, _ := NewSelector[TestModel](db).Select(Avg("Age")).Build()
 	fmt.Println(query.SQL)
-	// Output: SELECT AVG(`age`) AS `avg_age` FROM `test_model`;
+	// Output: SELECT AVG(`age`) FROM `test_model`;
 }
 
 func ExampleCount() {

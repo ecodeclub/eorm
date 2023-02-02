@@ -776,14 +776,9 @@ func TestSelectable(t *testing.T) {
 			wantSql: "SELECT `id`,`first_name` FROM `test_model`;",
 		},
 		{
-			name:    "alias",
-			builder: NewSelector[TestModel](db).Select(Columns("Id"), C("FirstName").As("name")),
-			wantSql: "SELECT `id`,`first_name` AS `name` FROM `test_model`;",
-		},
-		{
 			name:    "aggregate",
-			builder: NewSelector[TestModel](db).Select(Columns("Id"), Avg("Age").As("avg_age")),
-			wantSql: "SELECT `id`,AVG(`age`) AS `avg_age` FROM `test_model`;",
+			builder: NewSelector[TestModel](db).Select(Columns("Id"), Avg("Age")),
+			wantSql: "SELECT `id`,AVG(`age`) FROM `test_model`;",
 		},
 		{
 			name:    "raw",
@@ -851,13 +846,13 @@ func TestSelectable(t *testing.T) {
 		},
 		{
 			name:     "alias in having",
-			builder:  NewSelector[TestModel](db).Select(Columns("Id"), Columns("FirstName"), Avg("Age").As("avg_age")).GroupBy("FirstName").Having(C("avg_age").LT(20)),
-			wantSql:  "SELECT `id`,`first_name`,AVG(`age`) AS `avg_age` FROM `test_model` GROUP BY `first_name` HAVING `avg_age`<?;",
+			builder:  NewSelector[TestModel](db).Select(Columns("Id"), Columns("FirstName"), Avg("Age")).GroupBy("FirstName").Having(Avg("Age").LT(20)),
+			wantSql:  "SELECT `id`,`first_name`,AVG(`age`) FROM `test_model` GROUP BY `first_name` HAVING AVG(`age`)<?;",
 			wantArgs: []interface{}{20},
 		},
 		{
 			name:    "invalid alias in having",
-			builder: NewSelector[TestModel](db).Select(Columns("Id"), Columns("FirstName"), Avg("Age").As("avg_age")).GroupBy("FirstName").Having(C("Invalid").LT(20)),
+			builder: NewSelector[TestModel](db).Select(Columns("Id"), Columns("FirstName"), Avg("Age")).GroupBy("FirstName").Having(C("Invalid").LT(20)),
 			wantErr: errs.NewInvalidFieldError("Invalid"),
 		},
 		{
@@ -1027,13 +1022,13 @@ func TestSelectableCombination(t *testing.T) {
 		},
 		{
 			name:    "alias",
-			builder: NewSelector[TestCombinedModel](db).Select(Columns("Id"), C("CreateTime").As("creation")),
-			wantSql: "SELECT `id`,`create_time` AS `creation` FROM `test_combined_model`;",
+			builder: NewSelector[TestCombinedModel](db).Select(Columns("Id"), C("CreateTime")),
+			wantSql: "SELECT `id`,`create_time` FROM `test_combined_model`;",
 		},
 		{
 			name:    "aggregate",
-			builder: NewSelector[TestCombinedModel](db).Select(Columns("Id"), Max("CreateTime").As("max_time")),
-			wantSql: "SELECT `id`,MAX(`create_time`) AS `max_time` FROM `test_combined_model`;",
+			builder: NewSelector[TestCombinedModel](db).Select(Columns("Id"), Max("CreateTime")),
+			wantSql: "SELECT `id`,MAX(`create_time`) FROM `test_combined_model`;",
 		},
 		{
 			name:    "raw",
@@ -1101,13 +1096,13 @@ func TestSelectableCombination(t *testing.T) {
 		},
 		{
 			name:     "alias in having",
-			builder:  NewSelector[TestCombinedModel](db).Select(Columns("Id"), Columns("FirstName"), Avg("CreateTime").As("create")).GroupBy("FirstName").Having(C("create").LT(20)),
-			wantSql:  "SELECT `id`,`first_name`,AVG(`create_time`) AS `create` FROM `test_combined_model` GROUP BY `first_name` HAVING `create`<?;",
+			builder:  NewSelector[TestCombinedModel](db).Select(Columns("Id"), Columns("FirstName"), Avg("CreateTime")).GroupBy("FirstName").Having(Avg("CreateTime").LT(20)),
+			wantSql:  "SELECT `id`,`first_name`,AVG(`create_time`) FROM `test_combined_model` GROUP BY `first_name` HAVING AVG(`create_time`)<?;",
 			wantArgs: []interface{}{20},
 		},
 		{
 			name:    "invalid alias in having",
-			builder: NewSelector[TestCombinedModel](db).Select(Columns("Id"), Columns("FirstName"), Avg("Age").As("avg_age")).GroupBy("FirstName").Having(C("Invalid").LT(20)),
+			builder: NewSelector[TestCombinedModel](db).Select(Columns("Id"), Columns("FirstName"), Avg("Age")).GroupBy("FirstName").Having(C("Invalid").LT(20)),
 			wantErr: errs.NewInvalidFieldError("Invalid"),
 		},
 	}
@@ -1166,13 +1161,13 @@ func ExampleSelector_OrderBy() {
 
 func ExampleSelector_Having() {
 	db := memoryDB()
-	query, _ := NewSelector[TestModel](db).Select(Columns("Id"), Columns("FirstName"), Avg("Age").As("avg_age")).GroupBy("FirstName").Having(C("avg_age").LT(20)).Build()
+	query, _ := NewSelector[TestModel](db).Select(Columns("Id"), Columns("FirstName"), Avg("Age")).GroupBy("FirstName").Having(Avg("Age").LT(20)).Build()
 	fmt.Printf("case1\n%s", query.string())
-	query, err := NewSelector[TestModel](db).Select(Columns("Id"), Columns("FirstName"), Avg("Age").As("avg_age")).GroupBy("FirstName").Having(C("Invalid").LT(20)).Build()
+	query, err := NewSelector[TestModel](db).Select(Columns("Id"), Columns("FirstName"), Avg("Age")).GroupBy("FirstName").Having(C("Invalid").LT(20)).Build()
 	fmt.Printf("case2\n%s", err)
 	// Output:
 	// case1
-	// SQL: SELECT `id`,`first_name`,AVG(`age`) AS `avg_age` FROM `test_model` GROUP BY `first_name` HAVING `avg_age`<?;
+	// SQL: SELECT `id`,`first_name`,AVG(`age`) FROM `test_model` GROUP BY `first_name` HAVING AVG(`age`)<?;
 	// Args: []interface {}{20}
 	// case2
 	// eorm: 未知字段 Invalid
@@ -1187,9 +1182,9 @@ func ExampleSelector_Select() {
 		// case1: only query specific columns
 		NewSelector[TestModel](db).Select(Columns("Id", "Age")).From(tm),
 		// case2: using alias
-		NewSelector[TestModel](db).Select(C("Id").As("my_id")).From(tm),
+		NewSelector[TestModel](db).Select(C("Id")).From(tm),
 		// case3: using aggregation function and alias
-		NewSelector[TestModel](db).Select(Avg("Age").As("avg_age")).From(tm),
+		NewSelector[TestModel](db).Select(Avg("Age")).From(tm),
 		// case4: using raw expression
 		NewSelector[TestModel](db).Select(Raw("COUNT(DISTINCT `age`) AS `age_cnt`")).From(tm),
 	}
@@ -1206,10 +1201,10 @@ func ExampleSelector_Select() {
 	// SQL: SELECT `id`,`age` FROM `test_model` AS `t1`;
 	// Args: []interface {}(nil)
 	// case2:
-	// SQL: SELECT `id` AS `my_id` FROM `test_model` AS `t1`;
+	// SQL: SELECT `id` FROM `test_model` AS `t1`;
 	// Args: []interface {}(nil)
 	// case3:
-	// SQL: SELECT AVG(`age`) AS `avg_age` FROM `test_model` AS `t1`;
+	// SQL: SELECT AVG(`age`) FROM `test_model` AS `t1`;
 	// Args: []interface {}(nil)
 	// case4:
 	// SQL: SELECT COUNT(DISTINCT `age`) AS `age_cnt` FROM `test_model` AS `t1`;
@@ -1329,10 +1324,10 @@ func TestSelector_Join(t *testing.T) {
 				t1 := TableOf(&Order{}, "t1")
 				t2 := TableOf(&OrderDetail{}, "t2")
 				t3 := t1.Join(t2).Using("UsingCol1", "UsingCol2")
-				return NewSelector[Order](db).From(t3).Select(t1.Avg("UsingCol1").As("avg_using_col1"))
+				return NewSelector[Order](db).From(t3).Select(t1.Avg("UsingCol1"))
 			}(),
 			wantQuery: &Query{
-				SQL: "SELECT AVG(`t1`.`using_col1`) AS `avg_using_col1` FROM (`order` AS `t1` JOIN `order_detail` AS `t2` USING (`using_col1`,`using_col2`));",
+				SQL: "SELECT AVG(`t1`.`using_col1`) FROM (`order` AS `t1` JOIN `order_detail` AS `t2` USING (`using_col1`,`using_col2`));",
 			},
 		},
 		{
@@ -1410,10 +1405,10 @@ func TestSelector_Join(t *testing.T) {
 				t1 := TableOf(&Order{}, "t1")
 				t2 := TableOf(&OrderDetail{}, "t2")
 				t3 := t1.LeftJoin(t2).On(t1.C("Id").EQ(t2.C("OrderId")))
-				return NewSelector[Order](db).From(t3).Select(t1.Max("UsingCol1").As("UsingCol1"), t1.C("UsingCol2")).Where(t1.C("UsingCol2").EQ("UsingCol2_1").And(t1.C("UsingCol2").EQ("UsingCol2_2")))
+				return NewSelector[Order](db).From(t3).Select(t1.Max("UsingCol1"), t1.C("UsingCol2")).Where(t1.C("UsingCol2").EQ("UsingCol2_1").And(t1.C("UsingCol2").EQ("UsingCol2_2")))
 			}(),
 			wantQuery: &Query{
-				SQL:  "SELECT MAX(`t1`.`using_col1`) AS `UsingCol1`,`t1`.`using_col2` FROM (`order` AS `t1` LEFT JOIN `order_detail` AS `t2` ON `t1`.`id`=`t2`.`order_id`) WHERE (`t1`.`using_col2`=?) AND (`t1`.`using_col2`=?);",
+				SQL:  "SELECT MAX(`t1`.`using_col1`),`t1`.`using_col2` FROM (`order` AS `t1` LEFT JOIN `order_detail` AS `t2` ON `t1`.`id`=`t2`.`order_id`) WHERE (`t1`.`using_col2`=?) AND (`t1`.`using_col2`=?);",
 				Args: []interface{}{"UsingCol2_1", "UsingCol2_2"}},
 		},
 		{
@@ -1469,10 +1464,10 @@ func TestSelector_Join(t *testing.T) {
 				t3 := t1.Join(t2).On(t1.C("Id").EQ(t2.C("OrderId")))
 				t4 := TableOf(&Item{}, "t4")
 				t5 := t3.Join(t4).On(t2.C("ItemId").EQ(t4.C("Id")))
-				return NewSelector[Order](db).From(t5).Select(t1.Avg("UsingCol1").As("UsingCol1"), t1.Avg("UsingCol2").As("UsingCol2"))
+				return NewSelector[Order](db).From(t5).Select(t1.Avg("UsingCol1"), t1.Avg("UsingCol2"))
 			}(),
 			wantQuery: &Query{
-				SQL: "SELECT AVG(`t1`.`using_col1`) AS `UsingCol1`,AVG(`t1`.`using_col2`) AS `UsingCol2` FROM ((`order` AS `t1` JOIN `order_detail` AS `t2` ON `t1`.`id`=`t2`.`order_id`) JOIN `item` AS `t4` ON `t2`.`item_id`=`t4`.`id`);",
+				SQL: "SELECT AVG(`t1`.`using_col1`),AVG(`t1`.`using_col2`) FROM ((`order` AS `t1` JOIN `order_detail` AS `t2` ON `t1`.`id`=`t2`.`order_id`) JOIN `item` AS `t4` ON `t2`.`item_id`=`t4`.`id`);",
 			},
 		},
 		{
@@ -1540,10 +1535,10 @@ func TestSelector_Join(t *testing.T) {
 				t3 := t1.Join(t2).On(t1.C("Id").EQ(t2.C("OrderId")))
 				t4 := TableOf(&Item{}, "t4")
 				t5 := t4.Join(t3).On(t2.C("ItemId").EQ(t4.C("Id")))
-				return NewSelector[Order](db).From(t5).Select(t4.Sum("Id").As("sum_id"), t4.Min("Id").As("min_id"), t4.Max("Id").As("max_id"), t4.Sum("Id").As("t4_sum_id"), t4.Count("Id").As("t4_cnt_id"))
+				return NewSelector[Order](db).From(t5).Select(t4.Sum("Id"), t4.Min("Id"), t4.Max("Id"), t4.Sum("Id"), t4.Count("Id"))
 			}(),
 			wantQuery: &Query{
-				SQL: "SELECT SUM(`t4`.`id`) AS `sum_id`,MIN(`t4`.`id`) AS `min_id`,MAX(`t4`.`id`) AS `max_id`,SUM(`t4`.`id`) AS `t4_sum_id`,COUNT(`t4`.`id`) AS `t4_cnt_id` FROM (`item` AS `t4` JOIN (`order` AS `t1` JOIN `order_detail` AS `t2` ON `t1`.`id`=`t2`.`order_id`) ON `t2`.`item_id`=`t4`.`id`);",
+				SQL: "SELECT SUM(`t4`.`id`),MIN(`t4`.`id`),MAX(`t4`.`id`),SUM(`t4`.`id`),COUNT(`t4`.`id`) FROM (`item` AS `t4` JOIN (`order` AS `t1` JOIN `order_detail` AS `t2` ON `t1`.`id`=`t2`.`order_id`) ON `t2`.`item_id`=`t4`.`id`);",
 			},
 		},
 		{
@@ -1552,10 +1547,10 @@ func TestSelector_Join(t *testing.T) {
 				t1 := TableOf(&test.Order{}, "t1")
 				t2 := TableOf(&test.OrderDetail{}, "t2")
 				t3 := t1.Join(t2).On(t1.C("Id").EQ(t2.C("OrderId")))
-				return NewSelector[test.Order](db).From(t3).Select(t1.Avg("UsingCol1").As("UsingCol1"))
+				return NewSelector[test.Order](db).From(t3).Select(t1.Avg("UsingCol1"))
 			}(),
 			wantQuery: &Query{
-				SQL: "SELECT AVG(`t1`.`using_col1`) AS `UsingCol1` FROM (`order` AS `t1` JOIN `order_detail` AS `t2` ON `t1`.`id`=`t2`.`order_id`);",
+				SQL: "SELECT AVG(`t1`.`using_col1`) FROM (`order` AS `t1` JOIN `order_detail` AS `t2` ON `t1`.`id`=`t2`.`order_id`);",
 			},
 		},
 	}
