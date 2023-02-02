@@ -15,8 +15,6 @@
 package model
 
 import (
-	"database/sql"
-	"database/sql/driver"
 	"reflect"
 	"strings"
 	"sync"
@@ -25,11 +23,6 @@ import (
 
 	// nolint
 	"unicode"
-)
-
-var (
-	scannerType      = reflect.TypeOf((*sql.Scanner)(nil)).Elem()
-	driverValuerType = reflect.TypeOf((*driver.Valuer)(nil)).Elem()
 )
 
 // TableMeta represents data model, or a table
@@ -61,9 +54,6 @@ type ColumnMeta struct {
 	// }
 	// age 的偏移量是相对于 A 的起始地址的偏移量
 	Offset uintptr
-	// IsHolderType 用于表达是否是 Holder 的类型
-	// 所谓的 Holder，就是指同时实现了 sql.Scanner 和 driver.Valuer 两个接口的类型
-	IsHolderType bool
 	// FieldIndexes 用于表达从最外层结构体找到当前ColumnMeta对应的Field所需要的索引集
 	FieldIndexes []int
 }
@@ -183,7 +173,6 @@ func (t *tagMetaRegistry) parseFields(v reflect.Type, fieldIndexes []int,
 			IsAutoIncrement: isAuto,
 			IsPrimaryKey:    isKey,
 			Offset:          structField.Offset + pOffset,
-			IsHolderType:    structField.Type.AssignableTo(scannerType) && structField.Type.AssignableTo(driverValuerType),
 			FieldIndexes:    append(fieldIndexes, i),
 		}
 		*columnMetas = append(*columnMetas, columnMeta)
