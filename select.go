@@ -242,6 +242,7 @@ func (s *Selector[T]) selectAggregate(aggregate Aggregate) error {
 		s.writeString("DISTINCT ")
 	}
 	cMeta, ok := s.meta.FieldMap[aggregate.arg]
+	// s.aliases[aggregate.alias] = struct{}{}
 	if !ok {
 		return errs.NewInvalidFieldError(aggregate.arg)
 	}
@@ -253,6 +254,14 @@ func (s *Selector[T]) selectAggregate(aggregate Aggregate) error {
 	}
 	s.quote(cMeta.ColumnName)
 	s.writeByte(')')
+	if aggregate.alias != "" {
+		// if _, ok := s.aliases[aggregate.alias]; ok {
+		// 	s.writeString(" AS ")
+		// 	s.quote(aggregate.alias)
+		// }
+		s.writeString(" AS ")
+		s.quote(aggregate.alias)
+	}
 	return nil
 }
 

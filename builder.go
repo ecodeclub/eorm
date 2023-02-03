@@ -116,6 +116,7 @@ type builder struct {
 	buffer *bytebufferpool.ByteBuffer
 	meta   *model.TableMeta
 	args   []interface{}
+	// aliases map[string]struct{}
 }
 
 func (b *builder) quote(val string) {
@@ -163,6 +164,11 @@ func (b *builder) buildExpr(expr Expr) error {
 	case RawExpr:
 		b.buildRawExpr(e)
 	case Column:
+		// _, ok := b.aliases[e.name]
+		// if ok {
+		// 	b.quote(e.name)
+		// 	return nil
+		// }
 		return b.buildColumn(e)
 	case Aggregate:
 		if err := b.buildHavingAggregate(e); err != nil {
@@ -286,6 +292,11 @@ func (b *builder) buildColumn(c Column) error {
 			return errs.NewInvalidFieldError(c.name)
 		}
 		b.quote(fd.ColumnName)
+		if c.alias != "" {
+			// b.aliases[c.alias] = struct{}{}
+			b.writeString(" AS ")
+			b.quote(c.alias)
+		}
 	case Table:
 		m, err := b.metaRegistry.Get(table.entity)
 		if err != nil {
