@@ -871,7 +871,7 @@ func (s *SelectTestSuiteJoin) TestSelectorJoin() {
 				t1 := eorm.TableOf(&test.Order{}, "t1")
 				t2 := eorm.TableOf(&test.OrderDetail{}, "t2")
 				t3 := t1.Join(t2).On(t1.C("Id").EQ(t2.C("OrderId")))
-				return eorm.NewSelector[test.Order](s.orm).From(t3).Select(t1.Avg("UsingCol1"), t1.Avg("UsingCol2")).Get(context.Background())
+				return eorm.NewSelector[test.Order](s.orm).From(t3).Select(t1.Avg("UsingCol1").As("using_col1"), t1.Avg("UsingCol2").As("using_col2")).Get(context.Background())
 			},
 			wantRes: &test.Order{Id: 0, UsingCol1: "0", UsingCol2: "0"},
 		},
@@ -881,7 +881,7 @@ func (s *SelectTestSuiteJoin) TestSelectorJoin() {
 				t1 := eorm.TableOf(&test.Order{}, "t1")
 				t2 := eorm.TableOf(&test.OrderDetail{}, "t2")
 				t3 := t1.Join(t2).On(t1.C("Id").EQ(t2.C("OrderId")))
-				return eorm.NewSelector[test.Order](s.orm).From(t3).Select(t1.Avg("invalid"), t1.Avg("UsingCol2")).Get(context.Background())
+				return eorm.NewSelector[test.Order](s.orm).From(t3).Select(t1.Avg("invalid").As("using_col1"), t1.Avg("UsingCol2").As("using_col2")).Get(context.Background())
 			},
 			wantErr: errs.NewInvalidFieldError("invalid"),
 		},
@@ -1003,7 +1003,7 @@ func (s *SelectTestSuiteLeftJoin) TestSelectorLeftJoin() {
 				t1 := eorm.TableOf(&test.Order{}, "t1")
 				t2 := eorm.TableOf(&test.OrderDetail{}, "t2")
 				t3 := t1.LeftJoin(t2).Using("UsingCol1", "UsingCol2")
-				return eorm.NewSelector[test.Order](s.orm).From(t3).Select(t1.Avg("UsingCol1")).Get(context.Background())
+				return eorm.NewSelector[test.Order](s.orm).From(t3).Select(t1.Avg("UsingCol1").As("using_col1")).Get(context.Background())
 			},
 			wantRes: &test.Order{Id: 0, UsingCol1: "0", UsingCol2: ""},
 		},
@@ -1013,7 +1013,7 @@ func (s *SelectTestSuiteLeftJoin) TestSelectorLeftJoin() {
 				t1 := eorm.TableOf(&test.Order{}, "t1")
 				t2 := eorm.TableOf(&test.OrderDetail{}, "t2")
 				t3 := t1.LeftJoin(t2).Using("UsingCol1", "UsingCol2")
-				return eorm.NewSelector[test.Order](s.orm).From(t3).Select(t1.Avg("invalid")).Get(context.Background())
+				return eorm.NewSelector[test.Order](s.orm).From(t3).Select(t1.Avg("invalid").As("using_col1")).Get(context.Background())
 			},
 			wantErr: errs.NewInvalidFieldError("invalid"),
 		},
@@ -1113,7 +1113,7 @@ func (s *SelectTestSuiteRightJoin) TestSelectorRightJoin() {
 				t1 := eorm.TableOf(&test.Order{}, "t1")
 				t2 := eorm.TableOf(&test.OrderDetail{}, "t2")
 				t3 := t1.RightJoin(t2).Using("UsingCol1", "UsingCol2")
-				return eorm.NewSelector[test.Order](s.orm).From(t3).Select(t1.Avg("UsingCol1")).Get(context.Background())
+				return eorm.NewSelector[test.Order](s.orm).From(t3).Select(t1.Avg("UsingCol1").As("using_col1")).Get(context.Background())
 			},
 			wantRes: &test.Order{Id: 0, UsingCol1: "0", UsingCol2: ""},
 		},
@@ -1123,7 +1123,7 @@ func (s *SelectTestSuiteRightJoin) TestSelectorRightJoin() {
 				t1 := eorm.TableOf(&test.Order{}, "t1")
 				t2 := eorm.TableOf(&test.OrderDetail{}, "t2")
 				t3 := t1.RightJoin(t2).Using("UsingCol1", "UsingCol2")
-				return eorm.NewSelector[test.Order](s.orm).From(t3).Select(t1.Avg("invalid")).Get(context.Background())
+				return eorm.NewSelector[test.Order](s.orm).From(t3).Select(t1.Avg("invalid").As("using_col1")).Get(context.Background())
 			},
 			wantErr: errs.NewInvalidFieldError("invalid"),
 		},

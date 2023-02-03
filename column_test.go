@@ -55,13 +55,13 @@ Args: %v
 
 func ExampleColumn_As() {
 	db := memoryDB()
-	query, _ := NewSelector[TestModel](db).Select(C("Id")).Build()
+	query, _ := NewSelector[TestModel](db).Select(C("Id").As("my_id")).Build()
 	fmt.Printf(`
 SQL: %s
 Args: %v
 `, query.SQL, query.Args)
 	// Output:
-	// SQL: SELECT `id` FROM `test_model`;
+	// SQL: SELECT `id` AS `my_id` FROM `test_model`;
 	// Args: []
 }
 
