@@ -40,14 +40,14 @@ func NewUnsafeValue(val interface{}, meta *model.TableMeta) Value {
 	}
 }
 
-func (u unsafeValue) Field(name string) (interface{}, error) {
+func (u unsafeValue) Field(name string) (reflect.Value, error) {
 	fd, ok := u.meta.FieldMap[name]
 	if !ok {
-		return nil, errs.NewInvalidFieldError(name)
+		return reflect.Value{}, errs.NewInvalidFieldError(name)
 	}
 	ptr := unsafe.Pointer(uintptr(u.addr) + fd.Offset)
 	val := reflect.NewAt(fd.Typ, ptr).Elem()
-	return val.Interface(), nil
+	return val, nil
 }
 
 func (u unsafeValue) SetColumns(rows *sql.Rows) error {

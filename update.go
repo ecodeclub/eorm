@@ -34,7 +34,7 @@ type Updater[T any] struct {
 	where         []Predicate
 	assigns       []Assignable
 	ignoreNilVal  bool
-	ignoreZeroCol bool
+	ignoreZeroVal bool
 }
 
 // NewUpdater 开始构建一个 UPDATE 查询
@@ -108,10 +108,10 @@ func (u *Updater[T]) buildAssigns() error {
 			if !ok {
 				return errs.NewInvalidFieldError(a.name)
 			}
-			val, _ := u.val.Field(a.name)
+			refVal, _ := u.val.Field(a.name)
 			u.quote(c.ColumnName)
 			_ = u.buffer.WriteByte('=')
-			u.parameter(val)
+			u.parameter(refVal.Interface())
 			has = true
 		case columns:
 			for _, name := range a.cs {
@@ -119,13 +119,13 @@ func (u *Updater[T]) buildAssigns() error {
 				if !ok {
 					return errs.NewInvalidFieldError(name)
 				}
-				val, _ := u.val.Field(name)
+				refVal, _ := u.val.Field(name)
 				if has {
 					u.comma()
 				}
 				u.quote(c.ColumnName)
 				_ = u.buffer.WriteByte('=')
-				u.parameter(val)
+				u.parameter(refVal.Interface())
 				has = true
 			}
 		case Assignment:
@@ -145,16 +145,12 @@ func (u *Updater[T]) buildAssigns() error {
 
 func (u *Updater[T]) buildDefaultColumns() error {
 	has := false
-	refVal := reflect.Value{}
 	for _, c := range u.meta.Columns {
-		val, _ := u.val.Field(c.FieldName)
-		if u.ignoreZeroCol || u.ignoreNilVal {
-			refVal = reflect.ValueOf(val)
-		}
-		if u.ignoreNilVal && isNilValue(refVal) {
+		refVal, _ := u.val.Field(c.FieldName)
+		if u.ignoreZeroVal && isZeroValue(refVal) {
 			continue
 		}
-		if u.ignoreZeroCol && isZeroValue(refVal) {
+		if u.ignoreNilVal && isNilValue(refVal) {
 			continue
 		}
 		if has {
@@ -162,7 +158,7 @@ func (u *Updater[T]) buildDefaultColumns() error {
 		}
 		u.quote(c.ColumnName)
 		_ = u.buffer.WriteByte('=')
-		u.parameter(val)
+		u.parameter(refVal.Interface())
 		has = true
 	}
 	if !has {
@@ -183,7 +179,7 @@ func (u *Updater[T]) Where(predicates ...Predicate) *Updater[T] {
 	return u
 }
 
-// SkipNilValue uses the non-nil value to construct the Assignable instances.
+// SkipNilValue 使用非nil值构造Assignable实例
 func (u *Updater[T]) SkipNilValue() *Updater[T] {
 	u.ignoreNilVal = true
 	return u
@@ -197,9 +193,9 @@ func isNilValue(val reflect.Value) bool {
 	return false
 }
 
-// SkipZeroValue uses the non-zero value to construct the Assignable instances.
+// SkipZeroValue 使用非零值构造Assignable实例
 func (u *Updater[T]) SkipZeroValue() *Updater[T] {
-	u.ignoreZeroCol = true
+	u.ignoreZeroVal = true
 	return u
 }
 

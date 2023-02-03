@@ -40,12 +40,12 @@ func NewReflectValue(val interface{}, meta *model.TableMeta) Value {
 }
 
 // Field 返回字段值
-func (r reflectValue) Field(name string) (any, error) {
+func (r reflectValue) Field(name string) (reflect.Value, error) {
 	res, ok := r.fieldByIndex(name)
 	if !ok {
-		return nil, errs.NewInvalidFieldError(name)
+		return reflect.Value{}, errs.NewInvalidFieldError(name)
 	}
-	return res.Interface(), nil
+	return res, nil
 }
 
 func (r reflectValue) fieldByIndex(name string) (reflect.Value, bool) {
