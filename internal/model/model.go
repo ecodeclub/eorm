@@ -34,7 +34,14 @@ type TableMeta struct {
 	// ColumnMap 是列名到列元数据的映射
 	ColumnMap map[string]*ColumnMeta
 	Typ       reflect.Type
+
+	ShardingKey       string
+	DBShardingFunc    ShardingAlgorithm
+	TableShardingFunc ShardingAlgorithm
 }
+
+//ShardingAlgorithm 生成 ShardingKey
+type ShardingAlgorithm func(skVal any) (string, error)
 
 // ColumnMeta represents model's field, or column
 type ColumnMeta struct {
