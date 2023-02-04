@@ -179,7 +179,7 @@ func (u *Updater[T]) Where(predicates ...Predicate) *Updater[T] {
 	return u
 }
 
-// SkipNilValue 使用非nil值构造Assignable实例
+// SkipNilValue 忽略 nil 值 columns
 func (u *Updater[T]) SkipNilValue() *Updater[T] {
 	u.ignoreNilVal = true
 	return u
@@ -193,7 +193,7 @@ func isNilValue(val reflect.Value) bool {
 	return false
 }
 
-// SkipZeroValue 使用非零值构造Assignable实例
+// SkipZeroValue 忽略零值 columns
 func (u *Updater[T]) SkipZeroValue() *Updater[T] {
 	u.ignoreZeroVal = true
 	return u
