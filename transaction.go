@@ -32,11 +32,12 @@ type session interface {
 
 type Tx struct {
 	tx *sql.Tx
-	db *DB
+	core
+	db *sql.DB
 }
 
 func (t *Tx) getCore() core {
-	return t.db.core
+	return t.core
 }
 
 func (t *Tx) queryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
