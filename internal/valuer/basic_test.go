@@ -48,7 +48,7 @@ func testBasicValueField(t *testing.T, creator BasicTypeCreator) {
 				if err != nil {
 					return
 				}
-				assert.Equal(t, tc.wantVal, v)
+				assert.Equal(t, tc.wantVal, v.Interface())
 			})
 		}
 	})
@@ -63,7 +63,7 @@ func testBasicValueField(t *testing.T, creator BasicTypeCreator) {
 				if err != nil {
 					return
 				}
-				assert.Equal(t, tc.wantVal, v)
+				assert.Equal(t, tc.wantVal, v.Interface())
 			})
 		}
 	})
@@ -95,7 +95,7 @@ func testBasicValueField(t *testing.T, creator BasicTypeCreator) {
 				if err != nil {
 					return
 				}
-				assert.Equal(t, tc.wantVal, v)
+				assert.Equal(t, tc.wantVal, v.Interface())
 			})
 		}
 	})
@@ -142,7 +142,7 @@ func testBasicValueField(t *testing.T, creator BasicTypeCreator) {
 				if err != nil {
 					return
 				}
-				assert.Equal(t, tc.wantVal, v)
+				assert.Equal(t, tc.wantVal, v.Interface())
 			})
 		}
 	})

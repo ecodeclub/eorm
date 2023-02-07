@@ -229,7 +229,7 @@ func testValueField(t *testing.T, creator Creator) {
 				if err != nil {
 					return
 				}
-				assert.Equal(t, tc.wantVal, v)
+				assert.Equal(t, tc.wantVal, v.Interface())
 			})
 		}
 	})
@@ -244,7 +244,7 @@ func testValueField(t *testing.T, creator Creator) {
 				if err != nil {
 					return
 				}
-				assert.Equal(t, tc.wantVal, v)
+				assert.Equal(t, tc.wantVal, v.Interface())
 			})
 		}
 	})
@@ -276,7 +276,7 @@ func testValueField(t *testing.T, creator Creator) {
 				if err != nil {
 					return
 				}
-				assert.Equal(t, tc.wantVal, v)
+				assert.Equal(t, tc.wantVal, v.Interface())
 			})
 		}
 	})
@@ -323,7 +323,7 @@ func testValueField(t *testing.T, creator Creator) {
 				if err != nil {
 					return
 				}
-				assert.Equal(t, tc.wantVal, v)
+				assert.Equal(t, tc.wantVal, v.Interface())
 			})
 		}
 	})
@@ -529,14 +529,14 @@ func BenchmarkUnsafeValue_Field(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			val, err := ins.Field("Int64")
 			assert.Nil(b, err)
-			assert.Equal(b, int64(13), val)
+			assert.Equal(b, int64(13), val.Interface())
 		}
 	})
 	b.Run("holder", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			val, err := ins.Field("NullStringPtr")
 			assert.Nil(b, err)
-			assert.Equal(b, &sql.NullString{}, val)
+			assert.Equal(b, &sql.NullString{}, val.Interface())
 		}
 	})
 }
