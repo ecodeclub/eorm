@@ -17,8 +17,8 @@ type roundrobin struct {
 }
 
 func (r *roundrobin) Next(ctx context.Context) (*sql.DB, error) {
-	// 当从库一个都没有时，返回主库
-	if len(r.slaves) == 0 {
+	// 当从库一个都没有时，返回主库,或者再context传入master参数强制使用主库去执行语句
+	if len(r.slaves) == 0 || ctx.Value("master") == true {
 		return r.master, nil
 	}
 	cnt := atomic.AddUint32(&r.cnt, 1)
