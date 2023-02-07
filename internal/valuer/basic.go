@@ -29,7 +29,7 @@ type supportBasicTypeValue struct {
 }
 
 // Field 返回字段值
-func (s supportBasicTypeValue) Field(name string) (any, error) {
+func (s supportBasicTypeValue) Field(name string) (reflect.Value, error) {
 	return s.Value.Field(name)
 }
 

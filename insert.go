@@ -83,7 +83,7 @@ func (i *Inserter[T]) Build() (*Query, error) {
 			if err != nil {
 				return nil, err
 			}
-			i.parameter(fdVal)
+			i.parameter(fdVal.Interface())
 			if j != len(fields)-1 {
 				i.comma()
 			}

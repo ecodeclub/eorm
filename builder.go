@@ -113,10 +113,10 @@ type builder struct {
 	core
 	// 使用 bytebufferpool 以减少内存分配
 	// 每次调用 Get 之后不要忘记再调用 Put
-	buffer  *bytebufferpool.ByteBuffer
-	meta    *model.TableMeta
-	args    []interface{}
-	aliases map[string]struct{}
+	buffer *bytebufferpool.ByteBuffer
+	meta   *model.TableMeta
+	args   []interface{}
+	// aliases map[string]struct{}
 }
 
 func (b *builder) quote(val string) {
@@ -164,11 +164,11 @@ func (b *builder) buildExpr(expr Expr) error {
 	case RawExpr:
 		b.buildRawExpr(e)
 	case Column:
-		_, ok := b.aliases[e.name]
-		if ok {
-			b.quote(e.name)
-			return nil
-		}
+		// _, ok := b.aliases[e.name]
+		// if ok {
+		// 	b.quote(e.name)
+		// 	return nil
+		// }
 		return b.buildColumn(e)
 	case Aggregate:
 		if err := b.buildHavingAggregate(e); err != nil {
@@ -293,7 +293,7 @@ func (b *builder) buildColumn(c Column) error {
 		}
 		b.quote(fd.ColumnName)
 		if c.alias != "" {
-			b.aliases[c.alias] = struct{}{}
+			// b.aliases[c.alias] = struct{}{}
 			b.writeString(" AS ")
 			b.quote(c.alias)
 		}
