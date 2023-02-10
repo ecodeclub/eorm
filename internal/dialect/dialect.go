@@ -32,6 +32,10 @@ var (
 		Name:  "SQLite",
 		Quote: '`',
 	}
+	SQLServer = Dialect{
+		Name:  "SQLServer",
+		Quote: '"',
+	}
 )
 
 func Of(driver string) (Dialect, error) {
@@ -40,6 +44,10 @@ func Of(driver string) (Dialect, error) {
 		return SQLite, nil
 	case "mysql":
 		return MySQL, nil
+	case "mssql":
+		return SQLServer, nil
+	case "sqlserver":
+		return SQLServer, nil
 	default:
 		return Dialect{}, errs.NewUnsupportedDriverError(driver)
 	}

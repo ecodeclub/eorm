@@ -39,6 +39,16 @@ func TestOf(t *testing.T) {
 			wantDialect: SQLite,
 		},
 		{
+			name:        "mssql",
+			driver:      "mssql",
+			wantDialect: SQLServer,
+		},
+		{
+			name:        "sqlserver",
+			driver:      "sqlserver",
+			wantDialect: SQLServer,
+		},
+		{
 			name:    "unsupported",
 			driver:  "abc",
 			wantErr: errs.NewUnsupportedDriverError("abc"),
