@@ -28,7 +28,16 @@ var (
 	ErrTooManyColumns = errors.New("eorm: 过多列")
 
 	// ErrCombinationIsNotStruct 不支持的组合类型，eorm 只支持结构体组合
-	ErrCombinationIsNotStruct = errors.New("eorm: 不支持的组合类型，eorm 只支持结构体组合")
+	ErrCombinationIsNotStruct     = errors.New("eorm: 不支持的组合类型，eorm 只支持结构体组合")
+	ErrMissingShardingKey         = errors.New("eorm: sharding key 未设置")
+	ErrSardingDBNotFind           = errors.New("eorm: 未找到目标 sharding db")
+	ErrResultOne                  = errors.New("eorm: 只能生成一个 SQL")
+	ErrNotGenShardingQuery        = errors.New("eorm: 未生成 sharding query")
+	ErrUnsupportedTooComplexQuery = errors.New("eorm: 暂未支持太复杂的查询")
+	ErrExcShardingAlgorithm       = errors.New("eorm: 执行 sharding algorithm 出错")
+	ErrShardingBuilderNotMeta     = errors.New("eorm: TableMeta 未设置，请执行 `RegisterTableMeta` 方法")
+
+	ErrEmptyShardingDB = errors.New("eorm: ShardingDB DBs 不能为空")
 )
 
 func NewFieldConflictError(field string) error {
@@ -69,4 +78,8 @@ func NewErrUnsupportedExpressionType() error {
 
 func NewMustSpecifyColumnsError() error {
 	return fmt.Errorf("eorm: 复合查询如 JOIN 查询、子查询必须指定要查找的列，即指定 SELECT xxx 部分")
+}
+
+func NewUnsupportedOperatorError(op string) error {
+	return fmt.Errorf("eorm: 不支持的 operator %v", op)
 }

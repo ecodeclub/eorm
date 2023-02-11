@@ -16,8 +16,12 @@ package eorm
 
 import (
 	"context"
-	"errors"
-	"fmt"
+	"database/sql"
+
+	"github.com/gotomicro/eorm/internal/errs"
+	"github.com/gotomicro/eorm/internal/model"
+	"github.com/valyala/bytebufferpool"
+	"golang.org/x/sync/errgroup"
 )
 
 type ShardingSelector[T any] struct {
@@ -27,23 +31,121 @@ type ShardingSelector[T any] struct {
 	where   []Predicate
 	having  []Predicate
 	columns []Selectable
-
-	orderBy []string
+	groupBy []string
+	orderBy []OrderBy
 	offset  int
 	limit   int
 }
 
+func NewShardingSelector[T any](db *ShardingDB) *ShardingSelector[T] {
+	return &ShardingSelector[T]{
+		builder: builder{
+			buffer: bytebufferpool.Get(),
+		},
+		db: db,
+	}
+}
+
+func (s *ShardingSelector[T]) RegisterTableMeta(meta *model.TableMeta) *ShardingSelector[T] {
+	s.meta = meta
+	return s
+}
+
 func (s *ShardingSelector[T]) Build() ([]*ShardingQuery, error) {
-	// 初始化模型
-	// 通过 where 条件查找目标 sharding key
-	// build sql 语句
-	// 返回结果
-	panic("implement me")
+	if s.meta == nil {
+		return nil, errs.ErrShardingBuilderNotMeta
+	}
+	if s.meta.ShardingKey == "" {
+		return nil, errs.ErrMissingShardingKey
+	}
+	if len(s.db.DBs) == 0 {
+		return nil, errs.ErrEmptyShardingDB
+	}
+	dsts, err := s.findDsts()
+	if err != nil {
+		return nil, err
+	}
+	res := make([]*ShardingQuery, 0, len(dsts))
+	for _, dst := range dsts {
+		sess, ok := s.db.DBs[dst.DB]
+		if !ok {
+			return nil, errs.ErrSardingDBNotFind
+		}
+		s.builder.core = sess.getCore()
+		query, err := s.build(dst.DB, dst.Table)
+		if err != nil {
+			return nil, err
+		}
+		res = append(res, query)
+		s.args = make([]any, 0, 8)
+	}
+	return res, nil
 }
 
 func (s *ShardingSelector[T]) build(db, tbl string) (*ShardingQuery, error) {
-	// 常规构建 sql
-	panic("implement me")
+	defer bytebufferpool.Put(s.buffer)
+	var err error
+	s.writeString("SELECT ")
+	if len(s.columns) == 0 {
+		if err = s.buildAllColumns(); err != nil {
+			return nil, err
+		}
+	} else {
+		err = s.buildSelectedList()
+		if err != nil {
+			return nil, err
+		}
+	}
+	s.writeString(" FROM ")
+	s.quote(db)
+	s.writeByte('.')
+	s.quote(tbl)
+
+	if len(s.where) > 0 {
+		s.writeString(" WHERE ")
+		err = s.buildPredicates(s.where)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// group by
+	if len(s.groupBy) > 0 {
+		err = s.buildGroupBy()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// order by
+	if len(s.orderBy) > 0 {
+		err = s.buildOrderBy()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// having
+	if len(s.having) > 0 {
+		s.writeString(" HAVING ")
+		err = s.buildPredicates(s.having)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if s.offset > 0 {
+		s.writeString(" OFFSET ")
+		s.parameter(s.offset)
+	}
+
+	if s.limit > 0 {
+		s.writeString(" LIMIT ")
+		s.parameter(s.limit)
+	}
+	s.end()
+
+	return &ShardingQuery{SQL: s.buffer.String(), Args: s.args, DB: db}, nil
 }
 
 func (s *ShardingSelector[T]) findDsts() ([]Dst, error) {
@@ -55,10 +157,7 @@ func (s *ShardingSelector[T]) findDsts() ([]Dst, error) {
 		}
 		return s.findDstByPredicate(pre)
 	}
-	if len(s.having) > 0 {
-
-	}
-	panic("implement me")
+	return nil, nil
 }
 
 func (s *ShardingSelector[T]) findDstByPredicate(pre Predicate) ([]Dst, error) {
@@ -80,27 +179,22 @@ func (s *ShardingSelector[T]) findDstByPredicate(pre Predicate) ([]Dst, error) {
 			return left, nil
 		}
 		return s.merge(left, right), nil
-	case opGT:
-
-	case opLT:
-
 	case opEQ:
-		DBSf := s.meta.DBShardingFunc
-		TbSf := s.meta.TableShardingFunc
+		dbSf := s.meta.DBShardingFunc
+		tlbSf := s.meta.TableShardingFunc
 		col, isCol := pre.left.(Column)
-		right, isVals := pre.right.(values)
+		right, isVals := pre.right.(valueExpr)
 		if !isCol || !isVals {
-			return nil, errors.New("too complex query, temporarily not supported")
+			return nil, errs.ErrUnsupportedTooComplexQuery
 		}
-		skVal := right.data[0]
 		if col.name == s.meta.ShardingKey {
-			shardingDB, err := DBSf(skVal)
+			shardingDB, err := dbSf(right.val)
 			if err != nil {
-				return nil, errors.New("execute sharding algorithm err")
+				return nil, errs.ErrExcShardingAlgorithm
 			}
-			shardingTbl, err := TbSf(skVal)
+			shardingTbl, err := tlbSf(right.val)
 			if err != nil {
-				return nil, errors.New("execute sharding algorithm err")
+				return nil, errs.ErrExcShardingAlgorithm
 			}
 			dst := Dst{
 				DB:    shardingDB,
@@ -109,7 +203,7 @@ func (s *ShardingSelector[T]) findDstByPredicate(pre Predicate) ([]Dst, error) {
 			res = append(res, dst)
 		}
 	default:
-		return nil, fmt.Errorf("eorm: operators that do not know how to handle %v", pre.op.text)
+		return nil, errs.NewUnsupportedOperatorError(pre.op.text)
 	}
 	return res, nil
 }
@@ -130,18 +224,241 @@ func (s *ShardingSelector[T]) merge(left, right []Dst) []Dst {
 	return res
 }
 
+func (s *ShardingSelector[T]) buildAllColumns() error {
+	for i, cMeta := range s.meta.Columns {
+		_ = s.buildColumns(i, cMeta.FieldName)
+	}
+	return nil
+}
+
+func (s *ShardingSelector[T]) buildSelectedList() error {
+	for i, selectable := range s.columns {
+		if i > 0 {
+			s.comma()
+		}
+		switch expr := selectable.(type) {
+		case Column:
+			err := s.builder.buildColumn(expr)
+			if err != nil {
+				return errs.NewInvalidFieldError(expr.name)
+			}
+		case columns:
+			for j, c := range expr.cs {
+				err := s.buildColumns(j, c)
+				if err != nil {
+					return err
+				}
+			}
+		case Aggregate:
+			if err := s.selectAggregate(expr); err != nil {
+				return err
+			}
+		case RawExpr:
+			s.buildRawExpr(expr)
+		}
+	}
+	return nil
+
+}
+func (s *ShardingSelector[T]) selectAggregate(aggregate Aggregate) error {
+	s.writeString(aggregate.fn)
+
+	s.writeByte('(')
+	if aggregate.distinct {
+		s.writeString("DISTINCT ")
+	}
+	cMeta, ok := s.meta.FieldMap[aggregate.arg]
+	if !ok {
+		return errs.NewInvalidFieldError(aggregate.arg)
+	}
+	if aggregate.table != nil {
+		if alias := aggregate.table.getAlias(); alias != "" {
+			s.quote(alias)
+			s.point()
+		}
+	}
+	s.quote(cMeta.ColumnName)
+	s.writeByte(')')
+	if aggregate.alias != "" {
+		s.writeString(" AS ")
+		s.quote(aggregate.alias)
+	}
+	return nil
+}
+
+func (s *ShardingSelector[T]) buildColumns(index int, name string) error {
+	if index > 0 {
+		s.comma()
+	}
+	cMeta, ok := s.meta.FieldMap[name]
+	if !ok {
+		return errs.NewInvalidFieldError(name)
+	}
+	s.quote(cMeta.ColumnName)
+	return nil
+}
+
+func (s *ShardingSelector[T]) buildExpr(expr Expr) error {
+	switch exp := expr.(type) {
+	case nil:
+	case Column:
+		exp.alias = ""
+		_ = s.buildColumn(exp)
+	case valueExpr:
+		s.parameter(exp.val)
+	case RawExpr:
+		s.buildRawExpr(exp)
+	case Predicate:
+		if err := s.buildBinaryExpr(binaryExpr(exp)); err != nil {
+			return err
+		}
+	default:
+		return errs.NewErrUnsupportedExpressionType()
+	}
+	return nil
+}
+
+func (s *ShardingSelector[T]) buildOrderBy() error {
+	s.writeString(" ORDER BY ")
+	for i, ob := range s.orderBy {
+		if i > 0 {
+			s.comma()
+		}
+		for _, c := range ob.fields {
+			cMeta, ok := s.meta.FieldMap[c]
+			if !ok {
+				return errs.NewInvalidFieldError(c)
+			}
+			s.quote(cMeta.ColumnName)
+		}
+		s.space()
+		s.writeString(ob.order)
+	}
+	return nil
+}
+
+func (s *ShardingSelector[T]) buildGroupBy() error {
+	s.writeString(" GROUP BY ")
+	for i, gb := range s.groupBy {
+		cMeta, ok := s.meta.FieldMap[gb]
+		if !ok {
+			return errs.NewInvalidFieldError(gb)
+		}
+		if i > 0 {
+			s.comma()
+		}
+		s.quote(cMeta.ColumnName)
+	}
+	return nil
+}
+
 func (s *ShardingSelector[T]) Get(ctx context.Context) (*T, error) {
 	qs, err := s.Build()
 	if err != nil {
 		return nil, err
 	}
-	// 要确保前面的改写 SQL 只能生成一个 SQL ???
-	if len(qs) > 1 {
-		return nil, errors.New("只能生成一个 SQL")
+	if qs == nil || len(qs) == 0 {
+		return nil, errs.ErrNotGenShardingQuery
 	}
-	panic("implement me")
+	// TODO 要确保前面的改写 SQL 只能生成一个 SQL
+	if len(qs) > 1 {
+		return nil, errs.ErrResultOne
+	}
+	query := qs[0]
+	sess := s.db.DBs[query.DB]
+	row, err := sess.queryContext(ctx, query.SQL, query.Args...)
+	if !row.Next() {
+		return nil, ErrNoRows
+	}
+	tp := new(T)
+	val := s.valCreator.NewBasicTypeValue(tp, s.meta)
+	if err = val.SetColumns(row); err != nil {
+		return nil, err
+	}
+	return tp, nil
 }
 
 func (s *ShardingSelector[T]) GetMulti(ctx context.Context) ([]*T, error) {
-	panic("implement me")
+	qs, err := s.Build()
+	if err != nil {
+		return nil, err
+	}
+	var rowsSlice []*sql.Rows
+	var eg errgroup.Group
+	for _, query := range qs {
+		q := query
+		eg.Go(func() error {
+			sess := s.db.DBs[q.DB]
+			rows, err := sess.queryContext(ctx, q.SQL, q.Args...)
+			if err == nil {
+				rowsSlice = append(rowsSlice, rows)
+			}
+			return err
+		})
+	}
+	err = eg.Wait()
+	if err != nil {
+		return nil, err
+	}
+	var res []*T
+	for _, rows := range rowsSlice {
+		for rows.Next() {
+			tp := new(T)
+			val := s.valCreator.NewBasicTypeValue(tp, s.meta)
+			if err = val.SetColumns(rows); err != nil {
+				return nil, err
+			}
+			res = append(res, tp)
+		}
+	}
+	return res, nil
+}
+
+// Select 指定查询的列。
+// 列可以是物理列，也可以是聚合函数，或者 RawExpr
+func (s *ShardingSelector[T]) Select(columns ...Selectable) *ShardingSelector[T] {
+	s.columns = columns
+	return s
+}
+
+// From specifies the table which must be pointer of structure
+func (s *ShardingSelector[T]) From(tbl *T) *ShardingSelector[T] {
+	s.table = tbl
+	return s
+}
+
+// Where accepts predicates
+func (s *ShardingSelector[T]) Where(predicates ...Predicate) *ShardingSelector[T] {
+	s.where = predicates
+	return s
+}
+
+// Having accepts predicates
+func (s *ShardingSelector[T]) Having(predicates ...Predicate) *ShardingSelector[T] {
+	s.having = predicates
+	return s
+}
+
+// GroupBy means "GROUP BY"
+func (s *ShardingSelector[T]) GroupBy(columns ...string) *ShardingSelector[T] {
+	s.groupBy = columns
+	return s
+}
+
+// OrderBy means "ORDER BY"
+func (s *ShardingSelector[T]) OrderBy(orderBys ...OrderBy) *ShardingSelector[T] {
+	s.orderBy = orderBys
+	return s
+}
+
+// Limit limits the size of result set
+func (s *ShardingSelector[T]) Limit(limit int) *ShardingSelector[T] {
+	s.limit = limit
+	return s
+}
+
+// Offset was used by "LIMIT"
+func (s *ShardingSelector[T]) Offset(offset int) *ShardingSelector[T] {
+	s.offset = offset
+	return s
 }

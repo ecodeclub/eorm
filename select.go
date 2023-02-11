@@ -162,6 +162,7 @@ func (s *Selector[T]) buildTable(table TableReference) error {
 	}
 	return nil
 }
+
 func (s *Selector[T]) buildOrderBy() error {
 	s.writeString(" ORDER BY ")
 	for i, ob := range s.orderBy {

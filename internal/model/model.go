@@ -68,6 +68,24 @@ type ColumnMeta struct {
 // TableMetaOption represents options of TableMeta, this options will cover default cover.
 type TableMetaOption func(meta *TableMeta)
 
+func WithShardingKey(sk string) TableMetaOption {
+	return func(meta *TableMeta) {
+		meta.ShardingKey = sk
+	}
+}
+
+func WithDBShardingFunc(fn ShardingAlgorithm) TableMetaOption {
+	return func(meta *TableMeta) {
+		meta.DBShardingFunc = fn
+	}
+}
+
+func WithTableShardingFunc(fn ShardingAlgorithm) TableMetaOption {
+	return func(meta *TableMeta) {
+		meta.TableShardingFunc = fn
+	}
+}
+
 // MetaRegistry stores table metadata
 type MetaRegistry interface {
 	Get(table interface{}) (*TableMeta, error)

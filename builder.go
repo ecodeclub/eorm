@@ -23,19 +23,9 @@ import (
 	"github.com/valyala/bytebufferpool"
 )
 
-// QueryBuilder is used to build a query
-type QueryBuilder interface {
-	Build() (*Query, error)
-}
-
 var _ Executor = &Inserter[any]{}
 var _ Executor = &Updater[any]{}
 var _ Executor = &Deleter[any]{}
-
-// Executor is used to build a query
-type Executor interface {
-	Exec(ctx context.Context) Result
-}
 
 // Query 代表一个查询
 type Query struct {
