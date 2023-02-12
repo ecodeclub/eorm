@@ -1133,7 +1133,7 @@ type BaseEntity struct {
 
 type TestCombinedModel struct {
 	BaseEntity
-	Id        int64 `eorm:"auto_increment,primary_key"`
+	Id        int64 `eorm:"primary_key"`
 	FirstName string
 	Age       int8
 	LastName  *string
