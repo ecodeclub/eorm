@@ -17,6 +17,7 @@ package eorm
 import (
 	"context"
 	"database/sql"
+	"github.com/gotomicro/eorm/internal/slaves"
 
 	"github.com/gotomicro/eorm/internal/dialect"
 	"github.com/gotomicro/eorm/internal/model"
@@ -24,9 +25,8 @@ import (
 )
 
 type MasterSlavesDB struct {
-	master   *sql.DB
-	slaves   []*sql.DB
-	getslave SlaveGeter
+	master *sql.DB
+	slaves.Slaves
 	core
 }
 
@@ -35,15 +35,19 @@ func (m *MasterSlavesDB) getCore() core {
 }
 
 func (m *MasterSlavesDB) queryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
-	slave, err := m.getslave.Next(ctx)
+	_, ok := ctx.Value("master").(bool)
+	if ok {
+		return m.master.QueryContext(ctx, query, args...)
+	}
+	slave, err := m.Slaves.Next(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return slave.QueryContext(ctx, query, args)
+	return slave.DB.QueryContext(ctx, query, args...)
 }
 
 func (m *MasterSlavesDB) execContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
-	return m.master.ExecContext(ctx, query, args)
+	return m.master.ExecContext(ctx, query, args...)
 }
 
 func (m *MasterSlavesDB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) {
@@ -82,14 +86,13 @@ func OpenMasterSlaveDB(driver string, master *sql.DB, opts ...MasterSlaveDBOptio
 
 type MasterSlaveDBOption func(db *MasterSlavesDB)
 
-func MasterSlaveWithSlave(slaves ...*sql.DB) MasterSlaveDBOption {
+func MasterSlaveWithSlaveGeter(geter slaves.Slaves) MasterSlaveDBOption {
 	return func(db *MasterSlavesDB) {
-		db.slaves = slaves
+		db.Slaves = geter
 	}
 }
 
-func MasterSlaveWithSlaveGeter(geter SlaveGeter) MasterSlaveDBOption {
-	return func(db *MasterSlavesDB) {
-		db.getslave = geter
-	}
+func UserMaster(ctx context.Context) context.Context {
+	mctx := context.WithValue(ctx, "master", true)
+	return mctx
 }

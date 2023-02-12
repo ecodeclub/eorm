@@ -29,6 +29,7 @@ var (
 
 	// ErrCombinationIsNotStruct 不支持的组合类型，eorm 只支持结构体组合
 	ErrCombinationIsNotStruct = errors.New("eorm: 不支持的组合类型，eorm 只支持结构体组合")
+	ErrSlaveNotFound          = errors.New("eorm: slave不存在")
 )
 
 func NewFieldConflictError(field string) error {
