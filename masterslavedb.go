@@ -17,6 +17,7 @@ package eorm
 import (
 	"context"
 	"database/sql"
+
 	"github.com/gotomicro/eorm/internal/slaves"
 
 	"github.com/gotomicro/eorm/internal/dialect"
@@ -30,12 +31,18 @@ type MasterSlavesDB struct {
 	core
 }
 
+type key string
+
+const (
+	master key = "master"
+)
+
 func (m *MasterSlavesDB) getCore() core {
 	return m.core
 }
 
 func (m *MasterSlavesDB) queryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
-	_, ok := ctx.Value("master").(bool)
+	_, ok := ctx.Value(master).(bool)
 	if ok {
 		return m.master.QueryContext(ctx, query, args...)
 	}
@@ -93,6 +100,6 @@ func MasterSlaveWithSlaveGeter(geter slaves.Slaves) MasterSlaveDBOption {
 }
 
 func UserMaster(ctx context.Context) context.Context {
-	mctx := context.WithValue(ctx, "master", true)
+	mctx := context.WithValue(ctx, master, true)
 	return mctx
 }

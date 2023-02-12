@@ -19,6 +19,7 @@ package integration
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/gotomicro/eorm"
 	"github.com/gotomicro/eorm/internal/test"
@@ -60,15 +61,6 @@ func (s *MasterSlaveSelectTestSuite) TestMasterSlave() {
 		ctx       func() context.Context
 	}{
 		{
-			name:      "query use slave",
-			i:         eorm.NewSelector[test.SimpleStruct](s.orm).Where(eorm.C("Id").LT(4)),
-			wantSlave: "0",
-			wantRes:   s.data,
-			ctx: func() context.Context {
-				return context.Background()
-			},
-		},
-		{
 			name:    "query use master",
 			i:       eorm.NewSelector[test.SimpleStruct](s.orm).Where(eorm.C("Id").LT(4)),
 			wantRes: s.data,
@@ -78,21 +70,31 @@ func (s *MasterSlaveSelectTestSuite) TestMasterSlave() {
 				return c
 			},
 		},
+		{
+			name:      "query use slave",
+			i:         eorm.NewSelector[test.SimpleStruct](s.orm).Where(eorm.C("Id").LT(4)),
+			wantSlave: "0",
+			wantRes:   s.data,
+			ctx: func() context.Context {
+				return context.Background()
+			},
+		},
 	}
 	for _, tc := range testcases {
 		s.T().Run(tc.name, func(t *testing.T) {
 			ctx := tc.ctx()
+			time.Sleep(time.Second)
 			res, err := tc.i.GetMulti(ctx)
 			assert.Equal(t, tc.wantErr, err)
 			if err != nil {
 				return
 			}
+			assert.Equal(t, tc.wantRes, res)
 			slaveName := ""
 			select {
 			case slaveName = <-s.slaveNamegeter.ch:
 			default:
 			}
-			assert.Equal(t, tc.wantRes, res)
 			assert.Equal(t, tc.wantSlave, slaveName)
 		})
 	}

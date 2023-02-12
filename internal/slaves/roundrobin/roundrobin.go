@@ -40,7 +40,7 @@ func (r *Roundrobin) Next(ctx context.Context) (slaves.Slave, error) {
 
 func NewRoundrobin(slavedbs ...*sql.DB) *Roundrobin {
 	r := &Roundrobin{}
-	r.slaves = make([]slaves.Slave, len(slavedbs))
+	r.slaves = make([]slaves.Slave, 0, len(slavedbs))
 	for idx, slavedb := range slavedbs {
 		s := slaves.Slave{
 			SlaveName: strconv.Itoa(idx),

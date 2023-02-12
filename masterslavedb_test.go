@@ -19,9 +19,10 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"testing"
+
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestMasterSlavesDB_BeginTx(t *testing.T) {
@@ -49,7 +50,7 @@ func TestMasterSlavesDB_BeginTx(t *testing.T) {
 
 func ExampleMasterSlavesDB_BeginTx() {
 	sqlite3db, _ := sql.Open("sqlite3", "file:test.db?cache=shared&mode=memory")
-	db, err := OpenMasterSlaveDB("sqlite3", sqlite3db)
+	db, _ := OpenMasterSlaveDB("sqlite3", sqlite3db)
 	tx, err := db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err == nil {
 		fmt.Println("Begin")
