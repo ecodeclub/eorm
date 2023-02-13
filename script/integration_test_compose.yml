@@ -24,6 +24,54 @@ services:
       - ./mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
     ports:
       - "13306:3306"
+  master:
+    image: mysql:8.0.29
+    ports:
+      - '13307:3306'
+    restart: always
+    hostname: mysql-master
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MASTER_SYNC_USER: "sync"
+      MASTER_SYNC_PASSWORD: "123456"
+      ADMIN_USER: "root"
+      ADMIN_PASSWORD: "root"
+    command:
+      -  "--server-id=1"
+      -  "--character-set-server=utf8mb4"
+      -  "--collation-server=utf8mb4_unicode_ci"
+      -  "--log-bin=mysql-bin"
+      -  "--sync_binlog=1"
+      -  "--binlog-ignore-db=mysql"
+      -  "--binlog-ignore-db=sys"
+      -  "--binlog-ignore-db=performance_schema"
+      -  "--binlog-ignore-db=information_schema"
+      -  "--sql_mode=NO_AUTO_VALUE_ON_ZERO,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION,PIPES_AS_CONCAT,ANSI_QUOTES"
+    volumes:
+      - ./mysql/master:/docker-entrypoint-initdb.d/
+      - ./mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
+  slave:
+      image: mysql:8.0.29
+      container_name: mysql-slave
+      ports:
+        - '13308:3306'
+      restart: always
+      hostname: mysql-slave
+      environment:
+        MYSQL_ROOT_PASSWORD: "root"
+        SLAVE_SYNC_USER: "sync"
+        SLAVE_SYNC_PASSWORD: "123456"
+        ADMIN_USER: "root"
+        ADMIN_PASSWORD: "root"
+        MASTER_HOST: "mysql-master"
+      command:
+        -  "--server-id=2"
+        -  "--character-set-server=utf8mb4"
+        -  "--collation-server=utf8mb4_unicode_ci"
+        -  "--sql_mode=NO_AUTO_VALUE_ON_ZERO,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION,PIPES_AS_CONCAT,ANSI_QUOTES"
+      volumes:
+        - ./mysql/slave:/docker-entrypoint-initdb.d/
+        - ./mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
 #  mysql5:
 #    image: mysql:5.7.38
 #    restart: always
@@ -33,3 +81,4 @@ services:
 #      - ./init.sql:/script/sql/mysql.sh
 #    ports:
 #      - "13307:3306"
+

@@ -102,7 +102,7 @@ func (db *DB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Tx{tx: tx, db: db}, nil
+	return &Tx{tx: tx, db: db.db, core: db.core}, nil
 }
 
 // Wait 会等待数据库连接
