@@ -38,11 +38,10 @@ type TableMeta struct {
 
 // ColumnMeta represents model's field, or column
 type ColumnMeta struct {
-	ColumnName      string
-	FieldName       string
-	Typ             reflect.Type
-	IsPrimaryKey    bool
-	IsAutoIncrement bool
+	ColumnName   string
+	FieldName    string
+	Typ          reflect.Type
+	IsPrimaryKey bool
 	// Offset 是字段偏移量。需要注意的是，这里的字段偏移量是相对于整个结构体的偏移量
 	// 例如在组合的情况下，
 	// type A struct {
@@ -132,13 +131,11 @@ func (t *tagMetaRegistry) parseFields(v reflect.Type, fieldIndexes []int,
 	for i := 0; i < lens; i++ {
 		structField := v.Field(i)
 		tag := structField.Tag.Get("eorm")
-		var isKey, isAuto, isIgnore bool
+		var isKey, isIgnore bool
 		for _, t := range strings.Split(tag, ",") {
 			switch t {
 			case "primary_key":
 				isKey = true
-			case "auto_increment":
-				isAuto = true
 			case "-":
 				isIgnore = true
 			}
@@ -167,13 +164,12 @@ func (t *tagMetaRegistry) parseFields(v reflect.Type, fieldIndexes []int,
 		}
 
 		columnMeta := &ColumnMeta{
-			ColumnName:      underscoreName(structField.Name),
-			FieldName:       structField.Name,
-			Typ:             structField.Type,
-			IsAutoIncrement: isAuto,
-			IsPrimaryKey:    isKey,
-			Offset:          structField.Offset + pOffset,
-			FieldIndexes:    append(fieldIndexes, i),
+			ColumnName:   underscoreName(structField.Name),
+			FieldName:    structField.Name,
+			Typ:          structField.Type,
+			IsPrimaryKey: isKey,
+			Offset:       structField.Offset + pOffset,
+			FieldIndexes: append(fieldIndexes, i),
 		}
 		*columnMetas = append(*columnMetas, columnMeta)
 		fieldMap[columnMeta.FieldName] = columnMeta

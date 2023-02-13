@@ -16,6 +16,7 @@ package valuer
 
 import (
 	"database/sql"
+	"reflect"
 
 	"github.com/gotomicro/eorm/internal/model"
 )
@@ -23,7 +24,7 @@ import (
 // Value 是对结构体实例的内部抽象
 type Value interface {
 	// Field 访问结构体字段, name 是字段名
-	Field(name string) (any, error)
+	Field(name string) (reflect.Value, error)
 	// SetColumns 设置新值，column 是列名
 	// 要注意，val 可能存在被上层复用，从而引起篡改的问题
 	SetColumns(rows *sql.Rows) error
