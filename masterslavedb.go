@@ -27,7 +27,7 @@ import (
 
 type MasterSlavesDB struct {
 	master *sql.DB
-	slaves.Slaves
+	slaves slaves.Slaves
 	core
 }
 
@@ -46,7 +46,7 @@ func (m *MasterSlavesDB) queryContext(ctx context.Context, query string, args ..
 	if ok {
 		return m.master.QueryContext(ctx, query, args...)
 	}
-	slave, err := m.Slaves.Next(ctx)
+	slave, err := m.slaves.Next(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -93,13 +93,12 @@ func OpenMasterSlaveDB(driver string, master *sql.DB, opts ...MasterSlaveDBOptio
 
 type MasterSlaveDBOption func(db *MasterSlavesDB)
 
-func MasterSlaveWithSlaveGeter(geter slaves.Slaves) MasterSlaveDBOption {
+func MasterSlaveWithSlaves(s slaves.Slaves) MasterSlaveDBOption {
 	return func(db *MasterSlavesDB) {
-		db.Slaves = geter
+		db.slaves = s
 	}
 }
 
-func UserMaster(ctx context.Context) context.Context {
-	mctx := context.WithValue(ctx, master, true)
-	return mctx
+func UseMaster(ctx context.Context) context.Context {
+	return context.WithValue(ctx, master, true)
 }

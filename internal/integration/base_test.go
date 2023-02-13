@@ -76,8 +76,8 @@ func (s *MasterSlaveSuite) initDb() (*eorm.MasterSlavesDB, error) {
 		}
 		slaves = append(slaves, slave)
 	}
-	s.slaveNamegeter = newSlaveNameGet(roundrobin.NewRoundrobin(slaves...))
-	return eorm.OpenMasterSlaveDB(s.driver, master, eorm.MasterSlaveWithSlaveGeter(s.slaveNamegeter))
+	s.slaveNamegeter = newSlaveNameGet(roundrobin.NewSlaves(slaves...))
+	return eorm.OpenMasterSlaveDB(s.driver, master, eorm.MasterSlaveWithSlaves(s.slaveNamegeter))
 
 }
 

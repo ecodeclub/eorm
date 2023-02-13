@@ -66,7 +66,7 @@ func (s *MasterSlaveSelectTestSuite) TestMasterSlave() {
 			wantRes: s.data,
 			ctx: func() context.Context {
 				c := context.Background()
-				c = eorm.UserMaster(c)
+				c = eorm.UseMaster(c)
 				return c
 			},
 		},

@@ -24,12 +24,12 @@ import (
 	"github.com/gotomicro/eorm/internal/slaves"
 )
 
-type Roundrobin struct {
+type Slaves struct {
 	slaves []slaves.Slave
 	cnt    uint32
 }
 
-func (r *Roundrobin) Next(ctx context.Context) (slaves.Slave, error) {
+func (r *Slaves) Next(ctx context.Context) (slaves.Slave, error) {
 	if ctx.Err() != nil {
 		return slaves.Slave{}, ctx.Err()
 	}
@@ -41,8 +41,8 @@ func (r *Roundrobin) Next(ctx context.Context) (slaves.Slave, error) {
 	return r.slaves[index], nil
 }
 
-func NewRoundrobin(slavedbs ...*sql.DB) *Roundrobin {
-	r := &Roundrobin{}
+func NewSlaves(slavedbs ...*sql.DB) *Slaves {
+	r := &Slaves{}
 	r.slaves = make([]slaves.Slave, 0, len(slavedbs))
 	for idx, slavedb := range slavedbs {
 		s := slaves.Slave{
