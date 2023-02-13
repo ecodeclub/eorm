@@ -30,6 +30,9 @@ type Roundrobin struct {
 }
 
 func (r *Roundrobin) Next(ctx context.Context) (slaves.Slave, error) {
+	if ctx.Err() != nil {
+		return slaves.Slave{}, ctx.Err()
+	}
 	if len(r.slaves) == 0 {
 		return slaves.Slave{}, errs.ErrSlaveNotFound
 	}
