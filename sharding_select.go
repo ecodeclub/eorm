@@ -103,8 +103,11 @@ func (s *ShardingSelector[T]) build(db, tbl string) (*ShardingQuery, error) {
 
 	if len(s.where) > 0 {
 		s.writeString(" WHERE ")
-		err = s.buildPredicates(s.where)
-		if err != nil {
+		p := s.where[0]
+		for i := 1; i < len(s.where); i++ {
+			p = p.And(s.where[i])
+		}
+		if err = s.buildExpr(p); err != nil {
 			return nil, err
 		}
 	}
@@ -128,8 +131,11 @@ func (s *ShardingSelector[T]) build(db, tbl string) (*ShardingQuery, error) {
 	// having
 	if len(s.having) > 0 {
 		s.writeString(" HAVING ")
-		err = s.buildPredicates(s.having)
-		if err != nil {
+		p := s.having[0]
+		for i := 1; i < len(s.having); i++ {
+			p = p.And(s.having[i])
+		}
+		if err = s.buildExpr(p); err != nil {
 			return nil, err
 		}
 	}
@@ -357,7 +363,7 @@ func (s *ShardingSelector[T]) Get(ctx context.Context) (*T, error) {
 	if err != nil {
 		return nil, err
 	}
-	if qs == nil || len(qs) == 0 {
+	if len(qs) == 0 {
 		return nil, errs.ErrNotGenShardingQuery
 	}
 	// TODO 要确保前面的改写 SQL 只能生成一个 SQL
@@ -367,6 +373,9 @@ func (s *ShardingSelector[T]) Get(ctx context.Context) (*T, error) {
 	query := qs[0]
 	sess := s.db.DBs[query.DB]
 	row, err := sess.queryContext(ctx, query.SQL, query.Args...)
+	if err != nil {
+		return nil, err
+	}
 	if !row.Next() {
 		return nil, ErrNoRows
 	}

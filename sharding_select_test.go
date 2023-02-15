@@ -46,6 +46,22 @@ func TestShardingSelector_Build(t *testing.T) {
 		wantErr error
 	}{
 		{
+			name: "miss sharding key err",
+			builder: func() ShardingQueryBuilder {
+				reg := model.NewMetaRegistry()
+				meta, err := reg.Register(&Order{})
+				require.NoError(t, err)
+				shardingDB := &ShardingDB{
+					DBs: map[string]*DB{
+						"order_db_1": db,
+					},
+				}
+				s := NewShardingSelector[Order](shardingDB).RegisterTableMeta(meta).Where(C("UserId").EQ(int64(123)))
+				return s
+			}(),
+			wantErr: errs.ErrMissingShardingKey,
+		},
+		{
 			name: "only eq",
 			builder: func() ShardingQueryBuilder {
 				shardingDB := &ShardingDB{

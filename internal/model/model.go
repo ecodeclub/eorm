@@ -40,7 +40,7 @@ type TableMeta struct {
 	TableShardingFunc ShardingAlgorithm
 }
 
-//ShardingAlgorithm 生成 ShardingKey_xxx
+// ShardingAlgorithm 生成 ShardingKey_xxx
 type ShardingAlgorithm func(skVal any) (string, error)
 
 // ColumnMeta represents model's field, or column

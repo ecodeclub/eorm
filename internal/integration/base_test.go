@@ -39,3 +39,29 @@ func (s *Suite) SetupSuite() {
 	}
 	s.orm = orm
 }
+
+type Driver struct {
+	driver string
+	dsn    string
+}
+
+type ShardingSuite struct {
+	suite.Suite
+	tbMap      map[string]string
+	driverMap  map[string]*Driver
+	shardingDB *eorm.ShardingDB
+}
+
+func (s *ShardingSuite) SetupSuite() {
+	t := s.T()
+	for k, v := range s.driverMap {
+		orm, err := eorm.Open(v.driver, v.dsn)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err = orm.Wait(); err != nil {
+			t.Fatal(err)
+		}
+		s.shardingDB.DBs[k] = orm
+	}
+}

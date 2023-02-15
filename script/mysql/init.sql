@@ -73,3 +73,25 @@ create table if not exists `integration_test`.`item`
     `id`          bigint auto_increment
         primary key
 );
+
+/* sharding test */
+create database if not exists `order_detail_db_1`;
+create database if not exists `order_detail_db_2`;
+
+create table if not exists `order_detail_db_1`.`order_detail_tab_3`
+(
+    `order_id`          int(11) auto_increment
+    primary key,
+    `item_id`  int(11),
+    `using_col1`  varchar(128) null,
+    `using_col2`  varchar(128) null
+);
+
+create table if not exists `order_detail_db_2`.`order_detail_tab_4`
+(
+    `order_id`          int(11) auto_increment
+    primary key,
+    `item_id`  int(11),
+    `using_col1`  varchar(128) null,
+    `using_col2`  varchar(128) null
+);
