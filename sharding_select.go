@@ -72,7 +72,7 @@ func (s *ShardingSelector[T]) Build() ([]*ShardingQuery, error) {
 			return nil, errs.ErrSardingDBNotFind
 		}
 		s.builder.core = sess.getCore()
-		query, err := s.build(dst.DB, dst.Table)
+		query, err := s.buildQuery(dst.DB, dst.Table)
 		if err != nil {
 			return nil, err
 		}
@@ -82,7 +82,7 @@ func (s *ShardingSelector[T]) Build() ([]*ShardingQuery, error) {
 	return res, nil
 }
 
-func (s *ShardingSelector[T]) build(db, tbl string) (*ShardingQuery, error) {
+func (s *ShardingSelector[T]) buildQuery(db, tbl string) (*ShardingQuery, error) {
 	defer bytebufferpool.Put(s.buffer)
 	var err error
 	s.writeString("SELECT ")
