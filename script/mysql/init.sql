@@ -73,7 +73,7 @@ create table if not exists `integration_test`.`item`
         primary key
     );
 
-/* sharding test */
+        /* sharding test */
         create database if not exists `order_detail_db_1`;
         create database if not exists `order_detail_db_2`;
 
