@@ -46,6 +46,57 @@ func TestShardingSelector_Build(t *testing.T) {
 		wantErr error
 	}{
 		{
+			name: "not meta",
+			builder: func() ShardingQueryBuilder {
+				require.NoError(t, err)
+				shardingDB := &ShardingDB{
+					DBs: map[string]*DB{
+						"order_db_1": db,
+					},
+				}
+				s := NewShardingSelector[Order](shardingDB).Where(C("UserId").EQ(int64(123)))
+				return s
+			}(),
+			wantErr: errs.ErrShardingBuilderNotMeta,
+		},
+		{
+			name: "not db",
+			builder: func() ShardingQueryBuilder {
+				shardingDB := &ShardingDB{}
+				s := NewShardingSelector[Order](shardingDB).RegisterTableMeta(m).Where(C("UserId").EQ(int64(123)))
+				return s
+			}(),
+			wantErr: errs.ErrEmptyShardingDB,
+		},
+		{
+			name: "not dst",
+			builder: func() ShardingQueryBuilder {
+				require.NoError(t, err)
+				shardingDB := &ShardingDB{
+					DBs: map[string]*DB{
+						"order_db_1": db,
+					},
+				}
+				s := NewShardingSelector[Order](shardingDB).RegisterTableMeta(m).Where(C("UserId").EQ(int64(334)))
+				return s
+			}(),
+			wantErr: errs.ErrSardingDstNotFind,
+		},
+		{
+			name: "too complex operator",
+			builder: func() ShardingQueryBuilder {
+				require.NoError(t, err)
+				shardingDB := &ShardingDB{
+					DBs: map[string]*DB{
+						"order_db_1": db,
+					},
+				}
+				s := NewShardingSelector[Order](shardingDB).RegisterTableMeta(m).Where(C("UserId").GT(int64(123)))
+				return s
+			}(),
+			wantErr: errs.NewUnsupportedOperatorError(opGT.text),
+		},
+		{
 			name: "miss sharding key err",
 			builder: func() ShardingQueryBuilder {
 				reg := model.NewMetaRegistry()

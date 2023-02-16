@@ -30,7 +30,7 @@ var (
 	// ErrCombinationIsNotStruct 不支持的组合类型，eorm 只支持结构体组合
 	ErrCombinationIsNotStruct     = errors.New("eorm: 不支持的组合类型，eorm 只支持结构体组合")
 	ErrMissingShardingKey         = errors.New("eorm: sharding key 未设置")
-	ErrSardingDBNotFind           = errors.New("eorm: 未找到目标 sharding db")
+	ErrSardingDstNotFind          = errors.New("eorm: 未找到目标 sharding dst")
 	ErrResultOne                  = errors.New("eorm: 只能生成一个 SQL")
 	ErrNotGenShardingQuery        = errors.New("eorm: 未生成 sharding query")
 	ErrUnsupportedTooComplexQuery = errors.New("eorm: 暂未支持太复杂的查询")

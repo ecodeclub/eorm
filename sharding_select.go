@@ -69,7 +69,7 @@ func (s *ShardingSelector[T]) Build() ([]*ShardingQuery, error) {
 	for _, dst := range dsts {
 		sess, ok := s.db.DBs[dst.DB]
 		if !ok {
-			return nil, errs.ErrSardingDBNotFind
+			return nil, errs.ErrSardingDstNotFind
 		}
 		s.builder.core = sess.getCore()
 		query, err := s.buildQuery(dst.DB, dst.Table)
