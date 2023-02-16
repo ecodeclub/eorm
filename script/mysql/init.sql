@@ -65,7 +65,7 @@ create table if not exists `integration_test`.`order_detail`
     `item_id`  bigint null,
     `using_col1`  varchar(128) null,
     `using_col2`  varchar(128) null
-);
+    );
 
 create table if not exists `integration_test`.`item`
 (
@@ -74,8 +74,8 @@ create table if not exists `integration_test`.`item`
     );
 
 /* sharding test */
-create database if not exists `order_detail_db_1`;
-create database if not exists `order_detail_db_2`;
+        create database if not exists `order_detail_db_1`;
+        create database if not exists `order_detail_db_2`;
 
 create table if not exists `order_detail_db_1`.`order_detail_tab_3`
 (
