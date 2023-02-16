@@ -172,7 +172,7 @@ func testSetColumn(t *testing.T, creator Creator) {
 	})
 
 	type BaseEntity struct {
-		Id         int64 `eorm:"auto_increment,primary_key"`
+		Id         int64 `eorm:"primary_key"`
 		CreateTime uint64
 	}
 	type CombinedUser struct {
@@ -282,7 +282,7 @@ func testValueField(t *testing.T, creator Creator) {
 	})
 
 	type BaseEntity struct {
-		Id         int64 `eorm:"auto_increment,primary_key"`
+		Id         int64 `eorm:"primary_key"`
 		CreateTime uint64
 	}
 	type CombinedUser struct {

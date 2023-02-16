@@ -38,6 +38,7 @@ var (
 	ErrShardingBuilderNotMeta     = errors.New("eorm: TableMeta 未设置，请执行 `RegisterTableMeta` 方法")
 
 	ErrEmptyShardingDB = errors.New("eorm: ShardingDB DBs 不能为空")
+	ErrSlaveNotFound   = errors.New("eorm: slave不存在")
 )
 
 func NewFieldConflictError(field string) error {
