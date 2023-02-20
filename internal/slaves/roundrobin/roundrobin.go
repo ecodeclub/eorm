@@ -33,6 +33,9 @@ func (r *Slaves) Next(ctx context.Context) (slaves.Slave, error) {
 	if ctx.Err() != nil {
 		return slaves.Slave{}, ctx.Err()
 	}
+	if r == nil {
+		return slaves.Slave{}, errs.ErrSlaveNotFound
+	}
 	if len(r.slaves) == 0 {
 		return slaves.Slave{}, errs.ErrSlaveNotFound
 	}
