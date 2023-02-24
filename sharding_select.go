@@ -18,10 +18,11 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"github.com/gotomicro/eorm/internal/errs"
+	"sync"
+
+	"github.com/ecodehub/eorm/internal/errs"
 	"github.com/valyala/bytebufferpool"
 	"golang.org/x/sync/errgroup"
-	"sync"
 )
 
 type ShardingSelector[T any] struct {

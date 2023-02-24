@@ -1,4 +1,4 @@
-# Copyright 2021 gotomicro
+# Copyright 2021 ecodehub
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,13 +19,9 @@ name = "go"
 enabled = true
 
   [analyzers.meta]
-  import_root = "github.com/gotomicro/eorm"
+  import_root = "github.com/ecodehub/eorm"
   dependencies_vendored = false
 
 [[analyzers]]
 name = "test-coverage"
-enabled = true
-
-[[analyzers]]
-name = "sql"
 enabled = true

@@ -1,4 +1,4 @@
-// Copyright 2021 gotomicro
+// Copyright 2021 ecodehub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -82,4 +82,9 @@ func NewMustSpecifyColumnsError() error {
 
 func NewUnsupportedOperatorError(op string) error {
 	return fmt.Errorf("eorm: 不支持的 operator %v", op)
+}
+
+func NewInvalidDSNError(dsn string) error {
+	return fmt.Errorf("eorm: 不正确的 DSN %s", dsn)
+
 }

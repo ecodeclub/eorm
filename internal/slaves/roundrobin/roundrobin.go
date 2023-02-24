@@ -1,4 +1,4 @@
-// Copyright 2021 gotomicro
+// Copyright 2021 ecodehub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,8 +20,8 @@ import (
 	"strconv"
 	"sync/atomic"
 
-	"github.com/gotomicro/eorm/internal/errs"
-	"github.com/gotomicro/eorm/internal/slaves"
+	"github.com/ecodehub/eorm/internal/errs"
+	"github.com/ecodehub/eorm/internal/slaves"
 )
 
 type Slaves struct {
@@ -32,6 +32,9 @@ type Slaves struct {
 func (r *Slaves) Next(ctx context.Context) (slaves.Slave, error) {
 	if ctx.Err() != nil {
 		return slaves.Slave{}, ctx.Err()
+	}
+	if r == nil {
+		return slaves.Slave{}, errs.ErrSlaveNotFound
 	}
 	if len(r.slaves) == 0 {
 		return slaves.Slave{}, errs.ErrSlaveNotFound

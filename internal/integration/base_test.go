@@ -1,4 +1,4 @@
-// Copyright 2021 gotomicro
+// Copyright 2021 ecodehub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,10 +23,10 @@ import (
 	"log"
 	"time"
 
-	"github.com/gotomicro/eorm"
-	"github.com/gotomicro/eorm/internal/model"
-	"github.com/gotomicro/eorm/internal/slaves"
-	"github.com/gotomicro/eorm/internal/slaves/roundrobin"
+	"github.com/ecodehub/eorm"
+	"github.com/ecodehub/eorm/internal/model"
+	"github.com/ecodehub/eorm/internal/slaves"
+	"github.com/ecodehub/eorm/internal/slaves/roundrobin"
 	"github.com/stretchr/testify/suite"
 )
 

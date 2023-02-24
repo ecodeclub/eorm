@@ -20,5 +20,3 @@ import "github.com/gotomicro/eorm"
 type ShardingQueryBuilder interface {
 	Build() ([]*eorm.ShardingQuery, error)
 }
-
-

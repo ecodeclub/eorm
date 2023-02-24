@@ -1,6 +1,6 @@
 # EORM
 
-[![codecov](https://codecov.io/gh/gotomicro/eorm/branch/main/graph/badge.svg?token=vc0BDor3Lk)](https://codecov.io/gh/gotomicro/eorm)
+[![DeepSource](https://deepsource.io/gh/ecodeclub/eorm.svg/?label=active+issues&show_trend=true&token=pKgxd-FmZ5F3l0M2iXQRpBRy)](https://deepsource.io/gh/ecodeclub/eorm/?ref=repository-badge)
 
 简单的 ORM 框架。
 
