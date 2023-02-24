@@ -1,4 +1,4 @@
-// Copyright 2021 gotomicro
+// Copyright 2021 ecodehub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -222,7 +222,7 @@ func (s *ShardingSelector[T]) findDstByPredicate(pre Predicate) ([]Dst, error) {
 	return res, nil
 }
 
-func (s *ShardingSelector[T]) mergeAnd(left, right []Dst) []Dst {
+func (*ShardingSelector[T]) mergeAnd(left, right []Dst) []Dst {
 	res := make([]Dst, 0, len(left)+len(right))
 	for _, r := range right {
 		exist := false
@@ -238,7 +238,7 @@ func (s *ShardingSelector[T]) mergeAnd(left, right []Dst) []Dst {
 	return res
 }
 
-func (s *ShardingSelector[T]) mergeOR(left, right []Dst) []Dst {
+func (*ShardingSelector[T]) mergeOR(left, right []Dst) []Dst {
 	res := make([]Dst, 0, len(left)+len(right))
 	m := make(map[string]bool, 8)
 	for _, r := range right {

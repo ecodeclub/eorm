@@ -137,8 +137,8 @@ func (s *ShardingDB) getMasterSlavesDB(ctx context.Context) (*MasterSlavesDB, er
 
 func (s *ShardingDB) broadcast() []Dst {
 	dsts := make([]Dst, 0, 8)
-	for dbName, _ := range s.DBs {
-		for tbName, _ := range s.Tables {
+	for dbName := range s.DBs {
+		for tbName := range s.Tables {
 			dst := Dst{
 				DB:    dbName,
 				Table: tbName,
