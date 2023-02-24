@@ -30,15 +30,14 @@ var (
 	// ErrCombinationIsNotStruct 不支持的组合类型，eorm 只支持结构体组合
 	ErrCombinationIsNotStruct     = errors.New("eorm: 不支持的组合类型，eorm 只支持结构体组合")
 	ErrMissingShardingKey         = errors.New("eorm: sharding key 未设置")
-	ErrSardingDstNotFind          = errors.New("eorm: 未找到目标 sharding dst")
-	ErrResultOne                  = errors.New("eorm: 只能生成一个 SQL")
+	ErrOnlyResultOneQuery         = errors.New("eorm: 只能生成一个 SQL")
 	ErrNotGenShardingQuery        = errors.New("eorm: 未生成 sharding query")
 	ErrUnsupportedTooComplexQuery = errors.New("eorm: 暂未支持太复杂的查询")
 	ErrExcShardingAlgorithm       = errors.New("eorm: 执行 sharding algorithm 出错")
-	ErrShardingBuilderNotMeta     = errors.New("eorm: TableMeta 未设置，请执行 `RegisterTableMeta` 方法")
-
-	ErrEmptyShardingDB = errors.New("eorm: ShardingDB DBs 不能为空")
-	ErrSlaveNotFound   = errors.New("eorm: slave不存在")
+	ErrCtxGetDBName               = errors.New("eorm: ctx 获取目标 dbName 出错")
+	ErrNotFoundTargetDB           = errors.New("eorm: 未发现目标 DB")
+	ErrNotFoundTargetTable        = errors.New("eorm: 未发现目标 Table")
+	ErrSlaveNotFound              = errors.New("eorm: slave不存在")
 )
 
 func NewFieldConflictError(field string) error {

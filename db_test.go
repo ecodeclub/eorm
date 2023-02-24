@@ -142,6 +142,19 @@ func memoryDB() *DB {
 	return orm
 }
 
+// memoryDB 返回一个基于内存的 MasterSlaveDB，它使用的是 sqlite3 内存模式。
+func masterSlaveMemoryDB() *MasterSlavesDB {
+	db, err := sql.Open("sqlite3", "file:test.db?cache=shared&mode=memory")
+	if err != nil {
+		panic(err)
+	}
+	masterSlaveDB, err := OpenMasterSlaveDB("sqlite3", db)
+	if err != nil {
+		panic(err)
+	}
+	return masterSlaveDB
+}
+
 func memoryDBWithDB(db string) *DB {
 	orm, err := Open("sqlite3", fmt.Sprintf("file:%s.db?cache=shared&mode=memory", db))
 	if err != nil {

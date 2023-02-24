@@ -14,6 +14,15 @@
 
 package eorm
 
+import (
+	"context"
+	"database/sql"
+	"github.com/gotomicro/eorm/internal/dialect"
+	"github.com/gotomicro/eorm/internal/errs"
+	"github.com/gotomicro/eorm/internal/model"
+	"github.com/gotomicro/eorm/internal/valuer"
+)
+
 type ShardingQuery struct {
 	SQL  string
 	Args []any
@@ -25,6 +34,116 @@ type Dst struct {
 	Table string
 }
 
+type ShardingAlgorithm interface {
+	Broadcast() []Dst
+}
+
+type dbNameKey struct{}
+
+type ShardingDBOption func(db *ShardingDB)
+
+func CtxWithDBName(ctx context.Context, dbName string) context.Context {
+	return context.WithValue(ctx, dbNameKey{}, dbName)
+}
+
+func ctxGetDBName(ctx context.Context) (string, error) {
+	val := ctx.Value(dbNameKey{})
+	dbName, ok := val.(string)
+	if !ok {
+		return "", errs.ErrCtxGetDBName
+	}
+	return dbName, nil
+}
+
 type ShardingDB struct {
-	DBs map[string]*DB
+	core
+	DBs    map[string]*MasterSlavesDB
+	Tables map[string]bool
+}
+
+func OpenShardingDB(driver string, DBs map[string]*MasterSlavesDB, opts ...ShardingDBOption) (*ShardingDB, error) {
+	dl, err := dialect.Of(driver)
+	if err != nil {
+		return nil, err
+	}
+	orm := &ShardingDB{
+		DBs: DBs,
+		core: core{
+			metaRegistry: model.NewMetaRegistry(),
+			dialect:      dl,
+			valCreator: valuer.BasicTypeCreator{
+				Creator: valuer.NewUnsafeValue,
+			},
+		},
+	}
+	for _, o := range opts {
+		o(orm)
+	}
+	return orm, nil
+}
+
+func ShardingDBOptionWithMetaRegistry(r model.MetaRegistry) ShardingDBOption {
+	return func(db *ShardingDB) {
+		db.metaRegistry = r
+	}
+}
+
+func ShardingDBOptionWithTables(m map[string]bool) ShardingDBOption {
+	return func(db *ShardingDB) {
+		db.Tables = m
+	}
+}
+
+func (s *ShardingDB) getCore() core {
+	return s.core
+}
+
+func (s *ShardingDB) queryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
+	sess, err := s.getMasterSlavesDB(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return sess.queryContext(ctx, query, args...)
+}
+
+func (s *ShardingDB) execContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
+	sess, err := s.getMasterSlavesDB(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return sess.execContext(ctx, query, args...)
+}
+
+func (s *ShardingDB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) {
+	sess, err := s.getMasterSlavesDB(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return sess.BeginTx(ctx, opts)
+}
+
+func (s *ShardingDB) getMasterSlavesDB(ctx context.Context) (*MasterSlavesDB, error) {
+	dbName, err := ctxGetDBName(ctx)
+	if err != nil {
+		return nil, err
+	}
+	sess, ok := s.DBs[dbName]
+	if !ok {
+		return nil, errs.ErrNotFoundTargetDB
+	}
+	return sess, nil
+}
+
+func (s *ShardingDB) broadcast() []Dst {
+	dsts := make([]Dst, 0, 8)
+	for dbName, _ := range s.DBs {
+		for tbName, _ := range s.Tables {
+			dst := Dst{
+				DB:    dbName,
+				Table: tbName,
+			}
+			dsts = append(dsts, dst)
+		}
+	}
+	return dsts
 }

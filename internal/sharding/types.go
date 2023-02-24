@@ -12,21 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package eorm
+package sharding
 
-import "context"
+import "github.com/gotomicro/eorm"
 
-// Executor sql 语句执行器
-type Executor interface {
-	Exec(ctx context.Context) Result
-}
-
-// QueryBuilder 普通 sql 构造抽象
-type QueryBuilder interface {
-	Build() (*Query, error)
-}
-
-// ShardingQueryBuilder  sharding sql 构造抽象
+// ShardingQueryBuilder is used to build a ShardingQuery
 type ShardingQueryBuilder interface {
-	Build() ([]*ShardingQuery, error)
+	Build() ([]*eorm.ShardingQuery, error)
 }
+
+
