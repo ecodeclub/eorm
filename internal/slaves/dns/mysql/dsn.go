@@ -1,4 +1,4 @@
-// Copyright 2021 gotomicro
+// Copyright 2021 ecodehub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,40 +12,44 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package dns
+package mysql
 
 import (
 	"strings"
 
+	"github.com/ecodehub/eorm/internal/errs"
+
 	"github.com/go-sql-driver/mysql"
 )
 
-type ParseDSN interface {
-	Parse(dsn string) (domain string, err error)
-	Splice(ip string) (dsn string, err error)
+type Dsn struct {
+	cfg    *mysql.Config
+	domain string
+	port   string
 }
 
-type MysqlParse struct {
-	cfg  *mysql.Config
-	port string
-}
-
-// Parse 功能是从dsn中解析出domain
-func (m *MysqlParse) Parse(dsn string) (domain string, err error) {
+// Init 初始化
+func (m *Dsn) Init(dsn string) error {
 	cfg, err := mysql.ParseDSN(dsn)
 	if err != nil {
-		return "", err
+		return err
 	}
 	index := strings.Index(cfg.Addr, ":")
-	domain = cfg.Addr[:index]
+	if index == -1 {
+		return errs.NewInvalidDSNError(dsn)
+	}
+	m.domain = cfg.Addr[:index]
 	m.port = cfg.Addr[index+1:]
 	m.cfg = cfg
-	return domain, nil
-
+	return nil
 }
 
-// Splice 功能是将Ip拼成dsn
-func (m *MysqlParse) Splice(ip string) (dsn string, err error) {
+func (m *Dsn) Domain() string {
+	return m.domain
+}
+
+// FormatByIp 功能是利用目标 IP 拼接成一个 dsn
+func (m *Dsn) FormatByIp(ip string) (string, error) {
 	m.cfg.Addr = ip + ":" + m.port
 	return m.cfg.FormatDSN(), nil
 }

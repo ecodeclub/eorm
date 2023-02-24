@@ -1,4 +1,4 @@
-// Copyright 2021 gotomicro
+// Copyright 2021 ecodehub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,36 +23,38 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/ecodehub/eorm/internal/errs"
+	"github.com/ecodehub/eorm/internal/slaves"
+	"github.com/ecodehub/eorm/internal/slaves/dns/mysql"
 	_ "github.com/go-sql-driver/mysql"
-	"github.com/gotomicro/eorm/internal/errs"
-	"github.com/gotomicro/eorm/internal/slaves"
 )
 
-type dns interface {
-	LookUpAddr(ctx context.Context, domain string) ([]string, error)
+type Dsn interface {
+	// Init 利用 dsn 来初始化本实例
+	Init(dsn string) error
+	// FormatByIp 使用 ip 来取代当前的域名，返回 dsn
+	FormatByIp(ip string) (dsn string, err error)
+
+	// getter 类方法，用于查询具体的 Dsn 里面的字段
+
+	// Domain 返回 Dsn 中的域名部分
+	Domain() string
 }
 
-type dnsResolver struct {
-	resolver *net.Resolver
+type netResolver interface {
+	LookupAddr(ctx context.Context, domain string) ([]string, error)
 }
 
-func (d *dnsResolver) LookUpAddr(ctx context.Context, domain string) ([]string, error) {
-	return d.resolver.LookupAddr(ctx, domain)
-}
-
-type SlaveInfo struct {
-	Ip     string
-	Domain string
-}
+var _ netResolver = (*net.Resolver)(nil)
 
 type Slaves struct {
-	dns dns
+	resolver netResolver
 	// 域名
 	domain   string
 	slaves   []slaves.Slave
-	slavedsn []string
-	closech  chan struct{}
-	parse    ParseDSN
+	slaveDsn []string
+	closeCh  chan struct{}
+	dsn      Dsn
 	cnt      uint32
 	once     sync.Once
 	driver   string
@@ -76,83 +78,81 @@ func (s *Slaves) Next(ctx context.Context) (slaves.Slave, error) {
 
 type SlaveOption func(s *Slaves)
 
-func WithParseDSN(pdsn ParseDSN) SlaveOption {
+// WithDSN 指定 Dsn 的实现
+func WithDSN(pdsn Dsn) SlaveOption {
 	return func(s *Slaves) {
-		s.parse = pdsn
+		s.dsn = pdsn
 	}
 }
+
+// WithDriver 指定 driver
 func WithDriver(driver string) SlaveOption {
 	return func(s *Slaves) {
 		s.driver = driver
 	}
 }
-func WithResolver(dns *net.Resolver) SlaveOption {
-	return func(s *Slaves) {
-		resolver := &dnsResolver{
-			resolver: dns,
-		}
-		s.dns = resolver
-	}
-}
 
-func withdns(d dns) SlaveOption {
-	return func(s *Slaves) {
-		s.dns = d
-	}
-}
+// WithInterval 指定轮询 DNS 服务器的间隔
 func WithInterval(interval time.Duration) SlaveOption {
 	return func(s *Slaves) {
 		s.interval = interval
 	}
 }
 
+func withResolver(resolver netResolver) SlaveOption {
+	return func(s *Slaves) {
+		s.resolver = resolver
+	}
+}
+
 func NewSlaves(dsn string, opts ...SlaveOption) (*Slaves, error) {
-	slave := &Slaves{
-		closech:  make(chan struct{}),
-		parse:    &MysqlParse{},
+	s := &Slaves{
+		closeCh:  make(chan struct{}),
+		dsn:      &mysql.Dsn{},
+		resolver: net.DefaultResolver,
 		driver:   "mysql",
 		interval: time.Second,
 		mu:       &sync.RWMutex{},
 	}
 	for _, opt := range opts {
-		opt(slave)
+		opt(s)
 	}
-	domain, err := slave.parse.Parse(dsn)
+	err := s.dsn.Init(dsn)
 	if err != nil {
 		return nil, err
 	}
-	slave.domain = domain
-	ticker := time.NewTicker(slave.interval)
-	err = slave.getSlaves(context.Background())
+	s.domain = s.dsn.Domain()
+	err = s.getSlaves(context.Background())
 	if err != nil {
 		return nil, err
 	}
 	go func() {
+		ticker := time.NewTicker(s.interval)
 		for {
 			select {
 			case <-ticker.C:
-				err := slave.getSlaves(context.Background())
+				err := s.getSlaves(context.Background())
 				// 错误处理还没有想好怎么搞
 				if err != nil {
 					continue
 				}
-			case <-slave.closech:
+			case <-s.closeCh:
 				return
 			}
 		}
 	}()
-	return slave, nil
-
+	return s, nil
 }
+
 func (s *Slaves) getSlaves(ctx context.Context) error {
-	slavesip, err := s.dns.LookUpAddr(ctx, s.domain)
+	slavesip, err := s.resolver.LookupAddr(ctx, s.domain)
 	if err != nil {
 		return err
 	}
 	ss := make([]slaves.Slave, 0, len(slavesip))
 	sdnss := make([]string, 0, len(slavesip))
-	for i, slaveip := range slavesip {
-		dsn, err := s.parse.Splice(slaveip)
+	for i, slaveIp := range slavesip {
+		dsn, err := s.dsn.FormatByIp(slaveIp)
 		if err != nil {
 			return err
 		}
@@ -168,20 +168,14 @@ func (s *Slaves) getSlaves(ctx context.Context) error {
 		ss = append(ss, slave)
 	}
 	s.mu.Lock()
-	s.slavedsn = sdnss
+	s.slaveDsn = sdnss
 	s.slaves = ss
 	s.mu.Unlock()
 	return nil
 }
 
-func (s *Slaves) getslavedsns() []string {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.slavedsn
-}
-
 func (s *Slaves) Close() {
 	s.once.Do(func() {
-		close(s.closech)
+		close(s.closeCh)
 	})
 }

@@ -1,4 +1,4 @@
-// Copyright 2021 gotomicro
+// Copyright 2021 ecodehub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ import (
 	"database/sql"
 	"reflect"
 
-	"github.com/gotomicro/eorm/internal/model"
+	"github.com/ecodehub/eorm/internal/model"
 )
 
 // supportBasicTypeValue 支持基本类型 Value

@@ -1,4 +1,4 @@
-// Copyright 2021 gotomicro
+// Copyright 2021 ecodehub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,11 +21,11 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/gotomicro/eorm/internal/errs"
+	"github.com/ecodehub/eorm/internal/errs"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/gotomicro/eorm/internal/slaves/roundrobin"
+	"github.com/ecodehub/eorm/internal/slaves/roundrobin"
 	"github.com/stretchr/testify/assert"
 )
 

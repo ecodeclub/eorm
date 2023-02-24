@@ -1,4 +1,4 @@
-// Copyright 2021 gotomicro
+// Copyright 2021 ecodehub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -70,4 +70,8 @@ func NewErrUnsupportedExpressionType() error {
 
 func NewMustSpecifyColumnsError() error {
 	return fmt.Errorf("eorm: 复合查询如 JOIN 查询、子查询必须指定要查找的列，即指定 SELECT xxx 部分")
+}
+
+func NewInvalidDSNError(dsn string) error {
+	return fmt.Errorf("eorm: 不正确的 DSN %s", dsn)
 }
