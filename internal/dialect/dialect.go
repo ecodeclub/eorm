@@ -1,4 +1,4 @@
-// Copyright 2021 gotomicro
+// Copyright 2021 ecodehub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
 
 package dialect
 
-import "github.com/gotomicro/eorm/internal/errs"
+import "github.com/ecodehub/eorm/internal/errs"
 
 // Dialect specify config or behavior of special SQL dialects
 type Dialect struct {

@@ -1,4 +1,4 @@
-// Copyright 2021 gotomicro
+// Copyright 2021 ecodehub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,18 +21,20 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gotomicro/eorm/internal/errs"
+	"github.com/ecodehub/eorm/internal/slaves/dns/mysql"
+
+	"github.com/ecodehub/eorm/internal/errs"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-type mockdns struct {
+type mockResolver struct {
 	mu *sync.RWMutex
 	m  map[string][]string
 }
 
-func (m *mockdns) LookUpAddr(ctx context.Context, domain string) ([]string, error) {
+func (m *mockResolver) LookupAddr(ctx context.Context, domain string) ([]string, error) {
 	if ctx.Err() != nil {
 		return []string{}, ctx.Err()
 	}
@@ -46,9 +48,9 @@ func (m *mockdns) LookUpAddr(ctx context.Context, domain string) ([]string, erro
 }
 
 func TestGetSlaves(t *testing.T) {
-	resolver := &mockdns{
+	resolver := &mockResolver{
 		m: map[string][]string{
-			"slaves.mycompany.com": []string{"192.168.1.1", "192.168.1.2", "192.168.1.3"},
+			"slaves.mycompany.com": {"192.168.1.1", "192.168.1.2", "192.168.1.3"},
 		},
 		mu: &sync.RWMutex{},
 	}
@@ -60,10 +62,9 @@ func TestGetSlaves(t *testing.T) {
 		wantErr       error
 	}{
 		{
-			name: "normal dns",
+			name: "normal resolver",
 			slaves: func() (*Slaves, error) {
-				s, err := NewSlaves("root:root@tcp(slaves.mycompany.com:13308)/integration_test", withdns(resolver))
-				return s, err
+				return NewSlaves("root:root@tcp(slaves.mycompany.com:13308)/integration_test", withResolver(resolver))
 			},
 			wantSlavednss: []string{
 				"root:root@tcp(192.168.1.1:13308)/integration_test",
@@ -84,7 +85,7 @@ func TestGetSlaves(t *testing.T) {
 			if err != nil {
 				return
 			}
-			assert.Equal(t, tc.wantSlavednss, s.getslavedsns())
+			assert.Equal(t, tc.wantSlavednss, s.getSlaveDsns())
 			s.Close()
 
 		})
@@ -92,7 +93,7 @@ func TestGetSlaves(t *testing.T) {
 }
 
 func TestSlaves(t *testing.T) {
-	resolver := &mockdns{
+	resolver := &mockResolver{
 		m: map[string][]string{
 			"slaves.mycompany.com": []string{
 				"192.168.1.1",
@@ -109,9 +110,9 @@ func TestSlaves(t *testing.T) {
 		cs              func()
 	}{
 		{
-			name: "get slaves by dns",
+			name: "get slaves by resolver",
 			slaves: func() (*Slaves, error) {
-				s, err := NewSlaves("root:root@tcp(slaves.mycompany.com:13308)/integration_test", withdns(resolver))
+				s, err := NewSlaves("root:root@tcp(slaves.mycompany.com:13308)/integration_test", withResolver(resolver))
 				return s, err
 			},
 			beforeSlavednss: []string{
@@ -137,19 +138,19 @@ func TestSlaves(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			s, err := tc.slaves()
 			require.NoError(t, err)
-			assert.Equal(t, tc.beforeSlavednss, s.getslavedsns())
+			assert.Equal(t, tc.beforeSlavednss, s.getSlaveDsns())
 			go tc.cs()
 			time.Sleep(2 * time.Second)
-			assert.Equal(t, tc.afterSlavedns, s.getslavedsns())
+			assert.Equal(t, tc.afterSlavedns, s.getSlaveDsns())
 		})
 	}
 
 }
 
 func TestSlaves_Next(t *testing.T) {
-	resolver := &mockdns{
+	resolver := &mockResolver{
 		m: map[string][]string{
-			"slaves.mycompany.com": []string{
+			"slaves.mycompany.com": {
 				"192.168.1.1",
 				"192.168.1.2",
 				"192.168.1.3",
@@ -167,7 +168,11 @@ func TestSlaves_Next(t *testing.T) {
 		{
 			name: "get single slave",
 			slaves: func() (*Slaves, error) {
-				s, err := NewSlaves("root:root@tcp(slaves.mycompany.com:13308)/integration_test", withdns(resolver), WithInterval(time.Second), WithParseDSN(&MysqlParse{}), WithDriver("mysql"))
+				s, err := NewSlaves("root:root@tcp(slaves.mycompany.com:13308)/integration_test",
+					withResolver(resolver),
+					WithInterval(time.Second),
+					WithDSN(&mysql.Dsn{}),
+					WithDriver("mysql"))
 				return s, err
 			},
 			next: func(s *Slaves) ([]string, error) {
@@ -184,7 +189,7 @@ func TestSlaves_Next(t *testing.T) {
 		{
 			name: "get mutil slave",
 			slaves: func() (*Slaves, error) {
-				s, err := NewSlaves("root:root@tcp(slaves.mycompany.com:13308)/integration_test", withdns(resolver))
+				s, err := NewSlaves("root:root@tcp(slaves.mycompany.com:13308)/integration_test", withResolver(resolver))
 				return s, err
 			},
 			next: func(s *Slaves) ([]string, error) {
@@ -203,7 +208,7 @@ func TestSlaves_Next(t *testing.T) {
 		{
 			name: "Next timeout",
 			slaves: func() (*Slaves, error) {
-				s, err := NewSlaves("root:root@tcp(slaves.mycompany.com:13308)/integration_test", withdns(resolver))
+				s, err := NewSlaves("root:root@tcp(slaves.mycompany.com:13308)/integration_test", withResolver(resolver))
 				return s, err
 			},
 			next: func(s *Slaves) ([]string, error) {
@@ -221,13 +226,13 @@ func TestSlaves_Next(t *testing.T) {
 		{
 			name: "do not have slave",
 			slaves: func() (*Slaves, error) {
-				resolver := &mockdns{
+				r := &mockResolver{
 					m: map[string][]string{
-						"slaves.mycompany.com": []string{},
+						"slaves.mycompany.com": {},
 					},
 					mu: &sync.RWMutex{},
 				}
-				s, err := NewSlaves("root:root@tcp(slaves.mycompany.com:13308)/integration_test", withdns(resolver))
+				s, err := NewSlaves("root:root@tcp(slaves.mycompany.com:13308)/integration_test", withResolver(r))
 				return s, err
 			},
 			next: func(s *Slaves) ([]string, error) {
@@ -254,4 +259,10 @@ func TestSlaves_Next(t *testing.T) {
 			assert.Equal(t, tc.wantSlaveName, names)
 		})
 	}
+}
+
+func (s *Slaves) getSlaveDsns() []string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.slaveDsn
 }

@@ -1,4 +1,4 @@
-// Copyright 2021 gotomicro
+// Copyright 2021 ecodehub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,10 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package dns
+package mysql
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -26,19 +28,19 @@ func TestMysqlParse_Parse(t *testing.T) {
 		dsn     string
 		domain  string
 		wantErr error
-		m       *MysqlParse
+		m       *Dsn
 		port    string
 	}{
 		{
-			name:   "noraml dsn",
-			m:      &MysqlParse{},
+			name:   "normal dsn",
+			m:      &Dsn{},
 			dsn:    "root:root@tcp(slaves.mycompany.com:13308)/integration_test",
 			domain: "slaves.mycompany.com",
 			port:   "13308",
 		},
 		{
-			name:   "noraml dsn",
-			m:      &MysqlParse{},
+			name:   "no port",
+			m:      &Dsn{},
 			dsn:    "root:root@tcp(slaves.mycompany.com)/integration_test",
 			domain: "slaves.mycompany.com",
 			port:   "3306",
@@ -46,17 +48,18 @@ func TestMysqlParse_Parse(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			domain, err := tc.m.Parse(tc.dsn)
+			err := tc.m.Init(tc.dsn)
 			assert.Equal(t, tc.wantErr, err)
 			if err != nil {
 				return
 			}
+			domain := tc.m.Domain()
 			assert.Equal(t, tc.domain, domain)
 		})
 	}
 }
 
-func TestMysqlParse_Splice(t *testing.T) {
+func TestMysqlParse_FormatByIp(t *testing.T) {
 	testcases := []struct {
 		name    string
 		dsn     string
@@ -73,9 +76,10 @@ func TestMysqlParse_Splice(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			m := &MysqlParse{}
-			_, _ = m.Parse(tc.dsn)
-			ipdsn, err := m.Splice(tc.ip)
+			m := &Dsn{}
+			err := m.Init(tc.dsn)
+			require.NoError(t, err)
+			ipdsn, err := m.FormatByIp(tc.ip)
 			assert.Equal(t, tc.wantErr, err)
 			if err != nil {
 				return

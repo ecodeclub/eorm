@@ -13,7 +13,7 @@ lint:
 
 .PHONY: fmt
 fmt:
-	@goimports -l -w .
+	@sh ./script/fmt.sh
 
 .PHONY: tidy
 tidy:

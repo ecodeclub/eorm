@@ -1,4 +1,4 @@
-// Copyright 2021 gotomicro
+// Copyright 2021 ecodehub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
 
 package eorm
 
-import "github.com/gotomicro/eorm/internal/errs"
+import "github.com/ecodehub/eorm/internal/errs"
 
 // 哨兵错误，或者说预定义错误，谨慎添加
 var (

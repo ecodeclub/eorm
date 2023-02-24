@@ -1,4 +1,4 @@
-# Copyright 2021 gotomicro
+# Copyright 2021 ecodehub
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -52,10 +52,12 @@ linters:
     - errname
     - gochecknoglobals
     - sqlclosecheck
+    - gochecknoglobals
+    - revive
 #  disable:
 
 linters-settings:
   gci:
-    local-prefixes: github.com/gotomicro/eorm
+    local-prefixes: github.com/ecodehub/eorm
   goimports:
-    local-prefixes: github.com/gotomicro/eorm
+    local-prefixes: github.com/ecodehub/eorm
