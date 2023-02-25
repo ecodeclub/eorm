@@ -17,7 +17,7 @@ package eorm
 import (
 	"context"
 
-	"github.com/ecodehub/eorm/internal/model"
+	"github.com/ecodeclub/eorm/internal/model"
 )
 
 type QueryContext struct {

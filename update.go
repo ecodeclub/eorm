@@ -19,8 +19,8 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/ecodehub/eorm/internal/errs"
-	"github.com/ecodehub/eorm/internal/valuer"
+	"github.com/ecodeclub/eorm/internal/errs"
+	"github.com/ecodeclub/eorm/internal/valuer"
 
 	"github.com/valyala/bytebufferpool"
 )

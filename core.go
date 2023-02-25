@@ -18,10 +18,10 @@ import (
 	"context"
 	"reflect"
 
-	"github.com/ecodehub/eorm/internal/dialect"
-	"github.com/ecodehub/eorm/internal/errs"
-	"github.com/ecodehub/eorm/internal/model"
-	"github.com/ecodehub/eorm/internal/valuer"
+	"github.com/ecodeclub/eorm/internal/dialect"
+	"github.com/ecodeclub/eorm/internal/errs"
+	"github.com/ecodeclub/eorm/internal/model"
+	"github.com/ecodeclub/eorm/internal/valuer"
 )
 
 type core struct {

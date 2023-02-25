@@ -20,8 +20,8 @@ import (
 	"strconv"
 	"sync/atomic"
 
-	"github.com/ecodehub/eorm/internal/errs"
-	"github.com/ecodehub/eorm/internal/slaves"
+	"github.com/ecodeclub/eorm/internal/errs"
+	"github.com/ecodeclub/eorm/internal/slaves"
 )
 
 type Slaves struct {

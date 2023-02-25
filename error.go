@@ -14,7 +14,7 @@
 
 package eorm
 
-import "github.com/ecodehub/eorm/internal/errs"
+import "github.com/ecodeclub/eorm/internal/errs"
 
 // 哨兵错误，或者说预定义错误，谨慎添加
 var (

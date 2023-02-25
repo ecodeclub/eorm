@@ -14,7 +14,7 @@
 
 package dialect
 
-import "github.com/ecodehub/eorm/internal/errs"
+import "github.com/ecodeclub/eorm/internal/errs"
 
 // Dialect specify config or behavior of special SQL dialects
 type Dialect struct {

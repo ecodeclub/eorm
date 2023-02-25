@@ -18,11 +18,11 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/ecodehub/eorm/internal/slaves"
+	"github.com/ecodeclub/eorm/internal/slaves"
 
-	"github.com/ecodehub/eorm/internal/dialect"
-	"github.com/ecodehub/eorm/internal/model"
-	"github.com/ecodehub/eorm/internal/valuer"
+	"github.com/ecodeclub/eorm/internal/dialect"
+	"github.com/ecodeclub/eorm/internal/model"
+	"github.com/ecodeclub/eorm/internal/valuer"
 )
 
 type MasterSlavesDB struct {

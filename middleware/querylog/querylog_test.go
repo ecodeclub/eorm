@@ -22,7 +22,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ecodehub/eorm"
+	"github.com/ecodeclub/eorm"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/assert"
 )

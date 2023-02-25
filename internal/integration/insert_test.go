@@ -20,8 +20,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/ecodehub/eorm"
-	"github.com/ecodehub/eorm/internal/test"
+	"github.com/ecodeclub/eorm"
+	"github.com/ecodeclub/eorm/internal/test"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

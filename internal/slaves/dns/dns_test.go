@@ -21,9 +21,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ecodehub/eorm/internal/slaves/dns/mysql"
+	"github.com/ecodeclub/eorm/internal/slaves/dns/mysql"
 
-	"github.com/ecodehub/eorm/internal/errs"
+	"github.com/ecodeclub/eorm/internal/errs"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

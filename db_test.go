@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/ecodehub/eorm/internal/valuer"
+	"github.com/ecodeclub/eorm/internal/valuer"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/assert"
 )
@@ -153,12 +153,12 @@ func memoryDBWithDB(db string) *DB {
 // go test -bench=BenchmarkQuerier_Get -benchmem -benchtime=10000x
 // goos: linux
 // goarch: amd64
-// pkg: github.com/ecodehub/eorm
+// pkg: github.com/ecodeclub/eorm
 // cpu: Intel(R) Core(TM) i5-10400F CPU @ 2.90GHz
 // BenchmarkQuerier_Get/unsafe-12             10000            446263 ns/op            3849 B/op        116 allocs/op
 // BenchmarkQuerier_Get/reflect-12            10000            854557 ns/op            4062 B/op        128 allocs/op
 // PASS
-// ok      github.com/ecodehub/eorm       13.072s
+// ok      github.com/ecodeclub/eorm       13.072s
 func BenchmarkQuerier_Get(b *testing.B) {
 	b.ReportAllocs()
 	orm := memoryDBWithDB("benchmarkQuerierGet")

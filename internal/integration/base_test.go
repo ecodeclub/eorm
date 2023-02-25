@@ -20,9 +20,9 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/ecodehub/eorm"
-	"github.com/ecodehub/eorm/internal/slaves"
-	"github.com/ecodehub/eorm/internal/slaves/roundrobin"
+	"github.com/ecodeclub/eorm"
+	"github.com/ecodeclub/eorm/internal/slaves"
+	"github.com/ecodeclub/eorm/internal/slaves/roundrobin"
 	"github.com/stretchr/testify/suite"
 )
 

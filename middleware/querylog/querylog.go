@@ -18,7 +18,7 @@ import (
 	"context"
 	"log"
 
-	"github.com/ecodehub/eorm"
+	"github.com/ecodeclub/eorm"
 )
 
 type MiddlewareBuilder struct {
