@@ -9,6 +9,7 @@ require (
 	github.com/mattn/go-sqlite3 v1.14.13
 	github.com/stretchr/testify v1.7.1
 	github.com/valyala/bytebufferpool v1.0.0
+	golang.org/x/sync v0.1.0
 )
 
 require (

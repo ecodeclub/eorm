@@ -1,4 +1,4 @@
-// Copyright 2021 ecodehub
+// Copyright 2021 ecodeclub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,19 +23,9 @@ import (
 	"github.com/valyala/bytebufferpool"
 )
 
-// QueryBuilder is used to build a query
-type QueryBuilder interface {
-	Build() (*Query, error)
-}
-
 var _ Executor = &Inserter[any]{}
 var _ Executor = &Updater[any]{}
 var _ Executor = &Deleter[any]{}
-
-// Executor is used to build a query
-type Executor interface {
-	Exec(ctx context.Context) Result
-}
 
 // Query 代表一个查询
 type Query struct {
@@ -107,6 +97,18 @@ func (q Querier[T]) Get(ctx context.Context) (*T, error) {
 		return nil, res.Err
 	}
 	return res.Result.(*T), nil
+}
+
+type selectorBuilder struct {
+	builder
+	columns  []Selectable
+	where    []Predicate
+	distinct bool
+	having   []Predicate
+	groupBy  []string
+	orderBy  []OrderBy
+	offset   int
+	limit    int
 }
 
 type builder struct {

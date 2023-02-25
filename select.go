@@ -1,4 +1,4 @@
-// Copyright 2021 ecodehub
+// Copyright 2021 ecodeclub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,27 +21,21 @@ import (
 	"github.com/valyala/bytebufferpool"
 )
 
-// Selector represents a select query
+// Selector select 构造器
 type Selector[T any] struct {
-	builder
 	session
-	columns  []Selectable
-	table    TableReference
-	where    []Predicate
-	distinct bool
-	having   []Predicate
-	groupBy  []string
-	orderBy  []OrderBy
-	offset   int
-	limit    int
+	selectorBuilder
+	table TableReference
 }
 
 // NewSelector 创建一个 Selector
 func NewSelector[T any](sess session) *Selector[T] {
 	return &Selector[T]{
-		builder: builder{
-			core:   sess.getCore(),
-			buffer: bytebufferpool.Get(),
+		selectorBuilder: selectorBuilder{
+			builder: builder{
+				core:   sess.getCore(),
+				buffer: bytebufferpool.Get(),
+			},
 		},
 		session: sess,
 	}
@@ -162,6 +156,7 @@ func (s *Selector[T]) buildTable(table TableReference) error {
 	}
 	return nil
 }
+
 func (s *Selector[T]) buildOrderBy() error {
 	s.writeString(" ORDER BY ")
 	for i, ob := range s.orderBy {

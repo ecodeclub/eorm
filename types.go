@@ -12,22 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package valuer
+package eorm
 
-import (
-	"database/sql"
-	"reflect"
+import "context"
 
-	"github.com/ecodeclub/eorm/internal/model"
-)
-
-// Value 是对结构体实例的内部抽象
-type Value interface {
-	// Field 访问结构体字段, name 是字段名
-	Field(name string) (reflect.Value, error)
-	// SetColumns 设置新值，column 是列名
-	// 要注意，val 可能存在被上层复用，从而引起篡改的问题
-	SetColumns(rows *sql.Rows) error
+// Executor sql 语句执行器
+type Executor interface {
+	Exec(ctx context.Context) Result
 }
 
-type Creator func(val any, meta *model.TableMeta) Value
+// QueryBuilder 普通 sql 构造抽象
+type QueryBuilder interface {
+	Build() (*Query, error)
+}
+
+// ShardingQueryBuilder  sharding sql 构造抽象
+type ShardingQueryBuilder interface {
+	Build() ([]*ShardingQuery, error)
+}

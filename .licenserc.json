@@ -1,4 +1,4 @@
 {
-  "**/*.go": "// Copyright 2021 ecodehub",
+  "**/*.go": "// Copyright 2021 ecodeclub",
   "**/*.{yml,toml}": "# Copyright 2021 ecodeclub"
 }

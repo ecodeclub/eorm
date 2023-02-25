@@ -1,4 +1,4 @@
-// Copyright 2021 ecodehub
+// Copyright 2021 ecodeclub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -140,6 +140,19 @@ func memoryDB() *DB {
 		panic(err)
 	}
 	return orm
+}
+
+// memoryDB 返回一个基于内存的 MasterSlaveDB，它使用的是 sqlite3 内存模式。
+func masterSlaveMemoryDB() *MasterSlavesDB {
+	db, err := sql.Open("sqlite3", "file:test.db?cache=shared&mode=memory")
+	if err != nil {
+		panic(err)
+	}
+	masterSlaveDB, err := OpenMasterSlaveDB("sqlite3", db)
+	if err != nil {
+		panic(err)
+	}
+	return masterSlaveDB
 }
 
 func memoryDBWithDB(db string) *DB {

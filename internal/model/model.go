@@ -1,4 +1,4 @@
-// Copyright 2021 ecodehub
+// Copyright 2021 ecodeclub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -34,7 +34,14 @@ type TableMeta struct {
 	// ColumnMap 是列名到列元数据的映射
 	ColumnMap map[string]*ColumnMeta
 	Typ       reflect.Type
+
+	ShardingKey       string
+	DBShardingFunc    ShardingAlgorithm
+	TableShardingFunc ShardingAlgorithm
 }
+
+// ShardingAlgorithm 生成 ShardingKey_xxx
+type ShardingAlgorithm func(skVal any) (string, error)
 
 // ColumnMeta represents model's field, or column
 type ColumnMeta struct {
@@ -59,6 +66,24 @@ type ColumnMeta struct {
 
 // TableMetaOption represents options of TableMeta, this options will cover default cover.
 type TableMetaOption func(meta *TableMeta)
+
+func WithShardingKey(sk string) TableMetaOption {
+	return func(meta *TableMeta) {
+		meta.ShardingKey = sk
+	}
+}
+
+func WithDBShardingFunc(fn ShardingAlgorithm) TableMetaOption {
+	return func(meta *TableMeta) {
+		meta.DBShardingFunc = fn
+	}
+}
+
+func WithTableShardingFunc(fn ShardingAlgorithm) TableMetaOption {
+	return func(meta *TableMeta) {
+		meta.TableShardingFunc = fn
+	}
+}
 
 // MetaRegistry stores table metadata
 type MetaRegistry interface {
