@@ -17,7 +17,7 @@ package dialect
 import (
 	"testing"
 
-	"github.com/ecodehub/eorm/internal/errs"
+	"github.com/ecodeclub/eorm/internal/errs"
 	"github.com/stretchr/testify/assert"
 )
 

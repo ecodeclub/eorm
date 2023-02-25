@@ -17,7 +17,7 @@ package mysql
 import (
 	"strings"
 
-	"github.com/ecodehub/eorm/internal/errs"
+	"github.com/ecodeclub/eorm/internal/errs"
 
 	"github.com/go-sql-driver/mysql"
 )

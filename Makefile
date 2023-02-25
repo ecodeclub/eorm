@@ -21,8 +21,8 @@ tidy:
 
 .PHONY: check
 check:
-	@$(MAKE) fmt
-	@$(MAKE) tidy
+	@$(MAKE) --no-print-directory fmt
+	@$(MAKE) --no-print-directory tidy
 
 # e2e 测试
 .PHONY: e2e

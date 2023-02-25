@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	err "github.com/ecodehub/eorm/internal/errs"
+	err "github.com/ecodeclub/eorm/internal/errs"
 	"github.com/stretchr/testify/require"
 
 	"github.com/stretchr/testify/assert"
@@ -334,7 +334,7 @@ func TestUpdater_Exec(t *testing.T) {
 	}
 }
 
-func ExampleSkipNilColumns() {
+func ExampleUpdater_SkipNilValue() {
 	db := memoryDB()
 	query, _ := NewUpdater[TestModel](db).Update(&TestModel{Id: 13}).SkipNilValue().Build()
 	fmt.Println(query.string())
@@ -343,7 +343,7 @@ func ExampleSkipNilColumns() {
 	// Args: []interface {}{13, "", 0}
 }
 
-func ExampleSkipZeroColumns() {
+func ExampleUpdater_SkipZeroValue() {
 	db := memoryDB()
 	query, _ := NewUpdater[TestModel](db).Update(&TestModel{Id: 13}).SkipZeroValue().Build()
 	fmt.Println(query.string())

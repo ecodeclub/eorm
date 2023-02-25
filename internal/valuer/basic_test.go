@@ -21,9 +21,9 @@ import (
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/ecodehub/eorm/internal/errs"
-	"github.com/ecodehub/eorm/internal/model"
-	"github.com/ecodehub/eorm/internal/test"
+	"github.com/ecodeclub/eorm/internal/errs"
+	"github.com/ecodeclub/eorm/internal/model"
+	"github.com/ecodeclub/eorm/internal/test"
 	"github.com/stretchr/testify/assert"
 )
 

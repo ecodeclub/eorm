@@ -21,11 +21,11 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/ecodehub/eorm/internal/errs"
+	"github.com/ecodeclub/eorm/internal/errs"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/ecodehub/eorm/internal/slaves/roundrobin"
+	"github.com/ecodeclub/eorm/internal/slaves/roundrobin"
 	"github.com/stretchr/testify/assert"
 )
 

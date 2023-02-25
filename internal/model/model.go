@@ -19,7 +19,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/ecodehub/eorm/internal/errs"
+	"github.com/ecodeclub/eorm/internal/errs"
 
 	// nolint
 	"unicode"

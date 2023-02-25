@@ -21,11 +21,11 @@ import (
 	"database/sql"
 	"testing"
 
-	"github.com/ecodehub/eorm/internal/errs"
+	"github.com/ecodeclub/eorm/internal/errs"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ecodehub/eorm"
-	"github.com/ecodehub/eorm/internal/test"
+	"github.com/ecodeclub/eorm"
+	"github.com/ecodeclub/eorm/internal/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )

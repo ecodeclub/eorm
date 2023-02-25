@@ -17,7 +17,7 @@ package eorm
 import (
 	"context"
 
-	"github.com/ecodehub/eorm/internal/errs"
+	"github.com/ecodeclub/eorm/internal/errs"
 	"github.com/valyala/bytebufferpool"
 )
 

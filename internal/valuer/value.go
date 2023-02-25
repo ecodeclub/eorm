@@ -18,7 +18,7 @@ import (
 	"database/sql"
 	"reflect"
 
-	"github.com/ecodehub/eorm/internal/model"
+	"github.com/ecodeclub/eorm/internal/model"
 )
 
 // Value 是对结构体实例的内部抽象
