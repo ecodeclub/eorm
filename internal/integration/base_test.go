@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/ecodeclub/eorm"
+	"github.com/ecodeclub/eorm/internal/model"
 	"github.com/ecodeclub/eorm/internal/slaves"
 	"github.com/ecodeclub/eorm/internal/slaves/roundrobin"
 	"github.com/stretchr/testify/suite"
