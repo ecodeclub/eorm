@@ -1,4 +1,4 @@
-// Copyright 2021 ecodehub
+// Copyright 2021 ecodeclub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,9 +23,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ecodehub/eorm/internal/errs"
-	"github.com/ecodehub/eorm/internal/slaves"
-	"github.com/ecodehub/eorm/internal/slaves/dns/mysql"
+	"github.com/ecodeclub/eorm/internal/errs"
+	"github.com/ecodeclub/eorm/internal/slaves"
+	"github.com/ecodeclub/eorm/internal/slaves/dns/mysql"
 	_ "github.com/go-sql-driver/mysql"
 )
 

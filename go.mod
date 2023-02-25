@@ -1,4 +1,4 @@
-module github.com/ecodehub/eorm
+module github.com/ecodeclub/eorm
 
 go 1.18
 

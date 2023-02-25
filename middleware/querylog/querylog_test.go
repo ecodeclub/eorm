@@ -1,4 +1,4 @@
-// Copyright 2021 ecodehub
+// Copyright 2021 ecodeclub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ecodehub/eorm"
+	"github.com/ecodeclub/eorm"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/assert"
 )

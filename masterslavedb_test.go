@@ -1,4 +1,4 @@
-// Copyright 2021 ecodehub
+// Copyright 2021 ecodeclub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,11 +21,11 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/ecodehub/eorm/internal/errs"
+	"github.com/ecodeclub/eorm/internal/errs"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/ecodehub/eorm/internal/slaves/roundrobin"
+	"github.com/ecodeclub/eorm/internal/slaves/roundrobin"
 	"github.com/stretchr/testify/assert"
 )
 
