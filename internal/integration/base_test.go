@@ -23,6 +23,8 @@ import (
 	"log"
 	"time"
 
+	"github.com/ecodeclub/eorm/internal/slaves/dns"
+
 	"github.com/ecodeclub/eorm"
 	"github.com/ecodeclub/eorm/internal/model"
 	"github.com/ecodeclub/eorm/internal/slaves"
@@ -115,10 +117,11 @@ func (s *ShardingSuite) SetupSuite() {
 
 type MasterSlaveSuite struct {
 	suite.Suite
-	driver    string
-	masterdsn string
-	slavedsns []string
-	orm       *eorm.MasterSlavesDB
+	driver     string
+	masterDsn  string
+	slaveDsns  []string
+	orm        *eorm.MasterSlavesDB
+	initSlaves initSlaves
 	*slaveNamegeter
 }
 
@@ -132,19 +135,15 @@ func (s *MasterSlaveSuite) SetupSuite() {
 }
 
 func (s *MasterSlaveSuite) initDb() (*eorm.MasterSlavesDB, error) {
-	master, err := sql.Open(s.driver, s.masterdsn)
+	master, err := sql.Open(s.driver, s.masterDsn)
 	if err != nil {
 		return nil, err
 	}
-	slaves := make([]*sql.DB, 0, len(s.slavedsns))
-	for _, slavedsn := range s.slavedsns {
-		slave, err := sql.Open(s.driver, slavedsn)
-		if err != nil {
-			return nil, err
-		}
-		slaves = append(slaves, slave)
+	getter, err := s.initSlaves(s.driver, s.slaveDsns...)
+	if err != nil {
+		return nil, err
 	}
-	s.slaveNamegeter = newSlaveNameGet(roundrobin.NewSlaves(slaves...))
+	s.slaveNamegeter = newSlaveNameGet(getter)
 	return eorm.OpenMasterSlaveDB(s.driver, master, eorm.MasterSlaveWithSlaves(s.slaveNamegeter))
 
 }
@@ -182,4 +181,22 @@ func (s *slaveNamegeter) Next(ctx context.Context) (slaves.Slave, error) {
 	}
 	s.ch <- slave.SlaveName
 	return slave, err
+}
+
+type initSlaves func(driver string, slaveDsns ...string) (slaves.Slaves, error)
+
+func newDnsSlaves(driver string, slaveDsns ...string) (slaves.Slaves, error) {
+	return dns.NewSlaves(slaveDsns[0])
+}
+
+func newRoundRobinSlaves(driver string, slaveDsns ...string) (slaves.Slaves, error) {
+	slaves := make([]*sql.DB, 0, len(slaveDsns))
+	for _, slaveDsn := range slaveDsns {
+		slave, err := sql.Open(driver, slaveDsn)
+		if err != nil {
+			return nil, err
+		}
+		slaves = append(slaves, slave)
+	}
+	return roundrobin.NewSlaves(slaves...), nil
 }
