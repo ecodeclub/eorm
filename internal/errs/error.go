@@ -40,6 +40,8 @@ var (
 	ErrSlaveNotFound              = errors.New("eorm: slave不存在")
 	// ErrGetSlavesFromDNS 从dns获取slave列表失败
 	ErrGetSlavesFromDNS = errors.New("eorm: 从DNS获取slaves失败")
+	ErrMergerEmptyRows  = errors.New("eorm: sql.Rows列表为空")
+	ErrMergerRowsIsNull = errors.New("eorm: sql.Rows列表中有元素为nil")
 )
 
 func NewFieldConflictError(field string) error {
