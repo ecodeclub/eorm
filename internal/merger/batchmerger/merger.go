@@ -17,14 +17,18 @@ package batchmerger
 import (
 	"context"
 	"database/sql"
+	"sync"
+
 	"github.com/ecodeclub/eorm/internal/errs"
 	"github.com/ecodeclub/eorm/internal/merger"
-	"sync"
 )
 
 type Merger struct{}
 
-func (m Merger) Merge(ctx context.Context, results []*sql.Rows) (merger.Rows, error) {
+func (Merger) Merge(ctx context.Context, results []*sql.Rows) (merger.Rows, error) {
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
 	if len(results) == 0 {
 		return nil, errs.ErrMergerEmptyRows
 	}
@@ -52,9 +56,9 @@ func (m *MergerRows) Next() bool {
 		m.mu.RUnlock()
 		return false
 	}
-	if ok := m.rows[m.cnt].Next(); ok {
+	if m.rows[m.cnt].Next() {
 		m.mu.RUnlock()
-		return ok
+		return true
 	}
 	m.mu.RUnlock()
 	m.mu.Lock()
@@ -62,13 +66,13 @@ func (m *MergerRows) Next() bool {
 	if m.cnt >= len(m.rows) {
 		return false
 	}
-	if ok := m.rows[m.cnt].Next(); ok {
-		return ok
+	if m.rows[m.cnt].Next() {
+		return true
 	}
 	m.cnt++
 	if m.cnt < len(m.rows) {
-		if ok := m.rows[m.cnt].Next(); ok {
-			return ok
+		if m.rows[m.cnt].Next() {
+			return true
 		}
 	}
 	return false
