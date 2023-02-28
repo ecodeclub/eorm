@@ -34,7 +34,7 @@ type mockResolver struct {
 	m  map[string][]string
 }
 
-func (m *mockResolver) LookupAddr(ctx context.Context, domain string) ([]string, error) {
+func (m *mockResolver) LookupHost(ctx context.Context, domain string) ([]string, error) {
 	if ctx.Err() != nil {
 		return []string{}, ctx.Err()
 	}

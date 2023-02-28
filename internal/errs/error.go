@@ -38,6 +38,8 @@ var (
 	ErrNotFoundTargetDB           = errors.New("eorm: 未发现目标 DB")
 	ErrNotFoundTargetTable        = errors.New("eorm: 未发现目标 Table")
 	ErrSlaveNotFound              = errors.New("eorm: slave不存在")
+	// ErrGetSlavesFromDNS 从dns获取slave列表失败
+	ErrGetSlavesFromDNS = errors.New("eorm: 从DNS获取slaves失败")
 )
 
 func NewFieldConflictError(field string) error {

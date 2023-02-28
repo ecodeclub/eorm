@@ -17,6 +17,7 @@ package dns
 import (
 	"context"
 	"database/sql"
+	"log"
 	"net"
 	"strconv"
 	"sync"
@@ -26,6 +27,7 @@ import (
 	"github.com/ecodeclub/eorm/internal/errs"
 	"github.com/ecodeclub/eorm/internal/slaves"
 	"github.com/ecodeclub/eorm/internal/slaves/dns/mysql"
+
 	_ "github.com/go-sql-driver/mysql"
 )
 
@@ -42,7 +44,7 @@ type Dsn interface {
 }
 
 type netResolver interface {
-	LookupAddr(ctx context.Context, domain string) ([]string, error)
+	LookupHost(ctx context.Context, domain string) ([]string, error)
 }
 
 var _ netResolver = (*net.Resolver)(nil)
@@ -60,6 +62,7 @@ type Slaves struct {
 	driver   string
 	interval time.Duration
 	mu       *sync.RWMutex
+	timeout  time.Duration
 }
 
 func (s *Slaves) Next(ctx context.Context) (slaves.Slave, error) {
@@ -92,6 +95,13 @@ func WithDriver(driver string) SlaveOption {
 	}
 }
 
+// WithTimeout 指定查询 DNS 服务器的超时时间
+func WithTimeout(timeout time.Duration) SlaveOption {
+	return func(s *Slaves) {
+		s.timeout = timeout
+	}
+}
+
 // WithInterval 指定轮询 DNS 服务器的间隔
 func WithInterval(interval time.Duration) SlaveOption {
 	return func(s *Slaves) {
@@ -113,6 +123,7 @@ func NewSlaves(dsn string, opts ...SlaveOption) (*Slaves, error) {
 		driver:   "mysql",
 		interval: time.Second,
 		mu:       &sync.RWMutex{},
+		timeout:  time.Second,
 	}
 	for _, opt := range opts {
 		opt(s)
@@ -122,7 +133,9 @@ func NewSlaves(dsn string, opts ...SlaveOption) (*Slaves, error) {
 		return nil, err
 	}
 	s.domain = s.dsn.Domain()
-	err = s.getSlaves(context.Background())
+	ctx, cancel := context.WithTimeout(context.Background(), s.timeout)
+	err = s.getSlaves(ctx)
+	cancel()
 	if err != nil {
 		return nil, err
 	}
@@ -131,9 +144,12 @@ func NewSlaves(dsn string, opts ...SlaveOption) (*Slaves, error) {
 		for {
 			select {
 			case <-ticker.C:
-				err := s.getSlaves(context.Background())
-				// 错误处理还没有想好怎么搞
+				ctx, cancel := context.WithTimeout(context.Background(), s.timeout)
+				err := s.getSlaves(ctx)
+				cancel()
+				// 尽最大努力重试，拿到dns的响应
 				if err != nil {
+					log.Println(errs.ErrGetSlavesFromDNS)
 					continue
 				}
 			case <-s.closeCh:
@@ -145,7 +161,7 @@ func NewSlaves(dsn string, opts ...SlaveOption) (*Slaves, error) {
 }
 
 func (s *Slaves) getSlaves(ctx context.Context) error {
-	slavesip, err := s.resolver.LookupAddr(ctx, s.domain)
+	slavesip, err := s.resolver.LookupHost(ctx, s.domain)
 	if err != nil {
 		return err
 	}
