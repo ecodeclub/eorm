@@ -70,7 +70,7 @@ func (ms *MergerSuite) initMock(t *testing.T) {
 	}
 }
 
-func (ms *MergerSuite) TestMerger_NextandScan() {
+func (ms *MergerSuite) TestMerger_NextAndScan() {
 
 	testCases := []struct {
 		name    string
@@ -131,6 +131,24 @@ func (ms *MergerSuite) TestMerger_NextandScan() {
 			},
 			wantVal: []string{"1", "2", "3", "4"},
 		},
+		{
+			// 几个sql.rows里都没有数据
+			name: "mutil sqlrows but has no rows",
+			sqlRows: func() []*sql.Rows {
+				ms.mock01.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows([]string{"id"}))
+				ms.mock02.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows([]string{"id"}))
+				ms.mock03.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows([]string{"id"}))
+				res := make([]*sql.Rows, 0, 3)
+				row01, _ := ms.mockDB01.QueryContext(context.Background(), "SELECT * FROM `t1`;")
+				res = append(res, row01)
+				row02, _ := ms.mockDB02.QueryContext(context.Background(), "SELECT * FROM `t1`;")
+				res = append(res, row02)
+				row03, _ := ms.mockDB03.QueryContext(context.Background(), "SELECT * FROM `t1`;")
+				res = append(res, row03)
+				return res
+			},
+			wantVal: []string{},
+		},
 	}
 	for _, tc := range testCases {
 		ms.T().Run(tc.name, func(t *testing.T) {
@@ -173,6 +191,10 @@ func (ms *MergerSuite) TestClose() {
 		if err != nil {
 			return
 		}
+		err = rows.Close()
+		require.NoError(t, err)
+		err = rows.Close()
+		require.NoError(t, err)
 		err = rows.Close()
 		require.NoError(t, err)
 	})
