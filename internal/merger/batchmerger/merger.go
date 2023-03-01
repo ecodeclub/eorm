@@ -69,11 +69,15 @@ func (m *MergerRows) Next() bool {
 	if m.rows[m.cnt].Next() {
 		return true
 	}
-	m.cnt++
-	if m.cnt < len(m.rows) {
+	for {
+		m.cnt++
+		if m.cnt >= len(m.rows) {
+			break
+		}
 		if m.rows[m.cnt].Next() {
 			return true
 		}
+
 	}
 	return false
 

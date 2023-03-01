@@ -34,6 +34,8 @@ type MergerSuite struct {
 	mock02   sqlmock.Sqlmock
 	mockDB03 *sql.DB
 	mock03   sqlmock.Sqlmock
+	mockDB04 *sql.DB
+	mock04   sqlmock.Sqlmock
 }
 
 func (ms *MergerSuite) SetupTest() {
@@ -45,6 +47,7 @@ func (ms *MergerSuite) TearDownTest() {
 	_ = ms.mockDB01.Close()
 	_ = ms.mockDB02.Close()
 	_ = ms.mockDB03.Close()
+	_ = ms.mockDB04.Close()
 }
 
 func (ms *MergerSuite) initMock(t *testing.T) {
@@ -61,12 +64,14 @@ func (ms *MergerSuite) initMock(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	ms.mockDB04, ms.mock04, err = sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 func (ms *MergerSuite) TestMerger_NextandScan() {
-	ms.mock01.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("1"))
-	ms.mock02.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("2"))
-	ms.mock03.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("3").AddRow("4"))
+
 	testCases := []struct {
 		name    string
 		sqlRows func() []*sql.Rows
@@ -77,6 +82,9 @@ func (ms *MergerSuite) TestMerger_NextandScan() {
 		{
 			name: "multi rows",
 			sqlRows: func() []*sql.Rows {
+				ms.mock01.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("1"))
+				ms.mock02.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("2"))
+				ms.mock03.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("3").AddRow("4"))
 				res := make([]*sql.Rows, 0, 3)
 				row01, _ := ms.mockDB01.QueryContext(context.Background(), "SELECT * FROM `t1`;")
 				res = append(res, row01)
@@ -101,6 +109,27 @@ func (ms *MergerSuite) TestMerger_NextandScan() {
 				return []*sql.Rows{nil}
 			},
 			wantErr: errs.ErrMergerRowsIsNull,
+		},
+		{
+			// sqlrows列表中有一个没有查询到值
+			name: "sqlrows has empty rows",
+			sqlRows: func() []*sql.Rows {
+				ms.mock01.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("1"))
+				ms.mock02.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("2"))
+				ms.mock03.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("3").AddRow("4"))
+				ms.mock04.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows([]string{"id"}))
+				res := make([]*sql.Rows, 0, 4)
+				row01, _ := ms.mockDB01.QueryContext(context.Background(), "SELECT * FROM `t1`;")
+				res = append(res, row01)
+				row02, _ := ms.mockDB02.QueryContext(context.Background(), "SELECT * FROM `t1`;")
+				res = append(res, row02)
+				row04, _ := ms.mockDB04.QueryContext(context.Background(), "SELECT * FROM `t1`;")
+				res = append(res, row04)
+				row03, _ := ms.mockDB03.QueryContext(context.Background(), "SELECT * FROM `t1`;")
+				res = append(res, row03)
+				return res
+			},
+			wantVal: []string{"1", "2", "3", "4"},
 		},
 	}
 	for _, tc := range testCases {
