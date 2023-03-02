@@ -21,7 +21,9 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/ecodeclub/eorm/internal/errs"
+	"github.com/ecodeclub/eorm/internal/slaves"
+	"github.com/stretchr/testify/require"
+
 	"github.com/stretchr/testify/suite"
 
 	"github.com/DATA-DOG/go-sqlmock"
@@ -124,23 +126,16 @@ func (ms *MasterSlaveSuite) TestMasterSlaveDbQuery() {
 		ctx       context.Context
 		query     string
 		reqCnt    int
-		slaves    *roundrobin.Slaves
+		slaves    slaves.Slaves
 		wantReqDb []string
 		wantErr   error
 	}{
-		{
-			name:    "select null slave",
-			ctx:     context.Background(),
-			reqCnt:  1,
-			query:   "SELECT `first_name` FROM `test_model`",
-			wantErr: errs.ErrSlaveNotFound,
-		},
 		{
 			name:      "select default use slave",
 			ctx:       context.Background(),
 			reqCnt:    3,
 			query:     "SELECT `first_name` FROM `test_model`",
-			slaves:    roundrobin.NewSlaves(ms.mockSlave1DB, ms.mockSlave2DB, ms.mockSlave3DB),
+			slaves:    ms.newSlaves(ms.mockSlave1DB, ms.mockSlave2DB, ms.mockSlave3DB),
 			wantReqDb: []string{"slave1_1", "slave1_2", "slave1_3"},
 		},
 		{
@@ -148,7 +143,7 @@ func (ms *MasterSlaveSuite) TestMasterSlaveDbQuery() {
 			reqCnt:    1,
 			ctx:       UseMaster(context.Background()),
 			query:     "SELECT `first_name` FROM `test_model`",
-			slaves:    roundrobin.NewSlaves(ms.mockSlave1DB, ms.mockSlave2DB, ms.mockSlave3DB),
+			slaves:    ms.newSlaves(ms.mockSlave1DB, ms.mockSlave2DB, ms.mockSlave3DB),
 			wantReqDb: []string{"master"},
 		},
 	}
@@ -185,7 +180,7 @@ func (ms *MasterSlaveSuite) TestMasterSlaveDbExec() {
 		ctx       context.Context
 		insertSQL string
 		reqCnt    int
-		slaves    *roundrobin.Slaves
+		slaves    slaves.Slaves
 		wantReqDb []int64
 		wantErr   error
 	}{
@@ -201,7 +196,7 @@ func (ms *MasterSlaveSuite) TestMasterSlaveDbExec() {
 			ctx:       context.Background(),
 			reqCnt:    3,
 			insertSQL: "INSERT INTO `test_model`(`id`,`first_name`,`age`,`last_name`) VALUES(1,2,3,4)",
-			slaves:    roundrobin.NewSlaves(ms.mockSlave1DB, ms.mockSlave2DB, ms.mockSlave3DB),
+			slaves:    ms.newSlaves(ms.mockSlave1DB, ms.mockSlave2DB, ms.mockSlave3DB),
 			wantReqDb: []int64{1, 1, 1}, // 切片元素表示的是 lastInsertID, 这里表示请求 master db 3 次
 		},
 		{
@@ -209,7 +204,7 @@ func (ms *MasterSlaveSuite) TestMasterSlaveDbExec() {
 			reqCnt:    1,
 			ctx:       UseMaster(context.Background()),
 			insertSQL: "INSERT INTO `test_model`(`id`,`first_name`,`age`,`last_name`) VALUES(1,2,3,4)",
-			slaves:    roundrobin.NewSlaves(ms.mockSlave1DB, ms.mockSlave2DB, ms.mockSlave3DB),
+			slaves:    ms.newSlaves(ms.mockSlave1DB, ms.mockSlave2DB, ms.mockSlave3DB),
 			wantReqDb: []int64{1}, // 切片元素表示的是 lastInsertID, 这里表示请求 master db 1 次
 		},
 	}
@@ -236,6 +231,12 @@ func (ms *MasterSlaveSuite) TestMasterSlaveDbExec() {
 			assert.ElementsMatch(t, tc.wantReqDb, resAffectID)
 		})
 	}
+}
+
+func (ms *MasterSlaveSuite) newSlaves(dbs ...*sql.DB) slaves.Slaves {
+	res, err := roundrobin.NewSlaves(dbs...)
+	require.NoError(ms.T(), err)
+	return res
 }
 
 func TestMasterSlave(t *testing.T) {

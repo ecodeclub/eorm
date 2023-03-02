@@ -70,7 +70,7 @@ func (s *DeleteMasterSlaveTestSuite) TestDeleter() {
 			affected, err := res.RowsAffected()
 			slaveName := ""
 			select {
-			case slaveName = <-s.slaveNamegeter.ch:
+			case slaveName = <-s.testSlaves.ch:
 			default:
 			}
 			require.Nil(t, err)

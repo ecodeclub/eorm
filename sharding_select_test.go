@@ -728,9 +728,9 @@ func TestSardingSelector_Get(t *testing.T) {
 	}
 	defer func() { _ = mockDB.Close() }()
 
-	newMockSlaveNameGet(roundrobin.NewSlaves(mockDB))
-	masterSlaveDB, err := OpenMasterSlaveDB("mysql", mockDB,
-		MasterSlaveWithSlaves(newMockSlaveNameGet(roundrobin.NewSlaves(mockDB))))
+	rbSlaves, err := roundrobin.NewSlaves(mockDB)
+	require.NoError(t, err)
+	masterSlaveDB, err := OpenMasterSlaveDB("mysql", mockDB, MasterSlaveWithSlaves(newMockSlaveNameGet(rbSlaves)))
 	require.NoError(t, err)
 
 	testCases := []struct {
@@ -857,161 +857,6 @@ func TestSardingSelector_Get(t *testing.T) {
 	}
 }
 
-//func TestSardingSelector_GetMulti(t *testing.T) {
-//	r := model.NewMetaRegistry()
-//	_, err := r.Register(&test.OrderDetail{},
-//		model.WithShardingKey("OrderId"),
-//		model.WithDBShardingFunc(func(skVal any) (string, error) {
-//			db := skVal.(int) / 100
-//			return fmt.Sprintf("order_detail_db_%d", db), nil
-//		}),
-//		model.WithTableShardingFunc(func(skVal any) (string, error) {
-//			tbl := skVal.(int) % 10
-//			return fmt.Sprintf("order_detail_tab_%d", tbl), nil
-//		}))
-//	require.NoError(t, err)
-//
-//	mockDB, mock, err := sqlmock.New(
-//		sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
-//	if err != nil {
-//		t.Fatal(err)
-//	}
-//	defer func() { _ = mockDB.Close() }()
-//
-//	newMockSlaveNameGet(roundrobin.NewSlaves(mockDB))
-//	masterSlaveDB, err := OpenMasterSlaveDB("mysql", mockDB,
-//		MasterSlaveWithSlaves(newMockSlaveNameGet(roundrobin.NewSlaves(mockDB))))
-//	require.NoError(t, err)
-//	shardingDB, err := OpenShardingDB("mysql", map[string]*MasterSlavesDB{
-//		"order_detail_db_1": masterSlaveDB,
-//		"order_detail_db_2": masterSlaveDB,
-//	}, ShardingDBOptionWithMetaRegistry(r),
-//		ShardingDBOptionWithTables(map[string]bool{
-//			"order_detail_tab_3": true,
-//			"order_detail_tab_4": true,
-//		}))
-//	require.NoError(t, err)
-//
-//	testCases := []struct {
-//		name      string
-//		s         *ShardingSelector[test.OrderDetail]
-//		mockOrder func(mock sqlmock.Sqlmock)
-//		wantErr   error
-//		wantRes   []*test.OrderDetail
-//	}{
-//		{
-//			name: "found tab or",
-//			s: func() *ShardingSelector[test.OrderDetail] {
-//				builder := NewShardingSelector[test.OrderDetail](shardingDB).
-//					Where(C("OrderId").EQ(123).Or(C("OrderId").EQ(234)))
-//				return builder
-//			}(),
-//			mockOrder: func(mock sqlmock.Sqlmock) {
-//				rows1 := mock.NewRows([]string{"order_id", "item_id", "using_col1", "using_col2"}).
-//					AddRow(123, 10, "LeBron", "James")
-//				mock.ExpectQuery("SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail_db_1`.`order_detail_tab_3` WHERE (`order_id`=?) OR (`order_id`=?);").
-//					WithArgs(123, 234).
-//					WillReturnRows(rows1)
-//				rows2 := mock.NewRows([]string{"order_id", "item_id", "using_col1", "using_col2"}).
-//					AddRow(234, 12, "Kevin", "Durant")
-//				mock.ExpectQuery("SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail_db_1`.`order_detail_tab_3` WHERE (`order_id`=?) OR ((`item_id`=?) AND (`order_id`=?));").
-//					WithArgs(123, 234).
-//					WillReturnRows(rows2)
-//			},
-//			wantRes: []*test.OrderDetail{
-//				{OrderId: 123, ItemId: 10, UsingCol1: "LeBron", UsingCol2: "James"},
-//				{OrderId: 234, ItemId: 12, UsingCol1: "Kevin", UsingCol2: "Durant"},
-//			},
-//		},
-//		{
-//			name: "found tab or broadcast",
-//			s: func() *ShardingSelector[test.OrderDetail] {
-//				builder := NewShardingSelector[test.OrderDetail](shardingDB).
-//					Where(C("OrderId").EQ(123).Or(C("ItemId").EQ(12)))
-//				return builder
-//			}(),
-//			mockOrder: func(mock sqlmock.Sqlmock) {
-//				mock.ExpectQuery("SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail_db_1`.`order_detail_tab_4` WHERE (`order_id`=?) OR (`item_id`=?);").
-//					WithArgs(123, 12).
-//					WillReturnRows()
-//				rows2 := mock.NewRows([]string{"order_id", "item_id", "using_col1", "using_col2"}).
-//					AddRow(123, 10, "LeBron", "James")
-//				mock.ExpectQuery("SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail_db_1`.`order_detail_tab_3` WHERE (`order_id`=?) OR (`order_id`=?);").
-//					WithArgs(123, 12).
-//					WillReturnRows(rows2)
-//				rows3 := mock.NewRows([]string{"order_id", "item_id", "using_col1", "using_col2"}).
-//					AddRow(234, 12, "Kevin", "Durant")
-//				mock.ExpectQuery("SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail_db_2`.`order_detail_tab_4` WHERE (`order_id`=?) OR (`order_id`=?);").
-//					WithArgs(123, 12).
-//					WillReturnRows(rows3)
-//				mock.ExpectQuery("SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail_db_2`.`order_detail_tab_3` WHERE (`order_id`=?) OR (`item_id`=?);").
-//					WithArgs(123, 12).WillReturnRows()
-//			},
-//			wantRes: []*test.OrderDetail{
-//				{OrderId: 123, ItemId: 10, UsingCol1: "LeBron", UsingCol2: "James"},
-//				{OrderId: 234, ItemId: 12, UsingCol1: "Kevin", UsingCol2: "Durant"},
-//			},
-//		},
-//		{
-//			name: "found tab or-and",
-//			s: func() *ShardingSelector[test.OrderDetail] {
-//				builder := NewShardingSelector[test.OrderDetail](shardingDB).
-//					Where(C("OrderId").EQ(234).
-//						Or(C("ItemId").EQ(10).And(C("OrderId").EQ(123))))
-//				return builder
-//			}(),
-//			mockOrder: func(mock sqlmock.Sqlmock) {
-//				rows1 := mock.NewRows([]string{"order_id", "item_id", "using_col1", "using_col2"}).
-//					AddRow(123, 10, "LeBron", "James")
-//				mock.ExpectQuery("SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail_db_2`.`order_detail_tab_4` WHERE (`order_id`=?) OR ((`item_id`=?) AND (`order_id`=?));").
-//					WithArgs(234, 10, 123).
-//					WillReturnRows(rows1)
-//				rows2 := mock.NewRows([]string{"order_id", "item_id", "using_col1", "using_col2"}).
-//					AddRow(234, 12, "Kevin", "Durant")
-//				mock.ExpectQuery("SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail_db_1`.`order_detail_tab_3` WHERE (`order_id`=?) OR ((`item_id`=?) AND (`order_id`=?));").
-//					WithArgs(234, 10, 123).
-//					WillReturnRows(rows2)
-//			},
-//			wantRes: []*test.OrderDetail{
-//				{OrderId: 123, ItemId: 10, UsingCol1: "LeBron", UsingCol2: "James"},
-//				{OrderId: 234, ItemId: 12, UsingCol1: "Kevin", UsingCol2: "Durant"},
-//			},
-//		},
-//		{
-//			name: "found tab and-or",
-//			s: func() *ShardingSelector[test.OrderDetail] {
-//				builder := NewShardingSelector[test.OrderDetail](shardingDB).
-//					Where(C("OrderId").EQ(234).
-//						And(C("ItemId").EQ(12).Or(C("OrderId").EQ(123))))
-//				return builder
-//			}(),
-//			mockOrder: func(mock sqlmock.Sqlmock) {
-//				rows := mock.NewRows([]string{"order_id", "item_id", "using_col1", "using_col2"}).
-//					AddRow(123, 10, "LeBron", "James")
-//				mock.ExpectQuery("SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail_db_2`.`order_detail_tab_4` WHERE (`order_id`=?) AND ((`item_id`=?) OR (`order_id`=?));").
-//					WithArgs(234, 12, 123).
-//					WillReturnRows(rows)
-//			},
-//			wantRes: []*test.OrderDetail{
-//				{OrderId: 234, ItemId: 12, UsingCol1: "Kevin", UsingCol2: "Durant"},
-//			},
-//		},
-//	}
-//
-//	for _, tc := range testCases {
-//		t.Run(tc.name, func(t *testing.T) {
-//			tc.mockOrder(mock)
-//			ctx := UseMaster(context.Background())
-//			res, err := tc.s.GetMulti(ctx)
-//			assert.Equal(t, tc.wantErr, err)
-//			if err != nil {
-//				return
-//			}
-//			assert.ElementsMatch(t, tc.wantRes, res)
-//		})
-//	}
-//}
-
 type Order struct {
 	UserId  int64
 	OrderId int64
@@ -1019,17 +864,17 @@ type Order struct {
 	Account float64
 }
 
-type mockSlaveNamegeter struct {
+type testSlaves struct {
 	slaves.Slaves
 }
 
-func newMockSlaveNameGet(geter slaves.Slaves) *mockSlaveNamegeter {
-	return &mockSlaveNamegeter{
-		Slaves: geter,
+func newMockSlaveNameGet(s slaves.Slaves) *testSlaves {
+	return &testSlaves{
+		Slaves: s,
 	}
 }
 
-func (s *mockSlaveNamegeter) Next(ctx context.Context) (slaves.Slave, error) {
+func (s *testSlaves) Next(ctx context.Context) (slaves.Slave, error) {
 	slave, err := s.Slaves.Next(ctx)
 	if err != nil {
 		return slave, err

@@ -32,15 +32,14 @@ type MasterSlaveSelectTestSuite struct {
 	data []*test.SimpleStruct
 }
 
-func (m *MasterSlaveSelectTestSuite) SetupSuite() {
-	m.MasterSlaveSuite.SetupSuite()
-	m.data = append(m.data, test.NewSimpleStruct(1))
-	m.data = append(m.data, test.NewSimpleStruct(2))
-	m.data = append(m.data, test.NewSimpleStruct(3))
-	res := eorm.NewInserter[test.SimpleStruct](m.orm).Values(m.data...).Exec(context.Background())
+func (s *MasterSlaveSelectTestSuite) SetupSuite() {
+	s.MasterSlaveSuite.SetupSuite()
+	s.data = append(s.data, test.NewSimpleStruct(1))
+	s.data = append(s.data, test.NewSimpleStruct(2))
+	s.data = append(s.data, test.NewSimpleStruct(3))
+	res := eorm.NewInserter[test.SimpleStruct](s.orm).Values(s.data...).Exec(context.Background())
 	if res.Err() != nil {
-		m.T().Fatal(res.Err())
-		m.T()
+		s.T().Fatal(res.Err())
 	}
 }
 
@@ -93,7 +92,7 @@ func (s *MasterSlaveSelectTestSuite) TestMasterSlave() {
 			assert.Equal(t, tc.wantRes, res)
 			slaveName := ""
 			select {
-			case slaveName = <-s.slaveNamegeter.ch:
+			case slaveName = <-s.testSlaves.ch:
 			default:
 			}
 			assert.Equal(t, tc.wantSlave, slaveName)
@@ -133,7 +132,6 @@ func (m *MasterSlaveDNSTestSuite) SetupSuite() {
 	res := eorm.NewInserter[test.SimpleStruct](m.orm).Values(m.data...).Exec(context.Background())
 	if res.Err() != nil {
 		m.T().Fatal(res.Err())
-		m.T()
 	}
 }
 func (s *MasterSlaveDNSTestSuite) TearDownSuite() {
@@ -174,10 +172,21 @@ func (s *MasterSlaveDNSTestSuite) TestDNSMasterSlave() {
 			assert.Equal(t, tc.wantRes, res)
 			slaveName := ""
 			select {
-			case slaveName = <-s.slaveNamegeter.ch:
+			case slaveName = <-s.testSlaves.ch:
 			default:
 			}
 			assert.Equal(t, tc.wantSlave, slaveName)
 		})
 	}
+}
+
+type Hash struct {
+	// 有占位符就是要分集群，没有就不分
+	DatasoucePattern string
+	// 有占位符就分库，没有就不分
+	DatabasePattern string
+	// 有占位符就分表，没有就不分
+	TablePattern string
+
+	Base int
 }

@@ -23,6 +23,8 @@ import (
 	"log"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ecodeclub/eorm/internal/slaves/dns"
 
 	"github.com/ecodeclub/eorm"
@@ -58,7 +60,7 @@ type masterSalvesDriver struct {
 
 type ShardingSuite struct {
 	suite.Suite
-	*baseSlaveNamegeter
+	slaves     slaves.Slaves
 	driver     string
 	tbSet      map[string]bool
 	driverMap  map[string]*masterSalvesDriver
@@ -85,19 +87,19 @@ func (s *ShardingSuite) initDB() (*eorm.ShardingDB, error) {
 		if err != nil {
 			return nil, err
 		}
-		slaves := make([]*sql.DB, 0, len(v.slavedsns))
+		ss := make([]*sql.DB, 0, len(v.slavedsns))
 		for _, slavedsn := range v.slavedsns {
 			slave, err := s.openDB(s.driver, slavedsn)
 			if err != nil {
 				return nil, err
 			}
-			slaves = append(slaves, slave)
+			ss = append(ss, slave)
 		}
-		s.baseSlaveNamegeter = &baseSlaveNamegeter{
-			Slaves: roundrobin.NewSlaves(slaves...),
-		}
+		sl, err := roundrobin.NewSlaves(ss...)
+		require.NoError(s.T(), err)
+		s.slaves = newTestSlaves(sl)
 		masterSlaveDB, err := eorm.OpenMasterSlaveDB(
-			s.driver, master, eorm.MasterSlaveWithSlaves(s.baseSlaveNamegeter))
+			s.driver, master, eorm.MasterSlaveWithSlaves(s.slaves))
 		if err != nil {
 			return nil, err
 		}
@@ -122,7 +124,7 @@ type MasterSlaveSuite struct {
 	slaveDsns  []string
 	orm        *eorm.MasterSlavesDB
 	initSlaves initSlaves
-	*slaveNamegeter
+	*testSlaves
 }
 
 func (s *MasterSlaveSuite) SetupSuite() {
@@ -139,42 +141,40 @@ func (s *MasterSlaveSuite) initDb() (*eorm.MasterSlavesDB, error) {
 	if err != nil {
 		return nil, err
 	}
-	getter, err := s.initSlaves(s.driver, s.slaveDsns...)
+	ss, err := s.initSlaves(s.driver, s.slaveDsns...)
 	if err != nil {
 		return nil, err
 	}
-	s.slaveNamegeter = newSlaveNameGet(getter)
-	return eorm.OpenMasterSlaveDB(s.driver, master, eorm.MasterSlaveWithSlaves(s.slaveNamegeter))
+	s.testSlaves = newTestSlaves(ss)
+	return eorm.OpenMasterSlaveDB(s.driver, master, eorm.MasterSlaveWithSlaves(s.testSlaves))
 
 }
 
-type baseSlaveNamegeter struct {
+//type baseSlaveNamegeter struct {
+//	slaves.Slaves
+//}
+//
+//func (s *baseSlaveNamegeter) Next(ctx context.Context) (slaves.Slave, error) {
+//	slave, err := s.Slaves.Next(ctx)
+//	if err != nil {
+//		return slave, err
+//	}
+//	return slave, err
+//}
+
+type testSlaves struct {
 	slaves.Slaves
-}
-
-func (s *baseSlaveNamegeter) Next(ctx context.Context) (slaves.Slave, error) {
-	slave, err := s.Slaves.Next(ctx)
-	if err != nil {
-		return slave, err
-	}
-	return slave, err
-}
-
-type slaveNamegeter struct {
-	*baseSlaveNamegeter
 	ch chan string
 }
 
-func newSlaveNameGet(geter slaves.Slaves) *slaveNamegeter {
-	return &slaveNamegeter{
-		baseSlaveNamegeter: &baseSlaveNamegeter{
-			Slaves: geter,
-		},
-		ch: make(chan string, 1),
+func newTestSlaves(s slaves.Slaves) *testSlaves {
+	return &testSlaves{
+		Slaves: s,
+		ch:     make(chan string, 1),
 	}
 }
 
-func (s *slaveNamegeter) Next(ctx context.Context) (slaves.Slave, error) {
+func (s *testSlaves) Next(ctx context.Context) (slaves.Slave, error) {
 	slave, err := s.Slaves.Next(ctx)
 	if err != nil {
 		return slave, err
@@ -190,13 +190,13 @@ func newDnsSlaves(driver string, slaveDsns ...string) (slaves.Slaves, error) {
 }
 
 func newRoundRobinSlaves(driver string, slaveDsns ...string) (slaves.Slaves, error) {
-	slaves := make([]*sql.DB, 0, len(slaveDsns))
+	ss := make([]*sql.DB, 0, len(slaveDsns))
 	for _, slaveDsn := range slaveDsns {
 		slave, err := sql.Open(driver, slaveDsn)
 		if err != nil {
 			return nil, err
 		}
-		slaves = append(slaves, slave)
+		ss = append(ss, slave)
 	}
-	return roundrobin.NewSlaves(slaves...), nil
+	return roundrobin.NewSlaves(ss...)
 }
