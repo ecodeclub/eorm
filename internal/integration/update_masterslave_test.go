@@ -71,7 +71,7 @@ func (u *UpdateMasterSlaveTestSuite) TestUpdate() {
 			}
 			slaveName := ""
 			select {
-			case slaveName = <-u.slaveNamegeter.ch:
+			case slaveName = <-u.testSlaves.ch:
 			default:
 			}
 			affected, err := res.RowsAffected()

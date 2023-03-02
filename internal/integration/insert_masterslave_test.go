@@ -61,7 +61,7 @@ func (i *InsertMasterSlaveTestSuite) TestInsert() {
 			}
 			slaveName := ""
 			select {
-			case slaveName = <-i.slaveNamegeter.ch:
+			case slaveName = <-i.testSlaves.ch:
 			default:
 			}
 			affected, err := res.RowsAffected()

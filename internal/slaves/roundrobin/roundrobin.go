@@ -33,10 +33,7 @@ func (r *Slaves) Next(ctx context.Context) (slaves.Slave, error) {
 	if ctx.Err() != nil {
 		return slaves.Slave{}, ctx.Err()
 	}
-	if r == nil {
-		return slaves.Slave{}, errs.ErrSlaveNotFound
-	}
-	if len(r.slaves) == 0 {
+	if r == nil || len(r.slaves) == 0 {
 		return slaves.Slave{}, errs.ErrSlaveNotFound
 	}
 	cnt := atomic.AddUint32(&r.cnt, 1)
@@ -44,15 +41,15 @@ func (r *Slaves) Next(ctx context.Context) (slaves.Slave, error) {
 	return r.slaves[index], nil
 }
 
-func NewSlaves(slavedbs ...*sql.DB) *Slaves {
+func NewSlaves(dbs ...*sql.DB) (*Slaves, error) {
 	r := &Slaves{}
-	r.slaves = make([]slaves.Slave, 0, len(slavedbs))
-	for idx, slavedb := range slavedbs {
+	r.slaves = make([]slaves.Slave, 0, len(dbs))
+	for idx, db := range dbs {
 		s := slaves.Slave{
 			SlaveName: strconv.Itoa(idx),
-			DB:        slavedb,
+			DB:        db,
 		}
 		r.slaves = append(r.slaves, s)
 	}
-	return r
+	return r, nil
 }
