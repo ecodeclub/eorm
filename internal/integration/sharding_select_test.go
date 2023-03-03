@@ -53,7 +53,7 @@ func (s *ShardingSelectTestSuite) SetupSuite() {
 			t.Fatal(res.Err())
 		}
 	}
-	// TODO 防止®️主从延迟
+	// 防止主从延迟
 	time.Sleep(1)
 }
 

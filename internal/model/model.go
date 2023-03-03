@@ -15,6 +15,7 @@
 package model
 
 import (
+	"github.com/ecodeclub/eorm/internal/sharding"
 	"reflect"
 	"strings"
 	"sync"
@@ -38,6 +39,8 @@ type TableMeta struct {
 	ShardingKey       string
 	DBShardingFunc    ShardingAlgorithm
 	TableShardingFunc ShardingAlgorithm
+
+	ShardingAlgorithm sharding.Algorithm
 }
 
 // ShardingAlgorithm 生成 ShardingKey_xxx
@@ -82,6 +85,12 @@ func WithDBShardingFunc(fn ShardingAlgorithm) TableMetaOption {
 func WithTableShardingFunc(fn ShardingAlgorithm) TableMetaOption {
 	return func(meta *TableMeta) {
 		meta.TableShardingFunc = fn
+	}
+}
+
+func WithTableShardingAlgorithm(algorithm sharding.Algorithm) TableMetaOption {
+	return func(meta *TableMeta) {
+		meta.ShardingAlgorithm = algorithm
 	}
 }
 

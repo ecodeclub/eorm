@@ -25,9 +25,10 @@ import (
 )
 
 type ShardingQuery struct {
-	SQL  string
-	Args []any
-	DB   string
+	SQL        string
+	Args       []any
+	DB         string
+	Datasource string
 }
 
 type Dst struct {

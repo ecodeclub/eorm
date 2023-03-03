@@ -2,6 +2,8 @@ package sharding
 
 import "context"
 
+var EmptyResult = Result{}
+
 type Algorithm interface {
 	// Sharding 返回分库分表之后目标库和目标表信息
 	Sharding(ctx context.Context, req Request) (Result, error)

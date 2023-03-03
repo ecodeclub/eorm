@@ -61,7 +61,7 @@ type Slaves struct {
 	once     sync.Once
 	driver   string
 	interval time.Duration
-	mu       *sync.RWMutex
+	mu       sync.RWMutex
 	timeout  time.Duration
 }
 
@@ -122,7 +122,6 @@ func NewSlaves(dsn string, opts ...SlaveOption) (*Slaves, error) {
 		resolver: net.DefaultResolver,
 		driver:   "mysql",
 		interval: time.Second,
-		mu:       &sync.RWMutex{},
 		timeout:  time.Second,
 	}
 	for _, opt := range opts {
@@ -144,12 +143,12 @@ func NewSlaves(dsn string, opts ...SlaveOption) (*Slaves, error) {
 		for {
 			select {
 			case <-ticker.C:
-				ctx, cancel := context.WithTimeout(context.Background(), s.timeout)
-				err := s.getSlaves(ctx)
+				ctx, cancel = context.WithTimeout(context.Background(), s.timeout)
+				err = s.getSlaves(ctx)
 				cancel()
 				// 尽最大努力重试，拿到dns的响应
 				if err != nil {
-					log.Println(errs.ErrGetSlavesFromDNS)
+					log.Println(errs.NewFailedToGetSlavesFromDNS(err))
 					continue
 				}
 			case <-s.closeCh:

@@ -38,8 +38,8 @@ var (
 	ErrNotFoundTargetDB           = errors.New("eorm: 未发现目标 DB")
 	ErrNotFoundTargetTable        = errors.New("eorm: 未发现目标 Table")
 	ErrSlaveNotFound              = errors.New("eorm: slave不存在")
-	// ErrGetSlavesFromDNS 从dns获取slave列表失败
-	ErrGetSlavesFromDNS = errors.New("eorm: 从DNS获取slaves失败")
+	ErrMergerEmptyRows            = errors.New("eorm: sql.Rows列表为空")
+	ErrMergerRowsIsNull           = errors.New("eorm: sql.Rows列表中有元素为nil")
 )
 
 func NewFieldConflictError(field string) error {
@@ -88,5 +88,8 @@ func NewUnsupportedOperatorError(op string) error {
 
 func NewInvalidDSNError(dsn string) error {
 	return fmt.Errorf("eorm: 不正确的 DSN %s", dsn)
+}
 
+func NewFailedToGetSlavesFromDNS(err error) error {
+	return fmt.Errorf("eorm: 从DNS中解析从库失败 %w", err)
 }
