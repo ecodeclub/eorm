@@ -25,8 +25,3 @@ type Executor interface {
 type QueryBuilder interface {
 	Build() (*Query, error)
 }
-
-// ShardingQueryBuilder  sharding sql 构造抽象
-type ShardingQueryBuilder interface {
-	Build() ([]*ShardingQuery, error)
-}

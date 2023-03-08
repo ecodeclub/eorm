@@ -74,10 +74,10 @@ create table if not exists `integration_test`.`item`
     );
 
         /* sharding test */
+        create database if not exists `order_detail_db_0`;
         create database if not exists `order_detail_db_1`;
-        create database if not exists `order_detail_db_2`;
 
-create table if not exists `order_detail_db_1`.`order_detail_tab_3`
+create table if not exists `order_detail_db_0`.`order_detail_tab_0`
 (
     `order_id`          int(11) auto_increment
     primary key,
@@ -86,7 +86,7 @@ create table if not exists `order_detail_db_1`.`order_detail_tab_3`
     `using_col2`  varchar(128) null
     );
 
-create table if not exists `order_detail_db_1`.`order_detail_tab_4`
+create table if not exists `order_detail_db_0`.`order_detail_tab_1`
 (
     `order_id`          int(11) auto_increment
     primary key,
@@ -95,7 +95,7 @@ create table if not exists `order_detail_db_1`.`order_detail_tab_4`
     `using_col2`  varchar(128) null
     );
 
-create table if not exists `order_detail_db_2`.`order_detail_tab_3`
+create table if not exists `order_detail_db_0`.`order_detail_tab_2`
 (
     `order_id`          int(11) auto_increment
     primary key,
@@ -104,7 +104,25 @@ create table if not exists `order_detail_db_2`.`order_detail_tab_3`
     `using_col2`  varchar(128) null
     );
 
-create table if not exists `order_detail_db_2`.`order_detail_tab_4`
+create table if not exists `order_detail_db_1`.`order_detail_tab_0`
+(
+    `order_id`          int(11) auto_increment
+    primary key,
+    `item_id`  int(11),
+    `using_col1`  varchar(128) null,
+    `using_col2`  varchar(128) null
+    );
+
+create table if not exists `order_detail_db_1`.`order_detail_tab_1`
+(
+    `order_id`          int(11) auto_increment
+    primary key,
+    `item_id`  int(11),
+    `using_col1`  varchar(128) null,
+    `using_col2`  varchar(128) null
+    );
+
+create table if not exists `order_detail_db_1`.`order_detail_tab_2`
 (
     `order_id`          int(11) auto_increment
     primary key,

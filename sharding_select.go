@@ -18,8 +18,9 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"github.com/ecodeclub/eorm/internal/sharding"
 	"sync"
+
+	"github.com/ecodeclub/eorm/internal/sharding"
 
 	"github.com/ecodeclub/eorm/internal/errs"
 	"github.com/valyala/bytebufferpool"
@@ -45,7 +46,7 @@ func NewShardingSelector[T any](db *ShardingDB) *ShardingSelector[T] {
 	}
 }
 
-func (s *ShardingSelector[T]) Build() ([]*ShardingQuery, error) {
+func (s *ShardingSelector[T]) Build(ctx context.Context) ([]*sharding.Query, error) {
 	var err error
 	if s.meta == nil {
 		s.meta, err = s.metaRegistry.Get(new(T))
@@ -53,14 +54,11 @@ func (s *ShardingSelector[T]) Build() ([]*ShardingQuery, error) {
 			return nil, err
 		}
 	}
-	if s.meta.ShardingKey == "" {
-		return nil, errs.ErrMissingShardingKey
-	}
-	shardingRes, err := s.findDsts()
+	shardingRes, err := s.findDsts(ctx)
 	if err != nil {
 		return nil, err
 	}
-	res := make([]*ShardingQuery, 0, len(shardingRes.Dsts))
+	res := make([]*sharding.Query, 0, len(shardingRes.Dsts))
 	for _, dst := range shardingRes.Dsts {
 		query, err := s.buildQuery(dst.DB, dst.Table, dst.Name)
 		if err != nil {
@@ -72,7 +70,7 @@ func (s *ShardingSelector[T]) Build() ([]*ShardingQuery, error) {
 	return res, nil
 }
 
-func (s *ShardingSelector[T]) buildQuery(db, tbl, ds string) (*ShardingQuery, error) {
+func (s *ShardingSelector[T]) buildQuery(db, tbl, ds string) (*sharding.Query, error) {
 	defer bytebufferpool.Put(s.buffer)
 	var err error
 	s.writeString("SELECT ")
@@ -141,116 +139,35 @@ func (s *ShardingSelector[T]) buildQuery(db, tbl, ds string) (*ShardingQuery, er
 	}
 	s.end()
 
-	return &ShardingQuery{SQL: s.buffer.String(), Args: s.args, DB: db, Datasource: ds}, nil
+	return &sharding.Query{SQL: s.buffer.String(), Args: s.args, Datasource: ds, DB: db}, nil
 }
 
-// TODO findDsts
-//func (s *ShardingSelector[T]) findDsts() ([]Dst, error) {
-//	//  通过遍历 pre 查找目标 shardingkey
-//	if len(s.where) > 0 {
-//		pre := s.where[0]
-//		for i := 1; i < len(s.where)-1; i++ {
-//			pre = pre.And(s.where[i])
-//		}
-//		return s.findDstByPredicate(pre)
-//	}
-//	return nil, nil
-//}
-
-func (s *ShardingSelector[T]) findDsts() (sharding.Result, error) {
+func (s *ShardingSelector[T]) findDsts(ctx context.Context) (sharding.Result, error) {
 	//  通过遍历 pre 查找目标 shardingkey
 	if len(s.where) > 0 {
 		pre := s.where[0]
 		for i := 1; i < len(s.where)-1; i++ {
 			pre = pre.And(s.where[i])
 		}
-		return s.findDstByPredicate(pre)
+		return s.findDstByPredicate(ctx, pre)
 	}
 	res := sharding.Result{
-		Dsts: s.meta.ShardingAlgorithm.Broadcast(context.Background()),
+		Dsts: s.meta.ShardingAlgorithm.Broadcast(ctx),
 	}
 	return res, nil
 }
 
-// TODO findDstByPredicate
-//func (s *ShardingSelector[T]) findDstByPredicate(pre Predicate) ([]Dst, error) {
-//	var res []Dst
-//	switch pre.op {
-//	case opAnd:
-//		left, err := s.findDstByPredicate(pre.left.(Predicate))
-//		if err != nil {
-//			return nil, err
-//		}
-//		if len(left) == 0 {
-//			return s.findDstByPredicate(pre.right.(Predicate))
-//		}
-//		right, err := s.findDstByPredicate(pre.right.(Predicate))
-//		if err != nil {
-//			return nil, err
-//		}
-//		if len(right) == 0 {
-//			return left, nil
-//		}
-//		return s.mergeAnd(left, right), nil
-//	case opOr:
-//		left, err := s.findDstByPredicate(pre.left.(Predicate))
-//		if err != nil {
-//			return nil, err
-//		}
-//		if len(left) == 0 {
-//			return s.db.broadcast(), nil
-//		}
-//		right, err := s.findDstByPredicate(pre.right.(Predicate))
-//		if err != nil {
-//			return nil, err
-//		}
-//		if len(right) == 0 {
-//			return s.db.broadcast(), nil
-//		}
-//		return s.mergeOR(left, right), nil
-//	case opEQ:
-//		col, isCol := pre.left.(Column)
-//		right, isVals := pre.right.(valueExpr)
-//		if !isCol || !isVals {
-//			return nil, errs.ErrUnsupportedTooComplexQuery
-//		}
-//		if col.name == s.meta.ShardingKey {
-//			shardingDB, err := s.meta.DBShardingFunc(right.val)
-//			if err != nil {
-//				return nil, errs.ErrExcShardingAlgorithm
-//			}
-//			shardingTbl, err := s.meta.TableShardingFunc(right.val)
-//			if err != nil {
-//				return nil, errs.ErrExcShardingAlgorithm
-//			}
-//			_, existDB := s.db.DBs[shardingDB]
-//			if !existDB {
-//				return nil, errs.ErrNotFoundTargetDB
-//			}
-//			_, existTbl := s.db.Tables[shardingTbl]
-//			if !existTbl {
-//				return nil, errs.ErrNotFoundTargetTable
-//			}
-//			dst := Dst{DB: shardingDB, Table: shardingTbl}
-//			res = append(res, dst)
-//		}
-//	default:
-//		return nil, errs.NewUnsupportedOperatorError(pre.op.text)
-//	}
-//	return res, nil
-//}
-
-func (s *ShardingSelector[T]) findDstByPredicate(pre Predicate) (sharding.Result, error) {
+func (s *ShardingSelector[T]) findDstByPredicate(ctx context.Context, pre Predicate) (sharding.Result, error) {
 	switch pre.op {
 	case opAnd:
-		left, err := s.findDstByPredicate(pre.left.(Predicate))
+		left, err := s.findDstByPredicate(ctx, pre.left.(Predicate))
 		if err != nil {
 			return sharding.EmptyResult, err
 		}
 		if len(left.Dsts) == 0 {
-			return s.findDstByPredicate(pre.right.(Predicate))
+			return s.findDstByPredicate(ctx, pre.right.(Predicate))
 		}
-		right, err := s.findDstByPredicate(pre.right.(Predicate))
+		right, err := s.findDstByPredicate(ctx, pre.right.(Predicate))
 		if err != nil {
 			return sharding.EmptyResult, err
 		}
@@ -259,22 +176,22 @@ func (s *ShardingSelector[T]) findDstByPredicate(pre Predicate) (sharding.Result
 		}
 		return s.mergeAnd(left, right), nil
 	case opOr:
-		left, err := s.findDstByPredicate(pre.left.(Predicate))
+		left, err := s.findDstByPredicate(ctx, pre.left.(Predicate))
 		if err != nil {
 			return sharding.EmptyResult, err
 		}
 		if len(left.Dsts) == 0 {
 			return sharding.Result{
-				Dsts: s.meta.ShardingAlgorithm.Broadcast(context.Background()),
+				Dsts: s.meta.ShardingAlgorithm.Broadcast(ctx),
 			}, nil
 		}
-		right, err := s.findDstByPredicate(pre.right.(Predicate))
+		right, err := s.findDstByPredicate(ctx, pre.right.(Predicate))
 		if err != nil {
 			return sharding.EmptyResult, err
 		}
 		if len(right.Dsts) == 0 {
 			return sharding.Result{
-				Dsts: s.meta.ShardingAlgorithm.Broadcast(context.Background()),
+				Dsts: s.meta.ShardingAlgorithm.Broadcast(ctx),
 			}, nil
 		}
 		return s.mergeOR(left, right), nil
@@ -284,7 +201,7 @@ func (s *ShardingSelector[T]) findDstByPredicate(pre Predicate) (sharding.Result
 		if !isCol || !isVals {
 			return sharding.EmptyResult, errs.ErrUnsupportedTooComplexQuery
 		}
-		return s.meta.ShardingAlgorithm.Sharding(context.Background(),
+		return s.meta.ShardingAlgorithm.Sharding(ctx,
 			sharding.Request{SkValues: map[string]any{col.name: right.val}})
 	default:
 		return sharding.EmptyResult, errs.NewUnsupportedOperatorError(pre.op.text)
@@ -296,7 +213,7 @@ func (*ShardingSelector[T]) mergeAnd(left, right sharding.Result) sharding.Resul
 	for _, r := range right.Dsts {
 		exist := false
 		for _, l := range left.Dsts {
-			if r.DB == l.DB && r.Table == l.Table {
+			if r.Name == l.Name && r.DB == l.DB && r.Table == l.Table {
 				exist = true
 			}
 		}
@@ -312,8 +229,8 @@ func (*ShardingSelector[T]) mergeOR(left, right sharding.Result) sharding.Result
 	m := make(map[string]bool, 8)
 	for _, r := range right.Dsts {
 		for _, l := range left.Dsts {
-			if r.DB != l.DB || r.Table != l.Table {
-				tbl := fmt.Sprintf("%s_%s", l.DB, l.Table)
+			if r.Name != l.Name || r.DB != l.DB || r.Table != l.Table {
+				tbl := fmt.Sprintf("%s_%s_%s", l.Name, l.DB, l.Table)
 				if _, ok := m[tbl]; ok {
 					continue
 				}
@@ -455,12 +372,9 @@ func (s *ShardingSelector[T]) buildGroupBy() error {
 }
 
 func (s *ShardingSelector[T]) Get(ctx context.Context) (*T, error) {
-	qs, err := s.Limit(1).Build()
+	qs, err := s.Limit(1).Build(ctx)
 	if err != nil {
 		return nil, err
-	}
-	if len(qs) == 0 {
-		return nil, errs.ErrNotGenShardingQuery
 	}
 	// TODO 要确保前面的改写 SQL 只能生成一个 SQL
 	if len(qs) > 1 {
@@ -468,8 +382,7 @@ func (s *ShardingSelector[T]) Get(ctx context.Context) (*T, error) {
 	}
 	query := qs[0]
 	// TODO 利用 ctx 传递 DB name
-	ctx = CtxWithDBName(ctx, query.Datasource)
-	row, err := s.db.queryContext(ctx, query.SQL, query.Args...)
+	row, err := s.db.queryContext(ctx, query)
 	if err != nil {
 		return nil, err
 	}
@@ -485,7 +398,7 @@ func (s *ShardingSelector[T]) Get(ctx context.Context) (*T, error) {
 }
 
 func (s *ShardingSelector[T]) GetMulti(ctx context.Context) ([]*T, error) {
-	qs, err := s.Build()
+	qs, err := s.Build(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -497,8 +410,7 @@ func (s *ShardingSelector[T]) GetMulti(ctx context.Context) ([]*T, error) {
 			s.lock.Lock()
 			defer s.lock.Unlock()
 			// TODO 利用 ctx 传递 DB name
-			lctx := CtxWithDBName(ctx, q.Datasource)
-			rows, err := s.db.queryContext(lctx, q.SQL, q.Args...)
+			rows, err := s.db.queryContext(ctx, q)
 			if err == nil {
 				rowsSlice = append(rowsSlice, rows)
 			}

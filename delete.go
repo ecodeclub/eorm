@@ -23,19 +23,19 @@ import (
 // Deleter builds DELETE query
 type Deleter[T any] struct {
 	builder
-	session
+	Session
 	table interface{}
 	where []Predicate
 }
 
 // NewDeleter 开始构建一个 DELETE 查询
-func NewDeleter[T any](sess session) *Deleter[T] {
+func NewDeleter[T any](sess Session) *Deleter[T] {
 	return &Deleter[T]{
 		builder: builder{
 			core:   sess.getCore(),
 			buffer: bytebufferpool.Get(),
 		},
-		session: sess,
+		Session: sess,
 	}
 }
 
@@ -82,5 +82,5 @@ func (d *Deleter[T]) Exec(ctx context.Context) Result {
 	if err != nil {
 		return Result{err: err}
 	}
-	return newQuerier[T](d.session, query, d.meta, DELETE).Exec(ctx)
+	return newQuerier[T](d.Session, query, d.meta, DELETE).Exec(ctx)
 }

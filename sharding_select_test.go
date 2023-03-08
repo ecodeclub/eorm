@@ -16,1364 +16,552 @@ package eorm
 
 import (
 	"context"
-	"fmt"
-	"github.com/ecodeclub/eorm/internal/sharding"
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/ecodeclub/eorm/internal/errs"
-	"github.com/ecodeclub/eorm/internal/slaves"
+	"github.com/ecodeclub/eorm/internal/sharding"
+	"github.com/ecodeclub/eorm/internal/sharding/datasource"
+	"github.com/ecodeclub/eorm/internal/sharding/hash"
 	"github.com/ecodeclub/eorm/internal/slaves/roundrobin"
 	"github.com/ecodeclub/eorm/internal/test"
+
+	"github.com/ecodeclub/eorm/internal/slaves"
 
 	"github.com/ecodeclub/eorm/internal/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestShardingSelector_onlyDB_Build(t *testing.T) {
+func TestShardingSelector_shadow_Build(t *testing.T) {
 	r := model.NewMetaRegistry()
 	_, err := r.Register(&Order{},
-		model.WithTableShardingAlgorithm(sharding.Hash{
-			Base:         10,
-			ShardingKey:  "UserId",
-			DBPattern:    "order_db_%d",
-			TablePattern: "order_tab_0",
-			DsPattern:    "0.db.cluster.company.com:3306",
+		model.WithTableShardingAlgorithm(&hash.ShadowHash{
+			Hash: &hash.Hash{
+				ShardingKey:  "UserId",
+				DBPattern:    &sharding.Pattern{Name: "order_db_%d", Base: 2},
+				TablePattern: &sharding.Pattern{Name: "order_tab_%d", Base: 3},
+				DsPattern:    &sharding.Pattern{Name: "0.db.cluster.company.com:3306", NotSharding: true},
+			},
+			Prefix: "shadow_",
 		}))
 	require.NoError(t, err)
+	shardingDB, err := OpenShardingDB("sqlite3", ShardingDBOptionWithMetaRegistry(r))
+	require.NoError(t, err)
 
-	masterSlaveDB := masterSlaveMemoryDB()
 	testCases := []struct {
 		name    string
-		builder ShardingQueryBuilder
-		qs      []*ShardingQuery
+		builder sharding.QueryBuilder
+		qs      []*sharding.Query
 		wantErr error
 	}{
 		{
-			name: "not dst",
-			builder: func() ShardingQueryBuilder {
-				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_1": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](shardingDB).Where(C("UserId").EQ(int64(534)))
-				return s
-			}(),
-			wantErr: errs.ErrNotFoundTargetDB,
-		},
-		{
-			name: "too complex operator",
-			builder: func() ShardingQueryBuilder {
-				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_1": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](shardingDB).Where(C("UserId").GT(int64(123)))
-				return s
-			}(),
-			wantErr: errs.NewUnsupportedOperatorError(opGT.text),
-		},
-		{
-			name: "miss sharding key err",
-			builder: func() ShardingQueryBuilder {
-				db, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-				})
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](db).Where(C("UserId").EQ(int64(123)))
-				return s
-			}(),
-			wantErr: errs.ErrMissingShardingKey,
-		},
-		{
 			name: "only eq",
-			builder: func() ShardingQueryBuilder {
-				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](shardingDB).Where(C("UserId").EQ(int64(123)))
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).Where(C("UserId").EQ(123))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `user_id`,`order_id`,`content`,`account` FROM `order_db_1`.`order_tab_3` WHERE `user_id`=?;",
-					Args: []any{int64(123)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `user_id`,`order_id`,`content`,`account` FROM `shadow_order_db_1`.`shadow_order_tab_0` WHERE `user_id`=?;",
+					Args:       []any{123},
+					DB:         "shadow_order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "columns",
-			builder: func() ShardingQueryBuilder {
-				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-					}))
-				require.NoError(t, err)
+			builder: func() sharding.QueryBuilder {
 				s := NewShardingSelector[Order](shardingDB).
-					Select(Columns("Content", "OrderId")).Where(C("UserId").EQ(int64(123)))
+					Select(Columns("Content", "OrderId")).Where(C("UserId").EQ(123))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `content`,`order_id` FROM `order_db_1`.`order_tab_3` WHERE `user_id`=?;",
-					Args: []any{int64(123)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `content`,`order_id` FROM `shadow_order_db_1`.`shadow_order_tab_0` WHERE `user_id`=?;",
+					Args:       []any{123},
+					DB:         "shadow_order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "invalid columns",
-			builder: func() ShardingQueryBuilder {
-				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-					}))
-				require.NoError(t, err)
+			builder: func() sharding.QueryBuilder {
 				s := NewShardingSelector[Order](shardingDB).
-					Select(C("Invalid")).Where(C("UserId").EQ(int64(123)))
+					Select(C("Invalid")).Where(C("UserId").EQ(123))
 				return s
 			}(),
 			wantErr: errs.NewInvalidFieldError("Invalid"),
 		},
 		{
 			name: "order by",
-			builder: func() ShardingQueryBuilder {
-				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-					}))
-				require.NoError(t, err)
+			builder: func() sharding.QueryBuilder {
 				s := NewShardingSelector[Order](shardingDB).Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123))).OrderBy(ASC("UserId"), DESC("OrderId"))
+					Where(C("UserId").EQ(123)).OrderBy(ASC("UserId"), DESC("OrderId"))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE `user_id`=? ORDER BY `user_id` ASC,`order_id` DESC;",
-					Args: []any{int64(123)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_1`.`shadow_order_tab_0` WHERE `user_id`=? ORDER BY `user_id` ASC,`order_id` DESC;",
+					Args:       []any{123},
+					DB:         "shadow_order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "group by",
-			builder: func() ShardingQueryBuilder {
-				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-					}))
-				require.NoError(t, err)
+			builder: func() sharding.QueryBuilder {
 				s := NewShardingSelector[Order](shardingDB).Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123))).GroupBy("UserId", "OrderId")
+					Where(C("UserId").EQ(123)).GroupBy("UserId", "OrderId")
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE `user_id`=? GROUP BY `user_id`,`order_id`;",
-					Args: []any{int64(123)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_1`.`shadow_order_tab_0` WHERE `user_id`=? GROUP BY `user_id`,`order_id`;",
+					Args:       []any{123},
+					DB:         "shadow_order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "having",
-			builder: func() ShardingQueryBuilder {
-				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-					}))
-				require.NoError(t, err)
+			builder: func() sharding.QueryBuilder {
 				s := NewShardingSelector[Order](shardingDB).
 					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123))).GroupBy("OrderId").Having(C("OrderId").EQ(int64(18)))
+					Where(C("UserId").EQ(123)).GroupBy("OrderId").Having(C("OrderId").EQ(int64(18)))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE `user_id`=? GROUP BY `order_id` HAVING `order_id`=?;",
-					Args: []any{int64(123), int64(18)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_1`.`shadow_order_tab_0` WHERE `user_id`=? GROUP BY `order_id` HAVING `order_id`=?;",
+					Args:       []any{123, int64(18)},
+					DB:         "shadow_order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "where and left",
-			builder: func() ShardingQueryBuilder {
-				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-					}))
-				require.NoError(t, err)
+			builder: func() sharding.QueryBuilder {
 				s := NewShardingSelector[Order](shardingDB).
 					Select(C("OrderId"), C("Content")).
-					Where(C("OrderId").EQ(int64(12)).And(C("UserId").EQ(int64(123))))
+					Where(C("OrderId").EQ(int64(12)).And(C("UserId").EQ(123)))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE (`order_id`=?) AND (`user_id`=?);",
-					Args: []any{int64(12), int64(123)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_1`.`shadow_order_tab_0` WHERE (`order_id`=?) AND (`user_id`=?);",
+					Args:       []any{int64(12), 123},
+					DB:         "shadow_order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "where and right",
-			builder: func() ShardingQueryBuilder {
-				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-					}))
-				require.NoError(t, err)
+			builder: func() sharding.QueryBuilder {
 				s := NewShardingSelector[Order](shardingDB).
 					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123)).And(C("OrderId").EQ(int64(12))))
+					Where(C("UserId").EQ(123).And(C("OrderId").EQ(int64(12))))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE (`user_id`=?) AND (`order_id`=?);",
-					Args: []any{int64(123), int64(12)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_1`.`shadow_order_tab_0` WHERE (`user_id`=?) AND (`order_id`=?);",
+					Args:       []any{123, int64(12)},
+					DB:         "shadow_order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "where or",
-			builder: func() ShardingQueryBuilder {
-				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-					"order_db_2": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-						"order_tab_4": true,
-					}))
-				require.NoError(t, err)
+			builder: func() sharding.QueryBuilder {
 				s := NewShardingSelector[Order](shardingDB).
 					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123)).Or(C("UserId").EQ(int64(234))))
+					Where(C("UserId").EQ(123).Or(C("UserId").EQ(234)))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE (`user_id`=?) OR (`user_id`=?);",
-					Args: []any{int64(123), int64(234)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_1`.`shadow_order_tab_0` WHERE (`user_id`=?) OR (`user_id`=?);",
+					Args:       []any{123, 234},
+					DB:         "shadow_order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_4` WHERE (`user_id`=?) OR (`user_id`=?);",
-					Args: []any{int64(123), int64(234)},
-					DB:   "order_db_2",
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_0`.`shadow_order_tab_0` WHERE (`user_id`=?) OR (`user_id`=?);",
+					Args:       []any{123, 234},
+					DB:         "shadow_order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "where or left broadcast",
-			builder: func() ShardingQueryBuilder {
-				orm, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-					"order_db_2": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_1": true,
-						"order_tab_3": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](orm).
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
 					Select(C("OrderId"), C("Content")).
-					Where(C("OrderId").EQ(int64(12)).Or(C("UserId").EQ(int64(123))))
+					Where(C("OrderId").EQ(int64(12)).Or(C("UserId").EQ(123)))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_1` WHERE (`order_id`=?) OR (`user_id`=?);",
-					Args: []any{int64(12), int64(123)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_0`.`shadow_order_tab_0` WHERE (`order_id`=?) OR (`user_id`=?);",
+					Args:       []any{int64(12), 123},
+					DB:         "shadow_order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE (`order_id`=?) OR (`user_id`=?);",
-					Args: []any{int64(12), int64(123)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_0`.`shadow_order_tab_1` WHERE (`order_id`=?) OR (`user_id`=?);",
+					Args:       []any{int64(12), 123},
+					DB:         "shadow_order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_1` WHERE (`order_id`=?) OR (`user_id`=?);",
-					Args: []any{int64(12), int64(123)},
-					DB:   "order_db_2",
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_0`.`shadow_order_tab_2` WHERE (`order_id`=?) OR (`user_id`=?);",
+					Args:       []any{int64(12), 123},
+					DB:         "shadow_order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_3` WHERE (`order_id`=?) OR (`user_id`=?);",
-					Args: []any{int64(12), int64(123)},
-					DB:   "order_db_2",
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_1`.`shadow_order_tab_0` WHERE (`order_id`=?) OR (`user_id`=?);",
+					Args:       []any{int64(12), 123},
+					DB:         "shadow_order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_1`.`shadow_order_tab_1` WHERE (`order_id`=?) OR (`user_id`=?);",
+					Args:       []any{int64(12), 123},
+					DB:         "shadow_order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_1`.`shadow_order_tab_2` WHERE (`order_id`=?) OR (`user_id`=?);",
+					Args:       []any{int64(12), 123},
+					DB:         "shadow_order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "where or right broadcast",
-			builder: func() ShardingQueryBuilder {
-				orm, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-					"order_db_2": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_1": true,
-						"order_tab_3": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](orm).
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
 					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123)).Or(C("OrderId").EQ(int64(12))))
+					Where(C("UserId").EQ(123).Or(C("OrderId").EQ(int64(12))))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_1` WHERE (`user_id`=?) OR (`order_id`=?);",
-					Args: []any{int64(123), int64(12)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_0`.`shadow_order_tab_0` WHERE (`user_id`=?) OR (`order_id`=?);",
+					Args:       []any{123, int64(12)},
+					DB:         "shadow_order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE (`user_id`=?) OR (`order_id`=?);",
-					Args: []any{int64(123), int64(12)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_0`.`shadow_order_tab_1` WHERE (`user_id`=?) OR (`order_id`=?);",
+					Args:       []any{123, int64(12)},
+					DB:         "shadow_order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_1` WHERE (`user_id`=?) OR (`order_id`=?);",
-					Args: []any{int64(123), int64(12)},
-					DB:   "order_db_2",
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_0`.`shadow_order_tab_2` WHERE (`user_id`=?) OR (`order_id`=?);",
+					Args:       []any{123, int64(12)},
+					DB:         "shadow_order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_3` WHERE (`user_id`=?) OR (`order_id`=?);",
-					Args: []any{int64(123), int64(12)},
-					DB:   "order_db_2",
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_1`.`shadow_order_tab_0` WHERE (`user_id`=?) OR (`order_id`=?);",
+					Args:       []any{123, int64(12)},
+					DB:         "shadow_order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_1`.`shadow_order_tab_1` WHERE (`user_id`=?) OR (`order_id`=?);",
+					Args:       []any{123, int64(12)},
+					DB:         "shadow_order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_1`.`shadow_order_tab_2` WHERE (`user_id`=?) OR (`order_id`=?);",
+					Args:       []any{123, int64(12)},
+					DB:         "shadow_order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "where and-or",
-			builder: func() ShardingQueryBuilder {
-				orm, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-					"order_db_2": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_1": true,
-						"order_tab_3": true,
-						"order_tab_4": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](orm).
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
 					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123)).And(C("OrderId").EQ(int64(12))).Or(C("UserId").EQ(int64(234))))
+					Where(C("UserId").EQ(123).And(C("OrderId").EQ(int64(12))).Or(C("UserId").EQ(234)))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE ((`user_id`=?) AND (`order_id`=?)) OR (`user_id`=?);",
-					Args: []any{int64(123), int64(12), int64(234)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_1`.`shadow_order_tab_0` WHERE ((`user_id`=?) AND (`order_id`=?)) OR (`user_id`=?);",
+					Args:       []any{123, int64(12), 234},
+					DB:         "shadow_order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_4` WHERE ((`user_id`=?) AND (`order_id`=?)) OR (`user_id`=?);",
-					Args: []any{int64(123), int64(12), int64(234)},
-					DB:   "order_db_2",
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_0`.`shadow_order_tab_0` WHERE ((`user_id`=?) AND (`order_id`=?)) OR (`user_id`=?);",
+					Args:       []any{123, int64(12), 234},
+					DB:         "shadow_order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "where and-or broadcast",
-			builder: func() ShardingQueryBuilder {
-				orm, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-					"order_db_2": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_1": true,
-						"order_tab_3": true,
-						"order_tab_4": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](orm).
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
 					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123)).And(C("OrderId").EQ(int64(12)).
-						Or(C("UserId").EQ(int64(234)))))
+					Where(C("UserId").EQ(123).And(C("OrderId").EQ(int64(12)).
+						Or(C("UserId").EQ(234))))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE (`user_id`=?) AND ((`order_id`=?) OR (`user_id`=?));",
-					Args: []any{int64(123), int64(12), int64(234)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_1`.`shadow_order_tab_0` WHERE (`user_id`=?) AND ((`order_id`=?) OR (`user_id`=?));",
+					Args:       []any{123, int64(12), 234},
+					DB:         "shadow_order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "where or-and all",
-			builder: func() ShardingQueryBuilder {
-				orm, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-					"order_db_2": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_1": true,
-						"order_tab_3": true,
-						"order_tab_4": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](orm).
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
 					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123)).Or(C("UserId").EQ(int64(181)).And(C("UserId").EQ(int64(234)))))
+					Where(C("UserId").EQ(123).Or(C("UserId").EQ(181).And(C("UserId").EQ(234))))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_1` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
-					Args: []any{int64(123), int64(181), int64(234)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_0`.`shadow_order_tab_0` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
+					Args:       []any{123, 181, 234},
+					DB:         "shadow_order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
-					Args: []any{int64(123), int64(181), int64(234)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_0`.`shadow_order_tab_1` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
+					Args:       []any{123, 181, 234},
+					DB:         "shadow_order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_4` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
-					Args: []any{int64(123), int64(181), int64(234)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_0`.`shadow_order_tab_2` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
+					Args:       []any{123, 181, 234},
+					DB:         "shadow_order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_1` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
-					Args: []any{int64(123), int64(181), int64(234)},
-					DB:   "order_db_2",
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_1`.`shadow_order_tab_0` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
+					Args:       []any{123, 181, 234},
+					DB:         "shadow_order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_3` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
-					Args: []any{int64(123), int64(181), int64(234)},
-					DB:   "order_db_2",
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_1`.`shadow_order_tab_1` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
+					Args:       []any{123, 181, 234},
+					DB:         "shadow_order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_4` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
-					Args: []any{int64(123), int64(181), int64(234)},
-					DB:   "order_db_2",
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_1`.`shadow_order_tab_2` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
+					Args:       []any{123, 181, 234},
+					DB:         "shadow_order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "where or-and",
-			builder: func() ShardingQueryBuilder {
-				orm, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-					"order_db_2": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_1": true,
-						"order_tab_3": true,
-						"order_tab_4": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](orm).
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
 					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123)).Or(C("UserId").EQ(int64(234))).
+					Where(C("UserId").EQ(123).Or(C("UserId").EQ(234)).
 						And(C("OrderId").EQ(int64(24))))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE ((`user_id`=?) OR (`user_id`=?)) AND (`order_id`=?);",
-					Args: []any{int64(123), int64(234), int64(24)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_1`.`shadow_order_tab_0` WHERE ((`user_id`=?) OR (`user_id`=?)) AND (`order_id`=?);",
+					Args:       []any{123, 234, int64(24)},
+					DB:         "shadow_order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_4` WHERE ((`user_id`=?) OR (`user_id`=?)) AND (`order_id`=?);",
-					Args: []any{int64(123), int64(234), int64(24)},
-					DB:   "order_db_2",
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_0`.`shadow_order_tab_0` WHERE ((`user_id`=?) OR (`user_id`=?)) AND (`order_id`=?);",
+					Args:       []any{123, 234, int64(24)},
+					DB:         "shadow_order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "where or-and broadcast",
-			builder: func() ShardingQueryBuilder {
-				orm, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-					"order_db_2": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-						"order_tab_4": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](orm).
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
 					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123)).Or(C("OrderId").EQ(int64(12))).
-						And(C("UserId").EQ(int64(234))))
+					Where(C("UserId").EQ(123).Or(C("OrderId").EQ(int64(12))).
+						And(C("UserId").EQ(234)))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_4` WHERE ((`user_id`=?) OR (`order_id`=?)) AND (`user_id`=?);",
-					Args: []any{int64(123), int64(12), int64(234)},
-					DB:   "order_db_2",
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_0`.`shadow_order_tab_0` WHERE ((`user_id`=?) OR (`order_id`=?)) AND (`user_id`=?);",
+					Args:       []any{123, int64(12), 234},
+					DB:         "shadow_order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "where or-or",
-			builder: func() ShardingQueryBuilder {
-				orm, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-					"order_db_2": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-						"order_tab_4": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](orm).
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
 					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123)).Or(C("UserId").EQ(int64(253))).
-						Or(C("UserId").EQ(int64(234))))
+					Where(C("UserId").EQ(123).Or(C("UserId").EQ(253)).
+						Or(C("UserId").EQ(234)))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE ((`user_id`=?) OR (`user_id`=?)) OR (`user_id`=?);",
-					Args: []any{int64(123), int64(253), int64(234)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_1`.`shadow_order_tab_0` WHERE ((`user_id`=?) OR (`user_id`=?)) OR (`user_id`=?);",
+					Args:       []any{123, 253, 234},
+					DB:         "shadow_order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_3` WHERE ((`user_id`=?) OR (`user_id`=?)) OR (`user_id`=?);",
-					Args: []any{int64(123), int64(253), int64(234)},
-					DB:   "order_db_2",
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_1`.`shadow_order_tab_1` WHERE ((`user_id`=?) OR (`user_id`=?)) OR (`user_id`=?);",
+					Args:       []any{123, 253, 234},
+					DB:         "shadow_order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_4` WHERE ((`user_id`=?) OR (`user_id`=?)) OR (`user_id`=?);",
-					Args: []any{int64(123), int64(253), int64(234)},
-					DB:   "order_db_2",
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_0`.`shadow_order_tab_0` WHERE ((`user_id`=?) OR (`user_id`=?)) OR (`user_id`=?);",
+					Args:       []any{123, 253, 234},
+					DB:         "shadow_order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "where or-or broadcast",
-			builder: func() ShardingQueryBuilder {
-				orm, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-					"order_db_2": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-						"order_tab_4": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](orm).
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
 					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123)).Or(C("OrderId").EQ(int64(12))).
-						Or(C("UserId").EQ(int64(234))))
+					Where(C("UserId").EQ(123).Or(C("OrderId").EQ(int64(12))).
+						Or(C("UserId").EQ(234)))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE ((`user_id`=?) OR (`order_id`=?)) OR (`user_id`=?);",
-					Args: []any{int64(123), int64(12), int64(234)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_0`.`shadow_order_tab_0` WHERE ((`user_id`=?) OR (`order_id`=?)) OR (`user_id`=?);",
+					Args:       []any{123, int64(12), 234},
+					DB:         "shadow_order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_4` WHERE ((`user_id`=?) OR (`order_id`=?)) OR (`user_id`=?);",
-					Args: []any{int64(123), int64(12), int64(234)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_0`.`shadow_order_tab_1` WHERE ((`user_id`=?) OR (`order_id`=?)) OR (`user_id`=?);",
+					Args:       []any{123, int64(12), 234},
+					DB:         "shadow_order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_3` WHERE ((`user_id`=?) OR (`order_id`=?)) OR (`user_id`=?);",
-					Args: []any{int64(123), int64(12), int64(234)},
-					DB:   "order_db_2",
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_0`.`shadow_order_tab_2` WHERE ((`user_id`=?) OR (`order_id`=?)) OR (`user_id`=?);",
+					Args:       []any{123, int64(12), 234},
+					DB:         "shadow_order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_4` WHERE ((`user_id`=?) OR (`order_id`=?)) OR (`user_id`=?);",
-					Args: []any{int64(123), int64(12), int64(234)},
-					DB:   "order_db_2",
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_1`.`shadow_order_tab_0` WHERE ((`user_id`=?) OR (`order_id`=?)) OR (`user_id`=?);",
+					Args:       []any{123, int64(12), 234},
+					DB:         "shadow_order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_1`.`shadow_order_tab_1` WHERE ((`user_id`=?) OR (`order_id`=?)) OR (`user_id`=?);",
+					Args:       []any{123, int64(12), 234},
+					DB:         "shadow_order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_1`.`shadow_order_tab_2` WHERE ((`user_id`=?) OR (`order_id`=?)) OR (`user_id`=?);",
+					Args:       []any{123, int64(12), 234},
+					DB:         "shadow_order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "where and-and",
-			builder: func() ShardingQueryBuilder {
-				orm, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](orm).
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
 					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123)).And(C("OrderId").EQ(int64(12))).
+					Where(C("UserId").EQ(123).And(C("OrderId").EQ(int64(12))).
 						And(C("OrderId").EQ(int64(23))))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE ((`user_id`=?) AND (`order_id`=?)) AND (`order_id`=?);",
-					Args: []any{int64(123), int64(12), int64(23)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_1`.`shadow_order_tab_0` WHERE ((`user_id`=?) AND (`order_id`=?)) AND (`order_id`=?);",
+					Args:       []any{123, int64(12), int64(23)},
+					DB:         "shadow_order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "where and-or-and",
-			builder: func() ShardingQueryBuilder {
-				orm, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-					"order_db_2": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-						"order_tab_4": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](orm).
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
 					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123)).And(C("OrderId").EQ(int64(12))).
-						Or(C("UserId").EQ(int64(234)).And(C("OrderId").EQ(int64(18)))))
+					Where(C("UserId").EQ(123).And(C("OrderId").EQ(int64(12))).
+						Or(C("UserId").EQ(234).And(C("OrderId").EQ(int64(18)))))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE ((`user_id`=?) AND (`order_id`=?)) OR ((`user_id`=?) AND (`order_id`=?));",
-					Args: []any{int64(123), int64(12), int64(234), int64(18)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_1`.`shadow_order_tab_0` WHERE ((`user_id`=?) AND (`order_id`=?)) OR ((`user_id`=?) AND (`order_id`=?));",
+					Args:       []any{123, int64(12), 234, int64(18)},
+					DB:         "shadow_order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_4` WHERE ((`user_id`=?) AND (`order_id`=?)) OR ((`user_id`=?) AND (`order_id`=?));",
-					Args: []any{int64(123), int64(12), int64(234), int64(18)},
-					DB:   "order_db_2",
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_0`.`shadow_order_tab_0` WHERE ((`user_id`=?) AND (`order_id`=?)) OR ((`user_id`=?) AND (`order_id`=?));",
+					Args:       []any{123, int64(12), 234, int64(18)},
+					DB:         "shadow_order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "and empty",
-			builder: func() ShardingQueryBuilder {
-				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-						"order_tab_4": true,
-					}))
-				require.NoError(t, err)
+			builder: func() sharding.QueryBuilder {
 				s := NewShardingSelector[Order](shardingDB).
 					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123)).And(C("UserId").EQ(int64(124))))
+					Where(C("UserId").EQ(123).And(C("UserId").EQ(124)))
 				return s
 			}(),
-			qs: []*ShardingQuery{},
+			qs: []*sharding.Query{},
 		},
 	}
 
 	for _, tc := range testCases {
 		c := tc
 		t.Run(c.name, func(t *testing.T) {
-			qs, err := c.builder.Build()
-			assert.Equal(t, c.wantErr, err)
-			if err != nil {
-				return
-			}
-			assert.ElementsMatch(t, c.qs, qs)
-		})
-	}
-}
-
-func TestShardingSelector_onlyTable_Build(t *testing.T) {
-	r := model.NewMetaRegistry()
-	_, err := r.Register(&Order{},
-		model.WithShardingKey("UserId"),
-		model.WithDBShardingFunc(func(skVal any) (string, error) {
-			db := skVal.(int64) / 100
-			return fmt.Sprintf("order_db_%d", db), nil
-		}),
-		model.WithTableShardingFunc(func(skVal any) (string, error) {
-			tbl := skVal.(int64) % 10
-			return fmt.Sprintf("order_tab_%d", tbl), nil
-		}))
-	require.NoError(t, err)
-
-	masterSlaveDB := masterSlaveMemoryDB()
-	testCases := []struct {
-		name    string
-		builder ShardingQueryBuilder
-		qs      []*ShardingQuery
-		wantErr error
-	}{
-		{
-			name: "not dst",
-			builder: func() ShardingQueryBuilder {
-				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_1": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](shardingDB).Where(C("UserId").EQ(int64(534)))
-				return s
-			}(),
-			wantErr: errs.ErrNotFoundTargetDB,
-		},
-		{
-			name: "too complex operator",
-			builder: func() ShardingQueryBuilder {
-				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_1": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](shardingDB).Where(C("UserId").GT(int64(123)))
-				return s
-			}(),
-			wantErr: errs.NewUnsupportedOperatorError(opGT.text),
-		},
-		{
-			name: "miss sharding key err",
-			builder: func() ShardingQueryBuilder {
-				db, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-				})
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](db).Where(C("UserId").EQ(int64(123)))
-				return s
-			}(),
-			wantErr: errs.ErrMissingShardingKey,
-		},
-		{
-			name: "only eq",
-			builder: func() ShardingQueryBuilder {
-				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](shardingDB).Where(C("UserId").EQ(int64(123)))
-				return s
-			}(),
-			qs: []*ShardingQuery{
-				{
-					SQL:  "SELECT `user_id`,`order_id`,`content`,`account` FROM `order_db_1`.`order_tab_3` WHERE `user_id`=?;",
-					Args: []any{int64(123)},
-					DB:   "order_db_1",
-				},
-			},
-		},
-		{
-			name: "columns",
-			builder: func() ShardingQueryBuilder {
-				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](shardingDB).
-					Select(Columns("Content", "OrderId")).Where(C("UserId").EQ(int64(123)))
-				return s
-			}(),
-			qs: []*ShardingQuery{
-				{
-					SQL:  "SELECT `content`,`order_id` FROM `order_db_1`.`order_tab_3` WHERE `user_id`=?;",
-					Args: []any{int64(123)},
-					DB:   "order_db_1",
-				},
-			},
-		},
-		{
-			name: "invalid columns",
-			builder: func() ShardingQueryBuilder {
-				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](shardingDB).
-					Select(C("Invalid")).Where(C("UserId").EQ(int64(123)))
-				return s
-			}(),
-			wantErr: errs.NewInvalidFieldError("Invalid"),
-		},
-		{
-			name: "order by",
-			builder: func() ShardingQueryBuilder {
-				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](shardingDB).Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123))).OrderBy(ASC("UserId"), DESC("OrderId"))
-				return s
-			}(),
-			qs: []*ShardingQuery{
-				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE `user_id`=? ORDER BY `user_id` ASC,`order_id` DESC;",
-					Args: []any{int64(123)},
-					DB:   "order_db_1",
-				},
-			},
-		},
-		{
-			name: "group by",
-			builder: func() ShardingQueryBuilder {
-				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](shardingDB).Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123))).GroupBy("UserId", "OrderId")
-				return s
-			}(),
-			qs: []*ShardingQuery{
-				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE `user_id`=? GROUP BY `user_id`,`order_id`;",
-					Args: []any{int64(123)},
-					DB:   "order_db_1",
-				},
-			},
-		},
-		{
-			name: "having",
-			builder: func() ShardingQueryBuilder {
-				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](shardingDB).
-					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123))).GroupBy("OrderId").Having(C("OrderId").EQ(int64(18)))
-				return s
-			}(),
-			qs: []*ShardingQuery{
-				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE `user_id`=? GROUP BY `order_id` HAVING `order_id`=?;",
-					Args: []any{int64(123), int64(18)},
-					DB:   "order_db_1",
-				},
-			},
-		},
-		{
-			name: "where and left",
-			builder: func() ShardingQueryBuilder {
-				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](shardingDB).
-					Select(C("OrderId"), C("Content")).
-					Where(C("OrderId").EQ(int64(12)).And(C("UserId").EQ(int64(123))))
-				return s
-			}(),
-			qs: []*ShardingQuery{
-				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE (`order_id`=?) AND (`user_id`=?);",
-					Args: []any{int64(12), int64(123)},
-					DB:   "order_db_1",
-				},
-			},
-		},
-		{
-			name: "where and right",
-			builder: func() ShardingQueryBuilder {
-				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](shardingDB).
-					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123)).And(C("OrderId").EQ(int64(12))))
-				return s
-			}(),
-			qs: []*ShardingQuery{
-				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE (`user_id`=?) AND (`order_id`=?);",
-					Args: []any{int64(123), int64(12)},
-					DB:   "order_db_1",
-				},
-			},
-		},
-		{
-			name: "where or",
-			builder: func() ShardingQueryBuilder {
-				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-					"order_db_2": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-						"order_tab_4": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](shardingDB).
-					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123)).Or(C("UserId").EQ(int64(234))))
-				return s
-			}(),
-			qs: []*ShardingQuery{
-				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE (`user_id`=?) OR (`user_id`=?);",
-					Args: []any{int64(123), int64(234)},
-					DB:   "order_db_1",
-				},
-				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_4` WHERE (`user_id`=?) OR (`user_id`=?);",
-					Args: []any{int64(123), int64(234)},
-					DB:   "order_db_2",
-				},
-			},
-		},
-		{
-			name: "where or left broadcast",
-			builder: func() ShardingQueryBuilder {
-				orm, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-					"order_db_2": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_1": true,
-						"order_tab_3": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](orm).
-					Select(C("OrderId"), C("Content")).
-					Where(C("OrderId").EQ(int64(12)).Or(C("UserId").EQ(int64(123))))
-				return s
-			}(),
-			qs: []*ShardingQuery{
-				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_1` WHERE (`order_id`=?) OR (`user_id`=?);",
-					Args: []any{int64(12), int64(123)},
-					DB:   "order_db_1",
-				},
-				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE (`order_id`=?) OR (`user_id`=?);",
-					Args: []any{int64(12), int64(123)},
-					DB:   "order_db_1",
-				},
-				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_1` WHERE (`order_id`=?) OR (`user_id`=?);",
-					Args: []any{int64(12), int64(123)},
-					DB:   "order_db_2",
-				},
-				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_3` WHERE (`order_id`=?) OR (`user_id`=?);",
-					Args: []any{int64(12), int64(123)},
-					DB:   "order_db_2",
-				},
-			},
-		},
-		{
-			name: "where or right broadcast",
-			builder: func() ShardingQueryBuilder {
-				orm, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-					"order_db_2": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_1": true,
-						"order_tab_3": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](orm).
-					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123)).Or(C("OrderId").EQ(int64(12))))
-				return s
-			}(),
-			qs: []*ShardingQuery{
-				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_1` WHERE (`user_id`=?) OR (`order_id`=?);",
-					Args: []any{int64(123), int64(12)},
-					DB:   "order_db_1",
-				},
-				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE (`user_id`=?) OR (`order_id`=?);",
-					Args: []any{int64(123), int64(12)},
-					DB:   "order_db_1",
-				},
-				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_1` WHERE (`user_id`=?) OR (`order_id`=?);",
-					Args: []any{int64(123), int64(12)},
-					DB:   "order_db_2",
-				},
-				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_3` WHERE (`user_id`=?) OR (`order_id`=?);",
-					Args: []any{int64(123), int64(12)},
-					DB:   "order_db_2",
-				},
-			},
-		},
-		{
-			name: "where and-or",
-			builder: func() ShardingQueryBuilder {
-				orm, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-					"order_db_2": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_1": true,
-						"order_tab_3": true,
-						"order_tab_4": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](orm).
-					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123)).And(C("OrderId").EQ(int64(12))).Or(C("UserId").EQ(int64(234))))
-				return s
-			}(),
-			qs: []*ShardingQuery{
-				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE ((`user_id`=?) AND (`order_id`=?)) OR (`user_id`=?);",
-					Args: []any{int64(123), int64(12), int64(234)},
-					DB:   "order_db_1",
-				},
-				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_4` WHERE ((`user_id`=?) AND (`order_id`=?)) OR (`user_id`=?);",
-					Args: []any{int64(123), int64(12), int64(234)},
-					DB:   "order_db_2",
-				},
-			},
-		},
-		{
-			name: "where and-or broadcast",
-			builder: func() ShardingQueryBuilder {
-				orm, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-					"order_db_2": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_1": true,
-						"order_tab_3": true,
-						"order_tab_4": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](orm).
-					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123)).And(C("OrderId").EQ(int64(12)).
-						Or(C("UserId").EQ(int64(234)))))
-				return s
-			}(),
-			qs: []*ShardingQuery{
-				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE (`user_id`=?) AND ((`order_id`=?) OR (`user_id`=?));",
-					Args: []any{int64(123), int64(12), int64(234)},
-					DB:   "order_db_1",
-				},
-			},
-		},
-		{
-			name: "where or-and all",
-			builder: func() ShardingQueryBuilder {
-				orm, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-					"order_db_2": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_1": true,
-						"order_tab_3": true,
-						"order_tab_4": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](orm).
-					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123)).Or(C("UserId").EQ(int64(181)).And(C("UserId").EQ(int64(234)))))
-				return s
-			}(),
-			qs: []*ShardingQuery{
-				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_1` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
-					Args: []any{int64(123), int64(181), int64(234)},
-					DB:   "order_db_1",
-				},
-				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
-					Args: []any{int64(123), int64(181), int64(234)},
-					DB:   "order_db_1",
-				},
-				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_4` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
-					Args: []any{int64(123), int64(181), int64(234)},
-					DB:   "order_db_1",
-				},
-				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_1` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
-					Args: []any{int64(123), int64(181), int64(234)},
-					DB:   "order_db_2",
-				},
-				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_3` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
-					Args: []any{int64(123), int64(181), int64(234)},
-					DB:   "order_db_2",
-				},
-				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_4` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
-					Args: []any{int64(123), int64(181), int64(234)},
-					DB:   "order_db_2",
-				},
-			},
-		},
-		{
-			name: "where or-and",
-			builder: func() ShardingQueryBuilder {
-				orm, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-					"order_db_2": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_1": true,
-						"order_tab_3": true,
-						"order_tab_4": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](orm).
-					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123)).Or(C("UserId").EQ(int64(234))).
-						And(C("OrderId").EQ(int64(24))))
-				return s
-			}(),
-			qs: []*ShardingQuery{
-				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE ((`user_id`=?) OR (`user_id`=?)) AND (`order_id`=?);",
-					Args: []any{int64(123), int64(234), int64(24)},
-					DB:   "order_db_1",
-				},
-				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_4` WHERE ((`user_id`=?) OR (`user_id`=?)) AND (`order_id`=?);",
-					Args: []any{int64(123), int64(234), int64(24)},
-					DB:   "order_db_2",
-				},
-			},
-		},
-		{
-			name: "where or-and broadcast",
-			builder: func() ShardingQueryBuilder {
-				orm, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-					"order_db_2": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-						"order_tab_4": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](orm).
-					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123)).Or(C("OrderId").EQ(int64(12))).
-						And(C("UserId").EQ(int64(234))))
-				return s
-			}(),
-			qs: []*ShardingQuery{
-				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_4` WHERE ((`user_id`=?) OR (`order_id`=?)) AND (`user_id`=?);",
-					Args: []any{int64(123), int64(12), int64(234)},
-					DB:   "order_db_2",
-				},
-			},
-		},
-		{
-			name: "where or-or",
-			builder: func() ShardingQueryBuilder {
-				orm, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-					"order_db_2": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-						"order_tab_4": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](orm).
-					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123)).Or(C("UserId").EQ(int64(253))).
-						Or(C("UserId").EQ(int64(234))))
-				return s
-			}(),
-			qs: []*ShardingQuery{
-				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE ((`user_id`=?) OR (`user_id`=?)) OR (`user_id`=?);",
-					Args: []any{int64(123), int64(253), int64(234)},
-					DB:   "order_db_1",
-				},
-				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_3` WHERE ((`user_id`=?) OR (`user_id`=?)) OR (`user_id`=?);",
-					Args: []any{int64(123), int64(253), int64(234)},
-					DB:   "order_db_2",
-				},
-				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_4` WHERE ((`user_id`=?) OR (`user_id`=?)) OR (`user_id`=?);",
-					Args: []any{int64(123), int64(253), int64(234)},
-					DB:   "order_db_2",
-				},
-			},
-		},
-		{
-			name: "where or-or broadcast",
-			builder: func() ShardingQueryBuilder {
-				orm, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-					"order_db_2": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-						"order_tab_4": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](orm).
-					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123)).Or(C("OrderId").EQ(int64(12))).
-						Or(C("UserId").EQ(int64(234))))
-				return s
-			}(),
-			qs: []*ShardingQuery{
-				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE ((`user_id`=?) OR (`order_id`=?)) OR (`user_id`=?);",
-					Args: []any{int64(123), int64(12), int64(234)},
-					DB:   "order_db_1",
-				},
-				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_4` WHERE ((`user_id`=?) OR (`order_id`=?)) OR (`user_id`=?);",
-					Args: []any{int64(123), int64(12), int64(234)},
-					DB:   "order_db_1",
-				},
-				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_3` WHERE ((`user_id`=?) OR (`order_id`=?)) OR (`user_id`=?);",
-					Args: []any{int64(123), int64(12), int64(234)},
-					DB:   "order_db_2",
-				},
-				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_4` WHERE ((`user_id`=?) OR (`order_id`=?)) OR (`user_id`=?);",
-					Args: []any{int64(123), int64(12), int64(234)},
-					DB:   "order_db_2",
-				},
-			},
-		},
-		{
-			name: "where and-and",
-			builder: func() ShardingQueryBuilder {
-				orm, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](orm).
-					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123)).And(C("OrderId").EQ(int64(12))).
-						And(C("OrderId").EQ(int64(23))))
-				return s
-			}(),
-			qs: []*ShardingQuery{
-				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE ((`user_id`=?) AND (`order_id`=?)) AND (`order_id`=?);",
-					Args: []any{int64(123), int64(12), int64(23)},
-					DB:   "order_db_1",
-				},
-			},
-		},
-		{
-			name: "where and-or-and",
-			builder: func() ShardingQueryBuilder {
-				orm, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-					"order_db_2": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-						"order_tab_4": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](orm).
-					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123)).And(C("OrderId").EQ(int64(12))).
-						Or(C("UserId").EQ(int64(234)).And(C("OrderId").EQ(int64(18)))))
-				return s
-			}(),
-			qs: []*ShardingQuery{
-				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE ((`user_id`=?) AND (`order_id`=?)) OR ((`user_id`=?) AND (`order_id`=?));",
-					Args: []any{int64(123), int64(12), int64(234), int64(18)},
-					DB:   "order_db_1",
-				},
-				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_4` WHERE ((`user_id`=?) AND (`order_id`=?)) OR ((`user_id`=?) AND (`order_id`=?));",
-					Args: []any{int64(123), int64(12), int64(234), int64(18)},
-					DB:   "order_db_2",
-				},
-			},
-		},
-		{
-			name: "and empty",
-			builder: func() ShardingQueryBuilder {
-				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-						"order_tab_4": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](shardingDB).
-					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123)).And(C("UserId").EQ(int64(124))))
-				return s
-			}(),
-			qs: []*ShardingQuery{},
-		},
-	}
-
-	for _, tc := range testCases {
-		c := tc
-		t.Run(c.name, func(t *testing.T) {
-			qs, err := c.builder.Build()
+			ctx := hash.CtxWithDBKey(context.Background())
+			qs, err := c.builder.Build(hash.CtxWithTableKey(ctx))
 			assert.Equal(t, c.wantErr, err)
 			if err != nil {
 				return
@@ -1386,671 +574,1295 @@ func TestShardingSelector_onlyTable_Build(t *testing.T) {
 func TestShardingSelector_onlyDataSource_Build(t *testing.T) {
 	r := model.NewMetaRegistry()
 	_, err := r.Register(&Order{},
-		model.WithShardingKey("UserId"),
-		model.WithDBShardingFunc(func(skVal any) (string, error) {
-			db := skVal.(int64) / 100
-			return fmt.Sprintf("order_db_%d", db), nil
-		}),
-		model.WithTableShardingFunc(func(skVal any) (string, error) {
-			tbl := skVal.(int64) % 10
-			return fmt.Sprintf("order_tab_%d", tbl), nil
+		model.WithTableShardingAlgorithm(&hash.Hash{
+			ShardingKey:  "UserId",
+			DBPattern:    &sharding.Pattern{Name: "order_db", NotSharding: true},
+			TablePattern: &sharding.Pattern{Name: "order_tab", NotSharding: true},
+			DsPattern:    &sharding.Pattern{Name: "%d.db.cluster.company.com:3306", Base: 2},
 		}))
 	require.NoError(t, err)
+	m := map[string]sharding.DataSource{
+		"0.db.cluster.company.com:3306": masterSlaveMemoryDB(),
+	}
+	shardingDB, err := OpenShardingDB("sqlite3",
+		ShardingDBWithDataSource(datasource.NewShardingDataSource(m)),
+		ShardingDBOptionWithMetaRegistry(r))
+	require.NoError(t, err)
 
-	masterSlaveDB := masterSlaveMemoryDB()
 	testCases := []struct {
 		name    string
-		builder ShardingQueryBuilder
-		qs      []*ShardingQuery
+		builder sharding.QueryBuilder
+		qs      []*sharding.Query
 		wantErr error
 	}{
 		{
-			name: "not dst",
-			builder: func() ShardingQueryBuilder {
-				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_1": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](shardingDB).Where(C("UserId").EQ(int64(534)))
-				return s
-			}(),
-			wantErr: errs.ErrNotFoundTargetDB,
-		},
-		{
-			name: "too complex operator",
-			builder: func() ShardingQueryBuilder {
-				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_1": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](shardingDB).Where(C("UserId").GT(int64(123)))
-				return s
-			}(),
-			wantErr: errs.NewUnsupportedOperatorError(opGT.text),
-		},
-		{
-			name: "miss sharding key err",
-			builder: func() ShardingQueryBuilder {
-				db, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-				})
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](db).Where(C("UserId").EQ(int64(123)))
-				return s
-			}(),
-			wantErr: errs.ErrMissingShardingKey,
-		},
-		{
 			name: "only eq",
-			builder: func() ShardingQueryBuilder {
-				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](shardingDB).Where(C("UserId").EQ(int64(123)))
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).Where(C("UserId").EQ(123))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `user_id`,`order_id`,`content`,`account` FROM `order_db_1`.`order_tab_3` WHERE `user_id`=?;",
-					Args: []any{int64(123)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `user_id`,`order_id`,`content`,`account` FROM `order_db`.`order_tab` WHERE `user_id`=?;",
+					Args:       []any{123},
+					DB:         "order_db",
+					Datasource: "1.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "columns",
-			builder: func() ShardingQueryBuilder {
-				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-					}))
-				require.NoError(t, err)
+			builder: func() sharding.QueryBuilder {
 				s := NewShardingSelector[Order](shardingDB).
-					Select(Columns("Content", "OrderId")).Where(C("UserId").EQ(int64(123)))
+					Select(Columns("Content", "OrderId")).Where(C("UserId").EQ(123))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `content`,`order_id` FROM `order_db_1`.`order_tab_3` WHERE `user_id`=?;",
-					Args: []any{int64(123)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `content`,`order_id` FROM `order_db`.`order_tab` WHERE `user_id`=?;",
+					Args:       []any{123},
+					DB:         "order_db",
+					Datasource: "1.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "invalid columns",
-			builder: func() ShardingQueryBuilder {
-				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-					}))
-				require.NoError(t, err)
+			builder: func() sharding.QueryBuilder {
 				s := NewShardingSelector[Order](shardingDB).
-					Select(C("Invalid")).Where(C("UserId").EQ(int64(123)))
+					Select(C("Invalid")).Where(C("UserId").EQ(123))
 				return s
 			}(),
 			wantErr: errs.NewInvalidFieldError("Invalid"),
 		},
 		{
 			name: "order by",
-			builder: func() ShardingQueryBuilder {
-				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-					}))
-				require.NoError(t, err)
+			builder: func() sharding.QueryBuilder {
 				s := NewShardingSelector[Order](shardingDB).Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123))).OrderBy(ASC("UserId"), DESC("OrderId"))
+					Where(C("UserId").EQ(123)).OrderBy(ASC("UserId"), DESC("OrderId"))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE `user_id`=? ORDER BY `user_id` ASC,`order_id` DESC;",
-					Args: []any{int64(123)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab` WHERE `user_id`=? ORDER BY `user_id` ASC,`order_id` DESC;",
+					Args:       []any{123},
+					DB:         "order_db",
+					Datasource: "1.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "group by",
-			builder: func() ShardingQueryBuilder {
-				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-					}))
-				require.NoError(t, err)
+			builder: func() sharding.QueryBuilder {
 				s := NewShardingSelector[Order](shardingDB).Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123))).GroupBy("UserId", "OrderId")
+					Where(C("UserId").EQ(123)).GroupBy("UserId", "OrderId")
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE `user_id`=? GROUP BY `user_id`,`order_id`;",
-					Args: []any{int64(123)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab` WHERE `user_id`=? GROUP BY `user_id`,`order_id`;",
+					Args:       []any{123},
+					DB:         "order_db",
+					Datasource: "1.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "having",
-			builder: func() ShardingQueryBuilder {
-				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-					}))
-				require.NoError(t, err)
+			builder: func() sharding.QueryBuilder {
 				s := NewShardingSelector[Order](shardingDB).
 					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123))).GroupBy("OrderId").Having(C("OrderId").EQ(int64(18)))
+					Where(C("UserId").EQ(123)).GroupBy("OrderId").Having(C("OrderId").EQ(int64(18)))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE `user_id`=? GROUP BY `order_id` HAVING `order_id`=?;",
-					Args: []any{int64(123), int64(18)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab` WHERE `user_id`=? GROUP BY `order_id` HAVING `order_id`=?;",
+					Args:       []any{123, int64(18)},
+					DB:         "order_db",
+					Datasource: "1.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "where and left",
-			builder: func() ShardingQueryBuilder {
-				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-					}))
-				require.NoError(t, err)
+			builder: func() sharding.QueryBuilder {
 				s := NewShardingSelector[Order](shardingDB).
 					Select(C("OrderId"), C("Content")).
-					Where(C("OrderId").EQ(int64(12)).And(C("UserId").EQ(int64(123))))
+					Where(C("OrderId").EQ(int64(12)).And(C("UserId").EQ(123)))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE (`order_id`=?) AND (`user_id`=?);",
-					Args: []any{int64(12), int64(123)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab` WHERE (`order_id`=?) AND (`user_id`=?);",
+					Args:       []any{int64(12), 123},
+					DB:         "order_db",
+					Datasource: "1.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "where and right",
-			builder: func() ShardingQueryBuilder {
-				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-					}))
-				require.NoError(t, err)
+			builder: func() sharding.QueryBuilder {
 				s := NewShardingSelector[Order](shardingDB).
 					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123)).And(C("OrderId").EQ(int64(12))))
+					Where(C("UserId").EQ(123).And(C("OrderId").EQ(int64(12))))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE (`user_id`=?) AND (`order_id`=?);",
-					Args: []any{int64(123), int64(12)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab` WHERE (`user_id`=?) AND (`order_id`=?);",
+					Args:       []any{123, int64(12)},
+					DB:         "order_db",
+					Datasource: "1.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "where or",
-			builder: func() ShardingQueryBuilder {
-				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-					"order_db_2": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-						"order_tab_4": true,
-					}))
-				require.NoError(t, err)
+			builder: func() sharding.QueryBuilder {
 				s := NewShardingSelector[Order](shardingDB).
 					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123)).Or(C("UserId").EQ(int64(234))))
+					Where(C("UserId").EQ(123).Or(C("UserId").EQ(234)))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE (`user_id`=?) OR (`user_id`=?);",
-					Args: []any{int64(123), int64(234)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab` WHERE (`user_id`=?) OR (`user_id`=?);",
+					Args:       []any{123, 234},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_4` WHERE (`user_id`=?) OR (`user_id`=?);",
-					Args: []any{int64(123), int64(234)},
-					DB:   "order_db_2",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab` WHERE (`user_id`=?) OR (`user_id`=?);",
+					Args:       []any{123, 234},
+					DB:         "order_db",
+					Datasource: "1.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "where or left broadcast",
-			builder: func() ShardingQueryBuilder {
-				orm, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-					"order_db_2": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_1": true,
-						"order_tab_3": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](orm).
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
 					Select(C("OrderId"), C("Content")).
-					Where(C("OrderId").EQ(int64(12)).Or(C("UserId").EQ(int64(123))))
+					Where(C("OrderId").EQ(int64(12)).Or(C("UserId").EQ(123)))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_1` WHERE (`order_id`=?) OR (`user_id`=?);",
-					Args: []any{int64(12), int64(123)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab` WHERE (`order_id`=?) OR (`user_id`=?);",
+					Args:       []any{int64(12), 123},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE (`order_id`=?) OR (`user_id`=?);",
-					Args: []any{int64(12), int64(123)},
-					DB:   "order_db_1",
-				},
-				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_1` WHERE (`order_id`=?) OR (`user_id`=?);",
-					Args: []any{int64(12), int64(123)},
-					DB:   "order_db_2",
-				},
-				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_3` WHERE (`order_id`=?) OR (`user_id`=?);",
-					Args: []any{int64(12), int64(123)},
-					DB:   "order_db_2",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab` WHERE (`order_id`=?) OR (`user_id`=?);",
+					Args:       []any{int64(12), 123},
+					DB:         "order_db",
+					Datasource: "1.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "where or right broadcast",
-			builder: func() ShardingQueryBuilder {
-				orm, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-					"order_db_2": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_1": true,
-						"order_tab_3": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](orm).
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
 					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123)).Or(C("OrderId").EQ(int64(12))))
+					Where(C("UserId").EQ(123).Or(C("OrderId").EQ(int64(12))))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_1` WHERE (`user_id`=?) OR (`order_id`=?);",
-					Args: []any{int64(123), int64(12)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab` WHERE (`user_id`=?) OR (`order_id`=?);",
+					Args:       []any{123, int64(12)},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE (`user_id`=?) OR (`order_id`=?);",
-					Args: []any{int64(123), int64(12)},
-					DB:   "order_db_1",
-				},
-				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_1` WHERE (`user_id`=?) OR (`order_id`=?);",
-					Args: []any{int64(123), int64(12)},
-					DB:   "order_db_2",
-				},
-				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_3` WHERE (`user_id`=?) OR (`order_id`=?);",
-					Args: []any{int64(123), int64(12)},
-					DB:   "order_db_2",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab` WHERE (`user_id`=?) OR (`order_id`=?);",
+					Args:       []any{123, int64(12)},
+					DB:         "order_db",
+					Datasource: "1.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "where and-or",
-			builder: func() ShardingQueryBuilder {
-				orm, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-					"order_db_2": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_1": true,
-						"order_tab_3": true,
-						"order_tab_4": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](orm).
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
 					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123)).And(C("OrderId").EQ(int64(12))).Or(C("UserId").EQ(int64(234))))
+					Where(C("UserId").EQ(123).And(C("OrderId").EQ(int64(12))).Or(C("UserId").EQ(234)))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE ((`user_id`=?) AND (`order_id`=?)) OR (`user_id`=?);",
-					Args: []any{int64(123), int64(12), int64(234)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab` WHERE ((`user_id`=?) AND (`order_id`=?)) OR (`user_id`=?);",
+					Args:       []any{123, int64(12), 234},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_4` WHERE ((`user_id`=?) AND (`order_id`=?)) OR (`user_id`=?);",
-					Args: []any{int64(123), int64(12), int64(234)},
-					DB:   "order_db_2",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab` WHERE ((`user_id`=?) AND (`order_id`=?)) OR (`user_id`=?);",
+					Args:       []any{123, int64(12), 234},
+					DB:         "order_db",
+					Datasource: "1.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "where and-or broadcast",
-			builder: func() ShardingQueryBuilder {
-				orm, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-					"order_db_2": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_1": true,
-						"order_tab_3": true,
-						"order_tab_4": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](orm).
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
 					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123)).And(C("OrderId").EQ(int64(12)).
-						Or(C("UserId").EQ(int64(234)))))
+					Where(C("UserId").EQ(123).And(C("OrderId").EQ(int64(12)).
+						Or(C("UserId").EQ(234))))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE (`user_id`=?) AND ((`order_id`=?) OR (`user_id`=?));",
-					Args: []any{int64(123), int64(12), int64(234)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab` WHERE (`user_id`=?) AND ((`order_id`=?) OR (`user_id`=?));",
+					Args:       []any{123, int64(12), 234},
+					DB:         "order_db",
+					Datasource: "1.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "where or-and all",
-			builder: func() ShardingQueryBuilder {
-				orm, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-					"order_db_2": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_1": true,
-						"order_tab_3": true,
-						"order_tab_4": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](orm).
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
 					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123)).Or(C("UserId").EQ(int64(181)).And(C("UserId").EQ(int64(234)))))
+					Where(C("UserId").EQ(123).Or(C("UserId").EQ(181).And(C("UserId").EQ(234))))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_1` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
-					Args: []any{int64(123), int64(181), int64(234)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
+					Args:       []any{123, 181, 234},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
-					Args: []any{int64(123), int64(181), int64(234)},
-					DB:   "order_db_1",
-				},
-				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_4` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
-					Args: []any{int64(123), int64(181), int64(234)},
-					DB:   "order_db_1",
-				},
-				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_1` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
-					Args: []any{int64(123), int64(181), int64(234)},
-					DB:   "order_db_2",
-				},
-				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_3` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
-					Args: []any{int64(123), int64(181), int64(234)},
-					DB:   "order_db_2",
-				},
-				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_4` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
-					Args: []any{int64(123), int64(181), int64(234)},
-					DB:   "order_db_2",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
+					Args:       []any{123, 181, 234},
+					DB:         "order_db",
+					Datasource: "1.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "where or-and",
-			builder: func() ShardingQueryBuilder {
-				orm, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-					"order_db_2": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_1": true,
-						"order_tab_3": true,
-						"order_tab_4": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](orm).
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
 					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123)).Or(C("UserId").EQ(int64(234))).
+					Where(C("UserId").EQ(123).Or(C("UserId").EQ(234)).
 						And(C("OrderId").EQ(int64(24))))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE ((`user_id`=?) OR (`user_id`=?)) AND (`order_id`=?);",
-					Args: []any{int64(123), int64(234), int64(24)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab` WHERE ((`user_id`=?) OR (`user_id`=?)) AND (`order_id`=?);",
+					Args:       []any{123, 234, int64(24)},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_4` WHERE ((`user_id`=?) OR (`user_id`=?)) AND (`order_id`=?);",
-					Args: []any{int64(123), int64(234), int64(24)},
-					DB:   "order_db_2",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab` WHERE ((`user_id`=?) OR (`user_id`=?)) AND (`order_id`=?);",
+					Args:       []any{123, 234, int64(24)},
+					DB:         "order_db",
+					Datasource: "1.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "where or-and broadcast",
-			builder: func() ShardingQueryBuilder {
-				orm, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-					"order_db_2": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-						"order_tab_4": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](orm).
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
 					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123)).Or(C("OrderId").EQ(int64(12))).
-						And(C("UserId").EQ(int64(234))))
+					Where(C("UserId").EQ(123).Or(C("OrderId").EQ(int64(12))).
+						And(C("UserId").EQ(234)))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_4` WHERE ((`user_id`=?) OR (`order_id`=?)) AND (`user_id`=?);",
-					Args: []any{int64(123), int64(12), int64(234)},
-					DB:   "order_db_2",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab` WHERE ((`user_id`=?) OR (`order_id`=?)) AND (`user_id`=?);",
+					Args:       []any{123, int64(12), 234},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "where or-or",
-			builder: func() ShardingQueryBuilder {
-				orm, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-					"order_db_2": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-						"order_tab_4": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](orm).
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
 					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123)).Or(C("UserId").EQ(int64(253))).
-						Or(C("UserId").EQ(int64(234))))
+					Where(C("UserId").EQ(123).Or(C("UserId").EQ(253)).
+						Or(C("UserId").EQ(234)))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE ((`user_id`=?) OR (`user_id`=?)) OR (`user_id`=?);",
-					Args: []any{int64(123), int64(253), int64(234)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab` WHERE ((`user_id`=?) OR (`user_id`=?)) OR (`user_id`=?);",
+					Args:       []any{123, 253, 234},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_3` WHERE ((`user_id`=?) OR (`user_id`=?)) OR (`user_id`=?);",
-					Args: []any{int64(123), int64(253), int64(234)},
-					DB:   "order_db_2",
-				},
-				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_4` WHERE ((`user_id`=?) OR (`user_id`=?)) OR (`user_id`=?);",
-					Args: []any{int64(123), int64(253), int64(234)},
-					DB:   "order_db_2",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab` WHERE ((`user_id`=?) OR (`user_id`=?)) OR (`user_id`=?);",
+					Args:       []any{123, 253, 234},
+					DB:         "order_db",
+					Datasource: "1.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "where or-or broadcast",
-			builder: func() ShardingQueryBuilder {
-				orm, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-					"order_db_2": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-						"order_tab_4": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](orm).
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
 					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123)).Or(C("OrderId").EQ(int64(12))).
-						Or(C("UserId").EQ(int64(234))))
+					Where(C("UserId").EQ(123).Or(C("OrderId").EQ(int64(12))).
+						Or(C("UserId").EQ(234)))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE ((`user_id`=?) OR (`order_id`=?)) OR (`user_id`=?);",
-					Args: []any{int64(123), int64(12), int64(234)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab` WHERE ((`user_id`=?) OR (`order_id`=?)) OR (`user_id`=?);",
+					Args:       []any{123, int64(12), 234},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_4` WHERE ((`user_id`=?) OR (`order_id`=?)) OR (`user_id`=?);",
-					Args: []any{int64(123), int64(12), int64(234)},
-					DB:   "order_db_1",
-				},
-				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_3` WHERE ((`user_id`=?) OR (`order_id`=?)) OR (`user_id`=?);",
-					Args: []any{int64(123), int64(12), int64(234)},
-					DB:   "order_db_2",
-				},
-				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_4` WHERE ((`user_id`=?) OR (`order_id`=?)) OR (`user_id`=?);",
-					Args: []any{int64(123), int64(12), int64(234)},
-					DB:   "order_db_2",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab` WHERE ((`user_id`=?) OR (`order_id`=?)) OR (`user_id`=?);",
+					Args:       []any{123, int64(12), 234},
+					DB:         "order_db",
+					Datasource: "1.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "where and-and",
-			builder: func() ShardingQueryBuilder {
-				orm, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](orm).
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
 					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123)).And(C("OrderId").EQ(int64(12))).
+					Where(C("UserId").EQ(123).And(C("OrderId").EQ(int64(12))).
 						And(C("OrderId").EQ(int64(23))))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE ((`user_id`=?) AND (`order_id`=?)) AND (`order_id`=?);",
-					Args: []any{int64(123), int64(12), int64(23)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab` WHERE ((`user_id`=?) AND (`order_id`=?)) AND (`order_id`=?);",
+					Args:       []any{123, int64(12), int64(23)},
+					DB:         "order_db",
+					Datasource: "1.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "where and-or-and",
-			builder: func() ShardingQueryBuilder {
-				orm, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-					"order_db_2": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-						"order_tab_4": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](orm).
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
 					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123)).And(C("OrderId").EQ(int64(12))).
-						Or(C("UserId").EQ(int64(234)).And(C("OrderId").EQ(int64(18)))))
+					Where(C("UserId").EQ(123).And(C("OrderId").EQ(int64(12))).
+						Or(C("UserId").EQ(234).And(C("OrderId").EQ(int64(18)))))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE ((`user_id`=?) AND (`order_id`=?)) OR ((`user_id`=?) AND (`order_id`=?));",
-					Args: []any{int64(123), int64(12), int64(234), int64(18)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab` WHERE ((`user_id`=?) AND (`order_id`=?)) OR ((`user_id`=?) AND (`order_id`=?));",
+					Args:       []any{123, int64(12), 234, int64(18)},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_4` WHERE ((`user_id`=?) AND (`order_id`=?)) OR ((`user_id`=?) AND (`order_id`=?));",
-					Args: []any{int64(123), int64(12), int64(234), int64(18)},
-					DB:   "order_db_2",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab` WHERE ((`user_id`=?) AND (`order_id`=?)) OR ((`user_id`=?) AND (`order_id`=?));",
+					Args:       []any{123, int64(12), 234, int64(18)},
+					DB:         "order_db",
+					Datasource: "1.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "and empty",
-			builder: func() ShardingQueryBuilder {
-				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-						"order_tab_4": true,
-					}))
-				require.NoError(t, err)
+			builder: func() sharding.QueryBuilder {
 				s := NewShardingSelector[Order](shardingDB).
 					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123)).And(C("UserId").EQ(int64(124))))
+					Where(C("UserId").EQ(123).And(C("UserId").EQ(124)))
 				return s
 			}(),
-			qs: []*ShardingQuery{},
+			qs: []*sharding.Query{},
 		},
 	}
 
 	for _, tc := range testCases {
 		c := tc
 		t.Run(c.name, func(t *testing.T) {
-			qs, err := c.builder.Build()
+			qs, err := c.builder.Build(context.Background())
+			assert.Equal(t, c.wantErr, err)
+			if err != nil {
+				return
+			}
+			assert.ElementsMatch(t, c.qs, qs)
+		})
+	}
+}
+
+func TestShardingSelector_onlyTable_Build(t *testing.T) {
+	r := model.NewMetaRegistry()
+	_, err := r.Register(&Order{},
+		model.WithTableShardingAlgorithm(&hash.Hash{
+			ShardingKey:  "UserId",
+			DBPattern:    &sharding.Pattern{Name: "order_db", NotSharding: true},
+			TablePattern: &sharding.Pattern{Name: "order_tab_%d", Base: 3},
+			DsPattern:    &sharding.Pattern{Name: "0.db.cluster.company.com:3306", NotSharding: true},
+		}))
+	require.NoError(t, err)
+	shardingDB, err := OpenShardingDB("sqlite3", ShardingDBOptionWithMetaRegistry(r))
+	require.NoError(t, err)
+
+	testCases := []struct {
+		name    string
+		builder sharding.QueryBuilder
+		qs      []*sharding.Query
+		wantErr error
+	}{
+		{
+			name: "only eq",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).Where(C("UserId").EQ(123))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `user_id`,`order_id`,`content`,`account` FROM `order_db`.`order_tab_0` WHERE `user_id`=?;",
+					Args:       []any{123},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "columns",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(Columns("Content", "OrderId")).Where(C("UserId").EQ(123))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `content`,`order_id` FROM `order_db`.`order_tab_0` WHERE `user_id`=?;",
+					Args:       []any{123},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "invalid columns",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("Invalid")).Where(C("UserId").EQ(123))
+				return s
+			}(),
+			wantErr: errs.NewInvalidFieldError("Invalid"),
+		},
+		{
+			name: "order by",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).Select(C("OrderId"), C("Content")).
+					Where(C("UserId").EQ(123)).OrderBy(ASC("UserId"), DESC("OrderId"))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_0` WHERE `user_id`=? ORDER BY `user_id` ASC,`order_id` DESC;",
+					Args:       []any{123},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "group by",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).Select(C("OrderId"), C("Content")).
+					Where(C("UserId").EQ(123)).GroupBy("UserId", "OrderId")
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_0` WHERE `user_id`=? GROUP BY `user_id`,`order_id`;",
+					Args:       []any{123},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "having",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(C("UserId").EQ(123)).GroupBy("OrderId").Having(C("OrderId").EQ(int64(18)))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_0` WHERE `user_id`=? GROUP BY `order_id` HAVING `order_id`=?;",
+					Args:       []any{123, int64(18)},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "where and left",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(C("OrderId").EQ(int64(12)).And(C("UserId").EQ(123)))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_0` WHERE (`order_id`=?) AND (`user_id`=?);",
+					Args:       []any{int64(12), 123},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "where and right",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(C("UserId").EQ(123).And(C("OrderId").EQ(int64(12))))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_0` WHERE (`user_id`=?) AND (`order_id`=?);",
+					Args:       []any{123, int64(12)},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "where or",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(C("UserId").EQ(123).Or(C("UserId").EQ(234)))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_0` WHERE (`user_id`=?) OR (`user_id`=?);",
+					Args:       []any{123, 234},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "where or left broadcast",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(C("OrderId").EQ(int64(12)).Or(C("UserId").EQ(123)))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_0` WHERE (`order_id`=?) OR (`user_id`=?);",
+					Args:       []any{int64(12), 123},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_1` WHERE (`order_id`=?) OR (`user_id`=?);",
+					Args:       []any{int64(12), 123},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_2` WHERE (`order_id`=?) OR (`user_id`=?);",
+					Args:       []any{int64(12), 123},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "where or right broadcast",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(C("UserId").EQ(123).Or(C("OrderId").EQ(int64(12))))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_0` WHERE (`user_id`=?) OR (`order_id`=?);",
+					Args:       []any{123, int64(12)},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_1` WHERE (`user_id`=?) OR (`order_id`=?);",
+					Args:       []any{123, int64(12)},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_2` WHERE (`user_id`=?) OR (`order_id`=?);",
+					Args:       []any{123, int64(12)},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "where and-or",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(C("UserId").EQ(123).And(C("OrderId").EQ(int64(12))).Or(C("UserId").EQ(234)))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_0` WHERE ((`user_id`=?) AND (`order_id`=?)) OR (`user_id`=?);",
+					Args:       []any{123, int64(12), 234},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "where and-or broadcast",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(C("UserId").EQ(123).And(C("OrderId").EQ(int64(12)).
+						Or(C("UserId").EQ(234))))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_0` WHERE (`user_id`=?) AND ((`order_id`=?) OR (`user_id`=?));",
+					Args:       []any{123, int64(12), 234},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "where or-and all",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(C("UserId").EQ(123).Or(C("UserId").EQ(181).And(C("UserId").EQ(234))))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_0` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
+					Args:       []any{123, 181, 234},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_1` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
+					Args:       []any{123, 181, 234},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_2` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
+					Args:       []any{123, 181, 234},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "where or-and",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(C("UserId").EQ(123).Or(C("UserId").EQ(234)).
+						And(C("OrderId").EQ(int64(24))))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_0` WHERE ((`user_id`=?) OR (`user_id`=?)) AND (`order_id`=?);",
+					Args:       []any{123, 234, int64(24)},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "where or-and broadcast",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(C("UserId").EQ(123).Or(C("OrderId").EQ(int64(12))).
+						And(C("UserId").EQ(234)))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_0` WHERE ((`user_id`=?) OR (`order_id`=?)) AND (`user_id`=?);",
+					Args:       []any{123, int64(12), 234},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "where or-or",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(C("UserId").EQ(123).Or(C("UserId").EQ(253)).
+						Or(C("UserId").EQ(234)))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_0` WHERE ((`user_id`=?) OR (`user_id`=?)) OR (`user_id`=?);",
+					Args:       []any{123, 253, 234},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_1` WHERE ((`user_id`=?) OR (`user_id`=?)) OR (`user_id`=?);",
+					Args:       []any{123, 253, 234},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "where or-or broadcast",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(C("UserId").EQ(123).Or(C("OrderId").EQ(int64(12))).
+						Or(C("UserId").EQ(234)))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_0` WHERE ((`user_id`=?) OR (`order_id`=?)) OR (`user_id`=?);",
+					Args:       []any{123, int64(12), 234},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_1` WHERE ((`user_id`=?) OR (`order_id`=?)) OR (`user_id`=?);",
+					Args:       []any{123, int64(12), 234},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_2` WHERE ((`user_id`=?) OR (`order_id`=?)) OR (`user_id`=?);",
+					Args:       []any{123, int64(12), 234},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "where and-and",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(C("UserId").EQ(123).And(C("OrderId").EQ(int64(12))).
+						And(C("OrderId").EQ(int64(23))))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_0` WHERE ((`user_id`=?) AND (`order_id`=?)) AND (`order_id`=?);",
+					Args:       []any{123, int64(12), int64(23)},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "where and-or-and",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(C("UserId").EQ(123).And(C("OrderId").EQ(int64(12))).
+						Or(C("UserId").EQ(234).And(C("OrderId").EQ(int64(18)))))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_0` WHERE ((`user_id`=?) AND (`order_id`=?)) OR ((`user_id`=?) AND (`order_id`=?));",
+					Args:       []any{123, int64(12), 234, int64(18)},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "and empty",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(C("UserId").EQ(123).And(C("UserId").EQ(124)))
+				return s
+			}(),
+			qs: []*sharding.Query{},
+		},
+	}
+
+	for _, tc := range testCases {
+		c := tc
+		t.Run(c.name, func(t *testing.T) {
+			qs, err := c.builder.Build(context.Background())
+			assert.Equal(t, c.wantErr, err)
+			if err != nil {
+				return
+			}
+			assert.ElementsMatch(t, c.qs, qs)
+		})
+	}
+}
+
+func TestShardingSelector_onlyDB_Build(t *testing.T) {
+	r := model.NewMetaRegistry()
+	_, err := r.Register(&Order{},
+		model.WithTableShardingAlgorithm(&hash.Hash{
+			ShardingKey:  "UserId",
+			DBPattern:    &sharding.Pattern{Name: "order_db_%d", Base: 2},
+			TablePattern: &sharding.Pattern{Name: "order_tab", NotSharding: true},
+			DsPattern:    &sharding.Pattern{Name: "0.db.cluster.company.com:3306", NotSharding: true},
+		}))
+	require.NoError(t, err)
+	shardingDB, err := OpenShardingDB("sqlite3", ShardingDBOptionWithMetaRegistry(r))
+	require.NoError(t, err)
+
+	testCases := []struct {
+		name    string
+		builder sharding.QueryBuilder
+		qs      []*sharding.Query
+		wantErr error
+	}{
+		{
+			name: "only eq",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).Where(C("UserId").EQ(123))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `user_id`,`order_id`,`content`,`account` FROM `order_db_1`.`order_tab` WHERE `user_id`=?;",
+					Args:       []any{123},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "columns",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(Columns("Content", "OrderId")).Where(C("UserId").EQ(123))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `content`,`order_id` FROM `order_db_1`.`order_tab` WHERE `user_id`=?;",
+					Args:       []any{123},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "invalid columns",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("Invalid")).Where(C("UserId").EQ(123))
+				return s
+			}(),
+			wantErr: errs.NewInvalidFieldError("Invalid"),
+		},
+		{
+			name: "order by",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).Select(C("OrderId"), C("Content")).
+					Where(C("UserId").EQ(123)).OrderBy(ASC("UserId"), DESC("OrderId"))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab` WHERE `user_id`=? ORDER BY `user_id` ASC,`order_id` DESC;",
+					Args:       []any{123},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "group by",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).Select(C("OrderId"), C("Content")).
+					Where(C("UserId").EQ(123)).GroupBy("UserId", "OrderId")
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab` WHERE `user_id`=? GROUP BY `user_id`,`order_id`;",
+					Args:       []any{123},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "having",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(C("UserId").EQ(123)).GroupBy("OrderId").Having(C("OrderId").EQ(int64(18)))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab` WHERE `user_id`=? GROUP BY `order_id` HAVING `order_id`=?;",
+					Args:       []any{123, int64(18)},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "where and left",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(C("OrderId").EQ(int64(12)).And(C("UserId").EQ(123)))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab` WHERE (`order_id`=?) AND (`user_id`=?);",
+					Args:       []any{int64(12), 123},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "where and right",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(C("UserId").EQ(123).And(C("OrderId").EQ(int64(12))))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab` WHERE (`user_id`=?) AND (`order_id`=?);",
+					Args:       []any{123, int64(12)},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "where or",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(C("UserId").EQ(123).Or(C("UserId").EQ(234)))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab` WHERE (`user_id`=?) OR (`user_id`=?);",
+					Args:       []any{123, 234},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab` WHERE (`user_id`=?) OR (`user_id`=?);",
+					Args:       []any{123, 234},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "where or left broadcast",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(C("OrderId").EQ(int64(12)).Or(C("UserId").EQ(123)))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab` WHERE (`order_id`=?) OR (`user_id`=?);",
+					Args:       []any{int64(12), 123},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab` WHERE (`order_id`=?) OR (`user_id`=?);",
+					Args:       []any{int64(12), 123},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "where or right broadcast",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(C("UserId").EQ(123).Or(C("OrderId").EQ(int64(12))))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab` WHERE (`user_id`=?) OR (`order_id`=?);",
+					Args:       []any{123, int64(12)},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab` WHERE (`user_id`=?) OR (`order_id`=?);",
+					Args:       []any{123, int64(12)},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "where and-or",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(C("UserId").EQ(123).And(C("OrderId").EQ(int64(12))).Or(C("UserId").EQ(234)))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab` WHERE ((`user_id`=?) AND (`order_id`=?)) OR (`user_id`=?);",
+					Args:       []any{123, int64(12), 234},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab` WHERE ((`user_id`=?) AND (`order_id`=?)) OR (`user_id`=?);",
+					Args:       []any{123, int64(12), 234},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "where and-or broadcast",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(C("UserId").EQ(123).And(C("OrderId").EQ(int64(12)).
+						Or(C("UserId").EQ(234))))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab` WHERE (`user_id`=?) AND ((`order_id`=?) OR (`user_id`=?));",
+					Args:       []any{123, int64(12), 234},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "where or-and all",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(C("UserId").EQ(123).Or(C("UserId").EQ(181).And(C("UserId").EQ(234))))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
+					Args:       []any{123, 181, 234},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
+					Args:       []any{123, 181, 234},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "where or-and",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(C("UserId").EQ(123).Or(C("UserId").EQ(234)).
+						And(C("OrderId").EQ(int64(24))))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab` WHERE ((`user_id`=?) OR (`user_id`=?)) AND (`order_id`=?);",
+					Args:       []any{123, 234, int64(24)},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab` WHERE ((`user_id`=?) OR (`user_id`=?)) AND (`order_id`=?);",
+					Args:       []any{123, 234, int64(24)},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "where or-and broadcast",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(C("UserId").EQ(123).Or(C("OrderId").EQ(int64(12))).
+						And(C("UserId").EQ(234)))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab` WHERE ((`user_id`=?) OR (`order_id`=?)) AND (`user_id`=?);",
+					Args:       []any{123, int64(12), 234},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "where or-or",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(C("UserId").EQ(123).Or(C("UserId").EQ(253)).
+						Or(C("UserId").EQ(234)))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab` WHERE ((`user_id`=?) OR (`user_id`=?)) OR (`user_id`=?);",
+					Args:       []any{123, 253, 234},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab` WHERE ((`user_id`=?) OR (`user_id`=?)) OR (`user_id`=?);",
+					Args:       []any{123, 253, 234},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "where or-or broadcast",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(C("UserId").EQ(123).Or(C("OrderId").EQ(int64(12))).
+						Or(C("UserId").EQ(234)))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab` WHERE ((`user_id`=?) OR (`order_id`=?)) OR (`user_id`=?);",
+					Args:       []any{123, int64(12), 234},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab` WHERE ((`user_id`=?) OR (`order_id`=?)) OR (`user_id`=?);",
+					Args:       []any{123, int64(12), 234},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "where and-and",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(C("UserId").EQ(123).And(C("OrderId").EQ(int64(12))).
+						And(C("OrderId").EQ(int64(23))))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab` WHERE ((`user_id`=?) AND (`order_id`=?)) AND (`order_id`=?);",
+					Args:       []any{123, int64(12), int64(23)},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "where and-or-and",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(C("UserId").EQ(123).And(C("OrderId").EQ(int64(12))).
+						Or(C("UserId").EQ(234).And(C("OrderId").EQ(int64(18)))))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab` WHERE ((`user_id`=?) AND (`order_id`=?)) OR ((`user_id`=?) AND (`order_id`=?));",
+					Args:       []any{123, int64(12), 234, int64(18)},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab` WHERE ((`user_id`=?) AND (`order_id`=?)) OR ((`user_id`=?) AND (`order_id`=?));",
+					Args:       []any{123, int64(12), 234, int64(18)},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "and empty",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(C("UserId").EQ(123).And(C("UserId").EQ(124)))
+				return s
+			}(),
+			qs: []*sharding.Query{},
+		},
+	}
+
+	for _, tc := range testCases {
+		c := tc
+		t.Run(c.name, func(t *testing.T) {
+			qs, err := c.builder.Build(context.Background())
 			assert.Equal(t, c.wantErr, err)
 			if err != nil {
 				return
@@ -2063,671 +1875,684 @@ func TestShardingSelector_onlyDataSource_Build(t *testing.T) {
 func TestShardingSelector_all_Build(t *testing.T) {
 	r := model.NewMetaRegistry()
 	_, err := r.Register(&Order{},
-		model.WithShardingKey("UserId"),
-		model.WithDBShardingFunc(func(skVal any) (string, error) {
-			db := skVal.(int64) / 100
-			return fmt.Sprintf("order_db_%d", db), nil
-		}),
-		model.WithTableShardingFunc(func(skVal any) (string, error) {
-			tbl := skVal.(int64) % 10
-			return fmt.Sprintf("order_tab_%d", tbl), nil
+		model.WithTableShardingAlgorithm(&hash.Hash{
+			ShardingKey:  "UserId",
+			DBPattern:    &sharding.Pattern{Name: "order_db_%d", Base: 2},
+			TablePattern: &sharding.Pattern{Name: "order_tab_%d", Base: 3},
+			DsPattern:    &sharding.Pattern{Name: "%d.db.cluster.company.com:3306", Base: 2},
 		}))
 	require.NoError(t, err)
+	m := map[string]*MasterSlavesDB{
+		"order_db_0": masterSlaveMemoryDB(),
+		"order_db_1": masterSlaveMemoryDB(),
+		"order_db_2": masterSlaveMemoryDB(),
+	}
+	clusterDB := OpenClusterDB(m)
+	ds := map[string]sharding.DataSource{
+		"0.db.cluster.company.com:3306": clusterDB,
+		"1.db.cluster.company.com:3306": clusterDB,
+	}
+	shardingDB, err := OpenShardingDB("sqlite3",
+		ShardingDBWithDataSource(datasource.NewShardingDataSource(ds)),
+		ShardingDBOptionWithMetaRegistry(r))
+	require.NoError(t, err)
 
-	masterSlaveDB := masterSlaveMemoryDB()
 	testCases := []struct {
 		name    string
-		builder ShardingQueryBuilder
-		qs      []*ShardingQuery
+		builder sharding.QueryBuilder
+		qs      []*sharding.Query
 		wantErr error
 	}{
 		{
-			name: "not dst",
-			builder: func() ShardingQueryBuilder {
-				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_1": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](shardingDB).Where(C("UserId").EQ(int64(534)))
-				return s
-			}(),
-			wantErr: errs.ErrNotFoundTargetDB,
-		},
-		{
-			name: "too complex operator",
-			builder: func() ShardingQueryBuilder {
-				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_1": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](shardingDB).Where(C("UserId").GT(int64(123)))
-				return s
-			}(),
-			wantErr: errs.NewUnsupportedOperatorError(opGT.text),
-		},
-		{
-			name: "miss sharding key err",
-			builder: func() ShardingQueryBuilder {
-				db, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-				})
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](db).Where(C("UserId").EQ(int64(123)))
-				return s
-			}(),
-			wantErr: errs.ErrMissingShardingKey,
-		},
-		{
 			name: "only eq",
-			builder: func() ShardingQueryBuilder {
-				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](shardingDB).Where(C("UserId").EQ(int64(123)))
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).Where(C("UserId").EQ(123))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `user_id`,`order_id`,`content`,`account` FROM `order_db_1`.`order_tab_3` WHERE `user_id`=?;",
-					Args: []any{int64(123)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `user_id`,`order_id`,`content`,`account` FROM `order_db_1`.`order_tab_0` WHERE `user_id`=?;",
+					Args:       []any{123},
+					DB:         "order_db_1",
+					Datasource: "1.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "columns",
-			builder: func() ShardingQueryBuilder {
-				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-					}))
-				require.NoError(t, err)
+			builder: func() sharding.QueryBuilder {
 				s := NewShardingSelector[Order](shardingDB).
-					Select(Columns("Content", "OrderId")).Where(C("UserId").EQ(int64(123)))
+					Select(Columns("Content", "OrderId")).Where(C("UserId").EQ(123))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `content`,`order_id` FROM `order_db_1`.`order_tab_3` WHERE `user_id`=?;",
-					Args: []any{int64(123)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `content`,`order_id` FROM `order_db_1`.`order_tab_0` WHERE `user_id`=?;",
+					Args:       []any{123},
+					DB:         "order_db_1",
+					Datasource: "1.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "invalid columns",
-			builder: func() ShardingQueryBuilder {
-				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-					}))
-				require.NoError(t, err)
+			builder: func() sharding.QueryBuilder {
 				s := NewShardingSelector[Order](shardingDB).
-					Select(C("Invalid")).Where(C("UserId").EQ(int64(123)))
+					Select(C("Invalid")).Where(C("UserId").EQ(123))
 				return s
 			}(),
 			wantErr: errs.NewInvalidFieldError("Invalid"),
 		},
 		{
 			name: "order by",
-			builder: func() ShardingQueryBuilder {
-				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-					}))
-				require.NoError(t, err)
+			builder: func() sharding.QueryBuilder {
 				s := NewShardingSelector[Order](shardingDB).Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123))).OrderBy(ASC("UserId"), DESC("OrderId"))
+					Where(C("UserId").EQ(123)).OrderBy(ASC("UserId"), DESC("OrderId"))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE `user_id`=? ORDER BY `user_id` ASC,`order_id` DESC;",
-					Args: []any{int64(123)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE `user_id`=? ORDER BY `user_id` ASC,`order_id` DESC;",
+					Args:       []any{123},
+					DB:         "order_db_1",
+					Datasource: "1.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "group by",
-			builder: func() ShardingQueryBuilder {
-				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-					}))
-				require.NoError(t, err)
+			builder: func() sharding.QueryBuilder {
 				s := NewShardingSelector[Order](shardingDB).Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123))).GroupBy("UserId", "OrderId")
+					Where(C("UserId").EQ(123)).GroupBy("UserId", "OrderId")
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE `user_id`=? GROUP BY `user_id`,`order_id`;",
-					Args: []any{int64(123)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE `user_id`=? GROUP BY `user_id`,`order_id`;",
+					Args:       []any{123},
+					DB:         "order_db_1",
+					Datasource: "1.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "having",
-			builder: func() ShardingQueryBuilder {
-				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-					}))
-				require.NoError(t, err)
+			builder: func() sharding.QueryBuilder {
 				s := NewShardingSelector[Order](shardingDB).
 					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123))).GroupBy("OrderId").Having(C("OrderId").EQ(int64(18)))
+					Where(C("UserId").EQ(123)).GroupBy("OrderId").Having(C("OrderId").EQ(int64(18)))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE `user_id`=? GROUP BY `order_id` HAVING `order_id`=?;",
-					Args: []any{int64(123), int64(18)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE `user_id`=? GROUP BY `order_id` HAVING `order_id`=?;",
+					Args:       []any{123, int64(18)},
+					DB:         "order_db_1",
+					Datasource: "1.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "where and left",
-			builder: func() ShardingQueryBuilder {
-				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-					}))
-				require.NoError(t, err)
+			builder: func() sharding.QueryBuilder {
 				s := NewShardingSelector[Order](shardingDB).
 					Select(C("OrderId"), C("Content")).
-					Where(C("OrderId").EQ(int64(12)).And(C("UserId").EQ(int64(123))))
+					Where(C("OrderId").EQ(int64(12)).And(C("UserId").EQ(123)))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE (`order_id`=?) AND (`user_id`=?);",
-					Args: []any{int64(12), int64(123)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE (`order_id`=?) AND (`user_id`=?);",
+					Args:       []any{int64(12), 123},
+					DB:         "order_db_1",
+					Datasource: "1.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "where and right",
-			builder: func() ShardingQueryBuilder {
-				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-					}))
-				require.NoError(t, err)
+			builder: func() sharding.QueryBuilder {
 				s := NewShardingSelector[Order](shardingDB).
 					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123)).And(C("OrderId").EQ(int64(12))))
+					Where(C("UserId").EQ(123).And(C("OrderId").EQ(int64(12))))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE (`user_id`=?) AND (`order_id`=?);",
-					Args: []any{int64(123), int64(12)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE (`user_id`=?) AND (`order_id`=?);",
+					Args:       []any{123, int64(12)},
+					DB:         "order_db_1",
+					Datasource: "1.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "where or",
-			builder: func() ShardingQueryBuilder {
-				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-					"order_db_2": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-						"order_tab_4": true,
-					}))
-				require.NoError(t, err)
+			builder: func() sharding.QueryBuilder {
 				s := NewShardingSelector[Order](shardingDB).
 					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123)).Or(C("UserId").EQ(int64(234))))
+					Where(C("UserId").EQ(123).Or(C("UserId").EQ(234)))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE (`user_id`=?) OR (`user_id`=?);",
-					Args: []any{int64(123), int64(234)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE (`user_id`=?) OR (`user_id`=?);",
+					Args:       []any{123, 234},
+					DB:         "order_db_1",
+					Datasource: "1.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_4` WHERE (`user_id`=?) OR (`user_id`=?);",
-					Args: []any{int64(123), int64(234)},
-					DB:   "order_db_2",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_0` WHERE (`user_id`=?) OR (`user_id`=?);",
+					Args:       []any{123, 234},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "where or left broadcast",
-			builder: func() ShardingQueryBuilder {
-				orm, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-					"order_db_2": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_1": true,
-						"order_tab_3": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](orm).
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
 					Select(C("OrderId"), C("Content")).
-					Where(C("OrderId").EQ(int64(12)).Or(C("UserId").EQ(int64(123))))
+					Where(C("OrderId").EQ(int64(12)).Or(C("UserId").EQ(123)))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_1` WHERE (`order_id`=?) OR (`user_id`=?);",
-					Args: []any{int64(12), int64(123)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_0` WHERE (`order_id`=?) OR (`user_id`=?);",
+					Args:       []any{int64(12), 123},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE (`order_id`=?) OR (`user_id`=?);",
-					Args: []any{int64(12), int64(123)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_1` WHERE (`order_id`=?) OR (`user_id`=?);",
+					Args:       []any{int64(12), 123},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_1` WHERE (`order_id`=?) OR (`user_id`=?);",
-					Args: []any{int64(12), int64(123)},
-					DB:   "order_db_2",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_2` WHERE (`order_id`=?) OR (`user_id`=?);",
+					Args:       []any{int64(12), 123},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_3` WHERE (`order_id`=?) OR (`user_id`=?);",
-					Args: []any{int64(12), int64(123)},
-					DB:   "order_db_2",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE (`order_id`=?) OR (`user_id`=?);",
+					Args:       []any{int64(12), 123},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_1` WHERE (`order_id`=?) OR (`user_id`=?);",
+					Args:       []any{int64(12), 123},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_2` WHERE (`order_id`=?) OR (`user_id`=?);",
+					Args:       []any{int64(12), 123},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_0` WHERE (`order_id`=?) OR (`user_id`=?);",
+					Args:       []any{int64(12), 123},
+					DB:         "order_db_0",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_1` WHERE (`order_id`=?) OR (`user_id`=?);",
+					Args:       []any{int64(12), 123},
+					DB:         "order_db_0",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_2` WHERE (`order_id`=?) OR (`user_id`=?);",
+					Args:       []any{int64(12), 123},
+					DB:         "order_db_0",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE (`order_id`=?) OR (`user_id`=?);",
+					Args:       []any{int64(12), 123},
+					DB:         "order_db_1",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_1` WHERE (`order_id`=?) OR (`user_id`=?);",
+					Args:       []any{int64(12), 123},
+					DB:         "order_db_1",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_2` WHERE (`order_id`=?) OR (`user_id`=?);",
+					Args:       []any{int64(12), 123},
+					DB:         "order_db_1",
+					Datasource: "1.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "where or right broadcast",
-			builder: func() ShardingQueryBuilder {
-				orm, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-					"order_db_2": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_1": true,
-						"order_tab_3": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](orm).
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
 					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123)).Or(C("OrderId").EQ(int64(12))))
+					Where(C("UserId").EQ(123).Or(C("OrderId").EQ(int64(12))))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_1` WHERE (`user_id`=?) OR (`order_id`=?);",
-					Args: []any{int64(123), int64(12)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_0` WHERE (`user_id`=?) OR (`order_id`=?);",
+					Args:       []any{123, int64(12)},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE (`user_id`=?) OR (`order_id`=?);",
-					Args: []any{int64(123), int64(12)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_1` WHERE (`user_id`=?) OR (`order_id`=?);",
+					Args:       []any{123, int64(12)},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_1` WHERE (`user_id`=?) OR (`order_id`=?);",
-					Args: []any{int64(123), int64(12)},
-					DB:   "order_db_2",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_2` WHERE (`user_id`=?) OR (`order_id`=?);",
+					Args:       []any{123, int64(12)},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_3` WHERE (`user_id`=?) OR (`order_id`=?);",
-					Args: []any{int64(123), int64(12)},
-					DB:   "order_db_2",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE (`user_id`=?) OR (`order_id`=?);",
+					Args:       []any{123, int64(12)},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_1` WHERE (`user_id`=?) OR (`order_id`=?);",
+					Args:       []any{123, int64(12)},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_2` WHERE (`user_id`=?) OR (`order_id`=?);",
+					Args:       []any{123, int64(12)},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_0` WHERE (`user_id`=?) OR (`order_id`=?);",
+					Args:       []any{123, int64(12)},
+					DB:         "order_db_0",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_1` WHERE (`user_id`=?) OR (`order_id`=?);",
+					Args:       []any{123, int64(12)},
+					DB:         "order_db_0",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_2` WHERE (`user_id`=?) OR (`order_id`=?);",
+					Args:       []any{123, int64(12)},
+					DB:         "order_db_0",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE (`user_id`=?) OR (`order_id`=?);",
+					Args:       []any{123, int64(12)},
+					DB:         "order_db_1",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_1` WHERE (`user_id`=?) OR (`order_id`=?);",
+					Args:       []any{123, int64(12)},
+					DB:         "order_db_1",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_2` WHERE (`user_id`=?) OR (`order_id`=?);",
+					Args:       []any{123, int64(12)},
+					DB:         "order_db_1",
+					Datasource: "1.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "where and-or",
-			builder: func() ShardingQueryBuilder {
-				orm, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-					"order_db_2": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_1": true,
-						"order_tab_3": true,
-						"order_tab_4": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](orm).
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
 					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123)).And(C("OrderId").EQ(int64(12))).Or(C("UserId").EQ(int64(234))))
+					Where(C("UserId").EQ(123).And(C("OrderId").EQ(int64(12))).Or(C("UserId").EQ(234)))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE ((`user_id`=?) AND (`order_id`=?)) OR (`user_id`=?);",
-					Args: []any{int64(123), int64(12), int64(234)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE ((`user_id`=?) AND (`order_id`=?)) OR (`user_id`=?);",
+					Args:       []any{123, int64(12), 234},
+					DB:         "order_db_1",
+					Datasource: "1.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_4` WHERE ((`user_id`=?) AND (`order_id`=?)) OR (`user_id`=?);",
-					Args: []any{int64(123), int64(12), int64(234)},
-					DB:   "order_db_2",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_0` WHERE ((`user_id`=?) AND (`order_id`=?)) OR (`user_id`=?);",
+					Args:       []any{123, int64(12), 234},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "where and-or broadcast",
-			builder: func() ShardingQueryBuilder {
-				orm, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-					"order_db_2": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_1": true,
-						"order_tab_3": true,
-						"order_tab_4": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](orm).
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
 					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123)).And(C("OrderId").EQ(int64(12)).
-						Or(C("UserId").EQ(int64(234)))))
+					Where(C("UserId").EQ(123).And(C("OrderId").EQ(int64(12)).
+						Or(C("UserId").EQ(234))))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE (`user_id`=?) AND ((`order_id`=?) OR (`user_id`=?));",
-					Args: []any{int64(123), int64(12), int64(234)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE (`user_id`=?) AND ((`order_id`=?) OR (`user_id`=?));",
+					Args:       []any{123, int64(12), 234},
+					DB:         "order_db_1",
+					Datasource: "1.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "where or-and all",
-			builder: func() ShardingQueryBuilder {
-				orm, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-					"order_db_2": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_1": true,
-						"order_tab_3": true,
-						"order_tab_4": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](orm).
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
 					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123)).Or(C("UserId").EQ(int64(181)).And(C("UserId").EQ(int64(234)))))
+					Where(C("UserId").EQ(123).Or(C("UserId").EQ(181).And(C("UserId").EQ(234))))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_1` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
-					Args: []any{int64(123), int64(181), int64(234)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_0` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
+					Args:       []any{123, 181, 234},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
-					Args: []any{int64(123), int64(181), int64(234)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_1` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
+					Args:       []any{123, 181, 234},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_4` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
-					Args: []any{int64(123), int64(181), int64(234)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_2` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
+					Args:       []any{123, 181, 234},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_1` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
-					Args: []any{int64(123), int64(181), int64(234)},
-					DB:   "order_db_2",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
+					Args:       []any{123, 181, 234},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_3` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
-					Args: []any{int64(123), int64(181), int64(234)},
-					DB:   "order_db_2",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_1` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
+					Args:       []any{123, 181, 234},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_4` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
-					Args: []any{int64(123), int64(181), int64(234)},
-					DB:   "order_db_2",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_2` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
+					Args:       []any{123, 181, 234},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_0` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
+					Args:       []any{123, 181, 234},
+					DB:         "order_db_0",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_1` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
+					Args:       []any{123, 181, 234},
+					DB:         "order_db_0",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_2` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
+					Args:       []any{123, 181, 234},
+					DB:         "order_db_0",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
+					Args:       []any{123, 181, 234},
+					DB:         "order_db_1",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_1` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
+					Args:       []any{123, 181, 234},
+					DB:         "order_db_1",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_2` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
+					Args:       []any{123, 181, 234},
+					DB:         "order_db_1",
+					Datasource: "1.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "where or-and",
-			builder: func() ShardingQueryBuilder {
-				orm, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-					"order_db_2": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_1": true,
-						"order_tab_3": true,
-						"order_tab_4": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](orm).
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
 					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123)).Or(C("UserId").EQ(int64(234))).
+					Where(C("UserId").EQ(123).Or(C("UserId").EQ(234)).
 						And(C("OrderId").EQ(int64(24))))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE ((`user_id`=?) OR (`user_id`=?)) AND (`order_id`=?);",
-					Args: []any{int64(123), int64(234), int64(24)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE ((`user_id`=?) OR (`user_id`=?)) AND (`order_id`=?);",
+					Args:       []any{123, 234, int64(24)},
+					DB:         "order_db_1",
+					Datasource: "1.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_4` WHERE ((`user_id`=?) OR (`user_id`=?)) AND (`order_id`=?);",
-					Args: []any{int64(123), int64(234), int64(24)},
-					DB:   "order_db_2",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_0` WHERE ((`user_id`=?) OR (`user_id`=?)) AND (`order_id`=?);",
+					Args:       []any{123, 234, int64(24)},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "where or-and broadcast",
-			builder: func() ShardingQueryBuilder {
-				orm, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-					"order_db_2": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-						"order_tab_4": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](orm).
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
 					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123)).Or(C("OrderId").EQ(int64(12))).
-						And(C("UserId").EQ(int64(234))))
+					Where(C("UserId").EQ(123).Or(C("OrderId").EQ(int64(12))).
+						And(C("UserId").EQ(234)))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_4` WHERE ((`user_id`=?) OR (`order_id`=?)) AND (`user_id`=?);",
-					Args: []any{int64(123), int64(12), int64(234)},
-					DB:   "order_db_2",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_0` WHERE ((`user_id`=?) OR (`order_id`=?)) AND (`user_id`=?);",
+					Args:       []any{123, int64(12), 234},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "where or-or",
-			builder: func() ShardingQueryBuilder {
-				orm, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-					"order_db_2": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-						"order_tab_4": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](orm).
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
 					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123)).Or(C("UserId").EQ(int64(253))).
-						Or(C("UserId").EQ(int64(234))))
+					Where(C("UserId").EQ(123).Or(C("UserId").EQ(253)).
+						Or(C("UserId").EQ(234)))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE ((`user_id`=?) OR (`user_id`=?)) OR (`user_id`=?);",
-					Args: []any{int64(123), int64(253), int64(234)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE ((`user_id`=?) OR (`user_id`=?)) OR (`user_id`=?);",
+					Args:       []any{123, 253, 234},
+					DB:         "order_db_1",
+					Datasource: "1.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_3` WHERE ((`user_id`=?) OR (`user_id`=?)) OR (`user_id`=?);",
-					Args: []any{int64(123), int64(253), int64(234)},
-					DB:   "order_db_2",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_1` WHERE ((`user_id`=?) OR (`user_id`=?)) OR (`user_id`=?);",
+					Args:       []any{123, 253, 234},
+					DB:         "order_db_1",
+					Datasource: "1.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_4` WHERE ((`user_id`=?) OR (`user_id`=?)) OR (`user_id`=?);",
-					Args: []any{int64(123), int64(253), int64(234)},
-					DB:   "order_db_2",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_0` WHERE ((`user_id`=?) OR (`user_id`=?)) OR (`user_id`=?);",
+					Args:       []any{123, 253, 234},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "where or-or broadcast",
-			builder: func() ShardingQueryBuilder {
-				orm, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-					"order_db_2": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-						"order_tab_4": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](orm).
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
 					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123)).Or(C("OrderId").EQ(int64(12))).
-						Or(C("UserId").EQ(int64(234))))
+					Where(C("UserId").EQ(123).Or(C("OrderId").EQ(int64(12))).
+						Or(C("UserId").EQ(234)))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE ((`user_id`=?) OR (`order_id`=?)) OR (`user_id`=?);",
-					Args: []any{int64(123), int64(12), int64(234)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_0` WHERE ((`user_id`=?) OR (`order_id`=?)) OR (`user_id`=?);",
+					Args:       []any{123, int64(12), 234},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_4` WHERE ((`user_id`=?) OR (`order_id`=?)) OR (`user_id`=?);",
-					Args: []any{int64(123), int64(12), int64(234)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_1` WHERE ((`user_id`=?) OR (`order_id`=?)) OR (`user_id`=?);",
+					Args:       []any{123, int64(12), 234},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_3` WHERE ((`user_id`=?) OR (`order_id`=?)) OR (`user_id`=?);",
-					Args: []any{int64(123), int64(12), int64(234)},
-					DB:   "order_db_2",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_2` WHERE ((`user_id`=?) OR (`order_id`=?)) OR (`user_id`=?);",
+					Args:       []any{123, int64(12), 234},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_4` WHERE ((`user_id`=?) OR (`order_id`=?)) OR (`user_id`=?);",
-					Args: []any{int64(123), int64(12), int64(234)},
-					DB:   "order_db_2",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE ((`user_id`=?) OR (`order_id`=?)) OR (`user_id`=?);",
+					Args:       []any{123, int64(12), 234},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_1` WHERE ((`user_id`=?) OR (`order_id`=?)) OR (`user_id`=?);",
+					Args:       []any{123, int64(12), 234},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_2` WHERE ((`user_id`=?) OR (`order_id`=?)) OR (`user_id`=?);",
+					Args:       []any{123, int64(12), 234},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_0` WHERE ((`user_id`=?) OR (`order_id`=?)) OR (`user_id`=?);",
+					Args:       []any{123, int64(12), 234},
+					DB:         "order_db_0",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_1` WHERE ((`user_id`=?) OR (`order_id`=?)) OR (`user_id`=?);",
+					Args:       []any{123, int64(12), 234},
+					DB:         "order_db_0",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_2` WHERE ((`user_id`=?) OR (`order_id`=?)) OR (`user_id`=?);",
+					Args:       []any{123, int64(12), 234},
+					DB:         "order_db_0",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE ((`user_id`=?) OR (`order_id`=?)) OR (`user_id`=?);",
+					Args:       []any{123, int64(12), 234},
+					DB:         "order_db_1",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_1` WHERE ((`user_id`=?) OR (`order_id`=?)) OR (`user_id`=?);",
+					Args:       []any{123, int64(12), 234},
+					DB:         "order_db_1",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_2` WHERE ((`user_id`=?) OR (`order_id`=?)) OR (`user_id`=?);",
+					Args:       []any{123, int64(12), 234},
+					DB:         "order_db_1",
+					Datasource: "1.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "where and-and",
-			builder: func() ShardingQueryBuilder {
-				orm, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](orm).
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
 					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123)).And(C("OrderId").EQ(int64(12))).
+					Where(C("UserId").EQ(123).And(C("OrderId").EQ(int64(12))).
 						And(C("OrderId").EQ(int64(23))))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE ((`user_id`=?) AND (`order_id`=?)) AND (`order_id`=?);",
-					Args: []any{int64(123), int64(12), int64(23)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE ((`user_id`=?) AND (`order_id`=?)) AND (`order_id`=?);",
+					Args:       []any{123, int64(12), int64(23)},
+					DB:         "order_db_1",
+					Datasource: "1.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "where and-or-and",
-			builder: func() ShardingQueryBuilder {
-				orm, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-					"order_db_2": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-						"order_tab_4": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](orm).
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
 					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123)).And(C("OrderId").EQ(int64(12))).
-						Or(C("UserId").EQ(int64(234)).And(C("OrderId").EQ(int64(18)))))
+					Where(C("UserId").EQ(123).And(C("OrderId").EQ(int64(12))).
+						Or(C("UserId").EQ(234).And(C("OrderId").EQ(int64(18)))))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE ((`user_id`=?) AND (`order_id`=?)) OR ((`user_id`=?) AND (`order_id`=?));",
-					Args: []any{int64(123), int64(12), int64(234), int64(18)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE ((`user_id`=?) AND (`order_id`=?)) OR ((`user_id`=?) AND (`order_id`=?));",
+					Args:       []any{123, int64(12), 234, int64(18)},
+					DB:         "order_db_1",
+					Datasource: "1.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_4` WHERE ((`user_id`=?) AND (`order_id`=?)) OR ((`user_id`=?) AND (`order_id`=?));",
-					Args: []any{int64(123), int64(12), int64(234), int64(18)},
-					DB:   "order_db_2",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_0` WHERE ((`user_id`=?) AND (`order_id`=?)) OR ((`user_id`=?) AND (`order_id`=?));",
+					Args:       []any{123, int64(12), 234, int64(18)},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "and empty",
-			builder: func() ShardingQueryBuilder {
-				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-						"order_tab_4": true,
-					}))
-				require.NoError(t, err)
+			builder: func() sharding.QueryBuilder {
 				s := NewShardingSelector[Order](shardingDB).
 					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123)).And(C("UserId").EQ(int64(124))))
+					Where(C("UserId").EQ(123).And(C("UserId").EQ(124)))
 				return s
 			}(),
-			qs: []*ShardingQuery{},
+			qs: []*sharding.Query{},
 		},
 	}
 
 	for _, tc := range testCases {
 		c := tc
 		t.Run(c.name, func(t *testing.T) {
-			qs, err := c.builder.Build()
+			qs, err := c.builder.Build(context.Background())
 			assert.Equal(t, c.wantErr, err)
 			if err != nil {
 				return
@@ -2740,671 +2565,555 @@ func TestShardingSelector_all_Build(t *testing.T) {
 func TestShardingSelector_Build(t *testing.T) {
 	r := model.NewMetaRegistry()
 	_, err := r.Register(&Order{},
-		model.WithShardingKey("UserId"),
-		model.WithDBShardingFunc(func(skVal any) (string, error) {
-			db := skVal.(int64) / 100
-			return fmt.Sprintf("order_db_%d", db), nil
-		}),
-		model.WithTableShardingFunc(func(skVal any) (string, error) {
-			tbl := skVal.(int64) % 10
-			return fmt.Sprintf("order_tab_%d", tbl), nil
+		model.WithTableShardingAlgorithm(&hash.Hash{
+			ShardingKey:  "UserId",
+			DBPattern:    &sharding.Pattern{Name: "order_db_%d", Base: 2},
+			TablePattern: &sharding.Pattern{Name: "order_tab_%d", Base: 3},
+			DsPattern:    &sharding.Pattern{Name: "0.db.cluster.company.com:3306", NotSharding: true},
 		}))
 	require.NoError(t, err)
+	shardingDB, err := OpenShardingDB("sqlite3", ShardingDBOptionWithMetaRegistry(r))
+	require.NoError(t, err)
 
-	masterSlaveDB := masterSlaveMemoryDB()
 	testCases := []struct {
 		name    string
-		builder ShardingQueryBuilder
-		qs      []*ShardingQuery
+		builder sharding.QueryBuilder
+		qs      []*sharding.Query
 		wantErr error
 	}{
 		{
-			name: "not dst",
-			builder: func() ShardingQueryBuilder {
-				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_1": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](shardingDB).Where(C("UserId").EQ(int64(534)))
-				return s
-			}(),
-			wantErr: errs.ErrNotFoundTargetDB,
-		},
-		{
 			name: "too complex operator",
-			builder: func() ShardingQueryBuilder {
-				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_1": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](shardingDB).Where(C("UserId").GT(int64(123)))
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).Where(C("UserId").GT(123))
 				return s
 			}(),
 			wantErr: errs.NewUnsupportedOperatorError(opGT.text),
 		},
 		{
 			name: "miss sharding key err",
-			builder: func() ShardingQueryBuilder {
-				db, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-				})
+			builder: func() sharding.QueryBuilder {
+				reg := model.NewMetaRegistry()
+				meta, err := reg.Register(&Order{},
+					model.WithTableShardingAlgorithm(&hash.Hash{}))
 				require.NoError(t, err)
-				s := NewShardingSelector[Order](db).Where(C("UserId").EQ(int64(123)))
+				require.NotNil(t, meta.ShardingAlgorithm)
+				db, err := OpenShardingDB("sqlite3",
+					ShardingDBWithDataSource(datasource.NewShardingDataSource(map[string]sharding.DataSource{
+						"0.db.cluster.company.com:3306": masterSlaveMemoryDB(),
+					})),
+					ShardingDBOptionWithMetaRegistry(reg))
+				require.NoError(t, err)
+				s := NewShardingSelector[Order](db).Where(C("UserId").EQ(123))
 				return s
 			}(),
 			wantErr: errs.ErrMissingShardingKey,
 		},
 		{
 			name: "only eq",
-			builder: func() ShardingQueryBuilder {
-				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](shardingDB).Where(C("UserId").EQ(int64(123)))
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).Where(C("UserId").EQ(123))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `user_id`,`order_id`,`content`,`account` FROM `order_db_1`.`order_tab_3` WHERE `user_id`=?;",
-					Args: []any{int64(123)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `user_id`,`order_id`,`content`,`account` FROM `order_db_1`.`order_tab_0` WHERE `user_id`=?;",
+					Args:       []any{123},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "columns",
-			builder: func() ShardingQueryBuilder {
-				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-					}))
-				require.NoError(t, err)
+			builder: func() sharding.QueryBuilder {
 				s := NewShardingSelector[Order](shardingDB).
-					Select(Columns("Content", "OrderId")).Where(C("UserId").EQ(int64(123)))
+					Select(Columns("Content", "OrderId")).Where(C("UserId").EQ(123))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `content`,`order_id` FROM `order_db_1`.`order_tab_3` WHERE `user_id`=?;",
-					Args: []any{int64(123)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `content`,`order_id` FROM `order_db_1`.`order_tab_0` WHERE `user_id`=?;",
+					Args:       []any{123},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "invalid columns",
-			builder: func() ShardingQueryBuilder {
-				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-					}))
-				require.NoError(t, err)
+			builder: func() sharding.QueryBuilder {
 				s := NewShardingSelector[Order](shardingDB).
-					Select(C("Invalid")).Where(C("UserId").EQ(int64(123)))
+					Select(C("Invalid")).Where(C("UserId").EQ(123))
 				return s
 			}(),
 			wantErr: errs.NewInvalidFieldError("Invalid"),
 		},
 		{
 			name: "order by",
-			builder: func() ShardingQueryBuilder {
-				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-					}))
-				require.NoError(t, err)
+			builder: func() sharding.QueryBuilder {
 				s := NewShardingSelector[Order](shardingDB).Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123))).OrderBy(ASC("UserId"), DESC("OrderId"))
+					Where(C("UserId").EQ(123)).OrderBy(ASC("UserId"), DESC("OrderId"))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE `user_id`=? ORDER BY `user_id` ASC,`order_id` DESC;",
-					Args: []any{int64(123)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE `user_id`=? ORDER BY `user_id` ASC,`order_id` DESC;",
+					Args:       []any{123},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "group by",
-			builder: func() ShardingQueryBuilder {
-				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-					}))
-				require.NoError(t, err)
+			builder: func() sharding.QueryBuilder {
 				s := NewShardingSelector[Order](shardingDB).Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123))).GroupBy("UserId", "OrderId")
+					Where(C("UserId").EQ(123)).GroupBy("UserId", "OrderId")
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE `user_id`=? GROUP BY `user_id`,`order_id`;",
-					Args: []any{int64(123)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE `user_id`=? GROUP BY `user_id`,`order_id`;",
+					Args:       []any{123},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "having",
-			builder: func() ShardingQueryBuilder {
-				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-					}))
-				require.NoError(t, err)
+			builder: func() sharding.QueryBuilder {
 				s := NewShardingSelector[Order](shardingDB).
 					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123))).GroupBy("OrderId").Having(C("OrderId").EQ(int64(18)))
+					Where(C("UserId").EQ(123)).GroupBy("OrderId").Having(C("OrderId").EQ(int64(18)))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE `user_id`=? GROUP BY `order_id` HAVING `order_id`=?;",
-					Args: []any{int64(123), int64(18)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE `user_id`=? GROUP BY `order_id` HAVING `order_id`=?;",
+					Args:       []any{123, int64(18)},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "where and left",
-			builder: func() ShardingQueryBuilder {
-				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-					}))
-				require.NoError(t, err)
+			builder: func() sharding.QueryBuilder {
 				s := NewShardingSelector[Order](shardingDB).
 					Select(C("OrderId"), C("Content")).
-					Where(C("OrderId").EQ(int64(12)).And(C("UserId").EQ(int64(123))))
+					Where(C("OrderId").EQ(int64(12)).And(C("UserId").EQ(123)))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE (`order_id`=?) AND (`user_id`=?);",
-					Args: []any{int64(12), int64(123)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE (`order_id`=?) AND (`user_id`=?);",
+					Args:       []any{int64(12), 123},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "where and right",
-			builder: func() ShardingQueryBuilder {
-				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-					}))
-				require.NoError(t, err)
+			builder: func() sharding.QueryBuilder {
 				s := NewShardingSelector[Order](shardingDB).
 					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123)).And(C("OrderId").EQ(int64(12))))
+					Where(C("UserId").EQ(123).And(C("OrderId").EQ(int64(12))))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE (`user_id`=?) AND (`order_id`=?);",
-					Args: []any{int64(123), int64(12)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE (`user_id`=?) AND (`order_id`=?);",
+					Args:       []any{123, int64(12)},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "where or",
-			builder: func() ShardingQueryBuilder {
-				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-					"order_db_2": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-						"order_tab_4": true,
-					}))
-				require.NoError(t, err)
+			builder: func() sharding.QueryBuilder {
 				s := NewShardingSelector[Order](shardingDB).
 					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123)).Or(C("UserId").EQ(int64(234))))
+					Where(C("UserId").EQ(123).Or(C("UserId").EQ(234)))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE (`user_id`=?) OR (`user_id`=?);",
-					Args: []any{int64(123), int64(234)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE (`user_id`=?) OR (`user_id`=?);",
+					Args:       []any{123, 234},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_4` WHERE (`user_id`=?) OR (`user_id`=?);",
-					Args: []any{int64(123), int64(234)},
-					DB:   "order_db_2",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_0` WHERE (`user_id`=?) OR (`user_id`=?);",
+					Args:       []any{123, 234},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "where or left broadcast",
-			builder: func() ShardingQueryBuilder {
-				orm, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-					"order_db_2": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_1": true,
-						"order_tab_3": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](orm).
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
 					Select(C("OrderId"), C("Content")).
-					Where(C("OrderId").EQ(int64(12)).Or(C("UserId").EQ(int64(123))))
+					Where(C("OrderId").EQ(int64(12)).Or(C("UserId").EQ(123)))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_1` WHERE (`order_id`=?) OR (`user_id`=?);",
-					Args: []any{int64(12), int64(123)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_0` WHERE (`order_id`=?) OR (`user_id`=?);",
+					Args:       []any{int64(12), 123},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE (`order_id`=?) OR (`user_id`=?);",
-					Args: []any{int64(12), int64(123)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_1` WHERE (`order_id`=?) OR (`user_id`=?);",
+					Args:       []any{int64(12), 123},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_1` WHERE (`order_id`=?) OR (`user_id`=?);",
-					Args: []any{int64(12), int64(123)},
-					DB:   "order_db_2",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_2` WHERE (`order_id`=?) OR (`user_id`=?);",
+					Args:       []any{int64(12), 123},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_3` WHERE (`order_id`=?) OR (`user_id`=?);",
-					Args: []any{int64(12), int64(123)},
-					DB:   "order_db_2",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE (`order_id`=?) OR (`user_id`=?);",
+					Args:       []any{int64(12), 123},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_1` WHERE (`order_id`=?) OR (`user_id`=?);",
+					Args:       []any{int64(12), 123},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_2` WHERE (`order_id`=?) OR (`user_id`=?);",
+					Args:       []any{int64(12), 123},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "where or right broadcast",
-			builder: func() ShardingQueryBuilder {
-				orm, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-					"order_db_2": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_1": true,
-						"order_tab_3": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](orm).
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
 					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123)).Or(C("OrderId").EQ(int64(12))))
+					Where(C("UserId").EQ(123).Or(C("OrderId").EQ(int64(12))))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_1` WHERE (`user_id`=?) OR (`order_id`=?);",
-					Args: []any{int64(123), int64(12)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_0` WHERE (`user_id`=?) OR (`order_id`=?);",
+					Args:       []any{123, int64(12)},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE (`user_id`=?) OR (`order_id`=?);",
-					Args: []any{int64(123), int64(12)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_1` WHERE (`user_id`=?) OR (`order_id`=?);",
+					Args:       []any{123, int64(12)},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_1` WHERE (`user_id`=?) OR (`order_id`=?);",
-					Args: []any{int64(123), int64(12)},
-					DB:   "order_db_2",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_2` WHERE (`user_id`=?) OR (`order_id`=?);",
+					Args:       []any{123, int64(12)},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_3` WHERE (`user_id`=?) OR (`order_id`=?);",
-					Args: []any{int64(123), int64(12)},
-					DB:   "order_db_2",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE (`user_id`=?) OR (`order_id`=?);",
+					Args:       []any{123, int64(12)},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_1` WHERE (`user_id`=?) OR (`order_id`=?);",
+					Args:       []any{123, int64(12)},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_2` WHERE (`user_id`=?) OR (`order_id`=?);",
+					Args:       []any{123, int64(12)},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "where and-or",
-			builder: func() ShardingQueryBuilder {
-				orm, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-					"order_db_2": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_1": true,
-						"order_tab_3": true,
-						"order_tab_4": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](orm).
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
 					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123)).And(C("OrderId").EQ(int64(12))).Or(C("UserId").EQ(int64(234))))
+					Where(C("UserId").EQ(123).And(C("OrderId").EQ(int64(12))).Or(C("UserId").EQ(234)))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE ((`user_id`=?) AND (`order_id`=?)) OR (`user_id`=?);",
-					Args: []any{int64(123), int64(12), int64(234)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE ((`user_id`=?) AND (`order_id`=?)) OR (`user_id`=?);",
+					Args:       []any{123, int64(12), 234},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_4` WHERE ((`user_id`=?) AND (`order_id`=?)) OR (`user_id`=?);",
-					Args: []any{int64(123), int64(12), int64(234)},
-					DB:   "order_db_2",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_0` WHERE ((`user_id`=?) AND (`order_id`=?)) OR (`user_id`=?);",
+					Args:       []any{123, int64(12), 234},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "where and-or broadcast",
-			builder: func() ShardingQueryBuilder {
-				orm, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-					"order_db_2": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_1": true,
-						"order_tab_3": true,
-						"order_tab_4": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](orm).
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
 					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123)).And(C("OrderId").EQ(int64(12)).
-						Or(C("UserId").EQ(int64(234)))))
+					Where(C("UserId").EQ(123).And(C("OrderId").EQ(int64(12)).
+						Or(C("UserId").EQ(234))))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE (`user_id`=?) AND ((`order_id`=?) OR (`user_id`=?));",
-					Args: []any{int64(123), int64(12), int64(234)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE (`user_id`=?) AND ((`order_id`=?) OR (`user_id`=?));",
+					Args:       []any{123, int64(12), 234},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "where or-and all",
-			builder: func() ShardingQueryBuilder {
-				orm, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-					"order_db_2": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_1": true,
-						"order_tab_3": true,
-						"order_tab_4": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](orm).
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
 					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123)).Or(C("UserId").EQ(int64(181)).And(C("UserId").EQ(int64(234)))))
+					Where(C("UserId").EQ(123).Or(C("UserId").EQ(181).And(C("UserId").EQ(234))))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_1` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
-					Args: []any{int64(123), int64(181), int64(234)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_0` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
+					Args:       []any{123, 181, 234},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
-					Args: []any{int64(123), int64(181), int64(234)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_1` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
+					Args:       []any{123, 181, 234},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_4` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
-					Args: []any{int64(123), int64(181), int64(234)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_2` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
+					Args:       []any{123, 181, 234},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_1` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
-					Args: []any{int64(123), int64(181), int64(234)},
-					DB:   "order_db_2",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
+					Args:       []any{123, 181, 234},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_3` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
-					Args: []any{int64(123), int64(181), int64(234)},
-					DB:   "order_db_2",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_1` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
+					Args:       []any{123, 181, 234},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_4` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
-					Args: []any{int64(123), int64(181), int64(234)},
-					DB:   "order_db_2",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_2` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
+					Args:       []any{123, 181, 234},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "where or-and",
-			builder: func() ShardingQueryBuilder {
-				orm, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-					"order_db_2": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_1": true,
-						"order_tab_3": true,
-						"order_tab_4": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](orm).
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
 					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123)).Or(C("UserId").EQ(int64(234))).
+					Where(C("UserId").EQ(123).Or(C("UserId").EQ(234)).
 						And(C("OrderId").EQ(int64(24))))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE ((`user_id`=?) OR (`user_id`=?)) AND (`order_id`=?);",
-					Args: []any{int64(123), int64(234), int64(24)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE ((`user_id`=?) OR (`user_id`=?)) AND (`order_id`=?);",
+					Args:       []any{123, 234, int64(24)},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_4` WHERE ((`user_id`=?) OR (`user_id`=?)) AND (`order_id`=?);",
-					Args: []any{int64(123), int64(234), int64(24)},
-					DB:   "order_db_2",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_0` WHERE ((`user_id`=?) OR (`user_id`=?)) AND (`order_id`=?);",
+					Args:       []any{123, 234, int64(24)},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "where or-and broadcast",
-			builder: func() ShardingQueryBuilder {
-				orm, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-					"order_db_2": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-						"order_tab_4": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](orm).
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
 					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123)).Or(C("OrderId").EQ(int64(12))).
-						And(C("UserId").EQ(int64(234))))
+					Where(C("UserId").EQ(123).Or(C("OrderId").EQ(int64(12))).
+						And(C("UserId").EQ(234)))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_4` WHERE ((`user_id`=?) OR (`order_id`=?)) AND (`user_id`=?);",
-					Args: []any{int64(123), int64(12), int64(234)},
-					DB:   "order_db_2",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_0` WHERE ((`user_id`=?) OR (`order_id`=?)) AND (`user_id`=?);",
+					Args:       []any{123, int64(12), 234},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "where or-or",
-			builder: func() ShardingQueryBuilder {
-				orm, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-					"order_db_2": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-						"order_tab_4": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](orm).
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
 					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123)).Or(C("UserId").EQ(int64(253))).
-						Or(C("UserId").EQ(int64(234))))
+					Where(C("UserId").EQ(123).Or(C("UserId").EQ(253)).
+						Or(C("UserId").EQ(234)))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE ((`user_id`=?) OR (`user_id`=?)) OR (`user_id`=?);",
-					Args: []any{int64(123), int64(253), int64(234)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE ((`user_id`=?) OR (`user_id`=?)) OR (`user_id`=?);",
+					Args:       []any{123, 253, 234},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_3` WHERE ((`user_id`=?) OR (`user_id`=?)) OR (`user_id`=?);",
-					Args: []any{int64(123), int64(253), int64(234)},
-					DB:   "order_db_2",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_1` WHERE ((`user_id`=?) OR (`user_id`=?)) OR (`user_id`=?);",
+					Args:       []any{123, 253, 234},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_4` WHERE ((`user_id`=?) OR (`user_id`=?)) OR (`user_id`=?);",
-					Args: []any{int64(123), int64(253), int64(234)},
-					DB:   "order_db_2",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_0` WHERE ((`user_id`=?) OR (`user_id`=?)) OR (`user_id`=?);",
+					Args:       []any{123, 253, 234},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "where or-or broadcast",
-			builder: func() ShardingQueryBuilder {
-				orm, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-					"order_db_2": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-						"order_tab_4": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](orm).
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
 					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123)).Or(C("OrderId").EQ(int64(12))).
-						Or(C("UserId").EQ(int64(234))))
+					Where(C("UserId").EQ(123).Or(C("OrderId").EQ(int64(12))).
+						Or(C("UserId").EQ(234)))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE ((`user_id`=?) OR (`order_id`=?)) OR (`user_id`=?);",
-					Args: []any{int64(123), int64(12), int64(234)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_0` WHERE ((`user_id`=?) OR (`order_id`=?)) OR (`user_id`=?);",
+					Args:       []any{123, int64(12), 234},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_4` WHERE ((`user_id`=?) OR (`order_id`=?)) OR (`user_id`=?);",
-					Args: []any{int64(123), int64(12), int64(234)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_1` WHERE ((`user_id`=?) OR (`order_id`=?)) OR (`user_id`=?);",
+					Args:       []any{123, int64(12), 234},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_3` WHERE ((`user_id`=?) OR (`order_id`=?)) OR (`user_id`=?);",
-					Args: []any{int64(123), int64(12), int64(234)},
-					DB:   "order_db_2",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_2` WHERE ((`user_id`=?) OR (`order_id`=?)) OR (`user_id`=?);",
+					Args:       []any{123, int64(12), 234},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_4` WHERE ((`user_id`=?) OR (`order_id`=?)) OR (`user_id`=?);",
-					Args: []any{int64(123), int64(12), int64(234)},
-					DB:   "order_db_2",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE ((`user_id`=?) OR (`order_id`=?)) OR (`user_id`=?);",
+					Args:       []any{123, int64(12), 234},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_1` WHERE ((`user_id`=?) OR (`order_id`=?)) OR (`user_id`=?);",
+					Args:       []any{123, int64(12), 234},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_2` WHERE ((`user_id`=?) OR (`order_id`=?)) OR (`user_id`=?);",
+					Args:       []any{123, int64(12), 234},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "where and-and",
-			builder: func() ShardingQueryBuilder {
-				orm, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](orm).
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
 					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123)).And(C("OrderId").EQ(int64(12))).
+					Where(C("UserId").EQ(123).And(C("OrderId").EQ(int64(12))).
 						And(C("OrderId").EQ(int64(23))))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE ((`user_id`=?) AND (`order_id`=?)) AND (`order_id`=?);",
-					Args: []any{int64(123), int64(12), int64(23)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE ((`user_id`=?) AND (`order_id`=?)) AND (`order_id`=?);",
+					Args:       []any{123, int64(12), int64(23)},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "where and-or-and",
-			builder: func() ShardingQueryBuilder {
-				orm, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-					"order_db_2": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-						"order_tab_4": true,
-					}))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](orm).
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
 					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123)).And(C("OrderId").EQ(int64(12))).
-						Or(C("UserId").EQ(int64(234)).And(C("OrderId").EQ(int64(18)))))
+					Where(C("UserId").EQ(123).And(C("OrderId").EQ(int64(12))).
+						Or(C("UserId").EQ(234).And(C("OrderId").EQ(int64(18)))))
 				return s
 			}(),
-			qs: []*ShardingQuery{
+			qs: []*sharding.Query{
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE ((`user_id`=?) AND (`order_id`=?)) OR ((`user_id`=?) AND (`order_id`=?));",
-					Args: []any{int64(123), int64(12), int64(234), int64(18)},
-					DB:   "order_db_1",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE ((`user_id`=?) AND (`order_id`=?)) OR ((`user_id`=?) AND (`order_id`=?));",
+					Args:       []any{123, int64(12), 234, int64(18)},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 				{
-					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_4` WHERE ((`user_id`=?) AND (`order_id`=?)) OR ((`user_id`=?) AND (`order_id`=?));",
-					Args: []any{int64(123), int64(12), int64(234), int64(18)},
-					DB:   "order_db_2",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_0` WHERE ((`user_id`=?) AND (`order_id`=?)) OR ((`user_id`=?) AND (`order_id`=?));",
+					Args:       []any{123, int64(12), 234, int64(18)},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
 				},
 			},
 		},
 		{
 			name: "and empty",
-			builder: func() ShardingQueryBuilder {
-				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-					"order_db_1": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_tab_3": true,
-						"order_tab_4": true,
-					}))
-				require.NoError(t, err)
+			builder: func() sharding.QueryBuilder {
 				s := NewShardingSelector[Order](shardingDB).
 					Select(C("OrderId"), C("Content")).
-					Where(C("UserId").EQ(int64(123)).And(C("UserId").EQ(int64(124))))
+					Where(C("UserId").EQ(123).And(C("UserId").EQ(124)))
 				return s
 			}(),
-			qs: []*ShardingQuery{},
+			qs: []*sharding.Query{},
 		},
 	}
 
 	for _, tc := range testCases {
 		c := tc
 		t.Run(c.name, func(t *testing.T) {
-			qs, err := c.builder.Build()
+			qs, err := c.builder.Build(context.Background())
 			assert.Equal(t, c.wantErr, err)
 			if err != nil {
 				return
@@ -3414,694 +3123,14 @@ func TestShardingSelector_Build(t *testing.T) {
 	}
 }
 
-//func TestShardingSelector_Build(t *testing.T) {
-//	r := model.NewMetaRegistry()
-//	_, err := r.Register(&Order{},
-//		model.WithShardingKey("UserId"),
-//		model.WithDBShardingFunc(func(skVal any) (string, error) {
-//			db := skVal.(int64) / 100
-//			return fmt.Sprintf("order_db_%d", db), nil
-//		}),
-//		model.WithTableShardingFunc(func(skVal any) (string, error) {
-//			tbl := skVal.(int64) % 10
-//			return fmt.Sprintf("order_tab_%d", tbl), nil
-//		}))
-//	require.NoError(t, err)
-//
-//	masterSlaveDB := masterSlaveMemoryDB()
-//	testCases := []struct {
-//		name    string
-//		builder ShardingQueryBuilder
-//		qs      []*ShardingQuery
-//		wantErr error
-//	}{
-//		{
-//			name: "not dst",
-//			builder: func() ShardingQueryBuilder {
-//				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-//					"order_db_1": masterSlaveDB,
-//				}, ShardingDBOptionWithMetaRegistry(r),
-//					ShardingDBOptionWithTables(map[string]bool{
-//						"order_tab_1": true,
-//					}))
-//				require.NoError(t, err)
-//				s := NewShardingSelector[Order](shardingDB).Where(C("UserId").EQ(int64(534)))
-//				return s
-//			}(),
-//			wantErr: errs.ErrNotFoundTargetDB,
-//		},
-//		{
-//			name: "too complex operator",
-//			builder: func() ShardingQueryBuilder {
-//				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-//					"order_db_1": masterSlaveDB,
-//				}, ShardingDBOptionWithMetaRegistry(r),
-//					ShardingDBOptionWithTables(map[string]bool{
-//						"order_tab_1": true,
-//					}))
-//				require.NoError(t, err)
-//				s := NewShardingSelector[Order](shardingDB).Where(C("UserId").GT(int64(123)))
-//				return s
-//			}(),
-//			wantErr: errs.NewUnsupportedOperatorError(opGT.text),
-//		},
-//		{
-//			name: "miss sharding key err",
-//			builder: func() ShardingQueryBuilder {
-//				db, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-//					"order_db_1": masterSlaveDB,
-//				})
-//				require.NoError(t, err)
-//				s := NewShardingSelector[Order](db).Where(C("UserId").EQ(int64(123)))
-//				return s
-//			}(),
-//			wantErr: errs.ErrMissingShardingKey,
-//		},
-//		{
-//			name: "only eq",
-//			builder: func() ShardingQueryBuilder {
-//				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-//					"order_db_1": masterSlaveDB,
-//				}, ShardingDBOptionWithMetaRegistry(r),
-//					ShardingDBOptionWithTables(map[string]bool{
-//						"order_tab_3": true,
-//					}))
-//				require.NoError(t, err)
-//				s := NewShardingSelector[Order](shardingDB).Where(C("UserId").EQ(int64(123)))
-//				return s
-//			}(),
-//			qs: []*ShardingQuery{
-//				{
-//					SQL:  "SELECT `user_id`,`order_id`,`content`,`account` FROM `order_db_1`.`order_tab_3` WHERE `user_id`=?;",
-//					Args: []any{int64(123)},
-//					DB:   "order_db_1",
-//				},
-//			},
-//		},
-//		{
-//			name: "columns",
-//			builder: func() ShardingQueryBuilder {
-//				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-//					"order_db_1": masterSlaveDB,
-//				}, ShardingDBOptionWithMetaRegistry(r),
-//					ShardingDBOptionWithTables(map[string]bool{
-//						"order_tab_3": true,
-//					}))
-//				require.NoError(t, err)
-//				s := NewShardingSelector[Order](shardingDB).
-//					Select(Columns("Content", "OrderId")).Where(C("UserId").EQ(int64(123)))
-//				return s
-//			}(),
-//			qs: []*ShardingQuery{
-//				{
-//					SQL:  "SELECT `content`,`order_id` FROM `order_db_1`.`order_tab_3` WHERE `user_id`=?;",
-//					Args: []any{int64(123)},
-//					DB:   "order_db_1",
-//				},
-//			},
-//		},
-//		{
-//			name: "invalid columns",
-//			builder: func() ShardingQueryBuilder {
-//				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-//					"order_db_1": masterSlaveDB,
-//				}, ShardingDBOptionWithMetaRegistry(r),
-//					ShardingDBOptionWithTables(map[string]bool{
-//						"order_tab_3": true,
-//					}))
-//				require.NoError(t, err)
-//				s := NewShardingSelector[Order](shardingDB).
-//					Select(C("Invalid")).Where(C("UserId").EQ(int64(123)))
-//				return s
-//			}(),
-//			wantErr: errs.NewInvalidFieldError("Invalid"),
-//		},
-//		{
-//			name: "order by",
-//			builder: func() ShardingQueryBuilder {
-//				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-//					"order_db_1": masterSlaveDB,
-//				}, ShardingDBOptionWithMetaRegistry(r),
-//					ShardingDBOptionWithTables(map[string]bool{
-//						"order_tab_3": true,
-//					}))
-//				require.NoError(t, err)
-//				s := NewShardingSelector[Order](shardingDB).Select(C("OrderId"), C("Content")).
-//					Where(C("UserId").EQ(int64(123))).OrderBy(ASC("UserId"), DESC("OrderId"))
-//				return s
-//			}(),
-//			qs: []*ShardingQuery{
-//				{
-//					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE `user_id`=? ORDER BY `user_id` ASC,`order_id` DESC;",
-//					Args: []any{int64(123)},
-//					DB:   "order_db_1",
-//				},
-//			},
-//		},
-//		{
-//			name: "group by",
-//			builder: func() ShardingQueryBuilder {
-//				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-//					"order_db_1": masterSlaveDB,
-//				}, ShardingDBOptionWithMetaRegistry(r),
-//					ShardingDBOptionWithTables(map[string]bool{
-//						"order_tab_3": true,
-//					}))
-//				require.NoError(t, err)
-//				s := NewShardingSelector[Order](shardingDB).Select(C("OrderId"), C("Content")).
-//					Where(C("UserId").EQ(int64(123))).GroupBy("UserId", "OrderId")
-//				return s
-//			}(),
-//			qs: []*ShardingQuery{
-//				{
-//					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE `user_id`=? GROUP BY `user_id`,`order_id`;",
-//					Args: []any{int64(123)},
-//					DB:   "order_db_1",
-//				},
-//			},
-//		},
-//		{
-//			name: "having",
-//			builder: func() ShardingQueryBuilder {
-//				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-//					"order_db_1": masterSlaveDB,
-//				}, ShardingDBOptionWithMetaRegistry(r),
-//					ShardingDBOptionWithTables(map[string]bool{
-//						"order_tab_3": true,
-//					}))
-//				require.NoError(t, err)
-//				s := NewShardingSelector[Order](shardingDB).
-//					Select(C("OrderId"), C("Content")).
-//					Where(C("UserId").EQ(int64(123))).GroupBy("OrderId").Having(C("OrderId").EQ(int64(18)))
-//				return s
-//			}(),
-//			qs: []*ShardingQuery{
-//				{
-//					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE `user_id`=? GROUP BY `order_id` HAVING `order_id`=?;",
-//					Args: []any{int64(123), int64(18)},
-//					DB:   "order_db_1",
-//				},
-//			},
-//		},
-//		{
-//			name: "where and left",
-//			builder: func() ShardingQueryBuilder {
-//				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-//					"order_db_1": masterSlaveDB,
-//				}, ShardingDBOptionWithMetaRegistry(r),
-//					ShardingDBOptionWithTables(map[string]bool{
-//						"order_tab_3": true,
-//					}))
-//				require.NoError(t, err)
-//				s := NewShardingSelector[Order](shardingDB).
-//					Select(C("OrderId"), C("Content")).
-//					Where(C("OrderId").EQ(int64(12)).And(C("UserId").EQ(int64(123))))
-//				return s
-//			}(),
-//			qs: []*ShardingQuery{
-//				{
-//					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE (`order_id`=?) AND (`user_id`=?);",
-//					Args: []any{int64(12), int64(123)},
-//					DB:   "order_db_1",
-//				},
-//			},
-//		},
-//		{
-//			name: "where and right",
-//			builder: func() ShardingQueryBuilder {
-//				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-//					"order_db_1": masterSlaveDB,
-//				}, ShardingDBOptionWithMetaRegistry(r),
-//					ShardingDBOptionWithTables(map[string]bool{
-//						"order_tab_3": true,
-//					}))
-//				require.NoError(t, err)
-//				s := NewShardingSelector[Order](shardingDB).
-//					Select(C("OrderId"), C("Content")).
-//					Where(C("UserId").EQ(int64(123)).And(C("OrderId").EQ(int64(12))))
-//				return s
-//			}(),
-//			qs: []*ShardingQuery{
-//				{
-//					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE (`user_id`=?) AND (`order_id`=?);",
-//					Args: []any{int64(123), int64(12)},
-//					DB:   "order_db_1",
-//				},
-//			},
-//		},
-//		{
-//			name: "where or",
-//			builder: func() ShardingQueryBuilder {
-//				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-//					"order_db_1": masterSlaveDB,
-//					"order_db_2": masterSlaveDB,
-//				}, ShardingDBOptionWithMetaRegistry(r),
-//					ShardingDBOptionWithTables(map[string]bool{
-//						"order_tab_3": true,
-//						"order_tab_4": true,
-//					}))
-//				require.NoError(t, err)
-//				s := NewShardingSelector[Order](shardingDB).
-//					Select(C("OrderId"), C("Content")).
-//					Where(C("UserId").EQ(int64(123)).Or(C("UserId").EQ(int64(234))))
-//				return s
-//			}(),
-//			qs: []*ShardingQuery{
-//				{
-//					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE (`user_id`=?) OR (`user_id`=?);",
-//					Args: []any{int64(123), int64(234)},
-//					DB:   "order_db_1",
-//				},
-//				{
-//					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_4` WHERE (`user_id`=?) OR (`user_id`=?);",
-//					Args: []any{int64(123), int64(234)},
-//					DB:   "order_db_2",
-//				},
-//			},
-//		},
-//		{
-//			name: "where or left broadcast",
-//			builder: func() ShardingQueryBuilder {
-//				orm, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-//					"order_db_1": masterSlaveDB,
-//					"order_db_2": masterSlaveDB,
-//				}, ShardingDBOptionWithMetaRegistry(r),
-//					ShardingDBOptionWithTables(map[string]bool{
-//						"order_tab_1": true,
-//						"order_tab_3": true,
-//					}))
-//				require.NoError(t, err)
-//				s := NewShardingSelector[Order](orm).
-//					Select(C("OrderId"), C("Content")).
-//					Where(C("OrderId").EQ(int64(12)).Or(C("UserId").EQ(int64(123))))
-//				return s
-//			}(),
-//			qs: []*ShardingQuery{
-//				{
-//					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_1` WHERE (`order_id`=?) OR (`user_id`=?);",
-//					Args: []any{int64(12), int64(123)},
-//					DB:   "order_db_1",
-//				},
-//				{
-//					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE (`order_id`=?) OR (`user_id`=?);",
-//					Args: []any{int64(12), int64(123)},
-//					DB:   "order_db_1",
-//				},
-//				{
-//					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_1` WHERE (`order_id`=?) OR (`user_id`=?);",
-//					Args: []any{int64(12), int64(123)},
-//					DB:   "order_db_2",
-//				},
-//				{
-//					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_3` WHERE (`order_id`=?) OR (`user_id`=?);",
-//					Args: []any{int64(12), int64(123)},
-//					DB:   "order_db_2",
-//				},
-//			},
-//		},
-//		{
-//			name: "where or right broadcast",
-//			builder: func() ShardingQueryBuilder {
-//				orm, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-//					"order_db_1": masterSlaveDB,
-//					"order_db_2": masterSlaveDB,
-//				}, ShardingDBOptionWithMetaRegistry(r),
-//					ShardingDBOptionWithTables(map[string]bool{
-//						"order_tab_1": true,
-//						"order_tab_3": true,
-//					}))
-//				require.NoError(t, err)
-//				s := NewShardingSelector[Order](orm).
-//					Select(C("OrderId"), C("Content")).
-//					Where(C("UserId").EQ(int64(123)).Or(C("OrderId").EQ(int64(12))))
-//				return s
-//			}(),
-//			qs: []*ShardingQuery{
-//				{
-//					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_1` WHERE (`user_id`=?) OR (`order_id`=?);",
-//					Args: []any{int64(123), int64(12)},
-//					DB:   "order_db_1",
-//				},
-//				{
-//					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE (`user_id`=?) OR (`order_id`=?);",
-//					Args: []any{int64(123), int64(12)},
-//					DB:   "order_db_1",
-//				},
-//				{
-//					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_1` WHERE (`user_id`=?) OR (`order_id`=?);",
-//					Args: []any{int64(123), int64(12)},
-//					DB:   "order_db_2",
-//				},
-//				{
-//					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_3` WHERE (`user_id`=?) OR (`order_id`=?);",
-//					Args: []any{int64(123), int64(12)},
-//					DB:   "order_db_2",
-//				},
-//			},
-//		},
-//		{
-//			name: "where and-or",
-//			builder: func() ShardingQueryBuilder {
-//				orm, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-//					"order_db_1": masterSlaveDB,
-//					"order_db_2": masterSlaveDB,
-//				}, ShardingDBOptionWithMetaRegistry(r),
-//					ShardingDBOptionWithTables(map[string]bool{
-//						"order_tab_1": true,
-//						"order_tab_3": true,
-//						"order_tab_4": true,
-//					}))
-//				require.NoError(t, err)
-//				s := NewShardingSelector[Order](orm).
-//					Select(C("OrderId"), C("Content")).
-//					Where(C("UserId").EQ(int64(123)).And(C("OrderId").EQ(int64(12))).Or(C("UserId").EQ(int64(234))))
-//				return s
-//			}(),
-//			qs: []*ShardingQuery{
-//				{
-//					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE ((`user_id`=?) AND (`order_id`=?)) OR (`user_id`=?);",
-//					Args: []any{int64(123), int64(12), int64(234)},
-//					DB:   "order_db_1",
-//				},
-//				{
-//					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_4` WHERE ((`user_id`=?) AND (`order_id`=?)) OR (`user_id`=?);",
-//					Args: []any{int64(123), int64(12), int64(234)},
-//					DB:   "order_db_2",
-//				},
-//			},
-//		},
-//		{
-//			name: "where and-or broadcast",
-//			builder: func() ShardingQueryBuilder {
-//				orm, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-//					"order_db_1": masterSlaveDB,
-//					"order_db_2": masterSlaveDB,
-//				}, ShardingDBOptionWithMetaRegistry(r),
-//					ShardingDBOptionWithTables(map[string]bool{
-//						"order_tab_1": true,
-//						"order_tab_3": true,
-//						"order_tab_4": true,
-//					}))
-//				require.NoError(t, err)
-//				s := NewShardingSelector[Order](orm).
-//					Select(C("OrderId"), C("Content")).
-//					Where(C("UserId").EQ(int64(123)).And(C("OrderId").EQ(int64(12)).
-//						Or(C("UserId").EQ(int64(234)))))
-//				return s
-//			}(),
-//			qs: []*ShardingQuery{
-//				{
-//					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE (`user_id`=?) AND ((`order_id`=?) OR (`user_id`=?));",
-//					Args: []any{int64(123), int64(12), int64(234)},
-//					DB:   "order_db_1",
-//				},
-//			},
-//		},
-//		{
-//			name: "where or-and all",
-//			builder: func() ShardingQueryBuilder {
-//				orm, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-//					"order_db_1": masterSlaveDB,
-//					"order_db_2": masterSlaveDB,
-//				}, ShardingDBOptionWithMetaRegistry(r),
-//					ShardingDBOptionWithTables(map[string]bool{
-//						"order_tab_1": true,
-//						"order_tab_3": true,
-//						"order_tab_4": true,
-//					}))
-//				require.NoError(t, err)
-//				s := NewShardingSelector[Order](orm).
-//					Select(C("OrderId"), C("Content")).
-//					Where(C("UserId").EQ(int64(123)).Or(C("UserId").EQ(int64(181)).And(C("UserId").EQ(int64(234)))))
-//				return s
-//			}(),
-//			qs: []*ShardingQuery{
-//				{
-//					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_1` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
-//					Args: []any{int64(123), int64(181), int64(234)},
-//					DB:   "order_db_1",
-//				},
-//				{
-//					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
-//					Args: []any{int64(123), int64(181), int64(234)},
-//					DB:   "order_db_1",
-//				},
-//				{
-//					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_4` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
-//					Args: []any{int64(123), int64(181), int64(234)},
-//					DB:   "order_db_1",
-//				},
-//				{
-//					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_1` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
-//					Args: []any{int64(123), int64(181), int64(234)},
-//					DB:   "order_db_2",
-//				},
-//				{
-//					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_3` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
-//					Args: []any{int64(123), int64(181), int64(234)},
-//					DB:   "order_db_2",
-//				},
-//				{
-//					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_4` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
-//					Args: []any{int64(123), int64(181), int64(234)},
-//					DB:   "order_db_2",
-//				},
-//			},
-//		},
-//		{
-//			name: "where or-and",
-//			builder: func() ShardingQueryBuilder {
-//				orm, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-//					"order_db_1": masterSlaveDB,
-//					"order_db_2": masterSlaveDB,
-//				}, ShardingDBOptionWithMetaRegistry(r),
-//					ShardingDBOptionWithTables(map[string]bool{
-//						"order_tab_1": true,
-//						"order_tab_3": true,
-//						"order_tab_4": true,
-//					}))
-//				require.NoError(t, err)
-//				s := NewShardingSelector[Order](orm).
-//					Select(C("OrderId"), C("Content")).
-//					Where(C("UserId").EQ(int64(123)).Or(C("UserId").EQ(int64(234))).
-//						And(C("OrderId").EQ(int64(24))))
-//				return s
-//			}(),
-//			qs: []*ShardingQuery{
-//				{
-//					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE ((`user_id`=?) OR (`user_id`=?)) AND (`order_id`=?);",
-//					Args: []any{int64(123), int64(234), int64(24)},
-//					DB:   "order_db_1",
-//				},
-//				{
-//					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_4` WHERE ((`user_id`=?) OR (`user_id`=?)) AND (`order_id`=?);",
-//					Args: []any{int64(123), int64(234), int64(24)},
-//					DB:   "order_db_2",
-//				},
-//			},
-//		},
-//		{
-//			name: "where or-and broadcast",
-//			builder: func() ShardingQueryBuilder {
-//				orm, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-//					"order_db_1": masterSlaveDB,
-//					"order_db_2": masterSlaveDB,
-//				}, ShardingDBOptionWithMetaRegistry(r),
-//					ShardingDBOptionWithTables(map[string]bool{
-//						"order_tab_3": true,
-//						"order_tab_4": true,
-//					}))
-//				require.NoError(t, err)
-//				s := NewShardingSelector[Order](orm).
-//					Select(C("OrderId"), C("Content")).
-//					Where(C("UserId").EQ(int64(123)).Or(C("OrderId").EQ(int64(12))).
-//						And(C("UserId").EQ(int64(234))))
-//				return s
-//			}(),
-//			qs: []*ShardingQuery{
-//				{
-//					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_4` WHERE ((`user_id`=?) OR (`order_id`=?)) AND (`user_id`=?);",
-//					Args: []any{int64(123), int64(12), int64(234)},
-//					DB:   "order_db_2",
-//				},
-//			},
-//		},
-//		{
-//			name: "where or-or",
-//			builder: func() ShardingQueryBuilder {
-//				orm, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-//					"order_db_1": masterSlaveDB,
-//					"order_db_2": masterSlaveDB,
-//				}, ShardingDBOptionWithMetaRegistry(r),
-//					ShardingDBOptionWithTables(map[string]bool{
-//						"order_tab_3": true,
-//						"order_tab_4": true,
-//					}))
-//				require.NoError(t, err)
-//				s := NewShardingSelector[Order](orm).
-//					Select(C("OrderId"), C("Content")).
-//					Where(C("UserId").EQ(int64(123)).Or(C("UserId").EQ(int64(253))).
-//						Or(C("UserId").EQ(int64(234))))
-//				return s
-//			}(),
-//			qs: []*ShardingQuery{
-//				{
-//					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE ((`user_id`=?) OR (`user_id`=?)) OR (`user_id`=?);",
-//					Args: []any{int64(123), int64(253), int64(234)},
-//					DB:   "order_db_1",
-//				},
-//				{
-//					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_3` WHERE ((`user_id`=?) OR (`user_id`=?)) OR (`user_id`=?);",
-//					Args: []any{int64(123), int64(253), int64(234)},
-//					DB:   "order_db_2",
-//				},
-//				{
-//					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_4` WHERE ((`user_id`=?) OR (`user_id`=?)) OR (`user_id`=?);",
-//					Args: []any{int64(123), int64(253), int64(234)},
-//					DB:   "order_db_2",
-//				},
-//			},
-//		},
-//		{
-//			name: "where or-or broadcast",
-//			builder: func() ShardingQueryBuilder {
-//				orm, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-//					"order_db_1": masterSlaveDB,
-//					"order_db_2": masterSlaveDB,
-//				}, ShardingDBOptionWithMetaRegistry(r),
-//					ShardingDBOptionWithTables(map[string]bool{
-//						"order_tab_3": true,
-//						"order_tab_4": true,
-//					}))
-//				require.NoError(t, err)
-//				s := NewShardingSelector[Order](orm).
-//					Select(C("OrderId"), C("Content")).
-//					Where(C("UserId").EQ(int64(123)).Or(C("OrderId").EQ(int64(12))).
-//						Or(C("UserId").EQ(int64(234))))
-//				return s
-//			}(),
-//			qs: []*ShardingQuery{
-//				{
-//					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE ((`user_id`=?) OR (`order_id`=?)) OR (`user_id`=?);",
-//					Args: []any{int64(123), int64(12), int64(234)},
-//					DB:   "order_db_1",
-//				},
-//				{
-//					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_4` WHERE ((`user_id`=?) OR (`order_id`=?)) OR (`user_id`=?);",
-//					Args: []any{int64(123), int64(12), int64(234)},
-//					DB:   "order_db_1",
-//				},
-//				{
-//					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_3` WHERE ((`user_id`=?) OR (`order_id`=?)) OR (`user_id`=?);",
-//					Args: []any{int64(123), int64(12), int64(234)},
-//					DB:   "order_db_2",
-//				},
-//				{
-//					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_4` WHERE ((`user_id`=?) OR (`order_id`=?)) OR (`user_id`=?);",
-//					Args: []any{int64(123), int64(12), int64(234)},
-//					DB:   "order_db_2",
-//				},
-//			},
-//		},
-//		{
-//			name: "where and-and",
-//			builder: func() ShardingQueryBuilder {
-//				orm, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-//					"order_db_1": masterSlaveDB,
-//				}, ShardingDBOptionWithMetaRegistry(r),
-//					ShardingDBOptionWithTables(map[string]bool{
-//						"order_tab_3": true,
-//					}))
-//				require.NoError(t, err)
-//				s := NewShardingSelector[Order](orm).
-//					Select(C("OrderId"), C("Content")).
-//					Where(C("UserId").EQ(int64(123)).And(C("OrderId").EQ(int64(12))).
-//						And(C("OrderId").EQ(int64(23))))
-//				return s
-//			}(),
-//			qs: []*ShardingQuery{
-//				{
-//					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE ((`user_id`=?) AND (`order_id`=?)) AND (`order_id`=?);",
-//					Args: []any{int64(123), int64(12), int64(23)},
-//					DB:   "order_db_1",
-//				},
-//			},
-//		},
-//		{
-//			name: "where and-or-and",
-//			builder: func() ShardingQueryBuilder {
-//				orm, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-//					"order_db_1": masterSlaveDB,
-//					"order_db_2": masterSlaveDB,
-//				}, ShardingDBOptionWithMetaRegistry(r),
-//					ShardingDBOptionWithTables(map[string]bool{
-//						"order_tab_3": true,
-//						"order_tab_4": true,
-//					}))
-//				require.NoError(t, err)
-//				s := NewShardingSelector[Order](orm).
-//					Select(C("OrderId"), C("Content")).
-//					Where(C("UserId").EQ(int64(123)).And(C("OrderId").EQ(int64(12))).
-//						Or(C("UserId").EQ(int64(234)).And(C("OrderId").EQ(int64(18)))))
-//				return s
-//			}(),
-//			qs: []*ShardingQuery{
-//				{
-//					SQL:  "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_3` WHERE ((`user_id`=?) AND (`order_id`=?)) OR ((`user_id`=?) AND (`order_id`=?));",
-//					Args: []any{int64(123), int64(12), int64(234), int64(18)},
-//					DB:   "order_db_1",
-//				},
-//				{
-//					SQL:  "SELECT `order_id`,`content` FROM `order_db_2`.`order_tab_4` WHERE ((`user_id`=?) AND (`order_id`=?)) OR ((`user_id`=?) AND (`order_id`=?));",
-//					Args: []any{int64(123), int64(12), int64(234), int64(18)},
-//					DB:   "order_db_2",
-//				},
-//			},
-//		},
-//		{
-//			name: "and empty",
-//			builder: func() ShardingQueryBuilder {
-//				shardingDB, err := OpenShardingDB("sqlite3", map[string]*MasterSlavesDB{
-//					"order_db_1": masterSlaveDB,
-//				}, ShardingDBOptionWithMetaRegistry(r),
-//					ShardingDBOptionWithTables(map[string]bool{
-//						"order_tab_3": true,
-//						"order_tab_4": true,
-//					}))
-//				require.NoError(t, err)
-//				s := NewShardingSelector[Order](shardingDB).
-//					Select(C("OrderId"), C("Content")).
-//					Where(C("UserId").EQ(int64(123)).And(C("UserId").EQ(int64(124))))
-//				return s
-//			}(),
-//			qs: []*ShardingQuery{},
-//		},
-//	}
-//
-//	for _, tc := range testCases {
-//		c := tc
-//		t.Run(c.name, func(t *testing.T) {
-//			qs, err := c.builder.Build()
-//			assert.Equal(t, c.wantErr, err)
-//			if err != nil {
-//				return
-//			}
-//			assert.ElementsMatch(t, c.qs, qs)
-//		})
-//	}
-//}
-
 func TestSardingSelector_Get(t *testing.T) {
 	r := model.NewMetaRegistry()
 	_, err := r.Register(&test.OrderDetail{},
-		model.WithShardingKey("OrderId"),
-		model.WithDBShardingFunc(func(skVal any) (string, error) {
-			db := skVal.(int) / 100
-			return fmt.Sprintf("order_detail_db_%d", db), nil
-		}),
-		model.WithTableShardingFunc(func(skVal any) (string, error) {
-			tbl := skVal.(int) % 10
-			return fmt.Sprintf("order_detail_tab_%d", tbl), nil
+		model.WithTableShardingAlgorithm(&hash.Hash{
+			ShardingKey:  "OrderId",
+			DBPattern:    &sharding.Pattern{Name: "order_detail_db_%d", Base: 2},
+			TablePattern: &sharding.Pattern{Name: "order_detail_tab_%d", Base: 3},
+			DsPattern:    &sharding.Pattern{Name: "0.db.slave.company.com:3306", NotSharding: true},
 		}))
 	require.NoError(t, err)
 
@@ -4114,7 +3143,16 @@ func TestSardingSelector_Get(t *testing.T) {
 
 	rbSlaves, err := roundrobin.NewSlaves(mockDB)
 	require.NoError(t, err)
-	masterSlaveDB, err := OpenMasterSlaveDB("mysql", mockDB, MasterSlaveWithSlaves(newMockSlaveNameGet(rbSlaves)))
+	masterSlaveDB, err := OpenMasterSlaveDB("mysql",
+		mockDB, MasterSlaveWithSlaves(newMockSlaveNameGet(rbSlaves)))
+	require.NoError(t, err)
+
+	m := map[string]sharding.DataSource{
+		"0.db.slave.company.com:3306": masterSlaveDB,
+	}
+	shardingDB, err := OpenShardingDB("mysql",
+		ShardingDBWithDataSource(datasource.NewShardingDataSource(m)),
+		ShardingDBOptionWithMetaRegistry(r))
 	require.NoError(t, err)
 
 	testCases := []struct {
@@ -4125,30 +3163,8 @@ func TestSardingSelector_Get(t *testing.T) {
 		wantRes   *test.OrderDetail
 	}{
 		{
-			name: "not gen sharding query",
-			s: func() *ShardingSelector[test.OrderDetail] {
-				shardingDB, err := OpenShardingDB("mysql", map[string]*MasterSlavesDB{},
-					ShardingDBOptionWithMetaRegistry(r))
-				require.NoError(t, err)
-				builder := NewShardingSelector[test.OrderDetail](shardingDB).
-					Where(C("ItemId").EQ(12))
-				return builder
-			}(),
-			mockOrder: func(mock sqlmock.Sqlmock) {},
-			wantErr:   errs.ErrNotGenShardingQuery,
-		},
-		{
 			name: "only result one query",
 			s: func() *ShardingSelector[test.OrderDetail] {
-				shardingDB, err := OpenShardingDB("mysql", map[string]*MasterSlavesDB{
-					"order_detail_db_1": masterSlaveDB,
-					"order_detail_db_2": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_detail_tab_3": true,
-						"order_detail_tab_4": true,
-					}))
-				require.NoError(t, err)
 				builder := NewShardingSelector[test.OrderDetail](shardingDB).
 					Where(C("OrderId").EQ(123).Or(C("ItemId").EQ(12)))
 				return builder
@@ -4159,22 +3175,14 @@ func TestSardingSelector_Get(t *testing.T) {
 		{
 			name: "found tab 1",
 			s: func() *ShardingSelector[test.OrderDetail] {
-				shardingDB, err := OpenShardingDB("mysql", map[string]*MasterSlavesDB{
-					"order_detail_db_1": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_detail_tab_3": true,
-					}))
-				require.NoError(t, err)
 				builder := NewShardingSelector[test.OrderDetail](shardingDB).
 					Where(C("OrderId").EQ(123))
 				return builder
 			}(),
 			mockOrder: func(mock sqlmock.Sqlmock) {
-
 				rows := mock.NewRows([]string{"order_id", "item_id", "using_col1", "using_col2"}).
 					AddRow(123, 10, "LeBron", "James")
-				mock.ExpectQuery("SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail_db_1`.`order_detail_tab_3` WHERE `order_id`=? LIMIT ?;").
+				mock.ExpectQuery("SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail_db_1`.`order_detail_tab_0` WHERE `order_id`=? LIMIT ?;").
 					WithArgs(123, 1).
 					WillReturnRows(rows)
 			},
@@ -4183,13 +3191,6 @@ func TestSardingSelector_Get(t *testing.T) {
 		{
 			name: "found tab 2",
 			s: func() *ShardingSelector[test.OrderDetail] {
-				shardingDB, err := OpenShardingDB("mysql", map[string]*MasterSlavesDB{
-					"order_detail_db_2": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_detail_tab_4": true,
-					}))
-				require.NoError(t, err)
 				builder := NewShardingSelector[test.OrderDetail](shardingDB).
 					Where(C("OrderId").EQ(234))
 				return builder
@@ -4197,7 +3198,7 @@ func TestSardingSelector_Get(t *testing.T) {
 			mockOrder: func(mock sqlmock.Sqlmock) {
 				rows := mock.NewRows([]string{"order_id", "item_id", "using_col1", "using_col2"}).
 					AddRow(234, 12, "Kevin", "Durant")
-				mock.ExpectQuery("SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail_db_2`.`order_detail_tab_4` WHERE `order_id`=? LIMIT ?;").
+				mock.ExpectQuery("SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail_db_0`.`order_detail_tab_0` WHERE `order_id`=? LIMIT ?;").
 					WithArgs(234, 1).
 					WillReturnRows(rows)
 			},
@@ -4206,13 +3207,6 @@ func TestSardingSelector_Get(t *testing.T) {
 		{
 			name: "found tab and",
 			s: func() *ShardingSelector[test.OrderDetail] {
-				shardingDB, err := OpenShardingDB("mysql", map[string]*MasterSlavesDB{
-					"order_detail_db_2": masterSlaveDB,
-				}, ShardingDBOptionWithMetaRegistry(r),
-					ShardingDBOptionWithTables(map[string]bool{
-						"order_detail_tab_4": true,
-					}))
-				require.NoError(t, err)
 				builder := NewShardingSelector[test.OrderDetail](shardingDB).
 					Where(C("OrderId").EQ(234).And(C("ItemId").EQ(12)))
 				return builder
@@ -4220,7 +3214,7 @@ func TestSardingSelector_Get(t *testing.T) {
 			mockOrder: func(mock sqlmock.Sqlmock) {
 				rows := mock.NewRows([]string{"order_id", "item_id", "using_col1", "using_col2"}).
 					AddRow(234, 12, "Kevin", "Durant")
-				mock.ExpectQuery("SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail_db_2`.`order_detail_tab_4` WHERE (`order_id`=?) AND (`item_id`=?) LIMIT ?;").
+				mock.ExpectQuery("SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail_db_0`.`order_detail_tab_0` WHERE (`order_id`=?) AND (`item_id`=?) LIMIT ?;").
 					WithArgs(234, 12, 1).
 					WillReturnRows(rows)
 			},
@@ -4242,7 +3236,7 @@ func TestSardingSelector_Get(t *testing.T) {
 }
 
 type Order struct {
-	UserId  int64
+	UserId  int
 	OrderId int64
 	Content string
 	Account float64

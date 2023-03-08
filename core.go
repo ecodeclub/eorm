@@ -25,13 +25,13 @@ import (
 )
 
 type core struct {
-	ms           []Middleware
 	metaRegistry model.MetaRegistry
 	dialect      dialect.Dialect
 	valCreator   valuer.BasicTypeCreator
+	ms           []Middleware
 }
 
-func getHandler[T any](ctx context.Context, sess session, c core, qc *QueryContext) *QueryResult {
+func getHandler[T any](ctx context.Context, sess Session, c core, qc *QueryContext) *QueryResult {
 	rows, err := sess.queryContext(ctx, qc.q.SQL, qc.q.Args...)
 	if err != nil {
 		return &QueryResult{Err: err}
@@ -56,7 +56,7 @@ func getHandler[T any](ctx context.Context, sess session, c core, qc *QueryConte
 	return &QueryResult{Result: tp}
 }
 
-func get[T any](ctx context.Context, sess session, core core, qc *QueryContext) *QueryResult {
+func get[T any](ctx context.Context, sess Session, core core, qc *QueryContext) *QueryResult {
 	var handler HandleFunc = func(ctx context.Context, queryContext *QueryContext) *QueryResult {
 		return getHandler[T](ctx, sess, core, queryContext)
 	}
@@ -67,7 +67,7 @@ func get[T any](ctx context.Context, sess session, core core, qc *QueryContext) 
 	return handler(ctx, qc)
 }
 
-func getMultiHandler[T any](ctx context.Context, sess session, c core, qc *QueryContext) *QueryResult {
+func getMultiHandler[T any](ctx context.Context, sess Session, c core, qc *QueryContext) *QueryResult {
 	rows, err := sess.queryContext(ctx, qc.q.SQL, qc.q.Args...)
 	if err != nil {
 		return &QueryResult{Err: err}
@@ -94,7 +94,7 @@ func getMultiHandler[T any](ctx context.Context, sess session, c core, qc *Query
 	return &QueryResult{Result: res}
 }
 
-func getMulti[T any](ctx context.Context, sess session, core core, qc *QueryContext) *QueryResult {
+func getMulti[T any](ctx context.Context, sess Session, core core, qc *QueryContext) *QueryResult {
 	var handler HandleFunc = func(ctx context.Context, queryContext *QueryContext) *QueryResult {
 		return getMultiHandler[T](ctx, sess, core, queryContext)
 	}

@@ -19,12 +19,12 @@ import (
 	"database/sql"
 )
 
-// var _ session = &Tx{}
-var _ session = &DB{}
+// var _ Session = &Tx{}
+var _ Session = &DB{}
 
-// session 代表一个抽象的概念，即会话
+// Session 代表一个抽象的概念，即会话
 // 暂时做成私有的，后面考虑重构，因为这个东西用户可能有点难以理解
-type session interface {
+type Session interface {
 	getCore() core
 	queryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
 	execContext(ctx context.Context, query string, args ...any) (sql.Result, error)

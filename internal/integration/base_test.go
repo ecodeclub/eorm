@@ -20,6 +20,7 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"fmt"
 	"log"
 	"time"
 
@@ -28,7 +29,8 @@ import (
 	"github.com/ecodeclub/eorm/internal/slaves/dns"
 
 	"github.com/ecodeclub/eorm"
-	"github.com/ecodeclub/eorm/internal/model"
+	"github.com/ecodeclub/eorm/internal/sharding"
+	"github.com/ecodeclub/eorm/internal/sharding/datasource"
 	"github.com/ecodeclub/eorm/internal/slaves"
 	"github.com/ecodeclub/eorm/internal/slaves/roundrobin"
 	"github.com/stretchr/testify/suite"
@@ -53,6 +55,14 @@ func (s *Suite) SetupSuite() {
 	s.orm = orm
 }
 
+type clusterDrivers struct {
+	clDrivers []*clusterDriver
+}
+
+type clusterDriver struct {
+	msDrivers []*masterSalvesDriver
+}
+
 type masterSalvesDriver struct {
 	masterdsn string
 	slavedsns []string
@@ -60,13 +70,14 @@ type masterSalvesDriver struct {
 
 type ShardingSuite struct {
 	suite.Suite
-	slaves     slaves.Slaves
-	driver     string
-	tbSet      map[string]bool
-	driverMap  map[string]*masterSalvesDriver
-	shardingDB *eorm.ShardingDB
-	dbSf       model.ShardingAlgorithm
-	tableSf    model.ShardingAlgorithm
+	slaves      slaves.Slaves
+	clusters    *clusterDrivers
+	shardingDB  *eorm.ShardingDB
+	algorithm   sharding.Algorithm
+	dataSources map[string]sharding.DataSource
+	driver      string
+	DBPattern   string
+	DsPattern   string
 }
 
 func (s *ShardingSuite) openDB(dvr, dsn string) (*sql.DB, error) {
@@ -81,31 +92,40 @@ func (s *ShardingSuite) openDB(dvr, dsn string) (*sql.DB, error) {
 }
 
 func (s *ShardingSuite) initDB() (*eorm.ShardingDB, error) {
-	masterSlaveDBs := make(map[string]*eorm.MasterSlavesDB, 8)
-	for k, v := range s.driverMap {
-		master, err := s.openDB(s.driver, v.masterdsn)
-		if err != nil {
-			return nil, err
-		}
-		ss := make([]*sql.DB, 0, len(v.slavedsns))
-		for _, slavedsn := range v.slavedsns {
-			slave, err := s.openDB(s.driver, slavedsn)
+	clDrivers := s.clusters.clDrivers
+	sourceMap := make(map[string]sharding.DataSource, len(clDrivers))
+	for i, cluster := range clDrivers {
+		msMap := make(map[string]*eorm.MasterSlavesDB, 8)
+		for j, d := range cluster.msDrivers {
+			master, err := s.openDB(s.driver, d.masterdsn)
 			if err != nil {
 				return nil, err
 			}
-			ss = append(ss, slave)
+			ss := make([]*sql.DB, 0, len(d.slavedsns))
+			for _, slavedsn := range d.slavedsns {
+				slave, err := s.openDB(s.driver, slavedsn)
+				if err != nil {
+					return nil, err
+				}
+				ss = append(ss, slave)
+			}
+			sl, err := roundrobin.NewSlaves(ss...)
+			require.NoError(s.T(), err)
+			s.slaves = &testBaseSlaves{Slaves: sl}
+			masterSlaveDB, err := eorm.OpenMasterSlaveDB(
+				s.driver, master, eorm.MasterSlaveWithSlaves(s.slaves))
+			if err != nil {
+				return nil, err
+			}
+			dbName := fmt.Sprintf(s.DBPattern, j)
+			msMap[dbName] = masterSlaveDB
 		}
-		sl, err := roundrobin.NewSlaves(ss...)
-		require.NoError(s.T(), err)
-		s.slaves = newTestSlaves(sl)
-		masterSlaveDB, err := eorm.OpenMasterSlaveDB(
-			s.driver, master, eorm.MasterSlaveWithSlaves(s.slaves))
-		if err != nil {
-			return nil, err
-		}
-		masterSlaveDBs[k] = masterSlaveDB
+		sourceName := fmt.Sprintf(s.DsPattern, i)
+		sourceMap[sourceName] = eorm.OpenClusterDB(msMap)
 	}
-	return eorm.OpenShardingDB(s.driver, masterSlaveDBs, eorm.ShardingDBOptionWithTables(s.tbSet))
+	s.dataSources = sourceMap
+	dataSource := datasource.NewShardingDataSource(sourceMap)
+	return eorm.OpenShardingDB(s.driver, eorm.ShardingDBWithDataSource(dataSource))
 }
 
 func (s *ShardingSuite) SetupSuite() {
@@ -162,15 +182,29 @@ func (s *MasterSlaveSuite) initDb() (*eorm.MasterSlavesDB, error) {
 //	return slave, err
 //}
 
-type testSlaves struct {
+type testBaseSlaves struct {
 	slaves.Slaves
+}
+
+func (s *testBaseSlaves) Next(ctx context.Context) (slaves.Slave, error) {
+	slave, err := s.Slaves.Next(ctx)
+	if err != nil {
+		return slave, err
+	}
+	return slave, err
+}
+
+type testSlaves struct {
+	*testBaseSlaves
 	ch chan string
 }
 
 func newTestSlaves(s slaves.Slaves) *testSlaves {
 	return &testSlaves{
-		Slaves: s,
-		ch:     make(chan string, 1),
+		testBaseSlaves: &testBaseSlaves{
+			Slaves: s,
+		},
+		ch: make(chan string, 1),
 	}
 }
 

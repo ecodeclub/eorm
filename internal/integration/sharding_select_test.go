@@ -24,6 +24,8 @@ import (
 
 	"github.com/ecodeclub/eorm"
 	"github.com/ecodeclub/eorm/internal/model"
+	"github.com/ecodeclub/eorm/internal/sharding"
+	"github.com/ecodeclub/eorm/internal/sharding/hash"
 	"github.com/ecodeclub/eorm/internal/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -39,18 +41,24 @@ func (s *ShardingSelectTestSuite) SetupSuite() {
 	t := s.T()
 	s.ShardingSuite.SetupSuite()
 	for _, item := range s.data {
-		skVal := item.OrderId
-		dbName, err := s.dbSf(skVal)
+		shardingRes, err := s.algorithm.Sharding(
+			context.Background(), sharding.Request{SkValues: map[string]any{"OrderId": item.OrderId}})
 		require.NoError(t, err)
-		db := s.shardingDB.DBs[dbName]
-		tblName, err := s.tableSf(skVal)
-		require.NoError(t, err)
-		tbl := fmt.Sprintf("`%s`.`%s`", dbName, tblName)
-		sql := fmt.Sprintf("INSERT INTO %s (`order_id`,`item_id`,`using_col1`,`using_col2`) VALUES(?,?,?,?);", tbl)
-		args := []any{item.OrderId, item.ItemId, item.UsingCol1, item.UsingCol2}
-		res := eorm.RawQuery[any](db, sql, args...).Exec(context.Background())
-		if res.Err() != nil {
-			t.Fatal(res.Err())
+		require.NotNil(t, shardingRes.Dsts)
+		for _, dst := range shardingRes.Dsts {
+			tbl := fmt.Sprintf("`%s`.`%s`", dst.DB, dst.Table)
+			sql := fmt.Sprintf("INSERT INTO %s (`order_id`,`item_id`,`using_col1`,`using_col2`) VALUES(?,?,?,?);", tbl)
+			args := []any{item.OrderId, item.ItemId, item.UsingCol1, item.UsingCol2}
+			source, ok := s.dataSources[dst.Name]
+			require.True(t, ok)
+			cluster, ok := source.(*eorm.ClusterDB)
+			require.True(t, ok)
+			db, ok := cluster.MasterSlavesDBs[dst.DB]
+			require.True(t, ok)
+			res := eorm.RawQuery[any](db, sql, args...).Exec(context.Background())
+			if res.Err() != nil {
+				t.Fatal(res.Err())
+			}
 		}
 	}
 	// 防止主从延迟
@@ -61,11 +69,10 @@ func (s *ShardingSelectTestSuite) TestSardingSelectorGet() {
 	t := s.T()
 	r := model.NewMetaRegistry()
 	_, err := r.Register(&test.OrderDetail{},
-		model.WithShardingKey("OrderId"),
-		model.WithDBShardingFunc(s.dbSf),
-		model.WithTableShardingFunc(s.tableSf))
+		model.WithTableShardingAlgorithm(s.algorithm))
 	require.NoError(t, err)
 	eorm.ShardingDBOptionWithMetaRegistry(r)(s.shardingDB)
+
 	testCases := []struct {
 		name    string
 		s       *eorm.ShardingSelector[test.OrderDetail]
@@ -119,11 +126,10 @@ func (s *ShardingSelectTestSuite) TestSardingSelectorGetMulti() {
 	t := s.T()
 	r := model.NewMetaRegistry()
 	_, err := r.Register(&test.OrderDetail{},
-		model.WithShardingKey("OrderId"),
-		model.WithDBShardingFunc(s.dbSf),
-		model.WithTableShardingFunc(s.tableSf))
+		model.WithTableShardingAlgorithm(s.algorithm))
 	require.NoError(t, err)
 	eorm.ShardingDBOptionWithMetaRegistry(r)(s.shardingDB)
+
 	testCases := []struct {
 		name    string
 		s       *eorm.ShardingSelector[test.OrderDetail]
@@ -197,18 +203,23 @@ func (s *ShardingSelectTestSuite) TestSardingSelectorGetMulti() {
 
 func (s *ShardingSelectTestSuite) TearDownSuite() {
 	t := s.T()
-	for dbName, db := range s.shardingDB.DBs {
-		for tblName, _ := range s.tbSet {
-			tbl := fmt.Sprintf("`%s`.`%s`", dbName, tblName)
+	for _, item := range s.data {
+		shardingRes, err := s.algorithm.Sharding(
+			context.Background(), sharding.Request{SkValues: map[string]any{"OrderId": item.OrderId}})
+		require.NoError(t, err)
+		require.NotNil(t, shardingRes.Dsts)
+		for _, dst := range shardingRes.Dsts {
+			tbl := fmt.Sprintf("`%s`.`%s`", dst.DB, dst.Table)
 			sql := fmt.Sprintf("DELETE FROM %s", tbl)
-			//ctx := eorm.CtxWithDBName(context.Background(), dbName)
-			//// TODO 利用 ctx 传递 DB name
-			//_, err := s.shardingDB.execContext(ctx, sql, args...)
-			//if err != nil {
-			//	t.Fatal(err)
-			//}
+			source, ok := s.dataSources[dst.Name]
+			require.True(t, ok)
+			cluster, ok := source.(*eorm.ClusterDB)
+			require.True(t, ok)
+			db, ok := cluster.MasterSlavesDBs[dst.DB]
+			require.True(t, ok)
 			res := eorm.RawQuery[any](db, sql).Exec(context.Background())
 			if res.Err() != nil {
+				fmt.Println(res.Err().Error())
 				t.Fatal(res.Err())
 			}
 		}
@@ -216,37 +227,37 @@ func (s *ShardingSelectTestSuite) TearDownSuite() {
 }
 
 func TestMySQL8ShardingSelect(t *testing.T) {
-	m := map[string]*masterSalvesDriver{
-		"order_detail_db_1": {
+	m := []*masterSalvesDriver{
+		{
+			masterdsn: "root:root@tcp(localhost:13307)/order_detail_db_0",
+			slavedsns: []string{"root:root@tcp(localhost:13308)/order_detail_db_0"},
+		},
+		{
 			masterdsn: "root:root@tcp(localhost:13307)/order_detail_db_1",
 			slavedsns: []string{"root:root@tcp(localhost:13308)/order_detail_db_1"},
 		},
-		"order_detail_db_2": {
-			masterdsn: "root:root@tcp(localhost:13307)/order_detail_db_2",
-			slavedsns: []string{"root:root@tcp(localhost:13308)/order_detail_db_2"},
-		},
 	}
-	ts := map[string]bool{
-		"order_detail_tab_3": true,
-		"order_detail_tab_4": true,
-	}
+	clusterDr := &clusterDriver{msDrivers: m}
 	suite.Run(t, &ShardingSelectTestSuite{
 		ShardingSuite: ShardingSuite{
-			driver:    "mysql",
-			tbSet:     ts,
-			driverMap: m,
-			dbSf: func(skVal any) (string, error) {
-				db := skVal.(int) / 100
-				return fmt.Sprintf("order_detail_db_%d", db), nil
+			driver: "mysql",
+			algorithm: &hash.Hash{
+				ShardingKey:  "OrderId",
+				DBPattern:    &sharding.Pattern{Name: "order_detail_db_%d", Base: 2},
+				TablePattern: &sharding.Pattern{Name: "order_detail_tab_%d", Base: 3},
+				DsPattern:    &sharding.Pattern{Name: "root:root@tcp(localhost:13307).0", NotSharding: true},
 			},
-			tableSf: func(skVal any) (string, error) {
-				tbl := skVal.(int) % 10
-				return fmt.Sprintf("order_detail_tab_%d", tbl), nil
+			DBPattern: "order_detail_db_%d",
+			DsPattern: "root:root@tcp(localhost:13307).%d",
+			clusters: &clusterDrivers{
+				clDrivers: []*clusterDriver{clusterDr},
 			},
 		},
 		data: []*test.OrderDetail{
 			{123, 10, "LeBron", "James"},
 			{234, 12, "Kevin", "Durant"},
+			{253, 8, "Stephen", "Curry"},
+			{181, 11, "Kawhi", "Leonard"},
 		},
 	})
 }

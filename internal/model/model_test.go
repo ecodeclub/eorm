@@ -413,48 +413,49 @@ case3：
 	column names：%s
 `, meta.TableName, meta.Columns[0].ColumnName)
 
-	// case4 use IgnoreFieldOption to ignore field and sharding key
-	tim = &TestIgnoreModel{}
-	registry = &tagMetaRegistry{}
-	meta, _ = registry.Register(tim, IgnoreFieldsOption("FirstName"), WithShardingKey("Id"))
-	fmt.Printf(`
-case4：
-	table name：%s
-	column names：%s
-	sharding key name：%s
-`, meta.TableName, meta.Columns[0].ColumnName, meta.ShardingKey)
-
-	// case5 use IgnoreFieldOption to ignore field and db ShardingFunc
-	tim = &TestIgnoreModel{}
-	registry = &tagMetaRegistry{}
-	meta, _ = registry.Register(tim, IgnoreFieldsOption("FirstName"),
-		WithDBShardingFunc(func(skVal any) (string, error) {
-			db := skVal.(int) / 100
-			return fmt.Sprintf("order_db_%d", db), nil
-		}))
-	dbName, _ := meta.DBShardingFunc(123)
-	fmt.Printf(`
-case5：
-	table name：%s
-	column names：%s
-	db sharding name：%s
-`, meta.TableName, meta.Columns[0].ColumnName, dbName)
-
-	// case6 use IgnoreFieldOption to ignore field and sharding key and table ShardingFunc
-	tim = &TestIgnoreModel{}
-	registry = &tagMetaRegistry{}
-	meta, _ = registry.Register(tim, IgnoreFieldsOption("FirstName"),
-		WithTableShardingFunc(func(skVal any) (string, error) {
-			tbl := skVal.(int) % 10
-			return fmt.Sprintf("order_tab_%d", tbl), nil
-		}))
-	tbName, _ := meta.TableShardingFunc(123)
-	fmt.Printf(`
-case6：
-	table name：%s
-	column names：%s
-	table sharding name：%s
-`, meta.TableName, meta.Columns[0].ColumnName, tbName)
+	//	// case4 use IgnoreFieldOption to ignore field and sharding key
+	//	tim = &TestIgnoreModel{}
+	//	registry = &tagMetaRegistry{}
+	//	meta, _ = registry.Register(tim, IgnoreFieldsOption("FirstName"),
+	//		WithShardingKey("Id"))
+	//	fmt.Printf(`
+	//case4：
+	//	table name：%s
+	//	column names：%s
+	//	sharding key name：%s
+	//`, meta.TableName, meta.Columns[0].ColumnName, meta.ShardingKey)
+	//
+	//	// case5 use IgnoreFieldOption to ignore field and db ShardingFunc
+	//	tim = &TestIgnoreModel{}
+	//	registry = &tagMetaRegistry{}
+	//	meta, _ = registry.Register(tim, IgnoreFieldsOption("FirstName"),
+	//		WithDBShardingFunc(func(skVal any) (string, error) {
+	//			db := skVal.(int) / 100
+	//			return fmt.Sprintf("order_db_%d", db), nil
+	//		}))
+	//	dbName, _ := meta.DBShardingFunc(123)
+	//	fmt.Printf(`
+	//case5：
+	//	table name：%s
+	//	column names：%s
+	//	db sharding name：%s
+	//`, meta.TableName, meta.Columns[0].ColumnName, dbName)
+	//
+	//	// case6 use IgnoreFieldOption to ignore field and sharding key and table ShardingFunc
+	//	tim = &TestIgnoreModel{}
+	//	registry = &tagMetaRegistry{}
+	//	meta, _ = registry.Register(tim, IgnoreFieldsOption("FirstName"),
+	//		WithTableShardingFunc(func(skVal any) (string, error) {
+	//			tbl := skVal.(int) % 10
+	//			return fmt.Sprintf("order_tab_%d", tbl), nil
+	//		}))
+	//	tbName, _ := meta.TableShardingFunc(123)
+	//	fmt.Printf(`
+	//case6：
+	//	table name：%s
+	//	column names：%s
+	//	table sharding name：%s
+	//`, meta.TableName, meta.Columns[0].ColumnName, tbName)
 
 	// Output:
 	// case1：
@@ -468,21 +469,6 @@ case6：
 	// case3：
 	//	table name：test_ignore_model
 	//	column names：last_name
-	//
-	// case4：
-	//	table name：test_ignore_model
-	//	column names：last_name
-	//	sharding key name：Id
-	//
-	// case5：
-	//	table name：test_ignore_model
-	//	column names：last_name
-	//	db sharding name：order_db_1
-	//
-	// case6：
-	//	table name：test_ignore_model
-	//	column names：last_name
-	//	table sharding name：order_tab_3
 }
 
 type tableMetaBuilder struct {

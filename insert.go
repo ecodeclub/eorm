@@ -27,20 +27,20 @@ import (
 // More details check Build function
 type Inserter[T any] struct {
 	builder
-	session
+	Session
 	columns  []string
 	values   []*T
 	ignorePK bool
 }
 
 // NewInserter 开始构建一个 INSERT 查询
-func NewInserter[T any](sess session) *Inserter[T] {
+func NewInserter[T any](sess Session) *Inserter[T] {
 	return &Inserter[T]{
 		builder: builder{
 			core:   sess.getCore(),
 			buffer: bytebufferpool.Get(),
 		},
-		session: sess,
+		Session: sess,
 	}
 }
 
@@ -116,7 +116,7 @@ func (i *Inserter[T]) Exec(ctx context.Context) Result {
 	if err != nil {
 		return Result{err: err}
 	}
-	return newQuerier[T](i.session, query, i.meta, INSERT).Exec(ctx)
+	return newQuerier[T](i.Session, query, i.meta, INSERT).Exec(ctx)
 }
 
 func (i *Inserter[T]) buildColumns() ([]*model.ColumnMeta, error) {
