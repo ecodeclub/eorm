@@ -39,9 +39,9 @@ func TestShardingSelector_shadow_Build(t *testing.T) {
 		model.WithTableShardingAlgorithm(&hash.ShadowHash{
 			Hash: &hash.Hash{
 				ShardingKey:  "UserId",
-				DBPattern:    &sharding.Pattern{Name: "order_db_%d", Base: 2},
-				TablePattern: &sharding.Pattern{Name: "order_tab_%d", Base: 3},
-				DsPattern:    &sharding.Pattern{Name: "0.db.cluster.company.com:3306", NotSharding: true},
+				DBPattern:    &hash.Pattern{Name: "order_db_%d", Base: 2},
+				TablePattern: &hash.Pattern{Name: "order_tab_%d", Base: 3},
+				DsPattern:    &hash.Pattern{Name: "0.db.cluster.company.com:3306", NotSharding: true},
 			},
 			Prefix: "shadow_",
 		}))
@@ -576,9 +576,9 @@ func TestShardingSelector_onlyDataSource_Build(t *testing.T) {
 	_, err := r.Register(&Order{},
 		model.WithTableShardingAlgorithm(&hash.Hash{
 			ShardingKey:  "UserId",
-			DBPattern:    &sharding.Pattern{Name: "order_db", NotSharding: true},
-			TablePattern: &sharding.Pattern{Name: "order_tab", NotSharding: true},
-			DsPattern:    &sharding.Pattern{Name: "%d.db.cluster.company.com:3306", Base: 2},
+			DBPattern:    &hash.Pattern{Name: "order_db", NotSharding: true},
+			TablePattern: &hash.Pattern{Name: "order_tab", NotSharding: true},
+			DsPattern:    &hash.Pattern{Name: "%d.db.cluster.company.com:3306", Base: 2},
 		}))
 	require.NoError(t, err)
 	m := map[string]sharding.DataSource{
@@ -1013,9 +1013,9 @@ func TestShardingSelector_onlyTable_Build(t *testing.T) {
 	_, err := r.Register(&Order{},
 		model.WithTableShardingAlgorithm(&hash.Hash{
 			ShardingKey:  "UserId",
-			DBPattern:    &sharding.Pattern{Name: "order_db", NotSharding: true},
-			TablePattern: &sharding.Pattern{Name: "order_tab_%d", Base: 3},
-			DsPattern:    &sharding.Pattern{Name: "0.db.cluster.company.com:3306", NotSharding: true},
+			DBPattern:    &hash.Pattern{Name: "order_db", NotSharding: true},
+			TablePattern: &hash.Pattern{Name: "order_tab_%d", Base: 3},
+			DsPattern:    &hash.Pattern{Name: "0.db.cluster.company.com:3306", NotSharding: true},
 		}))
 	require.NoError(t, err)
 	shardingDB, err := OpenShardingDB("sqlite3", ShardingDBOptionWithMetaRegistry(r))
@@ -1445,9 +1445,9 @@ func TestShardingSelector_onlyDB_Build(t *testing.T) {
 	_, err := r.Register(&Order{},
 		model.WithTableShardingAlgorithm(&hash.Hash{
 			ShardingKey:  "UserId",
-			DBPattern:    &sharding.Pattern{Name: "order_db_%d", Base: 2},
-			TablePattern: &sharding.Pattern{Name: "order_tab", NotSharding: true},
-			DsPattern:    &sharding.Pattern{Name: "0.db.cluster.company.com:3306", NotSharding: true},
+			DBPattern:    &hash.Pattern{Name: "order_db_%d", Base: 2},
+			TablePattern: &hash.Pattern{Name: "order_tab", NotSharding: true},
+			DsPattern:    &hash.Pattern{Name: "0.db.cluster.company.com:3306", NotSharding: true},
 		}))
 	require.NoError(t, err)
 	shardingDB, err := OpenShardingDB("sqlite3", ShardingDBOptionWithMetaRegistry(r))
@@ -1877,9 +1877,9 @@ func TestShardingSelector_all_Build(t *testing.T) {
 	_, err := r.Register(&Order{},
 		model.WithTableShardingAlgorithm(&hash.Hash{
 			ShardingKey:  "UserId",
-			DBPattern:    &sharding.Pattern{Name: "order_db_%d", Base: 2},
-			TablePattern: &sharding.Pattern{Name: "order_tab_%d", Base: 3},
-			DsPattern:    &sharding.Pattern{Name: "%d.db.cluster.company.com:3306", Base: 2},
+			DBPattern:    &hash.Pattern{Name: "order_db_%d", Base: 2},
+			TablePattern: &hash.Pattern{Name: "order_tab_%d", Base: 3},
+			DsPattern:    &hash.Pattern{Name: "%d.db.cluster.company.com:3306", Base: 2},
 		}))
 	require.NoError(t, err)
 	m := map[string]*MasterSlavesDB{
@@ -2567,9 +2567,9 @@ func TestShardingSelector_Build(t *testing.T) {
 	_, err := r.Register(&Order{},
 		model.WithTableShardingAlgorithm(&hash.Hash{
 			ShardingKey:  "UserId",
-			DBPattern:    &sharding.Pattern{Name: "order_db_%d", Base: 2},
-			TablePattern: &sharding.Pattern{Name: "order_tab_%d", Base: 3},
-			DsPattern:    &sharding.Pattern{Name: "0.db.cluster.company.com:3306", NotSharding: true},
+			DBPattern:    &hash.Pattern{Name: "order_db_%d", Base: 2},
+			TablePattern: &hash.Pattern{Name: "order_tab_%d", Base: 3},
+			DsPattern:    &hash.Pattern{Name: "0.db.cluster.company.com:3306", NotSharding: true},
 		}))
 	require.NoError(t, err)
 	shardingDB, err := OpenShardingDB("sqlite3", ShardingDBOptionWithMetaRegistry(r))
@@ -3128,9 +3128,9 @@ func TestSardingSelector_Get(t *testing.T) {
 	_, err := r.Register(&test.OrderDetail{},
 		model.WithTableShardingAlgorithm(&hash.Hash{
 			ShardingKey:  "OrderId",
-			DBPattern:    &sharding.Pattern{Name: "order_detail_db_%d", Base: 2},
-			TablePattern: &sharding.Pattern{Name: "order_detail_tab_%d", Base: 3},
-			DsPattern:    &sharding.Pattern{Name: "0.db.slave.company.com:3306", NotSharding: true},
+			DBPattern:    &hash.Pattern{Name: "order_detail_db_%d", Base: 2},
+			TablePattern: &hash.Pattern{Name: "order_detail_tab_%d", Base: 3},
+			DsPattern:    &hash.Pattern{Name: "0.db.slave.company.com:3306", NotSharding: true},
 		}))
 	require.NoError(t, err)
 
@@ -3162,6 +3162,16 @@ func TestSardingSelector_Get(t *testing.T) {
 		wantErr   error
 		wantRes   *test.OrderDetail
 	}{
+		{
+			name: "not gen sharding query",
+			s: func() *ShardingSelector[test.OrderDetail] {
+				builder := NewShardingSelector[test.OrderDetail](shardingDB).
+					Where(C("ItemId").EQ(12))
+				return builder
+			}(),
+			mockOrder: func(mock sqlmock.Sqlmock) {},
+			wantErr:   errs.ErrNotGenShardingQuery,
+		},
 		{
 			name: "only result one query",
 			s: func() *ShardingSelector[test.OrderDetail] {

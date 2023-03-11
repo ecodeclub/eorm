@@ -23,6 +23,7 @@ import (
 	"github.com/ecodeclub/eorm/internal/sharding"
 )
 
+// ShadowHash TODO experiemntal
 type ShadowHash struct {
 	*Hash
 	Prefix string
@@ -31,11 +32,11 @@ type ShadowHash struct {
 func (h *ShadowHash) Broadcast(ctx context.Context) []sharding.Dst {
 	res := make([]sharding.Dst, 0, 8)
 	for i := 0; i < h.DBPattern.Base; i++ {
-		DBName := fmt.Sprintf(h.Prefix+h.DBPattern.Name, i)
+		dbName := fmt.Sprintf(h.Prefix+h.DBPattern.Name, i)
 		for j := 0; j < h.TablePattern.Base; j++ {
 			res = append(res, sharding.Dst{
 				Name:  h.DsPattern.Name,
-				DB:    DBName,
+				DB:    dbName,
 				Table: fmt.Sprintf(h.Prefix+h.TablePattern.Name, j),
 			})
 		}

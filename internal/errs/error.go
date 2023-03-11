@@ -38,6 +38,7 @@ var (
 	ErrNotFoundTargetDataSource   = errors.New("eorm: 未发现目标 data source")
 	ErrNotFoundTargetDB           = errors.New("eorm: 未发现目标 DB")
 	ErrRepeatedSetDB              = errors.New("eorm: 重复设置 DB")
+	ErrNotGenShardingQuery        = errors.New("eorm: 未生成 sharding query")
 
 	// ErrExcShardingAlgorithm       = errors.New("eorm: 执行 sharding algorithm 出错")
 )

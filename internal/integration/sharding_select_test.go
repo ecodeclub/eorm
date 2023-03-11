@@ -243,9 +243,9 @@ func TestMySQL8ShardingSelect(t *testing.T) {
 			driver: "mysql",
 			algorithm: &hash.Hash{
 				ShardingKey:  "OrderId",
-				DBPattern:    &sharding.Pattern{Name: "order_detail_db_%d", Base: 2},
-				TablePattern: &sharding.Pattern{Name: "order_detail_tab_%d", Base: 3},
-				DsPattern:    &sharding.Pattern{Name: "root:root@tcp(localhost:13307).0", NotSharding: true},
+				DBPattern:    &hash.Pattern{Name: "order_detail_db_%d", Base: 2},
+				TablePattern: &hash.Pattern{Name: "order_detail_tab_%d", Base: 3},
+				DsPattern:    &hash.Pattern{Name: "root:root@tcp(localhost:13307).0", NotSharding: true},
 			},
 			DBPattern: "order_detail_db_%d",
 			DsPattern: "root:root@tcp(localhost:13307).%d",

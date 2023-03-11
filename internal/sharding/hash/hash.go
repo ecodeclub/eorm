@@ -23,13 +23,14 @@ import (
 	"github.com/ecodeclub/eorm/internal/sharding"
 )
 
+// Hash TODO experiemntal
 type Hash struct {
 	// Base         int
 	ShardingKey  string
-	DBPattern    *sharding.Pattern
-	TablePattern *sharding.Pattern
+	DBPattern    *Pattern
+	TablePattern *Pattern
 	// Datasource Pattern
-	DsPattern *sharding.Pattern
+	DsPattern *Pattern
 }
 
 func (h *Hash) Broadcast(ctx context.Context) []sharding.Dst {
@@ -50,11 +51,11 @@ func (h *Hash) Broadcast(ctx context.Context) []sharding.Dst {
 func (h *Hash) defaultBroadcast(ctx context.Context) []sharding.Dst {
 	res := make([]sharding.Dst, 0, 8)
 	for i := 0; i < h.DBPattern.Base; i++ {
-		DBName := fmt.Sprintf(h.DBPattern.Name, i)
+		dbName := fmt.Sprintf(h.DBPattern.Name, i)
 		for j := 0; j < h.TablePattern.Base; j++ {
 			res = append(res, sharding.Dst{
 				Name:  h.DsPattern.Name,
-				DB:    DBName,
+				DB:    dbName,
 				Table: fmt.Sprintf(h.TablePattern.Name, j),
 			})
 		}
@@ -65,12 +66,12 @@ func (h *Hash) defaultBroadcast(ctx context.Context) []sharding.Dst {
 func (h *Hash) allBroadcast(ctx context.Context) []sharding.Dst {
 	res := make([]sharding.Dst, 0, 8)
 	for s := 0; s < h.DsPattern.Base; s++ {
-		DsName := fmt.Sprintf(h.DsPattern.Name, s)
+		dsName := fmt.Sprintf(h.DsPattern.Name, s)
 		for i := 0; i < h.DBPattern.Base; i++ {
-			DBName := fmt.Sprintf(h.DBPattern.Name, i)
+			dbName := fmt.Sprintf(h.DBPattern.Name, i)
 			for j := 0; j < h.TablePattern.Base; j++ {
 				res = append(res, sharding.Dst{
-					Name: DsName, DB: DBName,
+					Name: dsName, DB: dbName,
 					Table: fmt.Sprintf(h.TablePattern.Name, j),
 				})
 			}
@@ -142,4 +143,10 @@ func (h *Hash) Sharding(ctx context.Context, req sharding.Request) (sharding.Res
 
 func (h *Hash) ShardingKeys() []string {
 	return []string{h.ShardingKey}
+}
+
+type Pattern struct {
+	Base        int
+	Name        string
+	NotSharding bool
 }

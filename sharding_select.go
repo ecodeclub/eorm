@@ -213,7 +213,7 @@ func (*ShardingSelector[T]) mergeAnd(left, right sharding.Result) sharding.Resul
 	for _, r := range right.Dsts {
 		exist := false
 		for _, l := range left.Dsts {
-			if r.Name == l.Name && r.DB == l.DB && r.Table == l.Table {
+			if r.IsUnion(l) {
 				exist = true
 			}
 		}
@@ -229,7 +229,7 @@ func (*ShardingSelector[T]) mergeOR(left, right sharding.Result) sharding.Result
 	m := make(map[string]bool, 8)
 	for _, r := range right.Dsts {
 		for _, l := range left.Dsts {
-			if r.Name != l.Name || r.DB != l.DB || r.Table != l.Table {
+			if r.IsIntersection(l) {
 				tbl := fmt.Sprintf("%s_%s_%s", l.Name, l.DB, l.Table)
 				if _, ok := m[tbl]; ok {
 					continue
@@ -375,6 +375,9 @@ func (s *ShardingSelector[T]) Get(ctx context.Context) (*T, error) {
 	qs, err := s.Limit(1).Build(ctx)
 	if err != nil {
 		return nil, err
+	}
+	if len(qs) == 0 {
+		return nil, errs.ErrNotGenShardingQuery
 	}
 	// TODO 要确保前面的改写 SQL 只能生成一个 SQL
 	if len(qs) > 1 {

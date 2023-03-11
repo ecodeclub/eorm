@@ -42,12 +42,6 @@ type QueryBuilder interface {
 	Build(ctx context.Context) ([]*Query, error)
 }
 
-type Pattern struct {
-	Base        int
-	Name        string
-	NotSharding bool
-}
-
 type Query struct {
 	SQL        string
 	Args       []any
@@ -63,6 +57,14 @@ type Dst struct {
 	Name  string
 	DB    string
 	Table string
+}
+
+func (r Dst) IsUnion(l Dst) bool {
+	return r.Name == l.Name && r.DB == l.DB && r.Table == l.Table
+}
+
+func (r Dst) IsIntersection(l Dst) bool {
+	return r.Name != l.Name || r.DB != l.DB || r.Table != l.Table
 }
 
 type Request struct {
