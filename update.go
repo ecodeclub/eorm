@@ -28,7 +28,7 @@ import (
 // Updater is the builder responsible for building UPDATE query
 type Updater[T any] struct {
 	builder
-	session
+	Session
 	table         interface{}
 	val           valuer.Value
 	where         []Predicate
@@ -38,13 +38,13 @@ type Updater[T any] struct {
 }
 
 // NewUpdater 开始构建一个 UPDATE 查询
-func NewUpdater[T any](sess session) *Updater[T] {
+func NewUpdater[T any](sess Session) *Updater[T] {
 	return &Updater[T]{
 		builder: builder{
 			core:   sess.getCore(),
 			buffer: bytebufferpool.Get(),
 		},
-		session: sess,
+		Session: sess,
 	}
 }
 
@@ -209,5 +209,5 @@ func (u *Updater[T]) Exec(ctx context.Context) Result {
 	if err != nil {
 		return Result{err: err}
 	}
-	return newQuerier[T](u.session, query, u.meta, UPDATE).Exec(ctx)
+	return newQuerier[T](u.Session, query, u.meta, UPDATE).Exec(ctx)
 }

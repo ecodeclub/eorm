@@ -19,6 +19,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/ecodeclub/eorm/internal/sharding"
+
 	"github.com/ecodeclub/eorm/internal/errs"
 
 	// nolint
@@ -35,13 +37,8 @@ type TableMeta struct {
 	ColumnMap map[string]*ColumnMeta
 	Typ       reflect.Type
 
-	ShardingKey       string
-	DBShardingFunc    ShardingAlgorithm
-	TableShardingFunc ShardingAlgorithm
+	ShardingAlgorithm sharding.Algorithm
 }
-
-// ShardingAlgorithm 生成 ShardingKey_xxx
-type ShardingAlgorithm func(skVal any) (string, error)
 
 // ColumnMeta represents model's field, or column
 type ColumnMeta struct {
@@ -67,21 +64,9 @@ type ColumnMeta struct {
 // TableMetaOption represents options of TableMeta, this options will cover default cover.
 type TableMetaOption func(meta *TableMeta)
 
-func WithShardingKey(sk string) TableMetaOption {
+func WithTableShardingAlgorithm(algorithm sharding.Algorithm) TableMetaOption {
 	return func(meta *TableMeta) {
-		meta.ShardingKey = sk
-	}
-}
-
-func WithDBShardingFunc(fn ShardingAlgorithm) TableMetaOption {
-	return func(meta *TableMeta) {
-		meta.DBShardingFunc = fn
-	}
-}
-
-func WithTableShardingFunc(fn ShardingAlgorithm) TableMetaOption {
-	return func(meta *TableMeta) {
-		meta.TableShardingFunc = fn
+		meta.ShardingAlgorithm = algorithm
 	}
 }
 

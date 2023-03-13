@@ -23,13 +23,13 @@ import (
 
 // Selector select 构造器
 type Selector[T any] struct {
-	session
+	Session
 	selectorBuilder
 	table TableReference
 }
 
 // NewSelector 创建一个 Selector
-func NewSelector[T any](sess session) *Selector[T] {
+func NewSelector[T any](sess Session) *Selector[T] {
 	return &Selector[T]{
 		selectorBuilder: selectorBuilder{
 			builder: builder{
@@ -37,7 +37,7 @@ func NewSelector[T any](sess session) *Selector[T] {
 				buffer: bytebufferpool.Get(),
 			},
 		},
-		session: sess,
+		Session: sess,
 	}
 }
 
@@ -361,7 +361,7 @@ func (s *Selector[T]) Get(ctx context.Context) (*T, error) {
 	if err != nil {
 		return nil, err
 	}
-	return newQuerier[T](s.session, query, s.meta, SELECT).Get(ctx)
+	return newQuerier[T](s.Session, query, s.meta, SELECT).Get(ctx)
 }
 
 // OrderBy specify fields and ASC
@@ -396,7 +396,7 @@ func (s *Selector[T]) GetMulti(ctx context.Context) ([]*T, error) {
 	if err != nil {
 		return nil, err
 	}
-	return newQuerier[T](s.session, query, s.meta, SELECT).GetMulti(ctx)
+	return newQuerier[T](s.Session, query, s.meta, SELECT).GetMulti(ctx)
 }
 
 func (s *Selector[T]) buildJoin(t Join) error {

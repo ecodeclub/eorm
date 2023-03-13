@@ -17,6 +17,10 @@ package eorm
 import (
 	"context"
 	"database/sql"
+	"sync"
+
+	"github.com/ecodeclub/eorm/internal/errs"
+	"github.com/ecodeclub/eorm/internal/sharding"
 
 	"github.com/ecodeclub/eorm/internal/slaves"
 
@@ -24,6 +28,10 @@ import (
 	"github.com/ecodeclub/eorm/internal/model"
 	"github.com/ecodeclub/eorm/internal/valuer"
 )
+
+var _ Session = &MasterSlavesDB{}
+var _ sharding.DataSource = &MasterSlavesDB{}
+var _ sharding.DataSource = &ClusterDB{}
 
 type MasterSlavesDB struct {
 	master *sql.DB
@@ -36,6 +44,14 @@ type key string
 const (
 	master key = "master"
 )
+
+func (m *MasterSlavesDB) Query(ctx context.Context, query *sharding.Query) (*sql.Rows, error) {
+	return m.queryContext(ctx, query.SQL, query.Args...)
+}
+
+func (m *MasterSlavesDB) Exec(ctx context.Context, query *sharding.Query) (sql.Result, error) {
+	return m.execContext(ctx, query.SQL, query.Args...)
+}
 
 func (m *MasterSlavesDB) getCore() core {
 	return m.core
@@ -101,4 +117,40 @@ func MasterSlaveWithSlaves(s slaves.Slaves) MasterSlaveDBOption {
 
 func UseMaster(ctx context.Context) context.Context {
 	return context.WithValue(ctx, master, true)
+}
+
+type ClusterDB struct {
+	MasterSlavesDBs map[string]*MasterSlavesDB
+	lock            sync.Mutex
+}
+
+func (c *ClusterDB) Query(ctx context.Context, query *sharding.Query) (*sql.Rows, error) {
+	ms, ok := c.MasterSlavesDBs[query.DB]
+	if !ok {
+		return nil, errs.ErrNotFoundTargetDB
+	}
+	return ms.queryContext(ctx, query.SQL, query.Args...)
+}
+
+func (c *ClusterDB) Exec(ctx context.Context, query *sharding.Query) (sql.Result, error) {
+	ms, ok := c.MasterSlavesDBs[query.DB]
+	if !ok {
+		return nil, errs.ErrNotFoundTargetDB
+	}
+	return ms.execContext(ctx, query.SQL, query.Args...)
+}
+
+func (c *ClusterDB) Set(key string, db *MasterSlavesDB) error {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	_, ok := c.MasterSlavesDBs[key]
+	if ok {
+		return errs.ErrRepeatedSetDB
+	}
+	c.MasterSlavesDBs[key] = db
+	return nil
+}
+
+func OpenClusterDB(ms map[string]*MasterSlavesDB) *ClusterDB {
+	return &ClusterDB{MasterSlavesDBs: ms}
 }

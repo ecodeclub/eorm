@@ -31,15 +31,16 @@ var (
 	ErrCombinationIsNotStruct     = errors.New("eorm: 不支持的组合类型，eorm 只支持结构体组合")
 	ErrMissingShardingKey         = errors.New("eorm: sharding key 未设置")
 	ErrOnlyResultOneQuery         = errors.New("eorm: 只能生成一个 SQL")
-	ErrNotGenShardingQuery        = errors.New("eorm: 未生成 sharding query")
 	ErrUnsupportedTooComplexQuery = errors.New("eorm: 暂未支持太复杂的查询")
-	ErrExcShardingAlgorithm       = errors.New("eorm: 执行 sharding algorithm 出错")
-	ErrCtxGetDBName               = errors.New("eorm: ctx 获取目标 dbName 出错")
-	ErrNotFoundTargetDB           = errors.New("eorm: 未发现目标 DB")
-	ErrNotFoundTargetTable        = errors.New("eorm: 未发现目标 Table")
 	ErrSlaveNotFound              = errors.New("eorm: slave不存在")
-	ErrMergerEmptyRows            = errors.New("eorm: sql.Rows列表为空")
-	ErrMergerRowsIsNull           = errors.New("eorm: sql.Rows列表中有元素为nil")
+	ErrMergerEmptyRows            = errors.New("eorm: sql.Rows 列表为空")
+	ErrMergerRowsIsNull           = errors.New("eorm: sql.Rows 列表中有元素为 nil")
+	ErrNotFoundTargetDataSource   = errors.New("eorm: 未发现目标 data source")
+	ErrNotFoundTargetDB           = errors.New("eorm: 未发现目标 DB")
+	ErrRepeatedSetDB              = errors.New("eorm: 重复设置 DB")
+	ErrNotGenShardingQuery        = errors.New("eorm: 未生成 sharding query")
+
+	// ErrExcShardingAlgorithm       = errors.New("eorm: 执行 sharding algorithm 出错")
 )
 
 func NewFieldConflictError(field string) error {
