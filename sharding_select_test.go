@@ -2590,6 +2590,14 @@ func TestShardingSelector_Build(t *testing.T) {
 			wantErr: errs.NewUnsupportedOperatorError(opGT.text),
 		},
 		{
+			name: "too complex expr",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).Where(Avg("UserId").EQ([]int{1, 2, 3}))
+				return s
+			}(),
+			wantErr: errs.ErrUnsupportedTooComplexQuery,
+		},
+		{
 			name: "miss sharding key err",
 			builder: func() sharding.QueryBuilder {
 				reg := model.NewMetaRegistry()

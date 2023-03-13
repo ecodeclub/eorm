@@ -59,6 +59,7 @@ func (s *ShardingSelector[T]) Build(ctx context.Context) ([]*sharding.Query, err
 		return nil, err
 	}
 	res := make([]*sharding.Query, 0, len(shardingRes.Dsts))
+	defer bytebufferpool.Put(s.buffer)
 	for _, dst := range shardingRes.Dsts {
 		query, err := s.buildQuery(dst.DB, dst.Table, dst.Name)
 		if err != nil {
@@ -66,12 +67,12 @@ func (s *ShardingSelector[T]) Build(ctx context.Context) ([]*sharding.Query, err
 		}
 		res = append(res, query)
 		s.args = make([]any, 0, 8)
+		s.buffer.Reset()
 	}
 	return res, nil
 }
 
 func (s *ShardingSelector[T]) buildQuery(db, tbl, ds string) (*sharding.Query, error) {
-	defer bytebufferpool.Put(s.buffer)
 	var err error
 	s.writeString("SELECT ")
 	if len(s.columns) == 0 {
@@ -213,7 +214,7 @@ func (*ShardingSelector[T]) mergeAnd(left, right sharding.Result) sharding.Resul
 	for _, r := range right.Dsts {
 		exist := false
 		for _, l := range left.Dsts {
-			if r.IsUnion(l) {
+			if r.Equals(l) {
 				exist = true
 			}
 		}
@@ -229,7 +230,7 @@ func (*ShardingSelector[T]) mergeOR(left, right sharding.Result) sharding.Result
 	m := make(map[string]bool, 8)
 	for _, r := range right.Dsts {
 		for _, l := range left.Dsts {
-			if r.IsIntersection(l) {
+			if r.NotEquals(l) {
 				tbl := fmt.Sprintf("%s_%s_%s", l.Name, l.DB, l.Table)
 				if _, ok := m[tbl]; ok {
 					continue

@@ -59,11 +59,11 @@ type Dst struct {
 	Table string
 }
 
-func (r Dst) IsUnion(l Dst) bool {
+func (r Dst) Equals(l Dst) bool {
 	return r.Name == l.Name && r.DB == l.DB && r.Table == l.Table
 }
 
-func (r Dst) IsIntersection(l Dst) bool {
+func (r Dst) NotEquals(l Dst) bool {
 	return r.Name != l.Name || r.DB != l.DB || r.Table != l.Table
 }
 
