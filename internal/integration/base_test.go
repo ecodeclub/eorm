@@ -125,7 +125,7 @@ func (s *ShardingSuite) initDB() (*eorm.ShardingDB, error) {
 	}
 	s.dataSources = sourceMap
 	dataSource := datasource.NewShardingDataSource(sourceMap)
-	return eorm.OpenShardingDB(s.driver, eorm.ShardingDBWithDataSource(dataSource))
+	return eorm.OpenShardingDB(s.driver, dataSource)
 }
 
 func (s *ShardingSuite) SetupSuite() {

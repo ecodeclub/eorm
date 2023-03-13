@@ -31,7 +31,7 @@ type ShardingDB struct {
 	sharding.DataSource
 }
 
-func OpenShardingDB(driver string, opts ...ShardingDBOption) (*ShardingDB, error) {
+func OpenShardingDB(driver string, ds sharding.DataSource, opts ...ShardingDBOption) (*ShardingDB, error) {
 	dl, err := dialect.Of(driver)
 	if err != nil {
 		return nil, err
@@ -44,17 +44,12 @@ func OpenShardingDB(driver string, opts ...ShardingDBOption) (*ShardingDB, error
 				Creator: valuer.NewUnsafeValue,
 			},
 		},
+		DataSource: ds,
 	}
-	for _, o := range opts {
-		o(orm)
+	for _, opt := range opts {
+		opt(orm)
 	}
 	return orm, nil
-}
-
-func ShardingDBWithDataSource(ds sharding.DataSource) ShardingDBOption {
-	return func(db *ShardingDB) {
-		db.DataSource = ds
-	}
 }
 
 func ShardingDBOptionWithMetaRegistry(r model.MetaRegistry) ShardingDBOption {

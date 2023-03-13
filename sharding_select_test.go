@@ -46,7 +46,17 @@ func TestShardingSelector_shadow_Build(t *testing.T) {
 			Prefix: "shadow_",
 		}))
 	require.NoError(t, err)
-	shardingDB, err := OpenShardingDB("sqlite3", ShardingDBOptionWithMetaRegistry(r))
+	m := map[string]*MasterSlavesDB{
+		"order_db_0": masterSlaveMemoryDB(),
+		"order_db_1": masterSlaveMemoryDB(),
+		"order_db_2": masterSlaveMemoryDB(),
+	}
+	clusterDB := OpenClusterDB(m)
+	ds := map[string]sharding.DataSource{
+		"0.db.cluster.company.com:3306": clusterDB,
+	}
+	shardingDB, err := OpenShardingDB("sqlite3",
+		datasource.NewShardingDataSource(ds), ShardingDBOptionWithMetaRegistry(r))
 	require.NoError(t, err)
 
 	testCases := []struct {
@@ -581,12 +591,16 @@ func TestShardingSelector_onlyDataSource_Build(t *testing.T) {
 			DsPattern:    &hash.Pattern{Name: "%d.db.cluster.company.com:3306", Base: 2},
 		}))
 	require.NoError(t, err)
-	m := map[string]sharding.DataSource{
-		"0.db.cluster.company.com:3306": masterSlaveMemoryDB(),
+	m := map[string]*MasterSlavesDB{
+		"order_db": masterSlaveMemoryDB(),
+	}
+	clusterDB := OpenClusterDB(m)
+	ds := map[string]sharding.DataSource{
+		"0.db.cluster.company.com:3306": clusterDB,
+		"1.db.cluster.company.com:3306": clusterDB,
 	}
 	shardingDB, err := OpenShardingDB("sqlite3",
-		ShardingDBWithDataSource(datasource.NewShardingDataSource(m)),
-		ShardingDBOptionWithMetaRegistry(r))
+		datasource.NewShardingDataSource(ds), ShardingDBOptionWithMetaRegistry(r))
 	require.NoError(t, err)
 
 	testCases := []struct {
@@ -1018,7 +1032,17 @@ func TestShardingSelector_onlyTable_Build(t *testing.T) {
 			DsPattern:    &hash.Pattern{Name: "0.db.cluster.company.com:3306", NotSharding: true},
 		}))
 	require.NoError(t, err)
-	shardingDB, err := OpenShardingDB("sqlite3", ShardingDBOptionWithMetaRegistry(r))
+	m := map[string]*MasterSlavesDB{
+		"order_db_0": masterSlaveMemoryDB(),
+		"order_db_1": masterSlaveMemoryDB(),
+		"order_db_2": masterSlaveMemoryDB(),
+	}
+	clusterDB := OpenClusterDB(m)
+	ds := map[string]sharding.DataSource{
+		"0.db.cluster.company.com:3306": clusterDB,
+	}
+	shardingDB, err := OpenShardingDB("sqlite3",
+		datasource.NewShardingDataSource(ds), ShardingDBOptionWithMetaRegistry(r))
 	require.NoError(t, err)
 
 	testCases := []struct {
@@ -1450,7 +1474,17 @@ func TestShardingSelector_onlyDB_Build(t *testing.T) {
 			DsPattern:    &hash.Pattern{Name: "0.db.cluster.company.com:3306", NotSharding: true},
 		}))
 	require.NoError(t, err)
-	shardingDB, err := OpenShardingDB("sqlite3", ShardingDBOptionWithMetaRegistry(r))
+	m := map[string]*MasterSlavesDB{
+		"order_db_0": masterSlaveMemoryDB(),
+		"order_db_1": masterSlaveMemoryDB(),
+		"order_db_2": masterSlaveMemoryDB(),
+	}
+	clusterDB := OpenClusterDB(m)
+	ds := map[string]sharding.DataSource{
+		"0.db.cluster.company.com:3306": clusterDB,
+	}
+	shardingDB, err := OpenShardingDB("sqlite3",
+		datasource.NewShardingDataSource(ds), ShardingDBOptionWithMetaRegistry(r))
 	require.NoError(t, err)
 
 	testCases := []struct {
@@ -1893,8 +1927,7 @@ func TestShardingSelector_all_Build(t *testing.T) {
 		"1.db.cluster.company.com:3306": clusterDB,
 	}
 	shardingDB, err := OpenShardingDB("sqlite3",
-		ShardingDBWithDataSource(datasource.NewShardingDataSource(ds)),
-		ShardingDBOptionWithMetaRegistry(r))
+		datasource.NewShardingDataSource(ds), ShardingDBOptionWithMetaRegistry(r))
 	require.NoError(t, err)
 
 	testCases := []struct {
@@ -2572,7 +2605,18 @@ func TestShardingSelector_Build(t *testing.T) {
 			DsPattern:    &hash.Pattern{Name: "0.db.cluster.company.com:3306", NotSharding: true},
 		}))
 	require.NoError(t, err)
-	shardingDB, err := OpenShardingDB("sqlite3", ShardingDBOptionWithMetaRegistry(r))
+
+	m := map[string]*MasterSlavesDB{
+		"order_db_0": masterSlaveMemoryDB(),
+		"order_db_1": masterSlaveMemoryDB(),
+		"order_db_2": masterSlaveMemoryDB(),
+	}
+	clusterDB := OpenClusterDB(m)
+	ds := map[string]sharding.DataSource{
+		"0.db.cluster.company.com:3306": clusterDB,
+	}
+	shardingDB, err := OpenShardingDB("sqlite3",
+		datasource.NewShardingDataSource(ds), ShardingDBOptionWithMetaRegistry(r))
 	require.NoError(t, err)
 
 	testCases := []struct {
@@ -2606,9 +2650,9 @@ func TestShardingSelector_Build(t *testing.T) {
 				require.NoError(t, err)
 				require.NotNil(t, meta.ShardingAlgorithm)
 				db, err := OpenShardingDB("sqlite3",
-					ShardingDBWithDataSource(datasource.NewShardingDataSource(map[string]sharding.DataSource{
+					datasource.NewShardingDataSource(map[string]sharding.DataSource{
 						"0.db.cluster.company.com:3306": masterSlaveMemoryDB(),
-					})),
+					}),
 					ShardingDBOptionWithMetaRegistry(reg))
 				require.NoError(t, err)
 				s := NewShardingSelector[Order](db).Where(C("UserId").EQ(123))
@@ -3159,8 +3203,7 @@ func TestSardingSelector_Get(t *testing.T) {
 		"0.db.slave.company.com:3306": masterSlaveDB,
 	}
 	shardingDB, err := OpenShardingDB("mysql",
-		ShardingDBWithDataSource(datasource.NewShardingDataSource(m)),
-		ShardingDBOptionWithMetaRegistry(r))
+		datasource.NewShardingDataSource(m), ShardingDBOptionWithMetaRegistry(r))
 	require.NoError(t, err)
 
 	testCases := []struct {
