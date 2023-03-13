@@ -28,4 +28,5 @@ type Rows interface {
 	Scan(dest ...any) error
 	Close() error
 	Columns() ([]string, error)
+	Err() error
 }

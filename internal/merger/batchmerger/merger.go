@@ -19,13 +19,14 @@ import (
 	"database/sql"
 	"sync"
 
-	"github.com/ecodeclub/eorm/internal/errs"
 	"github.com/ecodeclub/eorm/internal/merger"
+	"github.com/ecodeclub/eorm/internal/merger/internal/errs"
 )
 
 type Merger struct{}
 
 func (Merger) Merge(ctx context.Context, results []*sql.Rows) (merger.Rows, error) {
+
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
@@ -106,4 +107,9 @@ func (m *MergerRows) Close() error {
 
 func (m *MergerRows) Columns() ([]string, error) {
 	return m.rows[0].Columns()
+}
+
+// Err 等会实现
+func (m *MergerRows) Err() error {
+	return nil
 }
