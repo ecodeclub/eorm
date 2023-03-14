@@ -208,7 +208,6 @@ type Rows struct {
 
 func (r *Rows) Next() bool {
 	r.mu.Lock()
-	defer r.mu.Unlock()
 	r.once.Do(func() {
 		// 初始化堆
 		h := &Hp{
@@ -219,21 +218,25 @@ func (r *Rows) Next() bool {
 		for i := 0; i < len(r.rowsList); i++ {
 			ok := r.nextRows(r.rowsList[i], i)
 			if !ok {
+				r.mu.Unlock()
 				_ = r.Close()
 				return
 			}
 		}
 	})
 	if r.hp.Len() == 0 || r.lastErr != nil {
+		r.mu.Unlock()
 		return false
 	}
 	r.cur = heap.Pop(r.hp).(*node)
 	row := r.rowsList[r.cur.index]
 	ok := r.nextRows(row, r.cur.index)
 	if !ok {
+		r.mu.Unlock()
 		_ = r.Close()
 		return false
 	}
+	r.mu.Unlock()
 	return true
 }
 
@@ -272,6 +275,8 @@ func (r *Rows) Scan(dest ...any) error {
 }
 
 func (r *Rows) Close() error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	r.closed = true
 	errorList := make([]error, 0, len(r.rowsList))
 	for i := 0; i < len(r.rowsList); i++ {
