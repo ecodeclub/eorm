@@ -1037,7 +1037,7 @@ func (ms *MergerSuite) TestRows_Close() {
 	ms.T().Run("close之后Scan返回迭代过程中的错误", func(t *testing.T) {
 		var id int
 		err := rows.Scan(&id)
-		assert.Equal(t, newCloseMockErr("db02"), err)
+		assert.Equal(t, errs.ErrMergerRowsClosed, err)
 	})
 	ms.T().Run("close之后调用Columns方法返回错误", func(t *testing.T) {
 		_, err := rows.Columns()

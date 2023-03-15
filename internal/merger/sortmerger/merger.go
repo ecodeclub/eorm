@@ -210,6 +210,11 @@ type Rows struct {
 }
 
 func (r *Rows) Next() bool {
+	r.mu.Lock()
+	if r.closed {
+		r.mu.Unlock()
+		return false
+	}
 	r.once.Do(func() {
 		// 初始化堆
 		h := &Heap{
@@ -220,12 +225,13 @@ func (r *Rows) Next() bool {
 		for i := 0; i < len(r.rowsList); i++ {
 			err := r.nextRows(r.rowsList[i], i)
 			if err != nil {
+				r.mu.Unlock()
 				_ = r.Close()
+				r.mu.Lock()
 				return
 			}
 		}
 	})
-	r.mu.Lock()
 	if r.hp.Len() == 0 || r.lastErr != nil {
 		if r.hp.Len() == 0 {
 			r.mu.Unlock()
