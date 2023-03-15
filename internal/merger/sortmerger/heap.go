@@ -32,16 +32,16 @@ var compareFuncMapping = map[reflect.Kind]func(any, any, Order) int{
 	reflect.Uint:    compare[uint],
 }
 
-type Hp struct {
+type Heap struct {
 	h           []*node
 	sortColumns sortColumns
 }
 
-func (h *Hp) Len() int {
+func (h *Heap) Len() int {
 	return len(h.h)
 }
 
-func (h *Hp) Less(i, j int) bool {
+func (h *Heap) Less(i, j int) bool {
 	for k := 0; k < h.sortColumns.Len(); k++ {
 		valueI := h.h[i].sortCols[k]
 		valueJ := h.h[j].sortCols[k]
@@ -59,15 +59,15 @@ func (h *Hp) Less(i, j int) bool {
 	return false
 }
 
-func (h *Hp) Swap(i, j int) {
+func (h *Heap) Swap(i, j int) {
 	h.h[i], h.h[j] = h.h[j], h.h[i]
 }
 
-func (h *Hp) Push(x any) {
+func (h *Heap) Push(x any) {
 	h.h = append(h.h, x.(*node))
 }
 
-func (h *Hp) Pop() any {
+func (h *Heap) Pop() any {
 	v := h.h[len(h.h)-1]
 	h.h = h.h[:len(h.h)-1]
 	return v

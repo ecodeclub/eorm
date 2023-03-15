@@ -23,8 +23,8 @@ var (
 	ErrEmptySortColumns  = errors.New("merger: 排序列为空")
 	ErrMergerEmptyRows   = errors.New("merger: sql.Rows列表为空")
 	ErrMergerRowsIsNull  = errors.New("merger: sql.Rows列表中有元素为nil")
-	ErrMergerScanNotNext = errors.New("merger:  Scan called without calling Next")
-	ErrMergerScanClosed  = errors.New("merger: Scan Rows Closed")
+	ErrMergerScanNotNext = errors.New("merger: Scan之前没有调用Next方法")
+	ErrMergerRowsClosed  = errors.New("merger: Rows已经关闭")
 )
 
 func NewRepeatSortColumn(column string) error {

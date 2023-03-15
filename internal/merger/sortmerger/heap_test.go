@@ -23,8 +23,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func newTestHp(nodes []*node, columns sortColumns) *Hp {
-	h := &Hp{
+func newTestHp(nodes []*node, columns sortColumns) *Heap {
+	h := &Heap{
 		sortColumns: columns,
 	}
 	for _, node := range nodes {

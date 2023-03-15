@@ -967,6 +967,8 @@ func (ms *MergerSuite) TestRows_NextAndScan() {
 				require.NoError(ms.T(), err)
 				res = append(res, t)
 			}
+			require.True(t, rows.(*Rows).closed)
+			assert.NoError(t, rows.Err())
 			assert.Equal(t, tc.wantVal, res)
 		})
 	}
@@ -991,9 +993,18 @@ func (ms *MergerSuite) TestRows_Columns() {
 
 	rows, err := merger.Merge(context.Background(), rowsList)
 	require.NoError(ms.T(), err)
-	columns, err := rows.Columns()
-	require.NoError(ms.T(), err)
-	assert.Equal(ms.T(), cols, columns)
+	ms.T().Run("Next没有迭代完", func(t *testing.T) {
+		for rows.Next() {
+			columns, err := rows.Columns()
+			require.NoError(t, err)
+			assert.Equal(t, cols, columns)
+		}
+	})
+	ms.T().Run("Next迭代完", func(t *testing.T) {
+		_, err := rows.Columns()
+		require.Error(t, err)
+	})
+
 }
 
 func (ms *MergerSuite) TestRows_Close() {
@@ -1021,6 +1032,16 @@ func (ms *MergerSuite) TestRows_Close() {
 		for i := 0; i < len(rowsList); i++ {
 			require.False(ms.T(), rowsList[i].Next())
 		}
+		require.False(ms.T(), rows.Next())
+	})
+	ms.T().Run("close之后Scan返回迭代过程中的错误", func(t *testing.T) {
+		var id int
+		err := rows.Scan(&id)
+		assert.Equal(t, newCloseMockErr("db02"), err)
+	})
+	ms.T().Run("close之后调用Columns方法返回错误", func(t *testing.T) {
+		_, err := rows.Columns()
+		require.Error(t, err)
 	})
 	ms.T().Run("close多次是等效的", func(t *testing.T) {
 		for i := 0; i < 4; i++ {
@@ -1093,6 +1114,23 @@ func (ms *MergerSuite) TestRows_ScanErr() {
 		err = rows.Scan(&model.Id, &model.Name, &model.Address)
 		assert.Equal(t, errs.ErrMergerScanNotNext, err)
 	})
+	ms.T().Run("迭代过程中发现错误,调用Scan", func(t *testing.T) {
+		cols := []string{"id", "name", "address"}
+		query := "SELECT * FROM `t1`"
+		ms.mock01.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(1, "abex", "cn").AddRow(5, "bruce", "cn").RowError(1, nextMockErr))
+		r, err := ms.mockDB01.QueryContext(context.Background(), query)
+		require.NoError(t, err)
+		rowsList := []*sql.Rows{r}
+		merger, err := NewMerger(NewSortColumn[int]("id", DESC))
+		require.NoError(t, err)
+		rows, err := merger.Merge(context.Background(), rowsList)
+		require.NoError(t, err)
+		for rows.Next() {
+		}
+		var model TestModel
+		err = rows.Scan(&model.Id, &model.Name, &model.Address)
+		assert.Equal(t, nextMockErr, err)
+	})
 	ms.T().Run("Close之后，调用Scan", func(t *testing.T) {
 		cols := []string{"id", "name", "address"}
 		query := "SELECT * FROM `t1`"
@@ -1108,7 +1146,7 @@ func (ms *MergerSuite) TestRows_ScanErr() {
 		require.NoError(t, err)
 		model := TestModel{}
 		err = rows.Scan(&model.Id, &model.Name, &model.Address)
-		assert.Equal(t, errs.ErrMergerScanClosed, err)
+		assert.Equal(t, errs.ErrMergerRowsClosed, err)
 	})
 }
 

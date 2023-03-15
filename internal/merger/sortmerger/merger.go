@@ -131,10 +131,12 @@ func (m *Merger) Merge(ctx context.Context, results []*sql.Rows) (merger.Rows, e
 			return nil, ctx.Err()
 		}
 	}
+	cols, _ := results[0].Columns()
 	rows := &Rows{
 		rowsList:    results,
 		sortColumns: m.sortColumns,
 		mu:          &sync.RWMutex{},
+		columns:     cols,
 	}
 	return rows, nil
 }
@@ -198,40 +200,45 @@ func newNode(row *sql.Rows, sortCols sortColumns, index int) (*node, error) {
 type Rows struct {
 	rowsList    []*sql.Rows
 	sortColumns sortColumns
-	hp          *Hp
+	hp          *Heap
 	cur         *node
 	mu          *sync.RWMutex
 	once        sync.Once
 	lastErr     error
 	closed      bool
+	columns     []string
 }
 
 func (r *Rows) Next() bool {
-	r.mu.Lock()
 	r.once.Do(func() {
 		// 初始化堆
-		h := &Hp{
+		h := &Heap{
 			h:           make([]*node, 0, len(r.rowsList)),
 			sortColumns: r.sortColumns,
 		}
 		r.hp = h
 		for i := 0; i < len(r.rowsList); i++ {
-			ok := r.nextRows(r.rowsList[i], i)
-			if !ok {
-				r.mu.Unlock()
+			err := r.nextRows(r.rowsList[i], i)
+			if err != nil {
 				_ = r.Close()
 				return
 			}
 		}
 	})
+	r.mu.Lock()
 	if r.hp.Len() == 0 || r.lastErr != nil {
+		if r.hp.Len() == 0 {
+			r.mu.Unlock()
+			_ = r.Close()
+			return false
+		}
 		r.mu.Unlock()
 		return false
 	}
 	r.cur = heap.Pop(r.hp).(*node)
 	row := r.rowsList[r.cur.index]
-	ok := r.nextRows(row, r.cur.index)
-	if !ok {
+	err := r.nextRows(row, r.cur.index)
+	if err != nil {
 		r.mu.Unlock()
 		_ = r.Close()
 		return false
@@ -240,26 +247,29 @@ func (r *Rows) Next() bool {
 	return true
 }
 
-func (r *Rows) nextRows(row *sql.Rows, index int) bool {
+func (r *Rows) nextRows(row *sql.Rows, index int) error {
 	if row.Next() {
 		n, err := newNode(row, r.sortColumns, index)
 		if err != nil {
 			r.lastErr = err
-			return false
+			return err
 		}
 		heap.Push(r.hp, n)
 	} else if row.Err() != nil {
 		r.lastErr = row.Err()
-		return false
+		return row.Err()
 	}
-	return true
+	return nil
 }
 
 func (r *Rows) Scan(dest ...any) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if r.lastErr != nil {
+		return r.lastErr
+	}
 	if r.closed {
-		return errs.ErrMergerScanClosed
+		return errs.ErrMergerRowsClosed
 	}
 	if r.cur == nil {
 		return errs.ErrMergerScanNotNext
@@ -296,5 +306,10 @@ func (r *Rows) Err() error {
 }
 
 func (r *Rows) Columns() ([]string, error) {
-	return r.rowsList[0].Columns()
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	if r.closed {
+		return nil, errs.ErrMergerRowsClosed
+	}
+	return r.columns, nil
 }
