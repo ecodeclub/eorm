@@ -109,7 +109,6 @@ func (m *MergerRows) Columns() ([]string, error) {
 	return m.rows[0].Columns()
 }
 
-// Err 等会实现
-func (m *MergerRows) Err() error {
-	return nil
+func (*MergerRows) Err() error {
+	panic("implement me")
 }

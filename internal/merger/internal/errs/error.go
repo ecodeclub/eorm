@@ -25,6 +25,7 @@ var (
 	ErrMergerRowsIsNull  = errors.New("merger: sql.Rows列表中有元素为nil")
 	ErrMergerScanNotNext = errors.New("merger: Scan之前没有调用Next方法")
 	ErrMergerRowsClosed  = errors.New("merger: Rows已经关闭")
+	ErrMergerRowsDiff    = errors.New("merger: sql.Rows列表中的字段不同")
 )
 
 func NewRepeatSortColumn(column string) error {

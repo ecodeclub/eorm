@@ -134,6 +134,52 @@ func (ms *MergerSuite) TestMerger_Merge() {
 		sqlRows func() []*sql.Rows
 	}{
 		{
+			name: "sqlRows字段不同",
+			merger: func() (*Merger, error) {
+				return NewMerger(NewSortColumn[int]("id", ASC))
+			},
+			ctx: func() (context.Context, context.CancelFunc) {
+				return context.WithCancel(context.Background())
+			},
+			sqlRows: func() []*sql.Rows {
+				query := "SELECT * FROM `t1`"
+				ms.mock01.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows([]string{"id", "name", "address"}).AddRow(1, "abex", "cn").AddRow(5, "bruce", "cn"))
+				ms.mock02.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows([]string{"id", "name", "email"}).AddRow(3, "alex", "cn").AddRow(4, "x", "cn"))
+				dbs := []*sql.DB{ms.mockDB01, ms.mockDB02}
+				rowsList := make([]*sql.Rows, 0, len(dbs))
+				for _, db := range dbs {
+					row, err := db.QueryContext(context.Background(), query)
+					require.NoError(ms.T(), err)
+					rowsList = append(rowsList, row)
+				}
+				return rowsList
+			},
+			wantErr: errs.ErrMergerRowsDiff,
+		},
+		{
+			name: "sqlRows字段不同_少一个字段",
+			merger: func() (*Merger, error) {
+				return NewMerger(NewSortColumn[int]("id", ASC))
+			},
+			ctx: func() (context.Context, context.CancelFunc) {
+				return context.WithCancel(context.Background())
+			},
+			sqlRows: func() []*sql.Rows {
+				query := "SELECT * FROM `t1`"
+				ms.mock01.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows([]string{"id", "name", "address"}).AddRow(1, "abex", "cn").AddRow(5, "bruce", "cn"))
+				ms.mock02.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows([]string{"id", "name"}).AddRow(3, "alex").AddRow(4, "x"))
+				dbs := []*sql.DB{ms.mockDB01, ms.mockDB02}
+				rowsList := make([]*sql.Rows, 0, len(dbs))
+				for _, db := range dbs {
+					row, err := db.QueryContext(context.Background(), query)
+					require.NoError(ms.T(), err)
+					rowsList = append(rowsList, row)
+				}
+				return rowsList
+			},
+			wantErr: errs.ErrMergerRowsDiff,
+		},
+		{
 			name: "超时",
 			merger: func() (*Merger, error) {
 				return NewMerger(NewSortColumn[int]("id", ASC))
@@ -324,6 +370,25 @@ func (ms *MergerSuite) TestMerger_Merge() {
 				res = append(res, rows)
 				return res
 			},
+			ctx: func() (context.Context, context.CancelFunc) {
+				return context.WithCancel(context.Background())
+			},
+		},
+		{
+			name: "初始化Rows错误",
+			merger: func() (*Merger, error) {
+				return NewMerger(NewSortColumn[int]("id", ASC))
+			},
+			sqlRows: func() []*sql.Rows {
+				query := "SELECT * FROM `t1`;"
+				cols := []string{"id", "name", "address"}
+				res := make([]*sql.Rows, 0, 1)
+				ms.mock01.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(1, "zwl", "sh").RowError(0, nextMockErr))
+				rows, _ := ms.mockDB01.QueryContext(context.Background(), query)
+				res = append(res, rows)
+				return res
+			},
+			wantErr: nextMockErr,
 			ctx: func() (context.Context, context.CancelFunc) {
 				return context.WithCancel(context.Background())
 			},
@@ -999,10 +1064,14 @@ func (ms *MergerSuite) TestRows_Columns() {
 			require.NoError(t, err)
 			assert.Equal(t, cols, columns)
 		}
+		require.NoError(t, rows.Err())
 	})
 	ms.T().Run("Next迭代完", func(t *testing.T) {
+		require.False(t, rows.Next())
+		require.NoError(t, rows.Err())
 		_, err := rows.Columns()
-		require.Error(t, err)
+		assert.Equal(t, errs.ErrMergerRowsClosed, err)
+
 	})
 
 }
@@ -1023,6 +1092,11 @@ func (ms *MergerSuite) TestRows_Close() {
 		rowsList = append(rowsList, row)
 	}
 	rows, err := merger.Merge(context.Background(), rowsList)
+	require.NoError(ms.T(), err)
+	// 判断当前是可以正常读取的
+	require.True(ms.T(), rows.Next())
+	var id int
+	err = rows.Scan(&id)
 	require.NoError(ms.T(), err)
 	err = rows.Close()
 	ms.T().Run("close返回multierror", func(t *testing.T) {
@@ -1049,7 +1123,6 @@ func (ms *MergerSuite) TestRows_Close() {
 			require.NoError(t, err)
 		}
 	})
-
 }
 
 // 测试Next迭代过程中遇到错误
@@ -1131,23 +1204,7 @@ func (ms *MergerSuite) TestRows_ScanErr() {
 		err = rows.Scan(&model.Id, &model.Name, &model.Address)
 		assert.Equal(t, nextMockErr, err)
 	})
-	ms.T().Run("Close之后，调用Scan", func(t *testing.T) {
-		cols := []string{"id", "name", "address"}
-		query := "SELECT * FROM `t1`"
-		ms.mock01.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(1, "abex", "cn").AddRow(5, "bruce", "cn"))
-		r, err := ms.mockDB01.QueryContext(context.Background(), query)
-		require.NoError(t, err)
-		rowsList := []*sql.Rows{r}
-		merger, err := NewMerger(NewSortColumn[int]("id", DESC))
-		require.NoError(t, err)
-		rows, err := merger.Merge(context.Background(), rowsList)
-		require.NoError(t, err)
-		err = rows.Close()
-		require.NoError(t, err)
-		model := TestModel{}
-		err = rows.Scan(&model.Id, &model.Name, &model.Address)
-		assert.Equal(t, errs.ErrMergerRowsClosed, err)
-	})
+
 }
 
 type TestModel struct {

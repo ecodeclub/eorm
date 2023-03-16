@@ -85,6 +85,7 @@ func (s sortColumns) Len() int {
 // Merger  如果有 GroupBy 子句，那么该实现无法运作正常
 type Merger struct {
 	sortColumns
+	cols []string
 }
 
 func NewMerger(sortCols ...SortColumn) (*Merger, error) {
@@ -131,12 +132,27 @@ func (m *Merger) Merge(ctx context.Context, results []*sql.Rows) (merger.Rows, e
 			return nil, ctx.Err()
 		}
 	}
-	cols, _ := results[0].Columns()
+	return m.initRows(results)
+}
+
+func (m *Merger) initRows(results []*sql.Rows) (*Rows, error) {
 	rows := &Rows{
 		rowsList:    results,
 		sortColumns: m.sortColumns,
 		mu:          &sync.RWMutex{},
-		columns:     cols,
+		columns:     m.cols,
+	}
+	h := &Heap{
+		h:           make([]*node, 0, len(rows.rowsList)),
+		sortColumns: rows.sortColumns,
+	}
+	rows.hp = h
+	for i := 0; i < len(rows.rowsList); i++ {
+		err := rows.nextRows(rows.rowsList[i], i)
+		if err != nil {
+			_ = rows.Close()
+			return nil, err
+		}
 	}
 	return rows, nil
 }
@@ -150,9 +166,19 @@ func (m *Merger) checkColumns(rows *sql.Rows) error {
 		return err
 	}
 	colMap := make(map[string]struct{}, len(cols))
-	for _, colName := range cols {
+	if len(m.cols) == 0 {
+		m.cols = cols
+	}
+	if len(m.cols) != len(cols) {
+		return errs.ErrMergerRowsDiff
+	}
+	for idx, colName := range cols {
+		if m.cols[idx] != colName {
+			return errs.ErrMergerRowsDiff
+		}
 		colMap[colName] = struct{}{}
 	}
+
 	for _, sortColumn := range m.sortColumns.columns {
 		_, ok := colMap[sortColumn.name]
 		if !ok {
@@ -203,7 +229,6 @@ type Rows struct {
 	hp          *Heap
 	cur         *node
 	mu          *sync.RWMutex
-	once        sync.Once
 	lastErr     error
 	closed      bool
 	columns     []string
@@ -215,36 +240,16 @@ func (r *Rows) Next() bool {
 		r.mu.Unlock()
 		return false
 	}
-	r.once.Do(func() {
-		// 初始化堆
-		h := &Heap{
-			h:           make([]*node, 0, len(r.rowsList)),
-			sortColumns: r.sortColumns,
-		}
-		r.hp = h
-		for i := 0; i < len(r.rowsList); i++ {
-			err := r.nextRows(r.rowsList[i], i)
-			if err != nil {
-				r.mu.Unlock()
-				_ = r.Close()
-				r.mu.Lock()
-				return
-			}
-		}
-	})
 	if r.hp.Len() == 0 || r.lastErr != nil {
-		if r.hp.Len() == 0 {
-			r.mu.Unlock()
-			_ = r.Close()
-			return false
-		}
 		r.mu.Unlock()
+		_ = r.Close()
 		return false
 	}
 	r.cur = heap.Pop(r.hp).(*node)
 	row := r.rowsList[r.cur.index]
 	err := r.nextRows(row, r.cur.index)
 	if err != nil {
+		r.lastErr = err
 		r.mu.Unlock()
 		_ = r.Close()
 		return false
@@ -257,12 +262,10 @@ func (r *Rows) nextRows(row *sql.Rows, index int) error {
 	if row.Next() {
 		n, err := newNode(row, r.sortColumns, index)
 		if err != nil {
-			r.lastErr = err
 			return err
 		}
 		heap.Push(r.hp, n)
 	} else if row.Err() != nil {
-		r.lastErr = row.Err()
 		return row.Err()
 	}
 	return nil
