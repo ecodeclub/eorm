@@ -66,6 +66,7 @@ func (s *ShardingDB) queryContext(ctx context.Context, query *sharding.Query) (*
 	return s.Query(ctx, query)
 }
 
+// nolint
 func (s *ShardingDB) execContext(ctx context.Context, query *sharding.Query) (sql.Result, error) {
 	return s.Exec(ctx, query)
 }
