@@ -1172,7 +1172,7 @@ func (ms *MergerSuite) TestRows_NextAndErr() {
 
 // Scan方法的一些边界情况的测试
 func (ms *MergerSuite) TestRows_ScanErr() {
-	ms.T().Run("未调用Next，直接Scan", func(t *testing.T) {
+	ms.T().Run("未调用Next，直接Scan，返回错", func(t *testing.T) {
 		cols := []string{"id", "name", "address"}
 		query := "SELECT * FROM `t1`"
 		ms.mock01.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(1, "abex", "cn").AddRow(5, "bruce", "cn"))
@@ -1187,7 +1187,7 @@ func (ms *MergerSuite) TestRows_ScanErr() {
 		err = rows.Scan(&model.Id, &model.Name, &model.Address)
 		assert.Equal(t, errs.ErrMergerScanNotNext, err)
 	})
-	ms.T().Run("迭代过程中发现错误,调用Scan", func(t *testing.T) {
+	ms.T().Run("迭代过程中发现错误,调用Scan，返回迭代中发现的错误", func(t *testing.T) {
 		cols := []string{"id", "name", "address"}
 		query := "SELECT * FROM `t1`"
 		ms.mock01.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(1, "abex", "cn").AddRow(5, "bruce", "cn").RowError(1, nextMockErr))

@@ -82,7 +82,7 @@ func (s sortColumns) Len() int {
 	return len(s.columns)
 }
 
-// Merger  如果有 GroupBy 子句，那么该实现无法运作正常
+// Merger  如果有GroupBy子句，会导致排序是给每个分组排的，那么该实现无法运作正常
 type Merger struct {
 	sortColumns
 	cols []string
