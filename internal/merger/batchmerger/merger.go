@@ -17,9 +17,8 @@ package batchmerger
 import (
 	"context"
 	"database/sql"
-	"sync"
-
 	"go.uber.org/multierr"
+	"sync"
 
 	"github.com/ecodeclub/eorm/internal/merger"
 	"github.com/ecodeclub/eorm/internal/merger/internal/errs"
@@ -130,7 +129,7 @@ func (r *Rows) Next() bool {
 	return false
 
 }
-func (r *Rows) nextRows(row *sql.Rows) (canNext bool, err error) {
+func (*Rows) nextRows(row *sql.Rows) (canNext bool, err error) {
 	if row.Next() {
 		canNext = true
 		return
