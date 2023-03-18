@@ -17,8 +17,9 @@ package batchmerger
 import (
 	"context"
 	"database/sql"
-	"go.uber.org/multierr"
 	"sync"
+
+	"go.uber.org/multierr"
 
 	"github.com/ecodeclub/eorm/internal/merger"
 	"github.com/ecodeclub/eorm/internal/merger/internal/errs"
