@@ -383,7 +383,7 @@ func (ms *MergerSuite) TestRows_NextAndScan() {
 
 }
 
-func (ms *MergerSuite) TestRows_NextErr() {
+func (ms *MergerSuite) TestRows_NextAndErr() {
 	testcases := []struct {
 		name     string
 		rowsList func() []*sql.Rows
@@ -422,7 +422,7 @@ func (ms *MergerSuite) TestRows_NextErr() {
 	}
 }
 
-func (ms *MergerSuite) TestRows_ScanErr() {
+func (ms *MergerSuite) TestRows_ScanAndErr() {
 	ms.T().Run("未调用Next，直接Scan，返回错", func(t *testing.T) {
 		cols := []string{"id"}
 		query := "SELECT * FROM `t1`"

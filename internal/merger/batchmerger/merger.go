@@ -96,49 +96,38 @@ func (r *Rows) Next() bool {
 		_ = r.Close()
 		return false
 	}
-	canNext, err := r.nextRows(r.rowsList[r.cnt])
+	canNext, err := r.nextRows()
 	if err != nil {
 		r.lastErr = err
 		r.mu.Unlock()
 		_ = r.Close()
 		return false
 	}
-	if canNext {
-		r.mu.Unlock()
-		return true
+	r.mu.Unlock()
+	return canNext
+
+}
+func (r *Rows) nextRows() (bool, error) {
+	row := r.rowsList[r.cnt]
+	if row.Next() {
+		return true, nil
+	}
+	if row.Err() != nil {
+		return false, row.Err()
 	}
 	for {
 		r.cnt++
 		if r.cnt >= len(r.rowsList) {
 			break
 		}
-		canNext, err := r.nextRows(r.rowsList[r.cnt])
-		if err != nil {
-			r.lastErr = err
-			r.mu.Unlock()
-			_ = r.Close()
-			return false
+		row = r.rowsList[r.cnt]
+		if row.Next() {
+			return true, nil
+		} else if row.Err() != nil {
+			return false, row.Err()
 		}
-		if canNext {
-			r.mu.Unlock()
-			return true
-		}
-
 	}
-	r.mu.Unlock()
-	return false
-
-}
-func (*Rows) nextRows(row *sql.Rows) (canNext bool, err error) {
-	if row.Next() {
-		canNext = true
-		return
-	}
-	canNext = false
-	if row.Err() != nil {
-		err = row.Err()
-	}
-	return
+	return false, nil
 }
 
 func (r *Rows) Scan(dest ...any) error {
