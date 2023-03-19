@@ -196,6 +196,13 @@ func (s *ShardingSelector[T]) findDstByPredicate(ctx context.Context, pre Predic
 			}, nil
 		}
 		return s.mergeOR(left, right), nil
+	case opNot:
+		right, err := s.findDstByPredicate(ctx, pre.right.(Predicate))
+		if err != nil {
+			return sharding.EmptyResult, err
+		}
+		all := sharding.Result{Dsts: s.meta.ShardingAlgorithm.Broadcast(ctx)}
+		return s.mergeNot(all, right), nil
 	case opEQ:
 		col, isCol := pre.left.(Column)
 		right, isVals := pre.right.(valueExpr)
@@ -240,6 +247,23 @@ func (*ShardingSelector[T]) mergeOR(left, right sharding.Result) sharding.Result
 			}
 		}
 		dsts = append(dsts, r)
+	}
+	return sharding.Result{Dsts: dsts}
+}
+
+func (s *ShardingSelector[T]) mergeNot(all, right sharding.Result) sharding.Result {
+	dsts := make([]sharding.Dst, 0, len(all.Dsts)-len(right.Dsts))
+	for _, a := range all.Dsts {
+		exist := false
+		for _, r := range right.Dsts {
+			if r.Equals(a) {
+				exist = true
+				break
+			}
+		}
+		if !exist {
+			dsts = append(dsts, a)
+		}
 	}
 	return sharding.Result{Dsts: dsts}
 }
