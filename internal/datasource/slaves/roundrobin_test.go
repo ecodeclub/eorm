@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package roundrobin
+package slaves
 
 import (
 	"context"
@@ -31,7 +31,7 @@ func TestSlaves_Next(t *testing.T) {
 	db3 := &sql.DB{}
 	testCases := []struct {
 		name   string
-		slaves func() *Slaves
+		slaves func() Slaves
 		ctx    context.Context
 
 		wantErr error
@@ -45,7 +45,7 @@ func TestSlaves_Next(t *testing.T) {
 				cancel()
 				return ctx
 			}(),
-			slaves: func() *Slaves {
+			slaves: func() Slaves {
 				res, err := NewSlaves(db1, db2, db3)
 				require.NoError(t, err)
 				return res
@@ -55,7 +55,7 @@ func TestSlaves_Next(t *testing.T) {
 		{
 			name: "no slaves",
 			ctx:  context.Background(),
-			slaves: func() *Slaves {
+			slaves: func() Slaves {
 				res, err := NewSlaves()
 				require.NoError(t, err)
 				return res
@@ -65,7 +65,7 @@ func TestSlaves_Next(t *testing.T) {
 		{
 			name: "index 0",
 			ctx:  context.Background(),
-			slaves: func() *Slaves {
+			slaves: func() Slaves {
 				res, err := NewSlaves(db1, db2, db3)
 				require.NoError(t, err)
 				return res
@@ -75,22 +75,26 @@ func TestSlaves_Next(t *testing.T) {
 		{
 			name: "index last",
 			ctx:  context.Background(),
-			slaves: func() *Slaves {
+			slaves: func() Slaves {
 				res, err := NewSlaves(db1, db2, db3)
-				res.cnt = 1
 				require.NoError(t, err)
-				return res
+				sl, ok := res.(*slaves)
+				require.True(t, ok)
+				sl.cnt = 1
+				return sl
 			},
 			wantDB: db3,
 		},
 		{
 			name: "jump to first",
 			ctx:  context.Background(),
-			slaves: func() *Slaves {
+			slaves: func() Slaves {
 				res, err := NewSlaves(db1, db2, db3)
-				res.cnt = 2
 				require.NoError(t, err)
-				return res
+				sl, ok := res.(*slaves)
+				require.True(t, ok)
+				sl.cnt = 2
+				return sl
 			},
 			wantDB: db1,
 		},

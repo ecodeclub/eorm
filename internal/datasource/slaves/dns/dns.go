@@ -24,10 +24,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ecodeclub/eorm/internal/errs"
-	"github.com/ecodeclub/eorm/internal/slaves"
-	"github.com/ecodeclub/eorm/internal/slaves/dns/mysql"
+	"github.com/ecodeclub/eorm/internal/datasource/slaves"
+	"github.com/ecodeclub/eorm/internal/datasource/slaves/dns/mysql"
 
+	"github.com/ecodeclub/eorm/internal/errs"
 	_ "github.com/go-sql-driver/mysql"
 )
 

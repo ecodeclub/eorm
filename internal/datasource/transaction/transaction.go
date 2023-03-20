@@ -12,40 +12,34 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package eorm
+package transaction
 
 import (
 	"context"
 	"database/sql"
+
+	"github.com/ecodeclub/eorm/internal/datasource"
+	"github.com/ecodeclub/eorm/internal/query"
 )
 
-// var _ Session = &Tx{}
-var _ Session = &DB{}
-
-// Session 代表一个抽象的概念，即会话
-// 暂时做成私有的，后面考虑重构，因为这个东西用户可能有点难以理解
-type Session interface {
-	getCore() core
-	queryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
-	execContext(ctx context.Context, query string, args ...any) (sql.Result, error)
-}
+//type transaction interface {
+//	Commit() error
+//	Rollback() error
+//}
 
 type Tx struct {
 	tx *sql.Tx
-	core
-	db *sql.DB
+	// TODO 事务是否要提供 close 方法
+	//db *sql.DB
+	ds datasource.DataSource
 }
 
-func (t *Tx) getCore() core {
-	return t.core
+func (t *Tx) Query(ctx context.Context, query query.Query) (*sql.Rows, error) {
+	return t.tx.QueryContext(ctx, query.SQL, query.Args...)
 }
 
-func (t *Tx) queryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
-	return t.tx.QueryContext(ctx, query, args...)
-}
-
-func (t *Tx) execContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
-	return t.tx.ExecContext(ctx, query, args...)
+func (t *Tx) Exec(ctx context.Context, query query.Query) (sql.Result, error) {
+	return t.tx.ExecContext(ctx, query.SQL, query.Args...)
 }
 
 func (t *Tx) Commit() error {
@@ -54,4 +48,8 @@ func (t *Tx) Commit() error {
 
 func (t *Tx) Rollback() error {
 	return t.tx.Rollback()
+}
+
+func OpenTx(tx *sql.Tx, ds datasource.DataSource) *Tx {
+	return &Tx{tx: tx, ds: ds}
 }

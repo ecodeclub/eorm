@@ -19,16 +19,16 @@ import (
 	"database/sql"
 
 	"github.com/ecodeclub/eorm/internal/errs"
-	"github.com/ecodeclub/eorm/internal/sharding"
+	"github.com/ecodeclub/eorm/internal/query"
 )
 
-var _ sharding.DataSource = &ShardingDataSource{}
+var _ DataSource = &ShardingDataSource{}
 
 type ShardingDataSource struct {
-	sources map[string]sharding.DataSource
+	sources map[string]DataSource
 }
 
-func (s *ShardingDataSource) Query(ctx context.Context, query *sharding.Query) (*sql.Rows, error) {
+func (s *ShardingDataSource) Query(ctx context.Context, query query.Query) (*sql.Rows, error) {
 	ds, ok := s.sources[query.Datasource]
 	if !ok {
 		return nil, errs.ErrNotFoundTargetDataSource
@@ -36,7 +36,7 @@ func (s *ShardingDataSource) Query(ctx context.Context, query *sharding.Query) (
 	return ds.Query(ctx, query)
 }
 
-func (s *ShardingDataSource) Exec(ctx context.Context, query *sharding.Query) (sql.Result, error) {
+func (s *ShardingDataSource) Exec(ctx context.Context, query query.Query) (sql.Result, error) {
 	ds, ok := s.sources[query.Datasource]
 	if !ok {
 		return nil, errs.ErrNotFoundTargetDataSource
@@ -44,7 +44,19 @@ func (s *ShardingDataSource) Exec(ctx context.Context, query *sharding.Query) (s
 	return ds.Exec(ctx, query)
 }
 
-func NewShardingDataSource(m map[string]sharding.DataSource) sharding.DataSource {
+//func (s *ShardingDataSource) BeginTx(ctx context.Context, query *sharding.Query, opts *sql.TxOptions) (*transaction.Tx, error) {
+//	ds, ok := s.sources[query.Datasource]
+//	if !ok {
+//		return nil, errs.ErrNotFoundTargetDataSource
+//	}
+//	tx, err := db.db.BeginTx(ctx, opts)
+//	if err != nil {
+//		return nil, err
+//	}
+//	return &Tx{tx: tx, db: db.db, Core: db.Core}, nil
+//}
+
+func NewShardingDataSource(m map[string]DataSource) DataSource {
 	return &ShardingDataSource{
 		sources: m,
 	}

@@ -22,6 +22,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ecodeclub/eorm/internal/datasource/single"
+
 	"github.com/ecodeclub/eorm"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/assert"
@@ -98,7 +100,7 @@ func TestMiddlewareBuilder_Build(t *testing.T) {
 			mdls := tc.mdls
 			mdls = append(mdls, tc.builder.Build())
 			db, err := eorm.Open("sqlite3",
-				"file:test.db?cache=shared&mode=memory", eorm.DBWithMiddlewares(
+				single.MemoryDB(), eorm.DBWithMiddlewares(
 					mdls...))
 			if err != nil {
 				t.Fatal(err)

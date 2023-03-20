@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/ecodeclub/eorm/internal/datasource/single"
+
 	"github.com/DATA-DOG/go-sqlmock"
 	err "github.com/ecodeclub/eorm/internal/errs"
 	"github.com/stretchr/testify/require"
@@ -302,7 +304,7 @@ func TestUpdater_Exec(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			orm, err := openDB("mysql", mockDB)
+			orm, err := Open("mysql", single.NewDB(mockDB))
 			defer func(db *DB) { _ = db.Close() }(orm)
 			if err != nil {
 				t.Fatal(err)

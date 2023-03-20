@@ -22,6 +22,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ecodeclub/eorm/internal/datasource/slaves"
+	"github.com/ecodeclub/eorm/internal/query"
+
 	"github.com/ecodeclub/eorm"
 	"github.com/ecodeclub/eorm/internal/model"
 	"github.com/ecodeclub/eorm/internal/sharding"
@@ -51,14 +54,18 @@ func (s *ShardingSelectTestSuite) SetupSuite() {
 			args := []any{item.OrderId, item.ItemId, item.UsingCol1, item.UsingCol2}
 			source, ok := s.dataSources[dst.Name]
 			require.True(t, ok)
-			cluster, ok := source.(*eorm.ClusterDB)
-			require.True(t, ok)
-			db, ok := cluster.MasterSlavesDBs[dst.DB]
-			require.True(t, ok)
-			res := eorm.RawQuery[any](db, sql, args...).Exec(context.Background())
-			if res.Err() != nil {
-				t.Fatal(res.Err())
+			_, err := source.Exec(context.Background(), query.Query{SQL: sql, Args: args, DB: dst.DB})
+			if err != nil {
+				t.Fatal(err)
 			}
+			//cluster, ok := source.(*eorm.ClusterDB)
+			//require.True(t, ok)
+			//db, ok := cluster.MasterSlavesDBs[dst.DB]
+			//require.True(t, ok)
+			// res := eorm.RawQuery[any](s.shardingDB, sql, args...).Exec(context.Background())
+			//if res.Err() != nil {
+			//	t.Fatal(res.Err())
+			//}
 		}
 	}
 	// 防止主从延迟
@@ -71,7 +78,7 @@ func (s *ShardingSelectTestSuite) TestSardingSelectorGet() {
 	_, err := r.Register(&test.OrderDetail{},
 		model.WithTableShardingAlgorithm(s.algorithm))
 	require.NoError(t, err)
-	eorm.ShardingDBOptionWithMetaRegistry(r)(s.shardingDB)
+	eorm.DBOptionWithMetaRegistry(r)(s.shardingDB)
 
 	testCases := []struct {
 		name    string
@@ -111,7 +118,7 @@ func (s *ShardingSelectTestSuite) TestSardingSelectorGet() {
 	for _, tc := range testCases {
 		s.T().Run(tc.name, func(t *testing.T) {
 			// TODO 从库测试目前有查不到数据的bug
-			ctx := eorm.UseMaster(context.Background())
+			ctx := slaves.UseMaster(context.Background())
 			res, err := tc.s.Get(ctx)
 			assert.Equal(t, tc.wantErr, err)
 			if err != nil {
@@ -128,7 +135,7 @@ func (s *ShardingSelectTestSuite) TestSardingSelectorGetMulti() {
 	_, err := r.Register(&test.OrderDetail{},
 		model.WithTableShardingAlgorithm(s.algorithm))
 	require.NoError(t, err)
-	eorm.ShardingDBOptionWithMetaRegistry(r)(s.shardingDB)
+	eorm.DBOptionWithMetaRegistry(r)(s.shardingDB)
 
 	testCases := []struct {
 		name    string
@@ -190,7 +197,7 @@ func (s *ShardingSelectTestSuite) TestSardingSelectorGetMulti() {
 	for _, tc := range testCases {
 		s.T().Run(tc.name, func(t *testing.T) {
 			// TODO 从库测试目前有查不到数据的bug
-			ctx := eorm.UseMaster(context.Background())
+			ctx := slaves.UseMaster(context.Background())
 			res, err := tc.s.GetMulti(ctx)
 			assert.Equal(t, tc.wantErr, err)
 			if err != nil {
@@ -213,15 +220,19 @@ func (s *ShardingSelectTestSuite) TearDownSuite() {
 			sql := fmt.Sprintf("DELETE FROM %s", tbl)
 			source, ok := s.dataSources[dst.Name]
 			require.True(t, ok)
-			cluster, ok := source.(*eorm.ClusterDB)
-			require.True(t, ok)
-			db, ok := cluster.MasterSlavesDBs[dst.DB]
-			require.True(t, ok)
-			res := eorm.RawQuery[any](db, sql).Exec(context.Background())
-			if res.Err() != nil {
-				fmt.Println(res.Err().Error())
-				t.Fatal(res.Err())
+			_, err := source.Exec(context.Background(), query.Query{SQL: sql, DB: dst.DB})
+			if err != nil {
+				t.Fatal(err)
 			}
+			//cluster, ok := source.(*eorm.ClusterDB)
+			//require.True(t, ok)
+			//db, ok := cluster.MasterSlavesDBs[dst.DB]
+			//require.True(t, ok)
+			//res := eorm.RawQuery[any](s.shardingDB, sql).Exec(context.Background())
+			//if res.Err() != nil {
+			//	fmt.Println(res.Err().Error())
+			//	t.Fatal(res.Err())
+			//}
 		}
 	}
 }

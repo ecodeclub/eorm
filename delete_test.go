@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/ecodeclub/eorm/internal/datasource/single"
+
 	"github.com/ecodeclub/eorm/internal/errs"
 
 	"github.com/DATA-DOG/go-sqlmock"
@@ -71,7 +73,7 @@ func TestDeleter_Exec(t *testing.T) {
 	testCases := []struct {
 		name      string
 		mockOrder func(mock sqlmock.Sqlmock)
-		delete    func(*DB, *testing.T) Result
+		delete    func(*sql.DB, *testing.T) Result
 		wantErr   error
 		wantVal   sql.Result
 	}{
@@ -81,8 +83,11 @@ func TestDeleter_Exec(t *testing.T) {
 				mock.ExpectExec("DELETE FROM `test_model` WHERE `invalid`=").
 					WithArgs(1).WillReturnError(errs.NewInvalidFieldError("Invalid"))
 			},
-			delete: func(db *DB, t *testing.T) Result {
-				deleter := NewDeleter[TestModel](db)
+			delete: func(db *sql.DB, t *testing.T) Result {
+				defer func(db *sql.DB) { _ = db.Close() }(db)
+				orm, err := Open("mysql", single.NewDB(db))
+				require.NoError(t, err)
+				deleter := NewDeleter[TestModel](orm)
 				result := deleter.From(&TestModel{}).Where(C("Invalid").EQ(1)).Exec(context.Background())
 				return result
 			},
@@ -93,8 +98,11 @@ func TestDeleter_Exec(t *testing.T) {
 			mockOrder: func(mock sqlmock.Sqlmock) {
 				mock.ExpectExec("DELETE FROM `test_model` WHERE `id`=").WithArgs(1).WillReturnResult(sqlmock.NewResult(100, 1000))
 			},
-			delete: func(db *DB, t *testing.T) Result {
-				deleter := NewDeleter[TestModel](db)
+			delete: func(db *sql.DB, t *testing.T) Result {
+				defer func(db *sql.DB) { _ = db.Close() }(db)
+				orm, err := Open("mysql", single.NewDB(db))
+				require.NoError(t, err)
+				deleter := NewDeleter[TestModel](orm)
 				result := deleter.From(&TestModel{}).Where(C("Id").EQ(1)).Exec(context.Background())
 				return result
 			},
@@ -108,11 +116,16 @@ func TestDeleter_Exec(t *testing.T) {
 				mock.ExpectExec("DELETE FROM `test_model` WHERE `id`=").WithArgs(1).WillReturnResult(sqlmock.NewResult(10, 20))
 				mock.ExpectCommit().WillReturnError(errors.New("commit 错误"))
 			},
-			delete: func(db *DB, t *testing.T) Result {
-				tx, err := db.BeginTx(context.Background(), &sql.TxOptions{})
+			delete: func(db *sql.DB, t *testing.T) Result {
+				defer func(db *sql.DB) { _ = db.Close() }(db)
+				sigDB := single.NewDB(db)
+				tx, err := sigDB.BeginTx(context.Background(), &sql.TxOptions{})
 				require.NoError(t, err)
 
-				deleter := NewDeleter[TestModel](db)
+				orm, err := Open("mysql", tx)
+				require.NoError(t, err)
+
+				deleter := NewDeleter[TestModel](orm)
 				result := deleter.From(&TestModel{}).Where(C("Id").EQ(1)).Exec(context.Background())
 				require.NoError(t, result.Err())
 
@@ -133,13 +146,13 @@ func TestDeleter_Exec(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			db, err := openDB("mysql", mockDB)
-			defer func(db *DB) { _ = db.Close() }(db)
-			if err != nil {
-				t.Fatal(err)
-			}
+			//db, err := openDB("mysql", mockDB)
+			//defer func(db *DB) { _ = db.Close() }(db)
+			//if err != nil {
+			//	t.Fatal(err)
+			//}
 			tc.mockOrder(mock)
-			result := tc.delete(db, t)
+			result := tc.delete(mockDB, t)
 
 			assert.Equal(t, tc.wantErr, result.Err())
 

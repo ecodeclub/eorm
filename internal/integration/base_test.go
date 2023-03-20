@@ -24,15 +24,17 @@ import (
 	"log"
 	"time"
 
+	"github.com/ecodeclub/eorm/internal/datasource/single"
+
 	"github.com/stretchr/testify/require"
 
-	"github.com/ecodeclub/eorm/internal/slaves/dns"
+	"github.com/ecodeclub/eorm/internal/datasource/slaves/dns"
 
 	"github.com/ecodeclub/eorm"
+	"github.com/ecodeclub/eorm/internal/datasource"
+	"github.com/ecodeclub/eorm/internal/datasource/cluster"
+	"github.com/ecodeclub/eorm/internal/datasource/slaves"
 	"github.com/ecodeclub/eorm/internal/sharding"
-	"github.com/ecodeclub/eorm/internal/sharding/datasource"
-	"github.com/ecodeclub/eorm/internal/slaves"
-	"github.com/ecodeclub/eorm/internal/slaves/roundrobin"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -45,11 +47,15 @@ type Suite struct {
 
 func (s *Suite) SetupSuite() {
 	t := s.T()
-	orm, err := eorm.Open(s.driver, s.dsn)
+	db, err := single.OpenDB(s.driver, s.dsn)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err = orm.Wait(); err != nil {
+	if err = db.Wait(); err != nil {
+		t.Fatal(err)
+	}
+	orm, err := eorm.Open(s.driver, db)
+	if err != nil {
 		t.Fatal(err)
 	}
 	s.orm = orm
@@ -72,9 +78,9 @@ type ShardingSuite struct {
 	suite.Suite
 	slaves      slaves.Slaves
 	clusters    *clusterDrivers
-	shardingDB  *eorm.ShardingDB
+	shardingDB  *eorm.DB
 	algorithm   sharding.Algorithm
-	dataSources map[string]sharding.DataSource
+	dataSources map[string]datasource.DataSource
 	driver      string
 	DBPattern   string
 	DsPattern   string
@@ -91,12 +97,12 @@ func (s *ShardingSuite) openDB(dvr, dsn string) (*sql.DB, error) {
 	return db, err
 }
 
-func (s *ShardingSuite) initDB() (*eorm.ShardingDB, error) {
+func (s *ShardingSuite) initDB() (*eorm.DB, error) {
 	clDrivers := s.clusters.clDrivers
-	sourceMap := make(map[string]sharding.DataSource, len(clDrivers))
-	for i, cluster := range clDrivers {
-		msMap := make(map[string]*eorm.MasterSlavesDB, 8)
-		for j, d := range cluster.msDrivers {
+	sourceMap := make(map[string]datasource.DataSource, len(clDrivers))
+	for i, clus := range clDrivers {
+		msMap := make(map[string]*slaves.MasterSlavesDB, 8)
+		for j, d := range clus.msDrivers {
 			master, err := s.openDB(s.driver, d.masterdsn)
 			if err != nil {
 				return nil, err
@@ -109,23 +115,20 @@ func (s *ShardingSuite) initDB() (*eorm.ShardingDB, error) {
 				}
 				ss = append(ss, slave)
 			}
-			sl, err := roundrobin.NewSlaves(ss...)
+			sl, err := slaves.NewSlaves(ss...)
 			require.NoError(s.T(), err)
 			s.slaves = &testBaseSlaves{Slaves: sl}
-			masterSlaveDB, err := eorm.OpenMasterSlaveDB(
-				s.driver, master, eorm.MasterSlaveWithSlaves(s.slaves))
-			if err != nil {
-				return nil, err
-			}
+			masterSlaveDB := slaves.NewMasterSlaveDB(
+				master, slaves.MasterSlaveWithSlaves(s.slaves))
 			dbName := fmt.Sprintf(s.DBPattern, j)
 			msMap[dbName] = masterSlaveDB
 		}
 		sourceName := fmt.Sprintf(s.DsPattern, i)
-		sourceMap[sourceName] = eorm.OpenClusterDB(msMap)
+		sourceMap[sourceName] = cluster.NewClusterDB(msMap)
 	}
 	s.dataSources = sourceMap
 	dataSource := datasource.NewShardingDataSource(sourceMap)
-	return eorm.OpenShardingDB(s.driver, dataSource)
+	return eorm.Open(s.driver, dataSource)
 }
 
 func (s *ShardingSuite) SetupSuite() {
@@ -142,7 +145,7 @@ type MasterSlaveSuite struct {
 	driver     string
 	masterDsn  string
 	slaveDsns  []string
-	orm        *eorm.MasterSlavesDB
+	orm        *eorm.DB
 	initSlaves initSlaves
 	*testSlaves
 }
@@ -156,7 +159,7 @@ func (s *MasterSlaveSuite) SetupSuite() {
 	s.orm = orm
 }
 
-func (s *MasterSlaveSuite) initDb() (*eorm.MasterSlavesDB, error) {
+func (s *MasterSlaveSuite) initDb() (*eorm.DB, error) {
 	master, err := sql.Open(s.driver, s.masterDsn)
 	if err != nil {
 		return nil, err
@@ -166,7 +169,7 @@ func (s *MasterSlaveSuite) initDb() (*eorm.MasterSlavesDB, error) {
 		return nil, err
 	}
 	s.testSlaves = newTestSlaves(ss)
-	return eorm.OpenMasterSlaveDB(s.driver, master, eorm.MasterSlaveWithSlaves(s.testSlaves))
+	return eorm.Open(s.driver, slaves.NewMasterSlaveDB(master, slaves.MasterSlaveWithSlaves(s.testSlaves)))
 
 }
 
@@ -232,5 +235,5 @@ func newRoundRobinSlaves(driver string, slaveDsns ...string) (slaves.Slaves, err
 		}
 		ss = append(ss, slave)
 	}
-	return roundrobin.NewSlaves(ss...)
+	return slaves.NewSlaves(ss...)
 }

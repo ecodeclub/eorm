@@ -12,24 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package eorm
+package cluster
 
 import (
 	"context"
 	"database/sql"
+	"testing"
+
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/ecodeclub/eorm/internal/datasource"
+	"github.com/ecodeclub/eorm/internal/datasource/slaves"
+	"github.com/ecodeclub/eorm/internal/query"
 	"github.com/ecodeclub/eorm/internal/sharding"
-	"github.com/ecodeclub/eorm/internal/slaves"
-	"github.com/ecodeclub/eorm/internal/slaves/roundrobin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"testing"
 )
 
 type ClusterSuite struct {
 	suite.Suite
-	sharding.DataSource
+	datasource.DataSource
 	mockMasterDB *sql.DB
 	mockMaster   sqlmock.Sqlmock
 
@@ -82,15 +84,14 @@ func (c *ClusterSuite) TestClusterDbQuery() {
 	c.mockSlave2.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows([]string{"mark"}).AddRow("slave1_2"))
 	c.mockSlave3.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows([]string{"mark"}).AddRow("slave1_3"))
 
-	db, err := OpenMasterSlaveDB("mysql", c.mockMasterDB, MasterSlaveWithSlaves(
+	db := slaves.NewMasterSlaveDB(c.mockMasterDB, slaves.MasterSlaveWithSlaves(
 		c.newSlaves(c.mockSlave1DB, c.mockSlave2DB, c.mockSlave3DB)))
-	assert.Nil(c.T(), err)
 	testCasesQuery := []struct {
 		name     string
 		reqCnt   int
 		ctx      context.Context
-		query    *sharding.Query
-		ms       map[string]*MasterSlavesDB
+		query    sharding.Query
+		ms       map[string]*slaves.MasterSlavesDB
 		wantResp []string
 		wantErr  error
 	}{
@@ -98,12 +99,12 @@ func (c *ClusterSuite) TestClusterDbQuery() {
 			name:   "select default use slave",
 			ctx:    context.Background(),
 			reqCnt: 3,
-			query: &sharding.Query{
+			query: sharding.Query{
 				SQL: "SELECT `first_name` FROM `test_model`",
 				DB:  "order_db_0",
 			},
-			ms: func() map[string]*MasterSlavesDB {
-				masterSlaves := map[string]*MasterSlavesDB{"order_db_0": db}
+			ms: func() map[string]*slaves.MasterSlavesDB {
+				masterSlaves := map[string]*slaves.MasterSlavesDB{"order_db_0": db}
 				return masterSlaves
 			}(),
 			wantResp: []string{"slave1_1", "slave1_2", "slave1_3"},
@@ -111,13 +112,13 @@ func (c *ClusterSuite) TestClusterDbQuery() {
 		{
 			name:   "use master",
 			reqCnt: 1,
-			ctx:    UseMaster(context.Background()),
-			query: &sharding.Query{
+			ctx:    slaves.UseMaster(context.Background()),
+			query: sharding.Query{
 				SQL: "SELECT `first_name` FROM `test_model`",
 				DB:  "order_db_1",
 			},
-			ms: func() map[string]*MasterSlavesDB {
-				masterSlaves := map[string]*MasterSlavesDB{"order_db_1": db}
+			ms: func() map[string]*slaves.MasterSlavesDB {
+				masterSlaves := map[string]*slaves.MasterSlavesDB{"order_db_1": db}
 				return masterSlaves
 			}(),
 			wantResp: []string{"master"},
@@ -126,11 +127,10 @@ func (c *ClusterSuite) TestClusterDbQuery() {
 
 	for _, tc := range testCasesQuery {
 		c.T().Run(tc.name, func(t *testing.T) {
-
-			clusterDB := OpenClusterDB(tc.ms)
+			clusDB := NewClusterDB(tc.ms)
 			var resp []string
 			for i := 1; i <= tc.reqCnt; i++ {
-				rows, queryErr := clusterDB.Query(tc.ctx, tc.query)
+				rows, queryErr := clusDB.Query(tc.ctx, query.Query(tc.query))
 				assert.Equal(t, queryErr, tc.wantErr)
 				if queryErr != nil {
 					return
@@ -140,7 +140,7 @@ func (c *ClusterSuite) TestClusterDbQuery() {
 				assert.True(t, ok)
 
 				val := new(string)
-				err = rows.Scan(val)
+				err := rows.Scan(val)
 				assert.Nil(t, err)
 				if err != nil {
 					return
@@ -166,8 +166,8 @@ func (c *ClusterSuite) TestClusterDbExec() {
 		reqCnt    int
 		ctx       context.Context
 		slaves    slaves.Slaves
-		query     *sharding.Query
-		ms        map[string]*MasterSlavesDB
+		query     sharding.Query
+		ms        map[string]*slaves.MasterSlavesDB
 		wantResp  []int64
 		wantErr   error
 	}{
@@ -175,15 +175,14 @@ func (c *ClusterSuite) TestClusterDbExec() {
 			name:   "null slave",
 			ctx:    context.Background(),
 			reqCnt: 1,
-			query: &sharding.Query{
+			query: sharding.Query{
 				SQL: "INSERT INTO `test_model`(`id`,`first_name`,`age`,`last_name`) VALUES(1,2,3,4)",
 				DB:  "order_db_0",
 			},
-			ms: func() map[string]*MasterSlavesDB {
-				db, err := OpenMasterSlaveDB("mysql", c.mockMasterDB,
-					MasterSlaveWithSlaves(c.newSlaves(nil)))
-				assert.Nil(c.T(), err)
-				masterSlaves := map[string]*MasterSlavesDB{"order_db_0": db}
+			ms: func() map[string]*slaves.MasterSlavesDB {
+				db := slaves.NewMasterSlaveDB(c.mockMasterDB,
+					slaves.MasterSlaveWithSlaves(c.newSlaves(nil)))
+				masterSlaves := map[string]*slaves.MasterSlavesDB{"order_db_0": db}
 				return masterSlaves
 			}(),
 			wantResp: []int64{1}, // 切片元素表示的是 lastInsertID, 这里表示请求 master db 1 次
@@ -192,15 +191,14 @@ func (c *ClusterSuite) TestClusterDbExec() {
 			name:   "3 salves",
 			ctx:    context.Background(),
 			reqCnt: 3,
-			query: &sharding.Query{
+			query: sharding.Query{
 				SQL: "INSERT INTO `test_model`(`id`,`first_name`,`age`,`last_name`) VALUES(1,2,3,4)",
 				DB:  "order_db_1",
 			},
-			ms: func() map[string]*MasterSlavesDB {
-				db, err := OpenMasterSlaveDB("mysql", c.mockMasterDB, MasterSlaveWithSlaves(
+			ms: func() map[string]*slaves.MasterSlavesDB {
+				db := slaves.NewMasterSlaveDB(c.mockMasterDB, slaves.MasterSlaveWithSlaves(
 					c.newSlaves(c.mockSlave1DB, c.mockSlave2DB, c.mockSlave3DB)))
-				assert.Nil(c.T(), err)
-				masterSlaves := map[string]*MasterSlavesDB{"order_db_1": db}
+				masterSlaves := map[string]*slaves.MasterSlavesDB{"order_db_1": db}
 				return masterSlaves
 			}(),
 			wantResp: []int64{1, 1, 1}, // 切片元素表示的是 lastInsertID, 这里表示请求 master db 3 次
@@ -208,16 +206,15 @@ func (c *ClusterSuite) TestClusterDbExec() {
 		{
 			name:   "use master with 3 slaves",
 			reqCnt: 1,
-			ctx:    UseMaster(context.Background()),
-			query: &sharding.Query{
+			ctx:    slaves.UseMaster(context.Background()),
+			query: sharding.Query{
 				SQL: "INSERT INTO `test_model`(`id`,`first_name`,`age`,`last_name`) VALUES(1,2,3,4)",
 				DB:  "order_db_2",
 			},
-			ms: func() map[string]*MasterSlavesDB {
-				db, err := OpenMasterSlaveDB("mysql", c.mockMasterDB, MasterSlaveWithSlaves(
+			ms: func() map[string]*slaves.MasterSlavesDB {
+				db := slaves.NewMasterSlaveDB(c.mockMasterDB, slaves.MasterSlaveWithSlaves(
 					c.newSlaves(c.mockSlave1DB, c.mockSlave2DB, c.mockSlave3DB)))
-				assert.Nil(c.T(), err)
-				masterSlaves := map[string]*MasterSlavesDB{"order_db_2": db}
+				masterSlaves := map[string]*slaves.MasterSlavesDB{"order_db_2": db}
 				return masterSlaves
 			}(),
 			wantResp: []int64{1}, // 切片元素表示的是 lastInsertID, 这里表示请求 master db 1 次
@@ -226,11 +223,11 @@ func (c *ClusterSuite) TestClusterDbExec() {
 
 	for _, tc := range testCasesExec {
 		c.T().Run(tc.name, func(t *testing.T) {
-			clusterDB := OpenClusterDB(tc.ms)
+			db := NewClusterDB(tc.ms)
 			var resAffectID []int64
 			for i := 1; i <= tc.reqCnt; i++ {
 				c.mockMaster.ExpectExec("^INSERT INTO (.+)").WillReturnResult(sqlmock.NewResult(1, 1))
-				res, err := clusterDB.Exec(tc.ctx, tc.query)
+				res, err := db.Exec(tc.ctx, query.Query(tc.query))
 				assert.Nil(t, err)
 
 				afID, er := res.LastInsertId()
@@ -245,7 +242,7 @@ func (c *ClusterSuite) TestClusterDbExec() {
 }
 
 func (c *ClusterSuite) newSlaves(dbs ...*sql.DB) slaves.Slaves {
-	res, err := roundrobin.NewSlaves(dbs...)
+	res, err := slaves.NewSlaves(dbs...)
 	require.NoError(c.T(), err)
 	return res
 }

@@ -12,27 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package eorm
+package slaves
 
 import (
 	"context"
 	"database/sql"
-	"github.com/ecodeclub/eorm/internal/sharding"
 
-	"github.com/ecodeclub/eorm/internal/slaves"
-
-	"github.com/ecodeclub/eorm/internal/dialect"
-	"github.com/ecodeclub/eorm/internal/model"
-	"github.com/ecodeclub/eorm/internal/valuer"
+	"github.com/ecodeclub/eorm/internal/datasource"
+	"github.com/ecodeclub/eorm/internal/datasource/transaction"
+	"github.com/ecodeclub/eorm/internal/query"
 )
 
-var _ Session = &MasterSlavesDB{}
-var _ sharding.DataSource = &MasterSlavesDB{}
+var _ datasource.DataSource = &MasterSlavesDB{}
 
 type MasterSlavesDB struct {
 	master *sql.DB
-	slaves slaves.Slaves
-	core
+	slaves Slaves
 }
 
 type key string
@@ -41,16 +36,12 @@ const (
 	master key = "master"
 )
 
-func (m *MasterSlavesDB) Query(ctx context.Context, query *sharding.Query) (*sql.Rows, error) {
+func (m *MasterSlavesDB) Query(ctx context.Context, query query.Query) (*sql.Rows, error) {
 	return m.queryContext(ctx, query.SQL, query.Args...)
 }
 
-func (m *MasterSlavesDB) Exec(ctx context.Context, query *sharding.Query) (sql.Result, error) {
+func (m *MasterSlavesDB) Exec(ctx context.Context, query query.Query) (sql.Result, error) {
 	return m.execContext(ctx, query.SQL, query.Args...)
-}
-
-func (m *MasterSlavesDB) getCore() core {
-	return m.core
 }
 
 func (m *MasterSlavesDB) queryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
@@ -69,43 +60,27 @@ func (m *MasterSlavesDB) execContext(ctx context.Context, query string, args ...
 	return m.master.ExecContext(ctx, query, args...)
 }
 
-func (m *MasterSlavesDB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) {
+func (m *MasterSlavesDB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*transaction.Tx, error) {
 	tx, err := m.master.BeginTx(ctx, opts)
 	if err != nil {
 		return nil, err
 	}
-	return &Tx{
-		tx:   tx,
-		db:   m.master,
-		core: m.core,
-	}, nil
+	return transaction.OpenTx(tx, m), nil
 }
 
-func OpenMasterSlaveDB(driver string, master *sql.DB, opts ...MasterSlaveDBOption) (*MasterSlavesDB, error) {
-	dl, err := dialect.Of(driver)
-	if err != nil {
-		return nil, err
-	}
-	orm := &MasterSlavesDB{
-		core: core{
-			metaRegistry: model.NewMetaRegistry(),
-			dialect:      dl,
-			// 可以设为默认，因为原本这里也有默认
-			valCreator: valuer.BasicTypeCreator{
-				Creator: valuer.NewUnsafeValue,
-			},
-		},
+func NewMasterSlaveDB(master *sql.DB, opts ...MasterSlaveDBOption) *MasterSlavesDB {
+	db := &MasterSlavesDB{
 		master: master,
 	}
-	for _, o := range opts {
-		o(orm)
+	for _, opt := range opts {
+		opt(db)
 	}
-	return orm, nil
+	return db
 }
 
 type MasterSlaveDBOption func(db *MasterSlavesDB)
 
-func MasterSlaveWithSlaves(s slaves.Slaves) MasterSlaveDBOption {
+func MasterSlaveWithSlaves(s Slaves) MasterSlaveDBOption {
 	return func(db *MasterSlavesDB) {
 		db.slaves = s
 	}
@@ -113,4 +88,14 @@ func MasterSlaveWithSlaves(s slaves.Slaves) MasterSlaveDBOption {
 
 func UseMaster(ctx context.Context) context.Context {
 	return context.WithValue(ctx, master, true)
+}
+
+// MasterSlaveMemoryDB 返回一个基于内存的 MasterSlaveDB，它使用的是 sqlite3 内存模式。
+func MasterSlaveMemoryDB() *MasterSlavesDB {
+	db, err := sql.Open("sqlite3", "file:test.db?cache=shared&mode=memory")
+	if err != nil {
+		panic(err)
+	}
+	masterSlaveDB := NewMasterSlaveDB(db)
+	return masterSlaveDB
 }

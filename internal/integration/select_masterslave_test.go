@@ -21,6 +21,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ecodeclub/eorm/internal/datasource/slaves"
+
 	"github.com/ecodeclub/eorm"
 	"github.com/ecodeclub/eorm/internal/test"
 	"github.com/stretchr/testify/assert"
@@ -65,7 +67,7 @@ func (s *MasterSlaveSelectTestSuite) TestMasterSlave() {
 			wantRes: s.data,
 			ctx: func() context.Context {
 				c := context.Background()
-				c = eorm.UseMaster(c)
+				c = slaves.UseMaster(c)
 				return c
 			},
 		},

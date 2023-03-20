@@ -17,57 +17,21 @@ package eorm
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"testing"
 
-	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/ecodeclub/eorm/internal/datasource/single"
+
 	"github.com/ecodeclub/eorm/internal/valuer"
 	_ "github.com/mattn/go-sqlite3"
-	"github.com/stretchr/testify/assert"
 )
 
-func TestDB_BeginTx(t *testing.T) {
-	mockDB, mock, err := sqlmock.New()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = mockDB.Close() }()
-
-	db, err := openDB("mysql", mockDB)
-	if err != nil {
-		t.Fatal(err)
-	}
-	// Begin 失败
-	mock.ExpectBegin().WillReturnError(errors.New("begin failed"))
-	tx, err := db.BeginTx(context.Background(), &sql.TxOptions{})
-	assert.Equal(t, errors.New("begin failed"), err)
-	assert.Nil(t, tx)
-
-	mock.ExpectBegin()
-	tx, err = db.BeginTx(context.Background(), &sql.TxOptions{})
-	assert.Nil(t, err)
-	assert.NotNil(t, tx)
-}
-
-func TestDB_Wait(t *testing.T) {
-	mockDB, mock, err := sqlmock.New()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = mockDB.Close() }()
-
-	db, err := openDB("mysql", mockDB)
-	if err != nil {
-		t.Fatal(err)
-	}
-	mock.ExpectPing()
-	err = db.Wait()
-	assert.Nil(t, err)
-}
-
 func ExampleMiddleware() {
-	db, _ := Open("sqlite3", "file:test.db?cache=shared&mode=memory",
+	db, err := single.OpenDB("sqlite3", "file:test.db?cache=shared&mode=memory")
+	if err != nil {
+		panic(err)
+	}
+	orm, _ := Open("sqlite3", db,
 		DBWithMiddlewares(func(next HandleFunc) HandleFunc {
 			return func(ctx context.Context, queryContext *QueryContext) *QueryResult {
 				return &QueryResult{Result: "mdl1"}
@@ -80,20 +44,22 @@ func ExampleMiddleware() {
 	defer func() {
 		_ = db.Close()
 	}()
-	fmt.Println(len(db.ms))
+	fmt.Println(len(orm.ms))
 	// Output:
 	// 2
 }
 
+// TODO tx 是否要维护 *sql.DB
 func ExampleDB_BeginTx() {
-	db, _ := Open("sqlite3", "file:test.db?cache=shared&mode=memory")
-	defer func() {
-		_ = db.Close()
-	}()
+	db := single.MemoryDB()
 	tx, err := db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err == nil {
 		fmt.Println("Begin")
 	}
+	orm, _ := Open("mysql", tx)
+	defer func() {
+		_ = orm.Close()
+	}()
 	// 或者 tx.Rollback()
 	err = tx.Commit()
 	if err == nil {
@@ -106,8 +72,12 @@ func ExampleDB_BeginTx() {
 
 func ExampleOpen() {
 	// case1 without DBOption
-	db, _ := Open("sqlite3", "file:test.db?cache=shared&mode=memory")
-	fmt.Printf("case1 dialect: %s\n", db.dialect.Name)
+	db, err := single.OpenDB("sqlite3", "file:test.db?cache=shared&mode=memory")
+	if err != nil {
+		panic(err)
+	}
+	orm, _ := Open("sqlite3", db)
+	fmt.Printf("case1 dialect: %s\n", orm.dialect.Name)
 
 	// Output:
 	// case1 dialect: SQLite
@@ -135,28 +105,17 @@ func ExampleNewUpdater() {
 
 // memoryDB 返回一个基于内存的 ORM，它使用的是 sqlite3 内存模式。
 func memoryDB() *DB {
-	orm, err := Open("sqlite3", "file:test.db?cache=shared&mode=memory")
+	db := single.MemoryDB()
+	orm, err := Open("sqlite3", db)
 	if err != nil {
 		panic(err)
 	}
 	return orm
 }
 
-// memoryDB 返回一个基于内存的 MasterSlaveDB，它使用的是 sqlite3 内存模式。
-func masterSlaveMemoryDB() *MasterSlavesDB {
-	db, err := sql.Open("sqlite3", "file:test.db?cache=shared&mode=memory")
-	if err != nil {
-		panic(err)
-	}
-	masterSlaveDB, err := OpenMasterSlaveDB("sqlite3", db)
-	if err != nil {
-		panic(err)
-	}
-	return masterSlaveDB
-}
-
-func memoryDBWithDB(db string) *DB {
-	orm, err := Open("sqlite3", fmt.Sprintf("file:%s.db?cache=shared&mode=memory", db))
+func memoryDBWithDB(dbName string) *DB {
+	db, err := single.OpenDB("sqlite3", fmt.Sprintf("file:%s.db?cache=shared&mode=memory", dbName))
+	orm, err := Open("sqlite3", db)
 	if err != nil {
 		panic(err)
 	}

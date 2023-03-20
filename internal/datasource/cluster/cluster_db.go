@@ -12,40 +12,44 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package eorm
+package cluster
 
 import (
 	"context"
 	"database/sql"
-	"github.com/ecodeclub/eorm/internal/errs"
-	"github.com/ecodeclub/eorm/internal/sharding"
 	"sync"
+
+	"github.com/ecodeclub/eorm/internal/datasource"
+	"github.com/ecodeclub/eorm/internal/datasource/slaves"
+	"github.com/ecodeclub/eorm/internal/errs"
+	"github.com/ecodeclub/eorm/internal/query"
 )
 
-var _ sharding.DataSource = &ClusterDB{}
+var _ datasource.DataSource = &clusterDB{}
 
-type ClusterDB struct {
-	MasterSlavesDBs map[string]*MasterSlavesDB
+type clusterDB struct {
+	// DataSource  应实现为 *masterSlavesDB
+	MasterSlavesDBs map[string]*slaves.MasterSlavesDB
 	lock            sync.Mutex
 }
 
-func (c *ClusterDB) Query(ctx context.Context, query *sharding.Query) (*sql.Rows, error) {
+func (c *clusterDB) Query(ctx context.Context, query query.Query) (*sql.Rows, error) {
 	ms, ok := c.MasterSlavesDBs[query.DB]
 	if !ok {
 		return nil, errs.ErrNotFoundTargetDB
 	}
-	return ms.queryContext(ctx, query.SQL, query.Args...)
+	return ms.Query(ctx, query)
 }
 
-func (c *ClusterDB) Exec(ctx context.Context, query *sharding.Query) (sql.Result, error) {
+func (c *clusterDB) Exec(ctx context.Context, query query.Query) (sql.Result, error) {
 	ms, ok := c.MasterSlavesDBs[query.DB]
 	if !ok {
 		return nil, errs.ErrNotFoundTargetDB
 	}
-	return ms.execContext(ctx, query.SQL, query.Args...)
+	return ms.Exec(ctx, query)
 }
 
-func (c *ClusterDB) Set(key string, db *MasterSlavesDB) error {
+func (c *clusterDB) Set(key string, db *slaves.MasterSlavesDB) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	_, ok := c.MasterSlavesDBs[key]
@@ -56,6 +60,6 @@ func (c *ClusterDB) Set(key string, db *MasterSlavesDB) error {
 	return nil
 }
 
-func OpenClusterDB(ms map[string]*MasterSlavesDB) *ClusterDB {
-	return &ClusterDB{MasterSlavesDBs: ms}
+func NewClusterDB(ms map[string]*slaves.MasterSlavesDB) datasource.DataSource {
+	return &clusterDB{MasterSlavesDBs: ms}
 }

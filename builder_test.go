@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/ecodeclub/eorm/internal/datasource/single"
+
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/ecodeclub/eorm/internal/errs"
 	"github.com/ecodeclub/eorm/internal/valuer"
@@ -75,7 +77,7 @@ func testQuerierGet(t *testing.T, creator valuer.BasicTypeCreator) {
 	}
 	defer func() { _ = db.Close() }()
 
-	orm, err := openDB("mysql", db)
+	orm, err := Open("mysql", single.NewDB(db))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -165,7 +167,7 @@ func testQuerier_GetMulti(t *testing.T, creator valuer.BasicTypeCreator) {
 	defer func() {
 		_ = db.Close()
 	}()
-	orm, err := openDB("mysql", db)
+	orm, err := Open("mysql", single.NewDB(db))
 	if err != nil {
 		t.Fatal(err)
 	}

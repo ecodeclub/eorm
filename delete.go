@@ -20,6 +20,8 @@ import (
 	"github.com/valyala/bytebufferpool"
 )
 
+var _ QueryBuilder = &Deleter[any]{}
+
 // Deleter builds DELETE query
 type Deleter[T any] struct {
 	builder
@@ -40,7 +42,7 @@ func NewDeleter[T any](sess Session) *Deleter[T] {
 }
 
 // Build returns DELETE query
-func (d *Deleter[T]) Build() (*Query, error) {
+func (d *Deleter[T]) Build() (Query, error) {
 	defer bytebufferpool.Put(d.buffer)
 	_, _ = d.buffer.WriteString("DELETE FROM ")
 	var err error
@@ -49,7 +51,7 @@ func (d *Deleter[T]) Build() (*Query, error) {
 	}
 	d.meta, err = d.metaRegistry.Get(d.table)
 	if err != nil {
-		return nil, err
+		return EmptyQuery, err
 	}
 
 	d.quote(d.meta.TableName)
@@ -57,11 +59,11 @@ func (d *Deleter[T]) Build() (*Query, error) {
 		d.writeString(" WHERE ")
 		err = d.buildPredicates(d.where)
 		if err != nil {
-			return nil, err
+			return EmptyQuery, err
 		}
 	}
 	d.end()
-	return &Query{SQL: d.buffer.String(), Args: d.args}, nil
+	return Query{SQL: d.buffer.String(), Args: d.args}, nil
 }
 
 // From accepts model definition

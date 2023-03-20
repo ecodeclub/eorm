@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package eorm
+package transaction
 
 import (
 	"context"
@@ -20,6 +20,8 @@ import (
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/ecodeclub/eorm/internal/datasource"
+	"github.com/ecodeclub/eorm/internal/query"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -30,7 +32,7 @@ func TestTx_Commit(t *testing.T) {
 	}
 	defer func() { _ = mockDB.Close() }()
 
-	db, err := openDB("mysql", mockDB)
+	db := openMockDB("mysql", mockDB)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,7 +59,7 @@ func TestTx_Rollback(t *testing.T) {
 	}
 	defer func() { _ = mockDB.Close() }()
 
-	db, err := openDB("mysql", mockDB)
+	db := openMockDB("mysql", mockDB)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,4 +71,34 @@ func TestTx_Rollback(t *testing.T) {
 	assert.Nil(t, err)
 	err = tx.Rollback()
 	assert.Nil(t, err)
+}
+
+type testMockDB struct {
+	driver string
+	db     *sql.DB
+	ds     datasource.DataSource
+}
+
+func (db *testMockDB) Query(ctx context.Context, query query.Query) (*sql.Rows, error) {
+	return &sql.Rows{}, nil
+}
+
+func (db *testMockDB) Exec(ctx context.Context, query query.Query) (sql.Result, error) {
+	return nil, nil
+}
+
+func openMockDB(driver string, db *sql.DB) *testMockDB {
+	return &testMockDB{driver: driver, db: db}
+}
+
+func (db *testMockDB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) {
+	tx, err := db.db.BeginTx(ctx, opts)
+	if err != nil {
+		return nil, err
+	}
+	return OpenTx(tx, db), nil
+}
+
+func (db *testMockDB) Close() error {
+	return db.db.Close()
 }
