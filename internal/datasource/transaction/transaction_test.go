@@ -19,9 +19,10 @@ import (
 	"database/sql"
 	"testing"
 
+	"github.com/ecodeclub/eorm/internal/query"
+
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/ecodeclub/eorm/internal/datasource"
-	"github.com/ecodeclub/eorm/internal/query"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -79,11 +80,11 @@ type testMockDB struct {
 	ds     datasource.DataSource
 }
 
-func (db *testMockDB) Query(ctx context.Context, query query.Query) (*sql.Rows, error) {
+func (db *testMockDB) Query(_ context.Context, _ query.Query) (*sql.Rows, error) {
 	return &sql.Rows{}, nil
 }
 
-func (db *testMockDB) Exec(ctx context.Context, query query.Query) (sql.Result, error) {
+func (db *testMockDB) Exec(_ context.Context, _ query.Query) (sql.Result, error) {
 	return nil, nil
 }
 

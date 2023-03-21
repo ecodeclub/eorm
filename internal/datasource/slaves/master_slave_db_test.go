@@ -183,36 +183,40 @@ func (ms *MasterSlaveSuite) TestMasterSlaveDbExec() {
 	ms.mockSlave3.ExpectExec("^INSERT INTO (.+)").WillReturnResult(sqlmock.NewResult(4, 1))
 
 	testCasesExec := []struct {
-		name      string
-		ctx       context.Context
-		insertSQL string
-		reqCnt    int
-		slaves    Slaves
-		wantResp  []int64
-		wantErr   error
+		name              string
+		ctx               context.Context
+		insertSQL         string
+		reqCnt            int
+		slaves            Slaves
+		wantRowsAffected  []int64
+		wantLastInsertIds []int64
+		wantErr           error
 	}{
 		{
-			name:      "null slave",
-			ctx:       context.Background(),
-			reqCnt:    1,
-			insertSQL: "INSERT INTO `test_model`(`id`,`first_name`,`age`,`last_name`) VALUES(1,2,3,4)",
-			wantResp:  []int64{1}, // 切片元素表示的是 lastInsertID, 这里表示请求 master db 1 次
+			name:              "null slave",
+			ctx:               context.Background(),
+			reqCnt:            1,
+			insertSQL:         "INSERT INTO `test_model`(`id`,`first_name`,`age`,`last_name`) VALUES(1,2,3,4)",
+			wantRowsAffected:  []int64{1}, // 切片元素表示的是 lastInsertID, 这里表示请求 master db 1 次
+			wantLastInsertIds: []int64{1},
 		},
 		{
-			name:      "3 salves",
-			ctx:       context.Background(),
-			reqCnt:    3,
-			insertSQL: "INSERT INTO `test_model`(`id`,`first_name`,`age`,`last_name`) VALUES(1,2,3,4)",
-			slaves:    ms.newSlaves(ms.mockSlave1DB, ms.mockSlave2DB, ms.mockSlave3DB),
-			wantResp:  []int64{1, 1, 1}, // 切片元素表示的是 lastInsertID, 这里表示请求 master db 3 次
+			name:              "3 salves",
+			ctx:               context.Background(),
+			reqCnt:            3,
+			insertSQL:         "INSERT INTO `test_model`(`id`,`first_name`,`age`,`last_name`) VALUES(1,2,3,4)",
+			slaves:            ms.newSlaves(ms.mockSlave1DB, ms.mockSlave2DB, ms.mockSlave3DB),
+			wantRowsAffected:  []int64{1, 1, 1}, // 切片元素表示的是 lastInsertID, 这里表示请求 master db 3 次
+			wantLastInsertIds: []int64{1, 1, 1},
 		},
 		{
-			name:      "use master with 3 slaves",
-			reqCnt:    1,
-			ctx:       UseMaster(context.Background()),
-			insertSQL: "INSERT INTO `test_model`(`id`,`first_name`,`age`,`last_name`) VALUES(1,2,3,4)",
-			slaves:    ms.newSlaves(ms.mockSlave1DB, ms.mockSlave2DB, ms.mockSlave3DB),
-			wantResp:  []int64{1}, // 切片元素表示的是 lastInsertID, 这里表示请求 master db 1 次
+			name:              "use master with 3 slaves",
+			reqCnt:            1,
+			ctx:               UseMaster(context.Background()),
+			insertSQL:         "INSERT INTO `test_model`(`id`,`first_name`,`age`,`last_name`) VALUES(1,2,3,4)",
+			slaves:            ms.newSlaves(ms.mockSlave1DB, ms.mockSlave2DB, ms.mockSlave3DB),
+			wantRowsAffected:  []int64{1}, // 切片元素表示的是 lastInsertID, 这里表示请求 master db 1 次
+			wantLastInsertIds: []int64{1},
 		},
 	}
 
@@ -223,17 +227,25 @@ func (ms *MasterSlaveSuite) TestMasterSlaveDbExec() {
 			//db, ok := source.(*masterSlavesDB)
 			//assert.True(t, ok)
 			var resAffectID []int64
+			var resLastID []int64
 			for i := 1; i <= tc.reqCnt; i++ {
 				ms.mockMaster.ExpectExec("^INSERT INTO (.+)").WillReturnResult(sqlmock.NewResult(1, 1))
 				res, err := db.execContext(tc.ctx, tc.insertSQL)
 				assert.Nil(t, err)
-				afID, er := res.LastInsertId()
+				afID, er := res.RowsAffected()
+				if er != nil {
+					continue
+				}
+				lastID, er := res.LastInsertId()
 				if er != nil {
 					continue
 				}
 				resAffectID = append(resAffectID, afID)
+				resLastID = append(resLastID, lastID)
 			}
-			assert.ElementsMatch(t, tc.wantResp, resAffectID)
+			assert.ElementsMatch(t, tc.wantRowsAffected, resAffectID)
+			assert.ElementsMatch(t, tc.wantLastInsertIds, resLastID)
+
 		})
 	}
 }

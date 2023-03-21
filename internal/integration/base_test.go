@@ -24,6 +24,8 @@ import (
 	"log"
 	"time"
 
+	"github.com/ecodeclub/eorm/internal/datasource/shardingsource"
+
 	"github.com/ecodeclub/eorm/internal/datasource/single"
 
 	"github.com/stretchr/testify/require"
@@ -127,7 +129,7 @@ func (s *ShardingSuite) initDB() (*eorm.DB, error) {
 		sourceMap[sourceName] = cluster.NewClusterDB(msMap)
 	}
 	s.dataSources = sourceMap
-	dataSource := datasource.NewShardingDataSource(sourceMap)
+	dataSource := shardingsource.NewShardingDataSource(sourceMap)
 	return eorm.Open(s.driver, dataSource)
 }
 

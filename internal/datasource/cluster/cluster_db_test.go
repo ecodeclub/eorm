@@ -161,15 +161,14 @@ func (c *ClusterSuite) TestClusterDbExec() {
 	c.mockSlave3.ExpectExec("^INSERT INTO (.+)").WillReturnResult(sqlmock.NewResult(4, 1))
 
 	testCasesExec := []struct {
-		name      string
-		insertSQL string
-		reqCnt    int
-		ctx       context.Context
-		slaves    slaves.Slaves
-		query     sharding.Query
-		ms        map[string]*slaves.MasterSlavesDB
-		wantResp  []int64
-		wantErr   error
+		name     string
+		reqCnt   int
+		ctx      context.Context
+		slaves   slaves.Slaves
+		query    sharding.Query
+		ms       map[string]*slaves.MasterSlavesDB
+		wantResp []int64
+		wantErr  error
 	}{
 		{
 			name:   "null slave",

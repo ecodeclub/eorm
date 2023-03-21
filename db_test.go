@@ -115,6 +115,9 @@ func memoryDB() *DB {
 
 func memoryDBWithDB(dbName string) *DB {
 	db, err := single.OpenDB("sqlite3", fmt.Sprintf("file:%s.db?cache=shared&mode=memory", dbName))
+	if err != nil {
+		panic(err)
+	}
 	orm, err := Open("sqlite3", db)
 	if err != nil {
 		panic(err)

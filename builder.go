@@ -57,17 +57,6 @@ func RawQuery[T any](sess Session, sql string, args ...any) Querier[T] {
 	}
 }
 
-//func RawQuery[T any](sess Session, query Query) Querier[T] {
-//	return Querier[T]{
-//		core:    sess.getCore(),
-//		Session: sess,
-//		qc: &QueryContext{
-//			q:    query,
-//			Type: RAW,
-//		},
-//	}
-//}
-
 func newQuerier[T any](sess Session, q Query, meta *model.TableMeta, typ string) Querier[T] {
 	return Querier[T]{
 		core:    sess.getCore(),
