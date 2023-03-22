@@ -17,8 +17,9 @@ package eorm
 import (
 	"context"
 	"database/sql"
-	"github.com/gotomicro/ekit/slice"
 	"sync"
+
+	"github.com/gotomicro/ekit/slice"
 
 	"github.com/ecodeclub/eorm/internal/sharding"
 
