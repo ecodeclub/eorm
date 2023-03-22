@@ -17,7 +17,7 @@ package eorm
 import (
 	"context"
 	"database/sql"
-	"fmt"
+	"github.com/gotomicro/ekit/slice"
 	"sync"
 
 	"github.com/ecodeclub/eorm/internal/sharding"
@@ -165,15 +165,9 @@ func (s *ShardingSelector[T]) findDstByPredicate(ctx context.Context, pre Predic
 		if err != nil {
 			return sharding.EmptyResult, err
 		}
-		if len(left.Dsts) == 0 {
-			return s.findDstByPredicate(ctx, pre.right.(Predicate))
-		}
 		right, err := s.findDstByPredicate(ctx, pre.right.(Predicate))
 		if err != nil {
 			return sharding.EmptyResult, err
-		}
-		if len(right.Dsts) == 0 {
-			return left, nil
 		}
 		return s.mergeAnd(left, right), nil
 	case opOr:
@@ -181,19 +175,9 @@ func (s *ShardingSelector[T]) findDstByPredicate(ctx context.Context, pre Predic
 		if err != nil {
 			return sharding.EmptyResult, err
 		}
-		if len(left.Dsts) == 0 {
-			return sharding.Result{
-				Dsts: s.meta.ShardingAlgorithm.Broadcast(ctx),
-			}, nil
-		}
 		right, err := s.findDstByPredicate(ctx, pre.right.(Predicate))
 		if err != nil {
 			return sharding.EmptyResult, err
-		}
-		if len(right.Dsts) == 0 {
-			return sharding.Result{
-				Dsts: s.meta.ShardingAlgorithm.Broadcast(ctx),
-			}, nil
 		}
 		return s.mergeOR(left, right), nil
 	case opNot:
@@ -216,55 +200,27 @@ func (s *ShardingSelector[T]) findDstByPredicate(ctx context.Context, pre Predic
 	}
 }
 
+// mergeAnd 两个分片结果的交集
 func (*ShardingSelector[T]) mergeAnd(left, right sharding.Result) sharding.Result {
-	dsts := make([]sharding.Dst, 0, len(left.Dsts)+len(right.Dsts))
-	for _, r := range right.Dsts {
-		exist := false
-		for _, l := range left.Dsts {
-			if r.Equals(l) {
-				exist = true
-			}
-		}
-		if exist {
-			dsts = append(dsts, r)
-		}
-	}
+	dsts := slice.IntersectSetFunc[sharding.Dst](left.Dsts, right.Dsts, func(src, dst sharding.Dst) bool {
+		return src.Equals(dst)
+	})
 	return sharding.Result{Dsts: dsts}
 }
 
+// mergeAnd 两个分片结果的并集
 func (*ShardingSelector[T]) mergeOR(left, right sharding.Result) sharding.Result {
-	dsts := make([]sharding.Dst, 0, len(left.Dsts)+len(right.Dsts))
-	m := make(map[string]bool, 8)
-	for _, r := range right.Dsts {
-		for _, l := range left.Dsts {
-			if r.NotEquals(l) {
-				tbl := fmt.Sprintf("%s_%s_%s", l.Name, l.DB, l.Table)
-				if _, ok := m[tbl]; ok {
-					continue
-				}
-				dsts = append(dsts, l)
-				m[tbl] = true
-			}
-		}
-		dsts = append(dsts, r)
-	}
+	dsts := slice.UnionSetFunc[sharding.Dst](left.Dsts, right.Dsts, func(src, dst sharding.Dst) bool {
+		return src.Equals(dst)
+	})
 	return sharding.Result{Dsts: dsts}
 }
 
+// mergeNot 两个分片结果的差集
 func (s *ShardingSelector[T]) mergeNot(all, right sharding.Result) sharding.Result {
-	dsts := make([]sharding.Dst, 0, len(all.Dsts)-len(right.Dsts))
-	for _, a := range all.Dsts {
-		exist := false
-		for _, r := range right.Dsts {
-			if r.Equals(a) {
-				exist = true
-				break
-			}
-		}
-		if !exist {
-			dsts = append(dsts, a)
-		}
-	}
+	dsts := slice.DiffSetFunc[sharding.Dst](all.Dsts, right.Dsts, func(src, dst sharding.Dst) bool {
+		return src.Equals(dst)
+	})
 	return sharding.Result{Dsts: dsts}
 }
 

@@ -81,6 +81,51 @@ func TestShardingSelector_shadow_Build(t *testing.T) {
 			},
 		},
 		{
+			name: "only eq broadcast",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).Where(C("OrderId").EQ(123))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `user_id`,`order_id`,`content`,`account` FROM `shadow_order_db_0`.`shadow_order_tab_0` WHERE `order_id`=?;",
+					Args:       []any{123},
+					DB:         "shadow_order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `user_id`,`order_id`,`content`,`account` FROM `shadow_order_db_0`.`shadow_order_tab_1` WHERE `order_id`=?;",
+					Args:       []any{123},
+					DB:         "shadow_order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `user_id`,`order_id`,`content`,`account` FROM `shadow_order_db_0`.`shadow_order_tab_2` WHERE `order_id`=?;",
+					Args:       []any{123},
+					DB:         "shadow_order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `user_id`,`order_id`,`content`,`account` FROM `shadow_order_db_1`.`shadow_order_tab_0` WHERE `order_id`=?;",
+					Args:       []any{123},
+					DB:         "shadow_order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `user_id`,`order_id`,`content`,`account` FROM `shadow_order_db_1`.`shadow_order_tab_1` WHERE `order_id`=?;",
+					Args:       []any{123},
+					DB:         "shadow_order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `user_id`,`order_id`,`content`,`account` FROM `shadow_order_db_1`.`shadow_order_tab_2` WHERE `order_id`=?;",
+					Args:       []any{123},
+					DB:         "shadow_order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
 			name: "columns",
 			builder: func() sharding.QueryBuilder {
 				s := NewShardingSelector[Order](shardingDB).
@@ -144,6 +189,15 @@ func TestShardingSelector_shadow_Build(t *testing.T) {
 					Datasource: "0.db.cluster.company.com:3306",
 				},
 			},
+		},
+		{
+			name: "not with broadcast",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).Select(C("OrderId"), C("Content")).
+					Where(Not(C("OrderId").EQ(123)))
+				return s
+			}(),
+			qs: []*sharding.Query{},
 		},
 		{
 			name: "order by",
@@ -396,37 +450,7 @@ func TestShardingSelector_shadow_Build(t *testing.T) {
 			}(),
 			qs: []*sharding.Query{
 				{
-					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_0`.`shadow_order_tab_0` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
-					Args:       []any{123, 181, 234},
-					DB:         "shadow_order_db_0",
-					Datasource: "0.db.cluster.company.com:3306",
-				},
-				{
-					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_0`.`shadow_order_tab_1` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
-					Args:       []any{123, 181, 234},
-					DB:         "shadow_order_db_0",
-					Datasource: "0.db.cluster.company.com:3306",
-				},
-				{
-					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_0`.`shadow_order_tab_2` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
-					Args:       []any{123, 181, 234},
-					DB:         "shadow_order_db_0",
-					Datasource: "0.db.cluster.company.com:3306",
-				},
-				{
 					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_1`.`shadow_order_tab_0` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
-					Args:       []any{123, 181, 234},
-					DB:         "shadow_order_db_1",
-					Datasource: "0.db.cluster.company.com:3306",
-				},
-				{
-					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_1`.`shadow_order_tab_1` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
-					Args:       []any{123, 181, 234},
-					DB:         "shadow_order_db_1",
-					Datasource: "0.db.cluster.company.com:3306",
-				},
-				{
-					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_1`.`shadow_order_tab_2` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
 					Args:       []any{123, 181, 234},
 					DB:         "shadow_order_db_1",
 					Datasource: "0.db.cluster.company.com:3306",
@@ -665,6 +689,27 @@ func TestShardingSelector_onlyDataSource_Build(t *testing.T) {
 			},
 		},
 		{
+			name: "only eq broadcast",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).Where(C("OrderId").EQ(123))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `user_id`,`order_id`,`content`,`account` FROM `order_db`.`order_tab` WHERE `order_id`=?;",
+					Args:       []any{123},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `user_id`,`order_id`,`content`,`account` FROM `order_db`.`order_tab` WHERE `order_id`=?;",
+					Args:       []any{123},
+					DB:         "order_db",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
 			name: "columns",
 			builder: func() sharding.QueryBuilder {
 				s := NewShardingSelector[Order](shardingDB).
@@ -704,6 +749,15 @@ func TestShardingSelector_onlyDataSource_Build(t *testing.T) {
 					Datasource: "0.db.cluster.company.com:3306",
 				},
 			},
+		},
+		{
+			name: "not with broadcast",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).Select(C("OrderId"), C("Content")).
+					Where(Not(C("OrderId").EQ(123)))
+				return s
+			}(),
+			qs: []*sharding.Query{},
 		},
 		{
 			name: "order by",
@@ -907,12 +961,6 @@ func TestShardingSelector_onlyDataSource_Build(t *testing.T) {
 				return s
 			}(),
 			qs: []*sharding.Query{
-				{
-					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
-					Args:       []any{123, 181, 234},
-					DB:         "order_db",
-					Datasource: "0.db.cluster.company.com:3306",
-				},
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
 					Args:       []any{123, 181, 234},
@@ -1123,6 +1171,33 @@ func TestShardingSelector_onlyTable_Build(t *testing.T) {
 			},
 		},
 		{
+			name: "only eq broadcast",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).Where(C("OrderId").EQ(123))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `user_id`,`order_id`,`content`,`account` FROM `order_db`.`order_tab_0` WHERE `order_id`=?;",
+					Args:       []any{123},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `user_id`,`order_id`,`content`,`account` FROM `order_db`.`order_tab_1` WHERE `order_id`=?;",
+					Args:       []any{123},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `user_id`,`order_id`,`content`,`account` FROM `order_db`.`order_tab_2` WHERE `order_id`=?;",
+					Args:       []any{123},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
 			name: "columns",
 			builder: func() sharding.QueryBuilder {
 				s := NewShardingSelector[Order](shardingDB).
@@ -1168,6 +1243,15 @@ func TestShardingSelector_onlyTable_Build(t *testing.T) {
 					Datasource: "0.db.cluster.company.com:3306",
 				},
 			},
+		},
+		{
+			name: "not with broadcast",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).Select(C("OrderId"), C("Content")).
+					Where(Not(C("OrderId").EQ(123)))
+				return s
+			}(),
+			qs: []*sharding.Query{},
 		},
 		{
 			name: "order by",
@@ -1377,14 +1461,19 @@ func TestShardingSelector_onlyTable_Build(t *testing.T) {
 					DB:         "order_db",
 					Datasource: "0.db.cluster.company.com:3306",
 				},
+			},
+		},
+		{
+			name: "where or-and all",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(C("UserId").EQ(123).Or(C("UserId").EQ(181).And(C("UserId").EQ(234))))
+				return s
+			}(),
+			qs: []*sharding.Query{
 				{
-					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_1` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
-					Args:       []any{123, 181, 234},
-					DB:         "order_db",
-					Datasource: "0.db.cluster.company.com:3306",
-				},
-				{
-					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_2` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_0` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
 					Args:       []any{123, 181, 234},
 					DB:         "order_db",
 					Datasource: "0.db.cluster.company.com:3306",
@@ -1587,6 +1676,28 @@ func TestShardingSelector_onlyDB_Build(t *testing.T) {
 			},
 		},
 		{
+			name: "only eq broadcast",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).Where(C("OrderId").EQ(123))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `user_id`,`order_id`,`content`,`account` FROM `order_db_0`.`order_tab` WHERE `order_id`=?;",
+					Args:       []any{123},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `user_id`,`order_id`,`content`,`account` FROM `order_db_1`.`order_tab` WHERE `order_id`=?;",
+					Args:       []any{123},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+
+		{
 			name: "columns",
 			builder: func() sharding.QueryBuilder {
 				s := NewShardingSelector[Order](shardingDB).
@@ -1626,6 +1737,15 @@ func TestShardingSelector_onlyDB_Build(t *testing.T) {
 					Datasource: "0.db.cluster.company.com:3306",
 				},
 			},
+		},
+		{
+			name: "not with broadcast",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).Select(C("OrderId"), C("Content")).
+					Where(Not(C("OrderId").EQ(123)))
+				return s
+			}(),
+			qs: []*sharding.Query{},
 		},
 		{
 			name: "order by",
@@ -1829,12 +1949,6 @@ func TestShardingSelector_onlyDB_Build(t *testing.T) {
 				return s
 			}(),
 			qs: []*sharding.Query{
-				{
-					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
-					Args:       []any{123, 181, 234},
-					DB:         "order_db_0",
-					Datasource: "0.db.cluster.company.com:3306",
-				},
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
 					Args:       []any{123, 181, 234},
@@ -2046,6 +2160,87 @@ func TestShardingSelector_all_Build(t *testing.T) {
 			},
 		},
 		{
+			name: "only eq broadcast",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).Where(C("OrderId").EQ(123))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `user_id`,`order_id`,`content`,`account` FROM `order_db_0`.`order_tab_0` WHERE `order_id`=?;",
+					Args:       []any{123},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `user_id`,`order_id`,`content`,`account` FROM `order_db_0`.`order_tab_1` WHERE `order_id`=?;",
+					Args:       []any{123},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `user_id`,`order_id`,`content`,`account` FROM `order_db_0`.`order_tab_2` WHERE `order_id`=?;",
+					Args:       []any{123},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `user_id`,`order_id`,`content`,`account` FROM `order_db_1`.`order_tab_0` WHERE `order_id`=?;",
+					Args:       []any{123},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `user_id`,`order_id`,`content`,`account` FROM `order_db_1`.`order_tab_1` WHERE `order_id`=?;",
+					Args:       []any{123},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `user_id`,`order_id`,`content`,`account` FROM `order_db_1`.`order_tab_2` WHERE `order_id`=?;",
+					Args:       []any{123},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `user_id`,`order_id`,`content`,`account` FROM `order_db_0`.`order_tab_0` WHERE `order_id`=?;",
+					Args:       []any{123},
+					DB:         "order_db_0",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `user_id`,`order_id`,`content`,`account` FROM `order_db_0`.`order_tab_1` WHERE `order_id`=?;",
+					Args:       []any{123},
+					DB:         "order_db_0",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `user_id`,`order_id`,`content`,`account` FROM `order_db_0`.`order_tab_2` WHERE `order_id`=?;",
+					Args:       []any{123},
+					DB:         "order_db_0",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `user_id`,`order_id`,`content`,`account` FROM `order_db_1`.`order_tab_0` WHERE `order_id`=?;",
+					Args:       []any{123},
+					DB:         "order_db_1",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `user_id`,`order_id`,`content`,`account` FROM `order_db_1`.`order_tab_1` WHERE `order_id`=?;",
+					Args:       []any{123},
+					DB:         "order_db_1",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `user_id`,`order_id`,`content`,`account` FROM `order_db_1`.`order_tab_2` WHERE `order_id`=?;",
+					Args:       []any{123},
+					DB:         "order_db_1",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
 			name: "columns",
 			builder: func() sharding.QueryBuilder {
 				s := NewShardingSelector[Order](shardingDB).
@@ -2145,6 +2340,15 @@ func TestShardingSelector_all_Build(t *testing.T) {
 					Datasource: "1.db.cluster.company.com:3306",
 				},
 			},
+		},
+		{
+			name: "not with broadcast",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).Select(C("OrderId"), C("Content")).
+					Where(Not(C("OrderId").EQ(123)))
+				return s
+			}(),
+			qs: []*sharding.Query{},
 		},
 		{
 			name: "order by",
@@ -2469,73 +2673,7 @@ func TestShardingSelector_all_Build(t *testing.T) {
 			}(),
 			qs: []*sharding.Query{
 				{
-					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_0` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
-					Args:       []any{123, 181, 234},
-					DB:         "order_db_0",
-					Datasource: "0.db.cluster.company.com:3306",
-				},
-				{
-					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_1` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
-					Args:       []any{123, 181, 234},
-					DB:         "order_db_0",
-					Datasource: "0.db.cluster.company.com:3306",
-				},
-				{
-					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_2` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
-					Args:       []any{123, 181, 234},
-					DB:         "order_db_0",
-					Datasource: "0.db.cluster.company.com:3306",
-				},
-				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
-					Args:       []any{123, 181, 234},
-					DB:         "order_db_1",
-					Datasource: "0.db.cluster.company.com:3306",
-				},
-				{
-					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_1` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
-					Args:       []any{123, 181, 234},
-					DB:         "order_db_1",
-					Datasource: "0.db.cluster.company.com:3306",
-				},
-				{
-					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_2` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
-					Args:       []any{123, 181, 234},
-					DB:         "order_db_1",
-					Datasource: "0.db.cluster.company.com:3306",
-				},
-				{
-					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_0` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
-					Args:       []any{123, 181, 234},
-					DB:         "order_db_0",
-					Datasource: "1.db.cluster.company.com:3306",
-				},
-				{
-					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_1` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
-					Args:       []any{123, 181, 234},
-					DB:         "order_db_0",
-					Datasource: "1.db.cluster.company.com:3306",
-				},
-				{
-					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_2` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
-					Args:       []any{123, 181, 234},
-					DB:         "order_db_0",
-					Datasource: "1.db.cluster.company.com:3306",
-				},
-				{
-					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
-					Args:       []any{123, 181, 234},
-					DB:         "order_db_1",
-					Datasource: "1.db.cluster.company.com:3306",
-				},
-				{
-					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_1` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
-					Args:       []any{123, 181, 234},
-					DB:         "order_db_1",
-					Datasource: "1.db.cluster.company.com:3306",
-				},
-				{
-					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_2` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
 					Args:       []any{123, 181, 234},
 					DB:         "order_db_1",
 					Datasource: "1.db.cluster.company.com:3306",
@@ -2846,6 +2984,51 @@ func TestShardingSelector_Build(t *testing.T) {
 			},
 		},
 		{
+			name: "only eq broadcast",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).Where(C("OrderId").EQ(123))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `user_id`,`order_id`,`content`,`account` FROM `order_db_0`.`order_tab_0` WHERE `order_id`=?;",
+					Args:       []any{123},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `user_id`,`order_id`,`content`,`account` FROM `order_db_0`.`order_tab_1` WHERE `order_id`=?;",
+					Args:       []any{123},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `user_id`,`order_id`,`content`,`account` FROM `order_db_0`.`order_tab_2` WHERE `order_id`=?;",
+					Args:       []any{123},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `user_id`,`order_id`,`content`,`account` FROM `order_db_1`.`order_tab_0` WHERE `order_id`=?;",
+					Args:       []any{123},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `user_id`,`order_id`,`content`,`account` FROM `order_db_1`.`order_tab_1` WHERE `order_id`=?;",
+					Args:       []any{123},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `user_id`,`order_id`,`content`,`account` FROM `order_db_1`.`order_tab_2` WHERE `order_id`=?;",
+					Args:       []any{123},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
 			name: "columns",
 			builder: func() sharding.QueryBuilder {
 				s := NewShardingSelector[Order](shardingDB).
@@ -2909,6 +3092,15 @@ func TestShardingSelector_Build(t *testing.T) {
 					Datasource: "0.db.cluster.company.com:3306",
 				},
 			},
+		},
+		{
+			name: "not with broadcast",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).Select(C("OrderId"), C("Content")).
+					Where(Not(C("OrderId").EQ(123)))
+				return s
+			}(),
+			qs: []*sharding.Query{},
 		},
 		{
 			name: "order by",
@@ -3161,37 +3353,7 @@ func TestShardingSelector_Build(t *testing.T) {
 			}(),
 			qs: []*sharding.Query{
 				{
-					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_0` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
-					Args:       []any{123, 181, 234},
-					DB:         "order_db_0",
-					Datasource: "0.db.cluster.company.com:3306",
-				},
-				{
-					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_1` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
-					Args:       []any{123, 181, 234},
-					DB:         "order_db_0",
-					Datasource: "0.db.cluster.company.com:3306",
-				},
-				{
-					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_2` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
-					Args:       []any{123, 181, 234},
-					DB:         "order_db_0",
-					Datasource: "0.db.cluster.company.com:3306",
-				},
-				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
-					Args:       []any{123, 181, 234},
-					DB:         "order_db_1",
-					Datasource: "0.db.cluster.company.com:3306",
-				},
-				{
-					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_1` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
-					Args:       []any{123, 181, 234},
-					DB:         "order_db_1",
-					Datasource: "0.db.cluster.company.com:3306",
-				},
-				{
-					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_2` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
 					Args:       []any{123, 181, 234},
 					DB:         "order_db_1",
 					Datasource: "0.db.cluster.company.com:3306",
@@ -3385,7 +3547,7 @@ func TestShardingSelector_Build(t *testing.T) {
 	}
 }
 
-func TestSardingSelector_Get(t *testing.T) {
+func TestShardingSelector_Get(t *testing.T) {
 	r := model.NewMetaRegistry()
 	_, err := r.Register(&test.OrderDetail{},
 		model.WithTableShardingAlgorithm(&hash.Hash{
@@ -3427,7 +3589,7 @@ func TestSardingSelector_Get(t *testing.T) {
 			name: "not gen sharding query",
 			s: func() *ShardingSelector[test.OrderDetail] {
 				builder := NewShardingSelector[test.OrderDetail](shardingDB).
-					Where(C("ItemId").EQ(12))
+					Where(C("OrderId").EQ(12).And(C("OrderId").EQ(14)))
 				return builder
 			}(),
 			mockOrder: func(mock sqlmock.Sqlmock) {},
