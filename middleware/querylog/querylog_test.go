@@ -99,16 +99,19 @@ func TestMiddlewareBuilder_Build(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			mdls := tc.mdls
 			mdls = append(mdls, tc.builder.Build())
-			db, err := eorm.Open("sqlite3",
-				single.MemoryDB(), eorm.DBWithMiddlewares(
-					mdls...))
+			db, err := single.MemoryDB()
+			if err != nil {
+				t.Fatal(err)
+			}
+			orm, err := eorm.Open("sqlite3",
+				db, eorm.DBWithMiddlewares(mdls...))
 			if err != nil {
 				t.Fatal(err)
 			}
 			defer func() {
-				_ = db.Close()
+				_ = orm.Close()
 			}()
-			_, err = eorm.NewSelector[TestModel](db).Get(context.Background())
+			_, err = eorm.NewSelector[TestModel](orm).Get(context.Background())
 			if err.Error() == "no such table: test_model" {
 				return
 			}

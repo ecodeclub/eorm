@@ -51,10 +51,7 @@ func ExampleMiddleware() {
 
 // TODO tx 是否要维护 *sql.DB
 func ExampleDB_BeginTx() {
-	db, err := single.MemoryDB()
-	if err != nil {
-		panic(err)
-	}
+	db, _ := single.MemoryDB()
 	tx, err := db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err == nil {
 		fmt.Println("Begin")

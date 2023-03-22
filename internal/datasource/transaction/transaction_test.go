@@ -82,11 +82,11 @@ type testMockDB struct {
 	ds     datasource.DataSource
 }
 
-func (db *testMockDB) Query(_ context.Context, _ query.Query) (*sql.Rows, error) {
+func (*testMockDB) Query(_ context.Context, _ query.Query) (*sql.Rows, error) {
 	return &sql.Rows{}, nil
 }
 
-func (db *testMockDB) Exec(_ context.Context, _ query.Query) (sql.Result, error) {
+func (*testMockDB) Exec(_ context.Context, _ query.Query) (sql.Result, error) {
 	return nil, nil
 }
 
