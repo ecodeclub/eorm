@@ -17,7 +17,11 @@ package batchmerger
 import (
 	"context"
 	"database/sql"
+	"errors"
+	"fmt"
 	"testing"
+
+	"go.uber.org/multierr"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/ecodeclub/eorm/internal/merger/internal/errs"
@@ -25,6 +29,14 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
+
+var (
+	nextMockErr error = errors.New("rows: MockNextErr")
+)
+
+func newCloseMockErr(dbName string) error {
+	return fmt.Errorf("rows: %s MockCloseErr", dbName)
+}
 
 type MergerSuite struct {
 	suite.Suite
@@ -70,7 +82,126 @@ func (ms *MergerSuite) initMock(t *testing.T) {
 	}
 }
 
-func (ms *MergerSuite) TestMerger_NextAndScan() {
+func (ms *MergerSuite) TestMerger_Merge() {
+	testcases := []struct {
+		name     string
+		rowsList func() []*sql.Rows
+		ctx      func() (context.Context, context.CancelFunc)
+		wantErr  error
+	}{
+		{
+			name: "sql.Rows列表中没有元素",
+			rowsList: func() []*sql.Rows {
+				return []*sql.Rows{}
+			},
+			ctx: func() (context.Context, context.CancelFunc) {
+				return context.WithCancel(context.Background())
+			},
+			wantErr: errs.ErrMergerEmptyRows,
+		},
+		{
+			name: "sql.Rows列表中有元素为nil",
+			rowsList: func() []*sql.Rows {
+				return []*sql.Rows{nil}
+			},
+			ctx: func() (context.Context, context.CancelFunc) {
+				return context.WithCancel(context.Background())
+			},
+			wantErr: errs.ErrMergerRowsIsNull,
+		},
+		{
+			name: "sqlRows字段不同_少一个字段",
+			ctx: func() (context.Context, context.CancelFunc) {
+				return context.WithCancel(context.Background())
+			},
+			rowsList: func() []*sql.Rows {
+				query := "SELECT * FROM `t1`"
+				ms.mock01.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows([]string{"id", "name", "address"}).AddRow(1, "abex", "cn").AddRow(5, "bruce", "cn"))
+				ms.mock02.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows([]string{"id", "name"}).AddRow(3, "alex").AddRow(4, "x"))
+				dbs := []*sql.DB{ms.mockDB01, ms.mockDB02}
+				rowsList := make([]*sql.Rows, 0, len(dbs))
+				for _, db := range dbs {
+					row, err := db.QueryContext(context.Background(), query)
+					require.NoError(ms.T(), err)
+					rowsList = append(rowsList, row)
+				}
+				return rowsList
+			},
+			wantErr: errs.ErrMergerRowsDiff,
+		},
+		{
+			name: "sqlRows字段不同",
+			ctx: func() (context.Context, context.CancelFunc) {
+				return context.WithCancel(context.Background())
+			},
+			rowsList: func() []*sql.Rows {
+				query := "SELECT * FROM `t1`"
+				ms.mock01.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows([]string{"id", "name", "address"}).AddRow(1, "abex", "cn").AddRow(5, "bruce", "cn"))
+				ms.mock02.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows([]string{"id", "name", "email"}).AddRow(3, "alex", "cn").AddRow(4, "x", "cn"))
+				dbs := []*sql.DB{ms.mockDB01, ms.mockDB02}
+				rowsList := make([]*sql.Rows, 0, len(dbs))
+				for _, db := range dbs {
+					row, err := db.QueryContext(context.Background(), query)
+					require.NoError(ms.T(), err)
+					rowsList = append(rowsList, row)
+				}
+				return rowsList
+			},
+			wantErr: errs.ErrMergerRowsDiff,
+		},
+		{
+			name: "正常的案例",
+			rowsList: func() []*sql.Rows {
+				query := "SELECT * FROM `t1`"
+				ms.mock01.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows([]string{"id", "name", "address"}).AddRow(1, "abex", "cn").AddRow(5, "bruce", "cn"))
+				ms.mock02.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows([]string{"id", "name", "address"}).AddRow(3, "alex", "cn").AddRow(4, "x", "cn"))
+				dbs := []*sql.DB{ms.mockDB01, ms.mockDB02}
+				rowsList := make([]*sql.Rows, 0, len(dbs))
+				for _, db := range dbs {
+					row, err := db.QueryContext(context.Background(), query)
+					require.NoError(ms.T(), err)
+					rowsList = append(rowsList, row)
+				}
+				return rowsList
+			},
+			ctx: func() (context.Context, context.CancelFunc) {
+				return context.WithCancel(context.Background())
+			},
+		},
+		{
+			name: "超时",
+			ctx: func() (context.Context, context.CancelFunc) {
+				ctx, cancel := context.WithTimeout(context.Background(), 0)
+				return ctx, cancel
+			},
+			wantErr: context.DeadlineExceeded,
+			rowsList: func() []*sql.Rows {
+				query := "SELECT * FROM `t1`;"
+				cols := []string{"id"}
+				res := make([]*sql.Rows, 0, 1)
+				ms.mock01.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(1))
+				rows, _ := ms.mockDB01.QueryContext(context.Background(), query)
+				res = append(res, rows)
+				return res
+			},
+		},
+	}
+	for _, tc := range testcases {
+		ms.T().Run(tc.name, func(t *testing.T) {
+			merger := NewMerger()
+			ctx, cancel := tc.ctx()
+			rows, err := merger.Merge(ctx, tc.rowsList())
+			cancel()
+			assert.Equal(t, tc.wantErr, err)
+			if err != nil {
+				return
+			}
+			require.NotNil(t, rows)
+		})
+	}
+}
+
+func (ms *MergerSuite) TestRows_NextAndScan() {
 
 	testCases := []struct {
 		name    string
@@ -80,60 +211,137 @@ func (ms *MergerSuite) TestMerger_NextAndScan() {
 		scanErr error
 	}{
 		{
-			name: "multi rows",
+			name: "sqlRows列表中没有空行",
 			sqlRows: func() []*sql.Rows {
-				ms.mock01.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("1"))
-				ms.mock02.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("2"))
-				ms.mock03.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("3").AddRow("4"))
-				res := make([]*sql.Rows, 0, 3)
-				row01, _ := ms.mockDB01.QueryContext(context.Background(), "SELECT * FROM `t1`;")
-				res = append(res, row01)
-				row02, _ := ms.mockDB02.QueryContext(context.Background(), "SELECT * FROM `t1`;")
-				res = append(res, row02)
-				row03, _ := ms.mockDB03.QueryContext(context.Background(), "SELECT * FROM `t1`;")
-				res = append(res, row03)
+				query := "SELECT * FROM `t1`;"
+				cols := []string{"id"}
+				ms.mock01.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow("1").AddRow("2"))
+				ms.mock02.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow("2").AddRow("2"))
+				ms.mock03.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow("3").AddRow("4"))
+				dbs := []*sql.DB{ms.mockDB01, ms.mockDB02, ms.mockDB03}
+				res := make([]*sql.Rows, 0, len(dbs))
+				for _, db := range dbs {
+					row, _ := db.QueryContext(context.Background(), query)
+					res = append(res, row)
+				}
+				return res
+			},
+			wantVal: []string{"1", "2", "2", "2", "3", "4"},
+		},
+		{
+			name: "sqlRows列表中，在前面有一个sqlRows返回空行在前面",
+			sqlRows: func() []*sql.Rows {
+				query := "SELECT * FROM `t1`;"
+				cols := []string{"id"}
+				ms.mock01.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow("1"))
+				ms.mock02.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow("2"))
+				ms.mock03.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow("3").AddRow("4"))
+				ms.mock04.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols))
+				dbs := []*sql.DB{ms.mockDB04, ms.mockDB01, ms.mockDB02, ms.mockDB03}
+				res := make([]*sql.Rows, 0, len(dbs))
+				for _, db := range dbs {
+					row, _ := db.QueryContext(context.Background(), query)
+					res = append(res, row)
+				}
 				return res
 			},
 			wantVal: []string{"1", "2", "3", "4"},
 		},
 		{
-			name: "empty rows",
+			name: "sqlRows列表中，在前面有多个sqlRows返回空行",
 			sqlRows: func() []*sql.Rows {
-				return []*sql.Rows{}
-			},
-			wantErr: errs.ErrMergerEmptyRows,
-		},
-		{
-			name: "nil sqlrows",
-			sqlRows: func() []*sql.Rows {
-				return []*sql.Rows{nil}
-			},
-			wantErr: errs.ErrMergerRowsIsNull,
-		},
-		{
-			// sqlrows列表中有一个没有查询到值
-			name: "sqlrows has empty rows",
-			sqlRows: func() []*sql.Rows {
-				ms.mock01.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("1"))
-				ms.mock02.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("2"))
-				ms.mock03.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("3").AddRow("4"))
-				ms.mock04.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows([]string{"id"}))
-				res := make([]*sql.Rows, 0, 4)
-				row01, _ := ms.mockDB01.QueryContext(context.Background(), "SELECT * FROM `t1`;")
-				res = append(res, row01)
-				row02, _ := ms.mockDB02.QueryContext(context.Background(), "SELECT * FROM `t1`;")
-				res = append(res, row02)
-				row04, _ := ms.mockDB04.QueryContext(context.Background(), "SELECT * FROM `t1`;")
-				res = append(res, row04)
-				row03, _ := ms.mockDB03.QueryContext(context.Background(), "SELECT * FROM `t1`;")
-				res = append(res, row03)
+				query := "SELECT * FROM `t1`;"
+				cols := []string{"id"}
+				ms.mock01.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols))
+				ms.mock02.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow("2"))
+				ms.mock03.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow("3").AddRow("4"))
+				ms.mock04.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols))
+				dbs := []*sql.DB{ms.mockDB04, ms.mockDB01, ms.mockDB02, ms.mockDB03}
+				res := make([]*sql.Rows, 0, len(dbs))
+				for _, db := range dbs {
+					row, _ := db.QueryContext(context.Background(), query)
+					res = append(res, row)
+				}
 				return res
 			},
-			wantVal: []string{"1", "2", "3", "4"},
+			wantVal: []string{"2", "3", "4"},
 		},
 		{
-			// 几个sql.rows里都没有数据
-			name: "mutil sqlrows but has no rows",
+			name: "sqlRows列表中，在中间有一个sqlRows返回空行",
+			sqlRows: func() []*sql.Rows {
+				query := "SELECT * FROM `t1`;"
+				cols := []string{"id"}
+				ms.mock01.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols))
+				ms.mock02.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow("2"))
+				ms.mock03.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow("3").AddRow("4"))
+				dbs := []*sql.DB{ms.mockDB02, ms.mockDB01, ms.mockDB03}
+				res := make([]*sql.Rows, 0, len(dbs))
+				for _, db := range dbs {
+					row, _ := db.QueryContext(context.Background(), query)
+					res = append(res, row)
+				}
+				return res
+			},
+			wantVal: []string{"2", "3", "4"},
+		},
+		{
+			name: "sqlRows列表中，在中间有多个sqlRows返回空行",
+			sqlRows: func() []*sql.Rows {
+				query := "SELECT * FROM `t1`;"
+				cols := []string{"id"}
+				ms.mock01.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols))
+				ms.mock02.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow("2"))
+				ms.mock03.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow("3").AddRow("4"))
+				ms.mock04.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols))
+				dbs := []*sql.DB{ms.mockDB02, ms.mockDB01, ms.mockDB04, ms.mockDB03}
+				res := make([]*sql.Rows, 0, len(dbs))
+				for _, db := range dbs {
+					row, _ := db.QueryContext(context.Background(), query)
+					res = append(res, row)
+				}
+				return res
+			},
+			wantVal: []string{"2", "3", "4"},
+		},
+		{
+			name: "sqlRows列表中，在后面有一个sqlRows返回空行",
+			sqlRows: func() []*sql.Rows {
+				query := "SELECT * FROM `t1`;"
+				cols := []string{"id"}
+				ms.mock01.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols))
+				ms.mock02.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow("2"))
+				ms.mock03.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow("3").AddRow("4"))
+				dbs := []*sql.DB{ms.mockDB02, ms.mockDB03, ms.mockDB01}
+				res := make([]*sql.Rows, 0, len(dbs))
+				for _, db := range dbs {
+					row, _ := db.QueryContext(context.Background(), query)
+					res = append(res, row)
+				}
+				return res
+			},
+			wantVal: []string{"2", "3", "4"},
+		},
+		{
+			name: "sqlRows列表中，在后面有多个个sqlRows返回空行",
+			sqlRows: func() []*sql.Rows {
+				query := "SELECT * FROM `t1`;"
+				cols := []string{"id"}
+				ms.mock01.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols))
+				ms.mock02.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow("2"))
+				ms.mock03.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow("3").AddRow("4"))
+				ms.mock04.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols))
+				dbs := []*sql.DB{ms.mockDB02, ms.mockDB03, ms.mockDB01, ms.mockDB04}
+				res := make([]*sql.Rows, 0, len(dbs))
+				for _, db := range dbs {
+					row, _ := db.QueryContext(context.Background(), query)
+					res = append(res, row)
+				}
+				return res
+			},
+			wantVal: []string{"2", "3", "4"},
+		},
+		{
+			name: "sqlRows列表中的元素均返回空行",
 			sqlRows: func() []*sql.Rows {
 				ms.mock01.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows([]string{"id"}))
 				ms.mock02.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows([]string{"id"}))
@@ -168,78 +376,166 @@ func (ms *MergerSuite) TestMerger_NextAndScan() {
 				}
 				res = append(res, id)
 			}
+			require.NoError(t, rows.Err())
 			assert.Equal(t, tc.wantVal, res)
 		})
 	}
 
 }
-func (ms *MergerSuite) TestClose() {
-	ms.mock01.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("1"))
-	ms.mock02.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("2"))
-	ms.mock03.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("3").AddRow("4"))
-	ms.T().Run("close", func(t *testing.T) {
-		merger := Merger{}
-		res := make([]*sql.Rows, 0, 3)
-		row01, _ := ms.mockDB01.QueryContext(context.Background(), "SELECT * FROM `t1`;")
-		res = append(res, row01)
-		row02, _ := ms.mockDB02.QueryContext(context.Background(), "SELECT * FROM `t1`;")
-		res = append(res, row02)
-		row03, _ := ms.mockDB03.QueryContext(context.Background(), "SELECT * FROM `t1`;")
-		res = append(res, row03)
-		rows, err := merger.Merge(context.Background(), res)
-		require.NoError(t, err)
-		if err != nil {
-			return
-		}
-		err = rows.Close()
-		require.NoError(t, err)
-		err = rows.Close()
-		require.NoError(t, err)
-		err = rows.Close()
-		require.NoError(t, err)
-	})
-}
-func (ms *MergerSuite) TestColumns() {
-	ms.mock01.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("1"))
-	ms.mock02.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("2"))
-	ms.mock03.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("3").AddRow("4"))
-	testCases := []struct {
+
+func (ms *MergerSuite) TestRows_NextAndErr() {
+	testcases := []struct {
 		name     string
-		wantCols []string
-		sqlRows  func() []*sql.Rows
+		rowsList func() []*sql.Rows
+		wantErr  error
 	}{
 		{
-			name:     "Columns",
-			wantCols: []string{"id"},
-			sqlRows: func() []*sql.Rows {
-				res := make([]*sql.Rows, 0, 3)
-				row01, _ := ms.mockDB01.QueryContext(context.Background(), "SELECT * FROM `t1`;")
-				res = append(res, row01)
-				row02, _ := ms.mockDB02.QueryContext(context.Background(), "SELECT * FROM `t1`;")
-				res = append(res, row02)
-				row03, _ := ms.mockDB03.QueryContext(context.Background(), "SELECT * FROM `t1`;")
-				res = append(res, row03)
-				return res
+			name: "sqlRows列表中有一个返回error",
+			rowsList: func() []*sql.Rows {
+				cols := []string{"id"}
+				query := "SELECT * FROM `t1`"
+				ms.mock01.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow("1"))
+				ms.mock02.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow("2"))
+				ms.mock03.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow("3").AddRow("4").RowError(1, nextMockErr))
+				ms.mock04.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow("5"))
+				dbs := []*sql.DB{ms.mockDB01, ms.mockDB02, ms.mockDB04, ms.mockDB03}
+				rowsList := make([]*sql.Rows, 0, len(dbs))
+				for _, db := range dbs {
+					row, err := db.QueryContext(context.Background(), query)
+					require.NoError(ms.T(), err)
+					rowsList = append(rowsList, row)
+				}
+				return rowsList
 			},
+			wantErr: nextMockErr,
 		},
 	}
-	for _, tc := range testCases {
+	for _, tc := range testcases {
 		ms.T().Run(tc.name, func(t *testing.T) {
-			merger := Merger{}
-			rows, err := merger.Merge(context.Background(), tc.sqlRows())
-			require.NoError(ms.T(), err)
-			if err != nil {
-				return
+			merger := NewMerger()
+			rows, err := merger.Merge(context.Background(), tc.rowsList())
+			require.NoError(t, err)
+			for rows.Next() {
 			}
-			cols, err := rows.Columns()
-			require.NoError(ms.T(), err)
-			if err != nil {
-				return
-			}
-			assert.Equal(t, tc.wantCols, cols)
+			assert.Equal(t, tc.wantErr, rows.Err())
 		})
-
 	}
+}
+
+func (ms *MergerSuite) TestRows_ScanAndErr() {
+	ms.T().Run("未调用Next，直接Scan，返回错", func(t *testing.T) {
+		cols := []string{"id"}
+		query := "SELECT * FROM `t1`"
+		ms.mock01.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(1).AddRow(5))
+		r, err := ms.mockDB01.QueryContext(context.Background(), query)
+		require.NoError(t, err)
+		rowsList := []*sql.Rows{r}
+		merger := NewMerger()
+		rows, err := merger.Merge(context.Background(), rowsList)
+		require.NoError(t, err)
+		id := 0
+		err = rows.Scan(&id)
+		require.Error(t, err)
+	})
+	ms.T().Run("迭代过程中发现错误,调用Scan，返回迭代中发现的错误", func(t *testing.T) {
+		cols := []string{"id"}
+		query := "SELECT * FROM `t1`"
+		ms.mock01.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(1).RowError(0, nextMockErr))
+		r, err := ms.mockDB01.QueryContext(context.Background(), query)
+		require.NoError(t, err)
+		rowsList := []*sql.Rows{r}
+		merger := NewMerger()
+		rows, err := merger.Merge(context.Background(), rowsList)
+		require.NoError(t, err)
+		for rows.Next() {
+		}
+		id := 0
+		err = rows.Scan(&id)
+		assert.Equal(t, nextMockErr, err)
+	})
+
+}
+
+func (ms *MergerSuite) TestRows_Close() {
+	cols := []string{"id"}
+	query := "SELECT * FROM `t1`"
+	ms.mock01.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow("1"))
+	ms.mock02.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow("2").CloseError(newCloseMockErr("db02")))
+	ms.mock03.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow("3").AddRow("4").CloseError(newCloseMockErr("db03")))
+	merger := NewMerger()
+	dbs := []*sql.DB{ms.mockDB01, ms.mockDB02, ms.mockDB03}
+	rowsList := make([]*sql.Rows, 0, len(dbs))
+	for _, db := range dbs {
+		row, err := db.QueryContext(context.Background(), query)
+		require.NoError(ms.T(), err)
+		rowsList = append(rowsList, row)
+	}
+	rows, err := merger.Merge(context.Background(), rowsList)
+	require.NoError(ms.T(), err)
+	// 判断当前是可以正常读取的
+	require.True(ms.T(), rows.Next())
+	var id int
+	err = rows.Scan(&id)
+	require.NoError(ms.T(), err)
+	err = rows.Close()
+	ms.T().Run("close返回multierror", func(t *testing.T) {
+		assert.Equal(ms.T(), multierr.Combine(newCloseMockErr("db02"), newCloseMockErr("db03")), err)
+	})
+	ms.T().Run("close之后Next返回false", func(t *testing.T) {
+		for i := 0; i < len(rowsList); i++ {
+			require.False(ms.T(), rowsList[i].Next())
+		}
+		require.False(ms.T(), rows.Next())
+	})
+	ms.T().Run("close之后Scan返回迭代过程中的错误", func(t *testing.T) {
+		var id int
+		err := rows.Scan(&id)
+		assert.Equal(t, errs.ErrMergerRowsClosed, err)
+	})
+	ms.T().Run("close之后调用Columns方法返回错误", func(t *testing.T) {
+		_, err := rows.Columns()
+		require.Error(t, err)
+	})
+	ms.T().Run("close多次是等效的", func(t *testing.T) {
+		for i := 0; i < 4; i++ {
+			err = rows.Close()
+			require.NoError(t, err)
+		}
+	})
+}
+
+func (ms *MergerSuite) TestRows_Columns() {
+	cols := []string{"id"}
+	query := "SELECT * FROM `t1`"
+	ms.mock01.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow("1"))
+	ms.mock02.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow("2"))
+	ms.mock03.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow("3").AddRow("4"))
+	merger := NewMerger()
+	dbs := []*sql.DB{ms.mockDB01, ms.mockDB02, ms.mockDB03}
+	rowsList := make([]*sql.Rows, 0, len(dbs))
+	for _, db := range dbs {
+		row, err := db.QueryContext(context.Background(), query)
+		require.NoError(ms.T(), err)
+		rowsList = append(rowsList, row)
+	}
+
+	rows, err := merger.Merge(context.Background(), rowsList)
+	require.NoError(ms.T(), err)
+	ms.T().Run("Next没有迭代完", func(t *testing.T) {
+		for rows.Next() {
+			columns, err := rows.Columns()
+			require.NoError(t, err)
+			assert.Equal(t, cols, columns)
+		}
+		require.NoError(t, rows.Err())
+	})
+	ms.T().Run("Next迭代完", func(t *testing.T) {
+		require.False(t, rows.Next())
+		require.NoError(t, rows.Err())
+		_, err := rows.Columns()
+		assert.Equal(t, errs.ErrMergerRowsClosed, err)
+
+	})
 }
 
 func TestMerger(t *testing.T) {
