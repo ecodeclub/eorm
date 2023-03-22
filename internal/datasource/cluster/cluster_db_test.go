@@ -19,6 +19,8 @@ import (
 	"database/sql"
 	"testing"
 
+	"github.com/ecodeclub/eorm/internal/errs"
+
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/ecodeclub/eorm/internal/datasource"
 	"github.com/ecodeclub/eorm/internal/datasource/slaves"
@@ -96,6 +98,20 @@ func (c *ClusterSuite) TestClusterDbQuery() {
 		wantErr  error
 	}{
 		{
+			name:   "query not found target db",
+			ctx:    context.Background(),
+			reqCnt: 3,
+			query: sharding.Query{
+				SQL: "SELECT `first_name` FROM `test_model`",
+				DB:  "order_db_1",
+			},
+			ms: func() map[string]*slaves.MasterSlavesDB {
+				masterSlaves := map[string]*slaves.MasterSlavesDB{"order_db_0": db}
+				return masterSlaves
+			}(),
+			wantErr: errs.ErrNotFoundTargetDB,
+		},
+		{
 			name:   "select default use slave",
 			ctx:    context.Background(),
 			reqCnt: 3,
@@ -171,6 +187,22 @@ func (c *ClusterSuite) TestClusterDbExec() {
 		wantErr  error
 	}{
 		{
+			name:   "exec not found target db",
+			ctx:    context.Background(),
+			reqCnt: 1,
+			query: sharding.Query{
+				SQL: "INSERT INTO `test_model`(`id`,`first_name`,`age`,`last_name`) VALUES(1,2,3,4)",
+				DB:  "order_db_1",
+			},
+			ms: func() map[string]*slaves.MasterSlavesDB {
+				db := slaves.NewMasterSlaveDB(c.mockMasterDB,
+					slaves.MasterSlaveWithSlaves(c.newSlaves(nil)))
+				masterSlaves := map[string]*slaves.MasterSlavesDB{"order_db_0": db}
+				return masterSlaves
+			}(),
+			wantErr: errs.ErrNotFoundTargetDB,
+		},
+		{
 			name:   "null slave",
 			ctx:    context.Background(),
 			reqCnt: 1,
@@ -226,8 +258,11 @@ func (c *ClusterSuite) TestClusterDbExec() {
 			var resAffectID []int64
 			for i := 1; i <= tc.reqCnt; i++ {
 				c.mockMaster.ExpectExec("^INSERT INTO (.+)").WillReturnResult(sqlmock.NewResult(1, 1))
-				res, err := db.Exec(tc.ctx, query.Query(tc.query))
-				assert.Nil(t, err)
+				res, execErr := db.Exec(tc.ctx, query.Query(tc.query))
+				assert.Equal(t, execErr, tc.wantErr)
+				if execErr != nil {
+					return
+				}
 
 				afID, er := res.LastInsertId()
 				if er != nil {

@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/ecodeclub/eorm/internal/query"
+
 	"github.com/stretchr/testify/require"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -121,25 +123,29 @@ func (ms *MasterSlaveSuite) TestMasterSlaveDbQuery() {
 	testCasesQuery := []struct {
 		name     string
 		ctx      context.Context
-		query    string
+		query    query.Query
 		reqCnt   int
 		slaves   Slaves
 		wantResp []string
 		wantErr  error
 	}{
 		{
-			name:     "select default use slave",
-			ctx:      context.Background(),
-			reqCnt:   3,
-			query:    "SELECT `first_name` FROM `test_model`",
+			name:   "select default use slave",
+			ctx:    context.Background(),
+			reqCnt: 3,
+			query: query.Query{
+				SQL: "SELECT `first_name` FROM `test_model`",
+			},
 			slaves:   ms.newSlaves(ms.mockSlave1DB, ms.mockSlave2DB, ms.mockSlave3DB),
 			wantResp: []string{"slave1_1", "slave1_2", "slave1_3"},
 		},
 		{
-			name:     "use master",
-			reqCnt:   1,
-			ctx:      UseMaster(context.Background()),
-			query:    "SELECT `first_name` FROM `test_model`",
+			name:   "use master",
+			reqCnt: 1,
+			ctx:    UseMaster(context.Background()),
+			query: query.Query{
+				SQL: "SELECT `first_name` FROM `test_model`",
+			},
 			slaves:   ms.newSlaves(ms.mockSlave1DB, ms.mockSlave2DB, ms.mockSlave3DB),
 			wantResp: []string{"master"},
 		},
@@ -153,7 +159,7 @@ func (ms *MasterSlaveSuite) TestMasterSlaveDbQuery() {
 			//assert.True(t, ok)
 			var resp []string
 			for i := 1; i <= tc.reqCnt; i++ {
-				rows, queryErr := db.queryContext(tc.ctx, tc.query)
+				rows, queryErr := db.Query(tc.ctx, tc.query)
 				assert.Equal(t, queryErr, tc.wantErr)
 				if queryErr != nil {
 					return
@@ -185,7 +191,7 @@ func (ms *MasterSlaveSuite) TestMasterSlaveDbExec() {
 	testCasesExec := []struct {
 		name              string
 		ctx               context.Context
-		insertSQL         string
+		query             query.Query
 		reqCnt            int
 		slaves            Slaves
 		wantRowsAffected  []int64
@@ -193,27 +199,36 @@ func (ms *MasterSlaveSuite) TestMasterSlaveDbExec() {
 		wantErr           error
 	}{
 		{
-			name:              "null slave",
-			ctx:               context.Background(),
-			reqCnt:            1,
-			insertSQL:         "INSERT INTO `test_model`(`id`,`first_name`,`age`,`last_name`) VALUES(1,2,3,4)",
+			name:   "null slave",
+			ctx:    context.Background(),
+			reqCnt: 1,
+			query: query.Query{
+				SQL:  "INSERT INTO `test_model`(`id`,`first_name`,`age`,`last_name`) VALUES(?,?,?,?)",
+				Args: []any{1, 2, 3, 4},
+			},
 			wantRowsAffected:  []int64{1}, // 切片元素表示的是 lastInsertID, 这里表示请求 master db 1 次
 			wantLastInsertIds: []int64{1},
 		},
 		{
-			name:              "3 salves",
-			ctx:               context.Background(),
-			reqCnt:            3,
-			insertSQL:         "INSERT INTO `test_model`(`id`,`first_name`,`age`,`last_name`) VALUES(1,2,3,4)",
+			name:   "3 salves",
+			ctx:    context.Background(),
+			reqCnt: 3,
+			query: query.Query{
+				SQL:  "INSERT INTO `test_model`(`id`,`first_name`,`age`,`last_name`) VALUES(?,?,?,?)",
+				Args: []any{1, 2, 3, 4},
+			},
 			slaves:            ms.newSlaves(ms.mockSlave1DB, ms.mockSlave2DB, ms.mockSlave3DB),
 			wantRowsAffected:  []int64{1, 1, 1}, // 切片元素表示的是 lastInsertID, 这里表示请求 master db 3 次
 			wantLastInsertIds: []int64{1, 1, 1},
 		},
 		{
-			name:              "use master with 3 slaves",
-			reqCnt:            1,
-			ctx:               UseMaster(context.Background()),
-			insertSQL:         "INSERT INTO `test_model`(`id`,`first_name`,`age`,`last_name`) VALUES(1,2,3,4)",
+			name:   "use master with 3 slaves",
+			reqCnt: 1,
+			ctx:    UseMaster(context.Background()),
+			query: query.Query{
+				SQL:  "INSERT INTO `test_model`(`id`,`first_name`,`age`,`last_name`) VALUES(?,?,?,?)",
+				Args: []any{1, 2, 3, 4},
+			},
 			slaves:            ms.newSlaves(ms.mockSlave1DB, ms.mockSlave2DB, ms.mockSlave3DB),
 			wantRowsAffected:  []int64{1}, // 切片元素表示的是 lastInsertID, 这里表示请求 master db 1 次
 			wantLastInsertIds: []int64{1},
@@ -230,7 +245,7 @@ func (ms *MasterSlaveSuite) TestMasterSlaveDbExec() {
 			var resLastID []int64
 			for i := 1; i <= tc.reqCnt; i++ {
 				ms.mockMaster.ExpectExec("^INSERT INTO (.+)").WillReturnResult(sqlmock.NewResult(1, 1))
-				res, err := db.execContext(tc.ctx, tc.insertSQL)
+				res, err := db.Exec(tc.ctx, tc.query)
 				assert.Nil(t, err)
 				afID, er := res.RowsAffected()
 				if er != nil {

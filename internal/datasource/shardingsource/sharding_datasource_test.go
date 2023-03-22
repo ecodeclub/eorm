@@ -19,6 +19,8 @@ import (
 	"database/sql"
 	"testing"
 
+	"github.com/ecodeclub/eorm/internal/errs"
+
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/ecodeclub/eorm/internal/datasource"
 	"github.com/ecodeclub/eorm/internal/datasource/cluster"
@@ -148,6 +150,17 @@ func (c *ShardingDataSourceSuite) TestClusterDbQuery() {
 		wantErr  error
 	}{
 		{
+			name:   "not found target DataSource",
+			ctx:    context.Background(),
+			reqCnt: 1,
+			query: sharding.Query{
+				SQL:        "SELECT `first_name` FROM `test_model`",
+				DB:         "db_0",
+				Datasource: "2.db.cluster.company.com:3306",
+			},
+			wantErr: errs.ErrNotFoundTargetDataSource,
+		},
+		{
 			name:   "cluster0 select default use slave",
 			ctx:    context.Background(),
 			reqCnt: 3,
@@ -237,6 +250,17 @@ func (c *ShardingDataSourceSuite) TestClusterDbExec() {
 		wantErr           error
 	}{
 		{
+			name:   "not found target DataSource",
+			ctx:    context.Background(),
+			reqCnt: 1,
+			query: sharding.Query{
+				SQL:        "INSERT INTO `test_model`(`id`,`first_name`,`age`,`last_name`) VALUES(1,2,3,4)",
+				DB:         "db_0",
+				Datasource: "2.db.cluster.company.com:3306",
+			},
+			wantErr: errs.ErrNotFoundTargetDataSource,
+		},
+		{
 			name:   "cluster0 exec",
 			reqCnt: 1,
 			ctx:    slaves.UseMaster(context.Background()),
@@ -267,8 +291,11 @@ func (c *ShardingDataSourceSuite) TestClusterDbExec() {
 			var resAffectID []int64
 			var resLastID []int64
 			for i := 1; i <= tc.reqCnt; i++ {
-				res, err := c.DataSource.Exec(tc.ctx, query.Query(tc.query))
-				assert.Nil(t, err)
+				res, execErr := c.DataSource.Exec(tc.ctx, query.Query(tc.query))
+				assert.Equal(t, execErr, tc.wantErr)
+				if execErr != nil {
+					return
+				}
 				afID, er := res.RowsAffected()
 				if er != nil {
 					continue

@@ -221,3 +221,13 @@ func ExampleDB_BeginTx() {
 	// Begin
 	// Commit
 }
+
+func Example_memoryDB() {
+	_, err := MemoryDB()
+	if err == nil {
+		fmt.Printf("case1 memory db")
+	}
+
+	// Output:
+	// case1 memory db
+}

@@ -51,7 +51,10 @@ func ExampleMiddleware() {
 
 // TODO tx 是否要维护 *sql.DB
 func ExampleDB_BeginTx() {
-	db := single.MemoryDB()
+	db, err := single.MemoryDB()
+	if err != nil {
+		panic(err)
+	}
 	tx, err := db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err == nil {
 		fmt.Println("Begin")
@@ -105,7 +108,10 @@ func ExampleNewUpdater() {
 
 // memoryDB 返回一个基于内存的 ORM，它使用的是 sqlite3 内存模式。
 func memoryDB() *DB {
-	db := single.MemoryDB()
+	db, err := single.MemoryDB()
+	if err != nil {
+		panic(err)
+	}
 	orm, err := Open("sqlite3", db)
 	if err != nil {
 		panic(err)

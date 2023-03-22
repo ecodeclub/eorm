@@ -50,6 +50,6 @@ func (t *Tx) Rollback() error {
 	return t.tx.Rollback()
 }
 
-func OpenTx(tx *sql.Tx, ds datasource.DataSource) *Tx {
+func BeginTx(tx *sql.Tx, ds datasource.DataSource) *Tx {
 	return &Tx{tx: tx, ds: ds}
 }

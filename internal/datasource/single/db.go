@@ -55,7 +55,7 @@ func (db *DB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*transaction.Tx
 	if err != nil {
 		return nil, err
 	}
-	return transaction.OpenTx(tx, db), nil
+	return transaction.BeginTx(tx, db), nil
 }
 
 // Wait 会等待数据库连接
@@ -75,10 +75,6 @@ func (db *DB) Close() error {
 }
 
 // MemoryDB 返回一个基于内存的 ORM，它使用的是 sqlite3 内存模式。
-func MemoryDB() *DB {
-	orm, err := OpenDB("sqlite3", "file:test.db?cache=shared&mode=memory")
-	if err != nil {
-		panic(err)
-	}
-	return orm
+func MemoryDB() (*DB, error) {
+	return OpenDB("sqlite3", "file:test.db?cache=shared&mode=memory")
 }

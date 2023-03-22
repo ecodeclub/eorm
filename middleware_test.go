@@ -62,7 +62,11 @@ func Test_Middleware(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			orm, err := Open("sqlite3", single.MemoryDB(),
+			db, err := single.MemoryDB()
+			if err != nil {
+				t.Error(err)
+			}
+			orm, err := Open("sqlite3", db,
 				DBWithMiddlewares(tc.mdls...))
 			if err != nil {
 				t.Error(err)
@@ -103,11 +107,13 @@ func Test_Middleware_order(t *testing.T) {
 			}
 		}
 	}
-	db, err := Open("sqlite3", single.MemoryDB(),
+	db, err := single.MemoryDB()
+	require.NoError(t, err)
+	orm, err := Open("sqlite3", db,
 		DBWithMiddlewares(mdl1, mdl2, mdl3, last))
 	require.NoError(t, err)
 
-	_, err = NewSelector[TestModel](db).Get(context.Background())
+	_, err = NewSelector[TestModel](orm).Get(context.Background())
 	assert.Equal(t, errors.New("mock error"), err)
 	assert.Equal(t, "123", string(res))
 

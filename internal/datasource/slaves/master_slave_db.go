@@ -37,27 +37,19 @@ const (
 )
 
 func (m *MasterSlavesDB) Query(ctx context.Context, query query.Query) (*sql.Rows, error) {
-	return m.queryContext(ctx, query.SQL, query.Args...)
-}
-
-func (m *MasterSlavesDB) Exec(ctx context.Context, query query.Query) (sql.Result, error) {
-	return m.execContext(ctx, query.SQL, query.Args...)
-}
-
-func (m *MasterSlavesDB) queryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
 	_, ok := ctx.Value(master).(bool)
 	if ok {
-		return m.master.QueryContext(ctx, query, args...)
+		return m.master.QueryContext(ctx, query.SQL, query.Args...)
 	}
 	slave, err := m.slaves.Next(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return slave.DB.QueryContext(ctx, query, args...)
+	return slave.DB.QueryContext(ctx, query.SQL, query.Args...)
 }
 
-func (m *MasterSlavesDB) execContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
-	return m.master.ExecContext(ctx, query, args...)
+func (m *MasterSlavesDB) Exec(ctx context.Context, query query.Query) (sql.Result, error) {
+	return m.master.ExecContext(ctx, query.SQL, query.Args...)
 }
 
 func (m *MasterSlavesDB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*transaction.Tx, error) {
@@ -65,7 +57,7 @@ func (m *MasterSlavesDB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*tra
 	if err != nil {
 		return nil, err
 	}
-	return transaction.OpenTx(tx, m), nil
+	return transaction.BeginTx(tx, m), nil
 }
 
 func NewMasterSlaveDB(master *sql.DB, opts ...MasterSlaveDBOption) *MasterSlavesDB {
