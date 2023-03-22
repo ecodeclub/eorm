@@ -19,14 +19,21 @@ import (
 	"database/sql"
 	"sync"
 
+	"go.uber.org/multierr"
+
 	"github.com/ecodeclub/eorm/internal/merger"
 	"github.com/ecodeclub/eorm/internal/merger/internal/errs"
 )
 
-type Merger struct{}
+type Merger struct {
+	cols []string
+}
 
-func (Merger) Merge(ctx context.Context, results []*sql.Rows) (merger.Rows, error) {
+func NewMerger() *Merger {
+	return &Merger{}
+}
 
+func (m *Merger) Merge(ctx context.Context, results []*sql.Rows) (merger.Rows, error) {
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
@@ -34,81 +41,135 @@ func (Merger) Merge(ctx context.Context, results []*sql.Rows) (merger.Rows, erro
 		return nil, errs.ErrMergerEmptyRows
 	}
 	for i := 0; i < len(results); i++ {
-		if results[i] == nil {
-			return nil, errs.ErrMergerRowsIsNull
+		err := m.checkColumns(results[i])
+		if err != nil {
+			return nil, err
 		}
 	}
-	return &MergerRows{
-		rows: results,
-		mu:   &sync.RWMutex{},
+	return &Rows{
+		rowsList: results,
+		mu:       &sync.RWMutex{},
+		columns:  m.cols,
 	}, nil
 }
 
-type MergerRows struct {
-	rows []*sql.Rows
-	cnt  int
-	mu   *sync.RWMutex
-	once sync.Once
+// checkColumns 检查sql.Rows列表中sql.Rows的列集是否相同,并且sql.Rows不能为nil
+func (m *Merger) checkColumns(rows *sql.Rows) error {
+	if rows == nil {
+		return errs.ErrMergerRowsIsNull
+	}
+	cols, err := rows.Columns()
+	if err != nil {
+		return err
+	}
+	if len(m.cols) == 0 {
+		m.cols = cols
+	}
+	if len(m.cols) != len(cols) {
+		return errs.ErrMergerRowsDiff
+	}
+	for idx, colName := range cols {
+		if m.cols[idx] != colName {
+			return errs.ErrMergerRowsDiff
+		}
+	}
+	return nil
+
 }
 
-func (m *MergerRows) Next() bool {
-	m.mu.RLock()
-	if m.cnt >= len(m.rows) {
-		m.mu.RUnlock()
+type Rows struct {
+	rowsList []*sql.Rows
+	cnt      int
+	mu       *sync.RWMutex
+	columns  []string
+	closed   bool
+	lastErr  error
+}
+
+func (r *Rows) Next() bool {
+	r.mu.Lock()
+	if r.closed {
+		r.mu.Unlock()
 		return false
 	}
-	if m.rows[m.cnt].Next() {
-		m.mu.RUnlock()
-		return true
-	}
-	m.mu.RUnlock()
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if m.cnt >= len(m.rows) {
+	if r.cnt >= len(r.rowsList) || r.lastErr != nil {
+		r.mu.Unlock()
+		_ = r.Close()
 		return false
 	}
-	if m.rows[m.cnt].Next() {
-		return true
+	canNext, err := r.nextRows()
+	if err != nil {
+		r.lastErr = err
+		r.mu.Unlock()
+		_ = r.Close()
+		return false
+	}
+	r.mu.Unlock()
+	return canNext
+
+}
+func (r *Rows) nextRows() (bool, error) {
+	row := r.rowsList[r.cnt]
+	if row.Next() {
+		return true, nil
+	}
+	if row.Err() != nil {
+		return false, row.Err()
 	}
 	for {
-		m.cnt++
-		if m.cnt >= len(m.rows) {
+		r.cnt++
+		if r.cnt >= len(r.rowsList) {
 			break
 		}
-		if m.rows[m.cnt].Next() {
-			return true
+		row = r.rowsList[r.cnt]
+		if row.Next() {
+			return true, nil
+		} else if row.Err() != nil {
+			return false, row.Err()
 		}
-
 	}
-	return false
+	return false, nil
+}
+
+func (r *Rows) Scan(dest ...any) error {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	if r.lastErr != nil {
+		return r.lastErr
+	}
+	if r.closed {
+		return errs.ErrMergerRowsClosed
+	}
+	return r.rowsList[r.cnt].Scan(dest...)
 
 }
 
-func (m *MergerRows) Scan(dest ...any) error {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	return m.rows[m.cnt].Scan(dest...)
-
-}
-
-func (m *MergerRows) Close() error {
-	var err error
-	m.once.Do(func() {
-		for i := 0; i < len(m.rows); i++ {
-			row := m.rows[i]
-			err = row.Close()
-			if err != nil {
-				return
-			}
+func (r *Rows) Close() error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.closed = true
+	errorList := make([]error, 0, len(r.rowsList))
+	for i := 0; i < len(r.rowsList); i++ {
+		row := r.rowsList[i]
+		err := row.Close()
+		if err != nil {
+			errorList = append(errorList, err)
 		}
-	})
-	return err
+	}
+	return multierr.Combine(errorList...)
 }
 
-func (m *MergerRows) Columns() ([]string, error) {
-	return m.rows[0].Columns()
+func (r *Rows) Columns() ([]string, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	if r.closed {
+		return nil, errs.ErrMergerRowsClosed
+	}
+	return r.columns, nil
 }
 
-func (*MergerRows) Err() error {
-	panic("implement me")
+func (r *Rows) Err() error {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.lastErr
 }
