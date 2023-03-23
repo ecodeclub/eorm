@@ -49,16 +49,16 @@ func (c *clusterDB) Exec(ctx context.Context, query query.Query) (sql.Result, er
 	return ms.Exec(ctx, query)
 }
 
-func (c *clusterDB) Set(key string, db *slaves.MasterSlavesDB) error {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-	_, ok := c.MasterSlavesDBs[key]
-	if ok {
-		return errs.ErrRepeatedSetDB
-	}
-	c.MasterSlavesDBs[key] = db
-	return nil
-}
+//func (c *clusterDB) Set(key string, db *slaves.MasterSlavesDB) error {
+//	c.lock.Lock()
+//	defer c.lock.Unlock()
+//	_, ok := c.MasterSlavesDBs[key]
+//	if ok {
+//		return errs.ErrRepeatedSetDB
+//	}
+//	c.MasterSlavesDBs[key] = db
+//	return nil
+//}
 
 func NewClusterDB(ms map[string]*slaves.MasterSlavesDB) datasource.DataSource {
 	return &clusterDB{MasterSlavesDBs: ms}
