@@ -197,7 +197,374 @@ func TestShardingSelector_shadow_Build(t *testing.T) {
 					Where(Not(C("OrderId").EQ(123)))
 				return s
 			}(),
-			qs: []*sharding.Query{},
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_0`.`shadow_order_tab_0` WHERE NOT (`order_id`=?);",
+					Args:       []any{123},
+					DB:         "shadow_order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_0`.`shadow_order_tab_1` WHERE NOT (`order_id`=?);",
+					Args:       []any{123},
+					DB:         "shadow_order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_0`.`shadow_order_tab_2` WHERE NOT (`order_id`=?);",
+					Args:       []any{123},
+					DB:         "shadow_order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_1`.`shadow_order_tab_0` WHERE NOT (`order_id`=?);",
+					Args:       []any{123},
+					DB:         "shadow_order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_1`.`shadow_order_tab_1` WHERE NOT (`order_id`=?);",
+					Args:       []any{123},
+					DB:         "shadow_order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_1`.`shadow_order_tab_2` WHERE NOT (`order_id`=?);",
+					Args:       []any{123},
+					DB:         "shadow_order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "not-and with part of sharding key",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").EQ(123).And(C("OrderId").EQ(124))))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_0`.`shadow_order_tab_0` WHERE NOT ((`user_id`=?) AND (`order_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "shadow_order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_0`.`shadow_order_tab_1` WHERE NOT ((`user_id`=?) AND (`order_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "shadow_order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_0`.`shadow_order_tab_2` WHERE NOT ((`user_id`=?) AND (`order_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "shadow_order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_1`.`shadow_order_tab_1` WHERE NOT ((`user_id`=?) AND (`order_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "shadow_order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_1`.`shadow_order_tab_2` WHERE NOT ((`user_id`=?) AND (`order_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "shadow_order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "not-and with all of sharding key",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").EQ(123).And(C("UserId").EQ(124))))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_0`.`shadow_order_tab_0` WHERE NOT ((`user_id`=?) AND (`user_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "shadow_order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_0`.`shadow_order_tab_1` WHERE NOT ((`user_id`=?) AND (`user_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "shadow_order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_0`.`shadow_order_tab_2` WHERE NOT ((`user_id`=?) AND (`user_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "shadow_order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_1`.`shadow_order_tab_0` WHERE NOT ((`user_id`=?) AND (`user_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "shadow_order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_1`.`shadow_order_tab_1` WHERE NOT ((`user_id`=?) AND (`user_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "shadow_order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_1`.`shadow_order_tab_2` WHERE NOT ((`user_id`=?) AND (`user_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "shadow_order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "not-or with part of sharding key",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").EQ(123).Or(C("OrderId").EQ(124))))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_0`.`shadow_order_tab_0` WHERE NOT ((`user_id`=?) OR (`order_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "shadow_order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_0`.`shadow_order_tab_1` WHERE NOT ((`user_id`=?) OR (`order_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "shadow_order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_0`.`shadow_order_tab_2` WHERE NOT ((`user_id`=?) OR (`order_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "shadow_order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_1`.`shadow_order_tab_0` WHERE NOT ((`user_id`=?) OR (`order_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "shadow_order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_1`.`shadow_order_tab_1` WHERE NOT ((`user_id`=?) OR (`order_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "shadow_order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_1`.`shadow_order_tab_2` WHERE NOT ((`user_id`=?) OR (`order_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "shadow_order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "not-or with all of sharding key",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").EQ(123).Or(C("UserId").EQ(124))))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_0`.`shadow_order_tab_0` WHERE NOT ((`user_id`=?) OR (`user_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "shadow_order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_0`.`shadow_order_tab_2` WHERE NOT ((`user_id`=?) OR (`user_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "shadow_order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_1`.`shadow_order_tab_1` WHERE NOT ((`user_id`=?) OR (`user_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "shadow_order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_1`.`shadow_order_tab_2` WHERE NOT ((`user_id`=?) OR (`user_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "shadow_order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "not (and) or with part of sharding key",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").EQ(123).And(C("OrderId").EQ(12)).Or(C("UserId").EQ(234))))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_0`.`shadow_order_tab_1` WHERE NOT (((`user_id`=?) AND (`order_id`=?)) OR (`user_id`=?));",
+					Args:       []any{123, 12, 234},
+					DB:         "shadow_order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_0`.`shadow_order_tab_2` WHERE NOT (((`user_id`=?) AND (`order_id`=?)) OR (`user_id`=?));",
+					Args:       []any{123, 12, 234},
+					DB:         "shadow_order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_1`.`shadow_order_tab_1` WHERE NOT (((`user_id`=?) AND (`order_id`=?)) OR (`user_id`=?));",
+					Args:       []any{123, 12, 234},
+					DB:         "shadow_order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_1`.`shadow_order_tab_2` WHERE NOT (((`user_id`=?) AND (`order_id`=?)) OR (`user_id`=?));",
+					Args:       []any{123, 12, 234},
+					DB:         "shadow_order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "not (and) or with all of sharding key",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").EQ(123).And(C("UserId").EQ(12)).Or(C("UserId").EQ(234))))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_0`.`shadow_order_tab_1` WHERE NOT (((`user_id`=?) AND (`user_id`=?)) OR (`user_id`=?));",
+					Args:       []any{123, 12, 234},
+					DB:         "shadow_order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_0`.`shadow_order_tab_2` WHERE NOT (((`user_id`=?) AND (`user_id`=?)) OR (`user_id`=?));",
+					Args:       []any{123, 12, 234},
+					DB:         "shadow_order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_1`.`shadow_order_tab_0` WHERE NOT (((`user_id`=?) AND (`user_id`=?)) OR (`user_id`=?));",
+					Args:       []any{123, 12, 234},
+					DB:         "shadow_order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_1`.`shadow_order_tab_1` WHERE NOT (((`user_id`=?) AND (`user_id`=?)) OR (`user_id`=?));",
+					Args:       []any{123, 12, 234},
+					DB:         "shadow_order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_1`.`shadow_order_tab_2` WHERE NOT (((`user_id`=?) AND (`user_id`=?)) OR (`user_id`=?));",
+					Args:       []any{123, 12, 234},
+					DB:         "shadow_order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "not and (or) with part of sharding key",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").EQ(123).And(C("OrderId").EQ(12).Or(C("UserId").EQ(234)))))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_0`.`shadow_order_tab_0` WHERE NOT ((`user_id`=?) AND ((`order_id`=?) OR (`user_id`=?)));",
+					Args:       []any{123, 12, 234},
+					DB:         "shadow_order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_0`.`shadow_order_tab_1` WHERE NOT ((`user_id`=?) AND ((`order_id`=?) OR (`user_id`=?)));",
+					Args:       []any{123, 12, 234},
+					DB:         "shadow_order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_0`.`shadow_order_tab_2` WHERE NOT ((`user_id`=?) AND ((`order_id`=?) OR (`user_id`=?)));",
+					Args:       []any{123, 12, 234},
+					DB:         "shadow_order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_1`.`shadow_order_tab_1` WHERE NOT ((`user_id`=?) AND ((`order_id`=?) OR (`user_id`=?)));",
+					Args:       []any{123, 12, 234},
+					DB:         "shadow_order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_1`.`shadow_order_tab_2` WHERE NOT ((`user_id`=?) AND ((`order_id`=?) OR (`user_id`=?)));",
+					Args:       []any{123, 12, 234},
+					DB:         "shadow_order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "not and (or) with all of sharding key",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").EQ(123).And(C("UserId").EQ(13).Or(C("UserId").EQ(234)))))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_0`.`shadow_order_tab_0` WHERE NOT ((`user_id`=?) AND ((`user_id`=?) OR (`user_id`=?)));",
+					Args:       []any{123, 13, 234},
+					DB:         "shadow_order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_0`.`shadow_order_tab_1` WHERE NOT ((`user_id`=?) AND ((`user_id`=?) OR (`user_id`=?)));",
+					Args:       []any{123, 13, 234},
+					DB:         "shadow_order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_0`.`shadow_order_tab_2` WHERE NOT ((`user_id`=?) AND ((`user_id`=?) OR (`user_id`=?)));",
+					Args:       []any{123, 13, 234},
+					DB:         "shadow_order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_1`.`shadow_order_tab_0` WHERE NOT ((`user_id`=?) AND ((`user_id`=?) OR (`user_id`=?)));",
+					Args:       []any{123, 13, 234},
+					DB:         "shadow_order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_1`.`shadow_order_tab_1` WHERE NOT ((`user_id`=?) AND ((`user_id`=?) OR (`user_id`=?)));",
+					Args:       []any{123, 13, 234},
+					DB:         "shadow_order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_1`.`shadow_order_tab_2` WHERE NOT ((`user_id`=?) AND ((`user_id`=?) OR (`user_id`=?)));",
+					Args:       []any{123, 13, 234},
+					DB:         "shadow_order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
 		},
 		{
 			name: "order by",
@@ -757,7 +1124,176 @@ func TestShardingSelector_onlyDataSource_Build(t *testing.T) {
 					Where(Not(C("OrderId").EQ(123)))
 				return s
 			}(),
-			qs: []*sharding.Query{},
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab` WHERE NOT (`order_id`=?);",
+					Args:       []any{123},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab` WHERE NOT (`order_id`=?);",
+					Args:       []any{123},
+					DB:         "order_db",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "not-and with part of sharding key",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").EQ(123).And(C("OrderId").EQ(124))))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab` WHERE NOT ((`user_id`=?) AND (`order_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "not-and with all of sharding key",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").EQ(123).And(C("UserId").EQ(124))))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab` WHERE NOT ((`user_id`=?) AND (`user_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab` WHERE NOT ((`user_id`=?) AND (`user_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "not-or with part of sharding key",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").EQ(123).Or(C("OrderId").EQ(124))))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab` WHERE NOT ((`user_id`=?) OR (`order_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab` WHERE NOT ((`user_id`=?) OR (`order_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "not-or with all of sharding key",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").EQ(123).Or(C("UserId").EQ(124))))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab` WHERE NOT ((`user_id`=?) OR (`user_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab` WHERE NOT ((`user_id`=?) OR (`user_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "not (and) or with part of sharding key",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").EQ(123).And(C("OrderId").EQ(12)).Or(C("UserId").EQ(234))))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab` WHERE NOT (((`user_id`=?) AND (`order_id`=?)) OR (`user_id`=?));",
+					Args:       []any{123, 12, 234},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab` WHERE NOT (((`user_id`=?) AND (`order_id`=?)) OR (`user_id`=?));",
+					Args:       []any{123, 12, 234},
+					DB:         "order_db",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "not (and) or with all of sharding key",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").EQ(123).And(C("UserId").EQ(12)).Or(C("UserId").EQ(234))))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab` WHERE NOT (((`user_id`=?) AND (`user_id`=?)) OR (`user_id`=?));",
+					Args:       []any{123, 12, 234},
+					DB:         "order_db",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "not and (or) with part of sharding key",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").EQ(123).And(C("OrderId").EQ(12).Or(C("UserId").EQ(234)))))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab` WHERE NOT ((`user_id`=?) AND ((`order_id`=?) OR (`user_id`=?)));",
+					Args:       []any{123, 12, 234},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "not and (or) with all of sharding key",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").EQ(123).And(C("UserId").EQ(13).Or(C("UserId").EQ(234)))))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab` WHERE NOT ((`user_id`=?) AND ((`user_id`=?) OR (`user_id`=?)));",
+					Args:       []any{123, 13, 234},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
 		},
 		{
 			name: "order by",
@@ -1251,7 +1787,211 @@ func TestShardingSelector_onlyTable_Build(t *testing.T) {
 					Where(Not(C("OrderId").EQ(123)))
 				return s
 			}(),
-			qs: []*sharding.Query{},
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_0` WHERE NOT (`order_id`=?);",
+					Args:       []any{123},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_1` WHERE NOT (`order_id`=?);",
+					Args:       []any{123},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_2` WHERE NOT (`order_id`=?);",
+					Args:       []any{123},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "not-and with part of sharding key",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").EQ(123).And(C("OrderId").EQ(124))))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_1` WHERE NOT ((`user_id`=?) AND (`order_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_2` WHERE NOT ((`user_id`=?) AND (`order_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "not-and with all of sharding key",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").EQ(123).And(C("UserId").EQ(124))))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_0` WHERE NOT ((`user_id`=?) AND (`user_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_1` WHERE NOT ((`user_id`=?) AND (`user_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_2` WHERE NOT ((`user_id`=?) AND (`user_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "not-or with part of sharding key",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").EQ(123).Or(C("OrderId").EQ(124))))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_0` WHERE NOT ((`user_id`=?) OR (`order_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_1` WHERE NOT ((`user_id`=?) OR (`order_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_2` WHERE NOT ((`user_id`=?) OR (`order_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "not-or with all of sharding key",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").EQ(123).Or(C("UserId").EQ(124))))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_2` WHERE NOT ((`user_id`=?) OR (`user_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "not (and) or with part of sharding key",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").EQ(123).And(C("OrderId").EQ(12)).Or(C("UserId").EQ(234))))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_1` WHERE NOT (((`user_id`=?) AND (`order_id`=?)) OR (`user_id`=?));",
+					Args:       []any{123, 12, 234},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_2` WHERE NOT (((`user_id`=?) AND (`order_id`=?)) OR (`user_id`=?));",
+					Args:       []any{123, 12, 234},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "not (and) or with all of sharding key",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").EQ(123).And(C("UserId").EQ(12)).Or(C("UserId").EQ(235))))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_2` WHERE NOT (((`user_id`=?) AND (`user_id`=?)) OR (`user_id`=?));",
+					Args:       []any{123, 12, 235},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "not and (or) with part of sharding key",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").EQ(123).And(C("OrderId").EQ(12).Or(C("UserId").EQ(235)))))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_1` WHERE NOT ((`user_id`=?) AND ((`order_id`=?) OR (`user_id`=?)));",
+					Args:       []any{123, 12, 235},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_2` WHERE NOT ((`user_id`=?) AND ((`order_id`=?) OR (`user_id`=?)));",
+					Args:       []any{123, 12, 235},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "not and (or) with all of sharding key",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").EQ(123).And(C("UserId").EQ(13).Or(C("UserId").EQ(235)))))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_0` WHERE NOT ((`user_id`=?) AND ((`user_id`=?) OR (`user_id`=?)));",
+					Args:       []any{123, 13, 235},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_1` WHERE NOT ((`user_id`=?) AND ((`user_id`=?) OR (`user_id`=?)));",
+					Args:       []any{123, 13, 235},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
+				}, {
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_2` WHERE NOT ((`user_id`=?) AND ((`user_id`=?) OR (`user_id`=?)));",
+					Args:       []any{123, 13, 235},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
 		},
 		{
 			name: "order by",
@@ -1745,7 +2485,176 @@ func TestShardingSelector_onlyDB_Build(t *testing.T) {
 					Where(Not(C("OrderId").EQ(123)))
 				return s
 			}(),
-			qs: []*sharding.Query{},
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab` WHERE NOT (`order_id`=?);",
+					Args:       []any{123},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab` WHERE NOT (`order_id`=?);",
+					Args:       []any{123},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "not-and with part of sharding key",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").EQ(123).And(C("OrderId").EQ(124))))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab` WHERE NOT ((`user_id`=?) AND (`order_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "not-and with all of sharding key",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").EQ(123).And(C("UserId").EQ(124))))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab` WHERE NOT ((`user_id`=?) AND (`user_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab` WHERE NOT ((`user_id`=?) AND (`user_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "not-or with part of sharding key",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").EQ(123).Or(C("OrderId").EQ(124))))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab` WHERE NOT ((`user_id`=?) OR (`order_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab` WHERE NOT ((`user_id`=?) OR (`order_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "not-or with all of sharding key",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").EQ(123).Or(C("UserId").EQ(124))))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab` WHERE NOT ((`user_id`=?) OR (`user_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab` WHERE NOT ((`user_id`=?) OR (`user_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "not (and) or with part of sharding key",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").EQ(123).And(C("OrderId").EQ(12)).Or(C("UserId").EQ(234))))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab` WHERE NOT (((`user_id`=?) AND (`order_id`=?)) OR (`user_id`=?));",
+					Args:       []any{123, 12, 234},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab` WHERE NOT (((`user_id`=?) AND (`order_id`=?)) OR (`user_id`=?));",
+					Args:       []any{123, 12, 234},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "not (and) or with all of sharding key",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").EQ(123).And(C("UserId").EQ(12)).Or(C("UserId").EQ(235))))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab` WHERE NOT (((`user_id`=?) AND (`user_id`=?)) OR (`user_id`=?));",
+					Args:       []any{123, 12, 235},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "not and (or) with part of sharding key",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").EQ(123).And(C("OrderId").EQ(12).Or(C("UserId").EQ(235)))))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab` WHERE NOT ((`user_id`=?) AND ((`order_id`=?) OR (`user_id`=?)));",
+					Args:       []any{123, 12, 235},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "not and (or) with all of sharding key",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").EQ(123).And(C("UserId").EQ(13).Or(C("UserId").EQ(235)))))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab` WHERE NOT ((`user_id`=?) AND ((`user_id`=?) OR (`user_id`=?)));",
+					Args:       []any{123, 13, 235},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
 		},
 		{
 			name: "order by",
@@ -2348,7 +3257,696 @@ func TestShardingSelector_all_Build(t *testing.T) {
 					Where(Not(C("OrderId").EQ(123)))
 				return s
 			}(),
-			qs: []*sharding.Query{},
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_0` WHERE NOT (`order_id`=?);",
+					Args:       []any{123},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_1` WHERE NOT (`order_id`=?);",
+					Args:       []any{123},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_2` WHERE NOT (`order_id`=?);",
+					Args:       []any{123},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE NOT (`order_id`=?);",
+					Args:       []any{123},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_1` WHERE NOT (`order_id`=?);",
+					Args:       []any{123},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_2` WHERE NOT (`order_id`=?);",
+					Args:       []any{123},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_0` WHERE NOT (`order_id`=?);",
+					Args:       []any{123},
+					DB:         "order_db_0",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_1` WHERE NOT (`order_id`=?);",
+					Args:       []any{123},
+					DB:         "order_db_0",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_2` WHERE NOT (`order_id`=?);",
+					Args:       []any{123},
+					DB:         "order_db_0",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE NOT (`order_id`=?);",
+					Args:       []any{123},
+					DB:         "order_db_1",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_1` WHERE NOT (`order_id`=?);",
+					Args:       []any{123},
+					DB:         "order_db_1",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_2` WHERE NOT (`order_id`=?);",
+					Args:       []any{123},
+					DB:         "order_db_1",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "not-and with part of sharding key",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").EQ(123).And(C("OrderId").EQ(124))))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_0` WHERE NOT ((`user_id`=?) AND (`order_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_1` WHERE NOT ((`user_id`=?) AND (`order_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_2` WHERE NOT ((`user_id`=?) AND (`order_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE NOT ((`user_id`=?) AND (`order_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_1` WHERE NOT ((`user_id`=?) AND (`order_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_2` WHERE NOT ((`user_id`=?) AND (`order_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_0` WHERE NOT ((`user_id`=?) AND (`order_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db_0",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_1` WHERE NOT ((`user_id`=?) AND (`order_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db_0",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_2` WHERE NOT ((`user_id`=?) AND (`order_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db_0",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_1` WHERE NOT ((`user_id`=?) AND (`order_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db_1",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_2` WHERE NOT ((`user_id`=?) AND (`order_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db_1",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "not-and with all of sharding key",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").EQ(123).And(C("UserId").EQ(124))))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_0` WHERE NOT ((`user_id`=?) AND (`user_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_1` WHERE NOT ((`user_id`=?) AND (`user_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_2` WHERE NOT ((`user_id`=?) AND (`user_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE NOT ((`user_id`=?) AND (`user_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_1` WHERE NOT ((`user_id`=?) AND (`user_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_2` WHERE NOT ((`user_id`=?) AND (`user_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_0` WHERE NOT ((`user_id`=?) AND (`user_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db_0",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_1` WHERE NOT ((`user_id`=?) AND (`user_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db_0",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_2` WHERE NOT ((`user_id`=?) AND (`user_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db_0",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE NOT ((`user_id`=?) AND (`user_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db_1",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_1` WHERE NOT ((`user_id`=?) AND (`user_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db_1",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_2` WHERE NOT ((`user_id`=?) AND (`user_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db_1",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "not-or with part of sharding key",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").EQ(123).Or(C("OrderId").EQ(124))))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_0` WHERE NOT ((`user_id`=?) OR (`order_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_1` WHERE NOT ((`user_id`=?) OR (`order_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_2` WHERE NOT ((`user_id`=?) OR (`order_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE NOT ((`user_id`=?) OR (`order_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_1` WHERE NOT ((`user_id`=?) OR (`order_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_2` WHERE NOT ((`user_id`=?) OR (`order_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_0` WHERE NOT ((`user_id`=?) OR (`order_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db_0",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_1` WHERE NOT ((`user_id`=?) OR (`order_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db_0",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_2` WHERE NOT ((`user_id`=?) OR (`order_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db_0",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE NOT ((`user_id`=?) OR (`order_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db_1",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_1` WHERE NOT ((`user_id`=?) OR (`order_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db_1",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_2` WHERE NOT ((`user_id`=?) OR (`order_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db_1",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "not-or with all of sharding key",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").EQ(123).Or(C("UserId").EQ(124))))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_0` WHERE NOT ((`user_id`=?) OR (`user_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_2` WHERE NOT ((`user_id`=?) OR (`user_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE NOT ((`user_id`=?) OR (`user_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_1` WHERE NOT ((`user_id`=?) OR (`user_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_2` WHERE NOT ((`user_id`=?) OR (`user_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_0` WHERE NOT ((`user_id`=?) OR (`user_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db_0",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_1` WHERE NOT ((`user_id`=?) OR (`user_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db_0",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_2` WHERE NOT ((`user_id`=?) OR (`user_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db_0",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_1` WHERE NOT ((`user_id`=?) OR (`user_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db_1",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_2` WHERE NOT ((`user_id`=?) OR (`user_id`=?));",
+					Args:       []any{123, 124},
+					DB:         "order_db_1",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "not (and) or with part of sharding key",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").EQ(123).And(C("OrderId").EQ(12)).Or(C("UserId").EQ(234))))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_1` WHERE NOT (((`user_id`=?) AND (`order_id`=?)) OR (`user_id`=?));",
+					Args:       []any{123, 12, 234},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_2` WHERE NOT (((`user_id`=?) AND (`order_id`=?)) OR (`user_id`=?));",
+					Args:       []any{123, 12, 234},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE NOT (((`user_id`=?) AND (`order_id`=?)) OR (`user_id`=?));",
+					Args:       []any{123, 12, 234},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_1` WHERE NOT (((`user_id`=?) AND (`order_id`=?)) OR (`user_id`=?));",
+					Args:       []any{123, 12, 234},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_2` WHERE NOT (((`user_id`=?) AND (`order_id`=?)) OR (`user_id`=?));",
+					Args:       []any{123, 12, 234},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_0` WHERE NOT (((`user_id`=?) AND (`order_id`=?)) OR (`user_id`=?));",
+					Args:       []any{123, 12, 234},
+					DB:         "order_db_0",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_1` WHERE NOT (((`user_id`=?) AND (`order_id`=?)) OR (`user_id`=?));",
+					Args:       []any{123, 12, 234},
+					DB:         "order_db_0",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_2` WHERE NOT (((`user_id`=?) AND (`order_id`=?)) OR (`user_id`=?));",
+					Args:       []any{123, 12, 234},
+					DB:         "order_db_0",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_1` WHERE NOT (((`user_id`=?) AND (`order_id`=?)) OR (`user_id`=?));",
+					Args:       []any{123, 12, 234},
+					DB:         "order_db_1",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_2` WHERE NOT (((`user_id`=?) AND (`order_id`=?)) OR (`user_id`=?));",
+					Args:       []any{123, 12, 234},
+					DB:         "order_db_1",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "not (and) or with all of sharding key",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").EQ(123).And(C("UserId").EQ(12)).Or(C("UserId").EQ(234))))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_1` WHERE NOT (((`user_id`=?) AND (`user_id`=?)) OR (`user_id`=?));",
+					Args:       []any{123, 12, 234},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_2` WHERE NOT (((`user_id`=?) AND (`user_id`=?)) OR (`user_id`=?));",
+					Args:       []any{123, 12, 234},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE NOT (((`user_id`=?) AND (`user_id`=?)) OR (`user_id`=?));",
+					Args:       []any{123, 12, 234},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_1` WHERE NOT (((`user_id`=?) AND (`user_id`=?)) OR (`user_id`=?));",
+					Args:       []any{123, 12, 234},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_2` WHERE NOT (((`user_id`=?) AND (`user_id`=?)) OR (`user_id`=?));",
+					Args:       []any{123, 12, 234},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_0` WHERE NOT (((`user_id`=?) AND (`user_id`=?)) OR (`user_id`=?));",
+					Args:       []any{123, 12, 234},
+					DB:         "order_db_0",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_1` WHERE NOT (((`user_id`=?) AND (`user_id`=?)) OR (`user_id`=?));",
+					Args:       []any{123, 12, 234},
+					DB:         "order_db_0",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_2` WHERE NOT (((`user_id`=?) AND (`user_id`=?)) OR (`user_id`=?));",
+					Args:       []any{123, 12, 234},
+					DB:         "order_db_0",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE NOT (((`user_id`=?) AND (`user_id`=?)) OR (`user_id`=?));",
+					Args:       []any{123, 12, 234},
+					DB:         "order_db_1",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_1` WHERE NOT (((`user_id`=?) AND (`user_id`=?)) OR (`user_id`=?));",
+					Args:       []any{123, 12, 234},
+					DB:         "order_db_1",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_2` WHERE NOT (((`user_id`=?) AND (`user_id`=?)) OR (`user_id`=?));",
+					Args:       []any{123, 12, 234},
+					DB:         "order_db_1",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "not and (or) with part of sharding key",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").EQ(123).And(C("OrderId").EQ(12).Or(C("UserId").EQ(234)))))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_0` WHERE NOT ((`user_id`=?) AND ((`order_id`=?) OR (`user_id`=?)));",
+					Args:       []any{123, 12, 234},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_1` WHERE NOT ((`user_id`=?) AND ((`order_id`=?) OR (`user_id`=?)));",
+					Args:       []any{123, 12, 234},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_2` WHERE NOT ((`user_id`=?) AND ((`order_id`=?) OR (`user_id`=?)));",
+					Args:       []any{123, 12, 234},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE NOT ((`user_id`=?) AND ((`order_id`=?) OR (`user_id`=?)));",
+					Args:       []any{123, 12, 234},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_1` WHERE NOT ((`user_id`=?) AND ((`order_id`=?) OR (`user_id`=?)));",
+					Args:       []any{123, 12, 234},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_2` WHERE NOT ((`user_id`=?) AND ((`order_id`=?) OR (`user_id`=?)));",
+					Args:       []any{123, 12, 234},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_0` WHERE NOT ((`user_id`=?) AND ((`order_id`=?) OR (`user_id`=?)));",
+					Args:       []any{123, 12, 234},
+					DB:         "order_db_0",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_1` WHERE NOT ((`user_id`=?) AND ((`order_id`=?) OR (`user_id`=?)));",
+					Args:       []any{123, 12, 234},
+					DB:         "order_db_0",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_2` WHERE NOT ((`user_id`=?) AND ((`order_id`=?) OR (`user_id`=?)));",
+					Args:       []any{123, 12, 234},
+					DB:         "order_db_0",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_1` WHERE NOT ((`user_id`=?) AND ((`order_id`=?) OR (`user_id`=?)));",
+					Args:       []any{123, 12, 234},
+					DB:         "order_db_1",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_2` WHERE NOT ((`user_id`=?) AND ((`order_id`=?) OR (`user_id`=?)));",
+					Args:       []any{123, 12, 234},
+					DB:         "order_db_1",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "not and (or) with all of sharding key",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").EQ(123).And(C("UserId").EQ(12).Or(C("UserId").EQ(234)))))
+				return s
+			}(),
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_0` WHERE NOT ((`user_id`=?) AND ((`user_id`=?) OR (`user_id`=?)));",
+					Args:       []any{123, 12, 234},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_1` WHERE NOT ((`user_id`=?) AND ((`user_id`=?) OR (`user_id`=?)));",
+					Args:       []any{123, 12, 234},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				}, {
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_2` WHERE NOT ((`user_id`=?) AND ((`user_id`=?) OR (`user_id`=?)));",
+					Args:       []any{123, 12, 234},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE NOT ((`user_id`=?) AND ((`user_id`=?) OR (`user_id`=?)));",
+					Args:       []any{123, 12, 234},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_1` WHERE NOT ((`user_id`=?) AND ((`user_id`=?) OR (`user_id`=?)));",
+					Args:       []any{123, 12, 234},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				}, {
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_2` WHERE NOT ((`user_id`=?) AND ((`user_id`=?) OR (`user_id`=?)));",
+					Args:       []any{123, 12, 234},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_0` WHERE NOT ((`user_id`=?) AND ((`user_id`=?) OR (`user_id`=?)));",
+					Args:       []any{123, 12, 234},
+					DB:         "order_db_0",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_1` WHERE NOT ((`user_id`=?) AND ((`user_id`=?) OR (`user_id`=?)));",
+					Args:       []any{123, 12, 234},
+					DB:         "order_db_0",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_2` WHERE NOT ((`user_id`=?) AND ((`user_id`=?) OR (`user_id`=?)));",
+					Args:       []any{123, 12, 234},
+					DB:         "order_db_0",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE NOT ((`user_id`=?) AND ((`user_id`=?) OR (`user_id`=?)));",
+					Args:       []any{123, 12, 234},
+					DB:         "order_db_1",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_1` WHERE NOT ((`user_id`=?) AND ((`user_id`=?) OR (`user_id`=?)));",
+					Args:       []any{123, 12, 234},
+					DB:         "order_db_1",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_2` WHERE NOT ((`user_id`=?) AND ((`user_id`=?) OR (`user_id`=?)));",
+					Args:       []any{123, 12, 234},
+					DB:         "order_db_1",
+					Datasource: "1.db.cluster.company.com:3306",
+				},
+			},
 		},
 		{
 			name: "order by",
@@ -3100,7 +4698,44 @@ func TestShardingSelector_Build(t *testing.T) {
 					Where(Not(C("OrderId").EQ(123)))
 				return s
 			}(),
-			qs: []*sharding.Query{},
+			qs: []*sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_0` WHERE NOT (`order_id`=?);",
+					Args:       []any{123},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_1` WHERE NOT (`order_id`=?);",
+					Args:       []any{123},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_2` WHERE NOT (`order_id`=?);",
+					Args:       []any{123},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE NOT (`order_id`=?);",
+					Args:       []any{123},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_1` WHERE NOT (`order_id`=?);",
+					Args:       []any{123},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_2` WHERE NOT (`order_id`=?);",
+					Args:       []any{123},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
 		},
 		{
 			name: "order by",

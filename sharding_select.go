@@ -186,7 +186,14 @@ func (s *ShardingSelector[T]) findDstByPredicate(ctx context.Context, pre Predic
 		if err != nil {
 			return sharding.EmptyResult, err
 		}
-		all := sharding.Result{Dsts: s.meta.ShardingAlgorithm.Broadcast(ctx)}
+		broadDsts := s.meta.ShardingAlgorithm.Broadcast(ctx)
+		// 对于right本身的查询结果是广播，取反后的结果依旧为广播
+		if len(right.Dsts) == len(broadDsts) {
+			return right, nil
+		}
+		// 对于right完全没命中，NOT的查询结果应该为广播
+		// 对于right命中了部分分片，那么NOT的查询结果为广播减去right的结果集
+		all := sharding.Result{Dsts: broadDsts}
 		return s.mergeNot(all, right), nil
 	case opEQ:
 		col, isCol := pre.left.(Column)
