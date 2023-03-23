@@ -118,3 +118,31 @@ func Test_Middleware_order(t *testing.T) {
 	assert.Equal(t, "123", string(res))
 
 }
+
+func TestQueryContext(t *testing.T) {
+	testCases := []struct {
+		name    string
+		wantErr error
+		q       Query
+		qc      *QueryContext
+	}{
+		{
+			name: "one middleware",
+			q: Query{
+				SQL:  `SELECT * FROM user_tab WHERE id = ?;`,
+				Args: []any{1},
+			},
+			qc: &QueryContext{
+				q: Query{
+					SQL:  `SELECT * FROM user_tab WHERE id = ?;`,
+					Args: []any{1},
+				},
+			},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.EqualValues(t, tc.q, tc.qc.GetQuery())
+		})
+	}
+}
