@@ -21,20 +21,20 @@ import (
 	"github.com/ecodeclub/eorm/internal/model"
 )
 
-// supportBasicTypeValue 支持基本类型 Value
-type supportBasicTypeValue struct {
+// primitiveValue 支持基本类型 Value
+type primitiveValue struct {
 	Value
 	val     any
 	valType reflect.Type
 }
 
 // Field 返回字段值
-func (s supportBasicTypeValue) Field(name string) (reflect.Value, error) {
+func (s primitiveValue) Field(name string) (reflect.Value, error) {
 	return s.Value.Field(name)
 }
 
 // SetColumns 设置列值， 支持基本类型，基于 reflect 与 unsafe Value 封装
-func (s supportBasicTypeValue) SetColumns(rows *sql.Rows) error {
+func (s primitiveValue) SetColumns(rows *sql.Rows) error {
 	switch s.valType.Elem().Kind() {
 	case reflect.Struct:
 		if scanner, ok := s.val.(sql.Scanner); ok {
@@ -46,15 +46,15 @@ func (s supportBasicTypeValue) SetColumns(rows *sql.Rows) error {
 	}
 }
 
-// BasicTypeCreator 支持基本类型的 Creator, 基于原生的 Creator 扩展
-type BasicTypeCreator struct {
+// PrimitiveCreator 支持基本类型的 Creator, 基于原生的 Creator 扩展
+type PrimitiveCreator struct {
 	Creator
 }
 
-// NewBasicTypeValue 返回一个封装好的，基于支持基本类型实现的 Value
+// NewPrimitiveValue 返回一个封装好的，基于支持基本类型实现的 Value
 // 输入 val 必须是一个指向结构体实例的指针，而不能是任何其它类型
-func (c BasicTypeCreator) NewBasicTypeValue(val any, meta *model.TableMeta) Value {
-	return supportBasicTypeValue{
+func (c PrimitiveCreator) NewPrimitiveValue(val any, meta *model.TableMeta) Value {
+	return primitiveValue{
 		val:     val,
 		Value:   c.Creator(val, meta),
 		valType: reflect.TypeOf(val),
