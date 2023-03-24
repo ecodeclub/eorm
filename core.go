@@ -27,7 +27,7 @@ import (
 type core struct {
 	metaRegistry model.MetaRegistry
 	dialect      dialect.Dialect
-	valCreator   valuer.BasicTypeCreator
+	valCreator   valuer.PrimitiveCreator
 	ms           []Middleware
 }
 
@@ -49,7 +49,7 @@ func getHandler[T any](ctx context.Context, sess Session, c core, qc *QueryConte
 		meta, _ = c.metaRegistry.Get(tp)
 	}
 
-	val := c.valCreator.NewBasicTypeValue(tp, meta)
+	val := c.valCreator.NewPrimitiveValue(tp, meta)
 	if err = val.SetColumns(rows); err != nil {
 		return &QueryResult{Err: err}
 	}
@@ -85,7 +85,7 @@ func getMultiHandler[T any](ctx context.Context, sess Session, c core, qc *Query
 	}
 	for rows.Next() {
 		tp := new(T)
-		val := c.valCreator.NewBasicTypeValue(tp, meta)
+		val := c.valCreator.NewPrimitiveValue(tp, meta)
 		if err = val.SetColumns(rows); err != nil {
 			return &QueryResult{Err: err}
 		}

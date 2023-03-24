@@ -77,7 +77,7 @@ func (i *Inserter[T]) Build() (*Query, error) {
 			i.comma()
 		}
 		i.writeString("(")
-		refVal := i.valCreator.NewBasicTypeValue(val, i.meta)
+		refVal := i.valCreator.NewPrimitiveValue(val, i.meta)
 		for j, v := range fields {
 			fdVal, err := refVal.Field(v.FieldName)
 			if err != nil {

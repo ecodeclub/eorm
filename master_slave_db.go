@@ -95,7 +95,7 @@ func OpenMasterSlaveDB(driver string, master *sql.DB, opts ...MasterSlaveDBOptio
 			metaRegistry: model.NewMetaRegistry(),
 			dialect:      dl,
 			// 可以设为默认，因为原本这里也有默认
-			valCreator: valuer.BasicTypeCreator{
+			valCreator: valuer.PrimitiveCreator{
 				Creator: valuer.NewUnsafeValue,
 			},
 		},

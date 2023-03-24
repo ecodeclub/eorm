@@ -52,7 +52,7 @@ func DBWithMiddlewares(ms ...Middleware) DBOption {
 
 func UseReflection() DBOption {
 	return func(db *DB) {
-		db.valCreator = valuer.BasicTypeCreator{Creator: valuer.NewUnsafeValue}
+		db.valCreator = valuer.PrimitiveCreator{Creator: valuer.NewUnsafeValue}
 	}
 }
 
@@ -84,7 +84,7 @@ func openDB(driver string, db *sql.DB, opts ...DBOption) (*DB, error) {
 			metaRegistry: model.NewMetaRegistry(),
 			dialect:      dl,
 			// 可以设为默认，因为原本这里也有默认
-			valCreator: valuer.BasicTypeCreator{
+			valCreator: valuer.PrimitiveCreator{
 				Creator: valuer.NewUnsafeValue,
 			},
 		},
