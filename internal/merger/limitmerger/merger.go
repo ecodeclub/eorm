@@ -29,12 +29,16 @@ type Merger struct {
 	offset int
 }
 
-func NewMerger(m merger.Merger, offset int, limit int) *Merger {
+func NewMerger(m merger.Merger, offset int, limit int) (*Merger, error) {
+	if offset < 0 || limit < 0 {
+		return nil, errs.ErrMergerInvalidLimitOrOffset
+	}
+
 	return &Merger{
 		m:      m,
 		limit:  limit,
 		offset: offset,
-	}
+	}, nil
 }
 
 func (m *Merger) Merge(ctx context.Context, results []*sql.Rows) (merger.Rows, error) {
@@ -53,6 +57,7 @@ func (m *Merger) Merge(ctx context.Context, results []*sql.Rows) (merger.Rows, e
 	}, nil
 }
 
+// nextOffset 会把游标挪到 offset 所指定的位置。
 func (m *Merger) nextOffset(ctx context.Context, rows merger.Rows) error {
 	offset := m.offset
 	for i := 0; i < offset; i++ {
@@ -61,10 +66,7 @@ func (m *Merger) nextOffset(ctx context.Context, rows merger.Rows) error {
 		}
 		// 如果偏移量超过rows结果集返回的行数，不会报错。用户最终查到0行
 		if !rows.Next() {
-			if rows.Err() != nil {
-				return rows.Err()
-			}
-			break
+			return rows.Err()
 		}
 	}
 	return nil
@@ -140,5 +142,7 @@ func (r *Rows) Columns() ([]string, error) {
 }
 
 func (r *Rows) Err() error {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	return r.lastErr
 }

@@ -20,12 +20,13 @@ import (
 )
 
 var (
-	ErrEmptySortColumns  = errors.New("merger: 排序列为空")
-	ErrMergerEmptyRows   = errors.New("merger: sql.Rows列表为空")
-	ErrMergerRowsIsNull  = errors.New("merger: sql.Rows列表中有元素为nil")
-	ErrMergerScanNotNext = errors.New("merger: Scan之前没有调用Next方法")
-	ErrMergerRowsClosed  = errors.New("merger: Rows已经关闭")
-	ErrMergerRowsDiff    = errors.New("merger: sql.Rows列表中的字段不同")
+	ErrEmptySortColumns           = errors.New("merger: 排序列为空")
+	ErrMergerEmptyRows            = errors.New("merger: sql.Rows列表为空")
+	ErrMergerRowsIsNull           = errors.New("merger: sql.Rows列表中有元素为nil")
+	ErrMergerScanNotNext          = errors.New("merger: Scan之前没有调用Next方法")
+	ErrMergerRowsClosed           = errors.New("merger: Rows已经关闭")
+	ErrMergerRowsDiff             = errors.New("merger: sql.Rows列表中的字段不同")
+	ErrMergerInvalidLimitOrOffset = errors.New("merger: offset或limit小于0")
 )
 
 func NewRepeatSortColumn(column string) error {
