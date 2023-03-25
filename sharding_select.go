@@ -360,7 +360,7 @@ func (s *ShardingSelector[T]) Get(ctx context.Context) (*T, error) {
 		return nil, ErrNoRows
 	}
 	tp := new(T)
-	val := s.valCreator.NewBasicTypeValue(tp, s.meta)
+	val := s.valCreator.NewPrimitiveValue(tp, s.meta)
 	if err = val.SetColumns(row); err != nil {
 		return nil, err
 	}
@@ -395,7 +395,7 @@ func (s *ShardingSelector[T]) GetMulti(ctx context.Context) ([]*T, error) {
 	for _, rows := range rowsSlice {
 		for rows.Next() {
 			tp := new(T)
-			val := s.valCreator.NewBasicTypeValue(tp, s.meta)
+			val := s.valCreator.NewPrimitiveValue(tp, s.meta)
 			if err = val.SetColumns(rows); err != nil {
 				return nil, err
 			}

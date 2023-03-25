@@ -40,7 +40,7 @@ func OpenShardingDB(driver string, ds sharding.DataSource, opts ...ShardingDBOpt
 		core: core{
 			metaRegistry: model.NewMetaRegistry(),
 			dialect:      dl,
-			valCreator: valuer.BasicTypeCreator{
+			valCreator: valuer.PrimitiveCreator{
 				Creator: valuer.NewUnsafeValue,
 			},
 		},

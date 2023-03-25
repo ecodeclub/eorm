@@ -60,15 +60,15 @@ func (q Query) string() string {
 
 func TestQuerier_Get(t *testing.T) {
 	t.Run("unsafe", func(t *testing.T) {
-		testQuerierGet(t, valuer.BasicTypeCreator{Creator: valuer.NewUnsafeValue})
+		testQuerierGet(t, valuer.PrimitiveCreator{Creator: valuer.NewUnsafeValue})
 	})
 
 	t.Run("reflect", func(t *testing.T) {
-		testQuerierGet(t, valuer.BasicTypeCreator{Creator: valuer.NewReflectValue})
+		testQuerierGet(t, valuer.PrimitiveCreator{Creator: valuer.NewReflectValue})
 	})
 }
 
-func testQuerierGet(t *testing.T, creator valuer.BasicTypeCreator) {
+func testQuerierGet(t *testing.T, creator valuer.PrimitiveCreator) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
 		t.Fatal(err)
@@ -150,14 +150,14 @@ func testQuerierGet(t *testing.T, creator valuer.BasicTypeCreator) {
 
 func TestQuerierGetMulti(t *testing.T) {
 	t.Run("unsafe", func(t *testing.T) {
-		testQuerier_GetMulti(t, valuer.BasicTypeCreator{Creator: valuer.NewUnsafeValue})
+		testQuerier_GetMulti(t, valuer.PrimitiveCreator{Creator: valuer.NewUnsafeValue})
 	})
 	t.Run("reflect", func(t *testing.T) {
-		testQuerier_GetMulti(t, valuer.BasicTypeCreator{Creator: valuer.NewReflectValue})
+		testQuerier_GetMulti(t, valuer.PrimitiveCreator{Creator: valuer.NewReflectValue})
 	})
 }
 
-func testQuerier_GetMulti(t *testing.T, creator valuer.BasicTypeCreator) {
+func testQuerier_GetMulti(t *testing.T, creator valuer.PrimitiveCreator) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
 		t.Fatal(err)
