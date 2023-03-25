@@ -181,20 +181,6 @@ func (s *ShardingSelector[T]) findDstByPredicate(ctx context.Context, pre Predic
 			return sharding.EmptyResult, err
 		}
 		return s.mergeOR(left, right), nil
-	case opNot:
-		right, err := s.findDstByPredicate(ctx, pre.right.(Predicate))
-		if err != nil {
-			return sharding.EmptyResult, err
-		}
-		broadDsts := s.meta.ShardingAlgorithm.Broadcast(ctx)
-		// 对于right本身的查询结果是广播，取反后的结果依旧为广播
-		if len(right.Dsts) == len(broadDsts) {
-			return right, nil
-		}
-		// 对于right完全没命中，NOT的查询结果应该为广播
-		// 对于right命中了部分分片，那么NOT的查询结果为广播减去right的结果集
-		all := sharding.Result{Dsts: broadDsts}
-		return s.mergeNot(all, right), nil
 	case opEQ:
 		col, isCol := pre.left.(Column)
 		right, isVals := pre.right.(valueExpr)
@@ -219,14 +205,6 @@ func (*ShardingSelector[T]) mergeAnd(left, right sharding.Result) sharding.Resul
 // mergeAnd 两个分片结果的并集
 func (*ShardingSelector[T]) mergeOR(left, right sharding.Result) sharding.Result {
 	dsts := slice.UnionSetFunc[sharding.Dst](left.Dsts, right.Dsts, func(src, dst sharding.Dst) bool {
-		return src.Equals(dst)
-	})
-	return sharding.Result{Dsts: dsts}
-}
-
-// mergeNot 两个分片结果的差集
-func (s *ShardingSelector[T]) mergeNot(all, right sharding.Result) sharding.Result {
-	dsts := slice.DiffSetFunc[sharding.Dst](all.Dsts, right.Dsts, func(src, dst sharding.Dst) bool {
 		return src.Equals(dst)
 	})
 	return sharding.Result{Dsts: dsts}
