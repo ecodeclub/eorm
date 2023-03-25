@@ -21,8 +21,6 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	"github.com/ecodeclub/eorm/internal/query"
-
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/ecodeclub/eorm/internal/datasource"
 	"github.com/stretchr/testify/assert"
@@ -82,11 +80,11 @@ type testMockDB struct {
 	ds     datasource.DataSource
 }
 
-func (*testMockDB) Query(_ context.Context, _ query.Query) (*sql.Rows, error) {
+func (*testMockDB) Query(_ context.Context, _ datasource.Query) (*sql.Rows, error) {
 	return &sql.Rows{}, nil
 }
 
-func (*testMockDB) Exec(_ context.Context, _ query.Query) (sql.Result, error) {
+func (*testMockDB) Exec(_ context.Context, _ datasource.Query) (sql.Result, error) {
 	return nil, nil
 }
 
@@ -151,14 +149,14 @@ func (s *TransactionSuite) TestDBQuery() {
 	testCases := []struct {
 		name     string
 		tx       *Tx
-		query    query.Query
+		query    datasource.Query
 		mockRows *sqlmock.Rows
 		wantResp []string
 		wantErr  error
 	}{
 		{
 			name: "query tx",
-			query: query.Query{
+			query: datasource.Query{
 				SQL: "SELECT `first_name` FROM `test_model`",
 			},
 			tx: func() *Tx {
@@ -206,11 +204,11 @@ func (s *TransactionSuite) TestDBExec() {
 		wantErr      error
 		isCommit     bool
 		tx           *Tx
-		query        query.Query
+		query        datasource.Query
 	}{
 		{
 			name: "res 1 rollback",
-			query: query.Query{
+			query: datasource.Query{
 				SQL: "INSERT INTO `test_model`(`id`,`first_name`,`age`,`last_name`) VALUES(1,2,3,4)",
 			},
 			tx: func() *Tx {
@@ -227,7 +225,7 @@ func (s *TransactionSuite) TestDBExec() {
 		},
 		{
 			name: "res 1",
-			query: query.Query{
+			query: datasource.Query{
 				SQL: "INSERT INTO `test_model`(`id`,`first_name`,`age`,`last_name`) VALUES(1,2,3,4)",
 			},
 			tx: func() *Tx {
@@ -245,7 +243,7 @@ func (s *TransactionSuite) TestDBExec() {
 		},
 		{
 			name: "res 2",
-			query: query.Query{
+			query: datasource.Query{
 				SQL: "INSERT INTO `test_model`(`id`,`first_name`,`age`,`last_name`) VALUES(1,2,3,4) (1,2,3,4)",
 			},
 			tx: func() *Tx {
@@ -289,11 +287,11 @@ type mockDB struct {
 	db *sql.DB
 }
 
-func (m *mockDB) Query(ctx context.Context, query query.Query) (*sql.Rows, error) {
+func (m *mockDB) Query(ctx context.Context, query datasource.Query) (*sql.Rows, error) {
 	return m.db.QueryContext(ctx, query.SQL, query.Args...)
 }
 
-func (m *mockDB) Exec(ctx context.Context, query query.Query) (sql.Result, error) {
+func (m *mockDB) Exec(ctx context.Context, query datasource.Query) (sql.Result, error) {
 	return m.db.ExecContext(ctx, query.SQL, query.Args...)
 }
 

@@ -32,26 +32,30 @@ import (
 )
 
 func TestDeleter_Build(t *testing.T) {
+	db, err := Open("sqlite3", memoryDB())
+	if err != nil {
+		t.Error(err)
+	}
 	testCases := []CommonTestCase{
 		{
 			name:    "no where",
-			builder: NewDeleter[TestModel](memoryDB()).From(&TestModel{}),
+			builder: NewDeleter[TestModel](db).From(&TestModel{}),
 			wantSql: "DELETE FROM `test_model`;",
 		},
 		{
 			name:     "where",
-			builder:  NewDeleter[TestModel](memoryDB()).Where(C("Id").EQ(16)),
+			builder:  NewDeleter[TestModel](db).Where(C("Id").EQ(16)),
 			wantSql:  "DELETE FROM `test_model` WHERE `id`=?;",
 			wantArgs: []interface{}{16},
 		},
 		{
 			name:    "no where combination",
-			builder: NewDeleter[TestCombinedModel](memoryDB()).From(&TestCombinedModel{}),
+			builder: NewDeleter[TestCombinedModel](db).From(&TestCombinedModel{}),
 			wantSql: "DELETE FROM `test_combined_model`;",
 		},
 		{
 			name:     "where combination",
-			builder:  NewDeleter[TestCombinedModel](memoryDB()).Where(C("CreateTime").EQ(uint64(1000))),
+			builder:  NewDeleter[TestCombinedModel](db).Where(C("CreateTime").EQ(uint64(1000))),
 			wantSql:  "DELETE FROM `test_combined_model` WHERE `create_time`=?;",
 			wantArgs: []interface{}{uint64(1000)},
 		},
@@ -118,14 +122,13 @@ func TestDeleter_Exec(t *testing.T) {
 			},
 			delete: func(db *sql.DB, t *testing.T) Result {
 				defer func(db *sql.DB) { _ = db.Close() }(db)
-				sigDB := single.NewDB(db)
-				tx, err := sigDB.BeginTx(context.Background(), &sql.TxOptions{})
+
+				orm, err := Open("mysql", single.NewDB(db))
+				require.NoError(t, err)
+				tx, err := orm.BeginTx(context.Background(), &sql.TxOptions{})
 				require.NoError(t, err)
 
-				orm, err := Open("mysql", tx)
-				require.NoError(t, err)
-
-				deleter := NewDeleter[TestModel](orm)
+				deleter := NewDeleter[TestModel](tx)
 				result := deleter.From(&TestModel{}).Where(C("Id").EQ(1)).Exec(context.Background())
 				require.NoError(t, result.Err())
 
@@ -146,11 +149,6 @@ func TestDeleter_Exec(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			//db, err := openDB("mysql", mockDB)
-			//defer func(db *DB) { _ = db.Close() }(db)
-			//if err != nil {
-			//	t.Fatal(err)
-			//}
 			tc.mockOrder(mock)
 			result := tc.delete(mockDB, t)
 
@@ -180,21 +178,24 @@ func TestDeleter_Exec(t *testing.T) {
 }
 
 func ExampleDeleter_Build() {
-	query, _ := NewDeleter[TestModel](memoryDB()).From(&TestModel{}).Build()
+	db, _ := Open("sqlite3", memoryDB())
+	query, _ := NewDeleter[TestModel](db).From(&TestModel{}).Build()
 	fmt.Printf("SQL: %s", query.SQL)
 	// Output:
 	// SQL: DELETE FROM `test_model`;
 }
 
 func ExampleDeleter_From() {
-	query, _ := NewDeleter[TestModel](memoryDB()).From(&TestModel{}).Build()
+	db, _ := Open("sqlite3", memoryDB())
+	query, _ := NewDeleter[TestModel](db).From(&TestModel{}).Build()
 	fmt.Printf("SQL: %s", query.SQL)
 	// Output:
 	// SQL: DELETE FROM `test_model`;
 }
 
 func ExampleDeleter_Where() {
-	query, _ := NewDeleter[TestModel](memoryDB()).Where(C("Id").EQ(12)).Build()
+	db, _ := Open("sqlite3", memoryDB())
+	query, _ := NewDeleter[TestModel](db).Where(C("Id").EQ(12)).Build()
 	fmt.Printf("SQL: %s\nArgs: %v", query.SQL, query.Args)
 	// Output:
 	// SQL: DELETE FROM `test_model` WHERE `id`=?;

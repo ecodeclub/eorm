@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ecodeclub/eorm/internal/datasource/slaves"
+	"github.com/ecodeclub/eorm/internal/datasource/masterslave"
 
 	"github.com/ecodeclub/eorm"
 	"github.com/ecodeclub/eorm/internal/test"
@@ -67,7 +67,7 @@ func (s *MasterSlaveSelectTestSuite) TestMasterSlave() {
 			wantRes: s.data,
 			ctx: func() context.Context {
 				c := context.Background()
-				c = slaves.UseMaster(c)
+				c = masterslave.UseMaster(c)
 				return c
 			},
 		},

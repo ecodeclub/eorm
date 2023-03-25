@@ -765,7 +765,10 @@ func TestSelector_GetMulti_baseType(t *testing.T) {
 }
 
 func TestSelectable(t *testing.T) {
-	db := memoryDB()
+	db, err := Open("sqlite3", memoryDB())
+	if err != nil {
+		t.Error(err)
+	}
 	testCases := []CommonTestCase{
 		{
 			name:    "simple",
@@ -1015,7 +1018,10 @@ func TestSelectable(t *testing.T) {
 }
 
 func TestSelectableCombination(t *testing.T) {
-	db := memoryDB()
+	db, err := Open("sqlite3", memoryDB())
+	if err != nil {
+		t.Error(err)
+	}
 	testCases := []CommonTestCase{
 		{
 			name:    "simple",
@@ -1142,7 +1148,7 @@ type TestCombinedModel struct {
 }
 
 func ExampleSelector_OrderBy() {
-	db := memoryDB()
+	db, _ := Open("sqlite3", memoryDB())
 	query, _ := NewSelector[TestModel](db).OrderBy(ASC("Age")).Build()
 	fmt.Printf("case1\n%s", query.string())
 	query, _ = NewSelector[TestModel](db).OrderBy(ASC("Age", "Id")).Build()
@@ -1167,7 +1173,7 @@ func ExampleSelector_OrderBy() {
 }
 
 func ExampleSelector_Having() {
-	db := memoryDB()
+	db, _ := Open("sqlite3", memoryDB())
 	query, _ := NewSelector[TestModel](db).Select(Columns("Id"), Columns("FirstName"), Avg("Age").As("avg_age")).GroupBy("FirstName").Having(Avg("Age").LT(20)).Build()
 	fmt.Printf("case1\n%s", query.string())
 	query, err := NewSelector[TestModel](db).Select(Columns("Id"), Columns("FirstName"), Avg("Age").As("avg_age")).GroupBy("FirstName").Having(C("Invalid").LT(20)).Build()
@@ -1181,7 +1187,7 @@ func ExampleSelector_Having() {
 }
 
 func ExampleSelector_Select() {
-	db := memoryDB()
+	db, _ := Open("sqlite3", memoryDB())
 	tm := TableOf(&TestModel{}, "t1")
 	cases := []*Selector[TestModel]{
 		// case0: all columns are included
@@ -1219,7 +1225,7 @@ func ExampleSelector_Select() {
 }
 
 func ExampleSelector_Distinct() {
-	db := memoryDB()
+	db, _ := Open("sqlite3", memoryDB())
 	cases := []*Selector[TestModel]{
 		// case0: disinct column
 		NewSelector[TestModel](db).Distinct().Select(C("FirstName")),
@@ -1246,7 +1252,10 @@ func ExampleSelector_Distinct() {
 }
 
 func TestSelector_Join(t *testing.T) {
-	db := memoryDB()
+	db, err := Open("sqlite3", memoryDB())
+	if err != nil {
+		t.Error(err)
+	}
 	type Order struct {
 		Id        int
 		UsingCol1 string
@@ -1575,7 +1584,10 @@ func TestSelector_Join(t *testing.T) {
 }
 
 func TestSelector_Subquery(t *testing.T) {
-	db := memoryDB()
+	db, err := Open("sqlite3", memoryDB())
+	if err != nil {
+		t.Error(err)
+	}
 	type Order struct {
 		Id        int
 		UsingCol1 string

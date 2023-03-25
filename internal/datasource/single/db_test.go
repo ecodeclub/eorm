@@ -22,8 +22,9 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/ecodeclub/eorm/internal/datasource"
+
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/ecodeclub/eorm/internal/query"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -57,14 +58,14 @@ func (s *SingleSuite) TestDBQuery() {
 
 	testCases := []struct {
 		name     string
-		query    query.Query
+		query    datasource.Query
 		mockRows *sqlmock.Rows
 		wantResp []string
 		wantErr  error
 	}{
 		{
 			name: "one row",
-			query: query.Query{
+			query: datasource.Query{
 				SQL: "SELECT `first_name` FROM `test_model`",
 			},
 			mockRows: sqlmock.NewRows([]string{"first_name"}).AddRow("value"),
@@ -72,7 +73,7 @@ func (s *SingleSuite) TestDBQuery() {
 		},
 		{
 			name: "multi row",
-			query: query.Query{
+			query: datasource.Query{
 				SQL: "SELECT `first_name` FROM `test_model`",
 			},
 			mockRows: func() *sqlmock.Rows {
@@ -120,11 +121,11 @@ func (s *SingleSuite) TestDBExec() {
 		rowsAffected int64
 		wantErr      error
 		mockResult   driver.Result
-		query        query.Query
+		query        datasource.Query
 	}{
 		{
 			name: "res 1",
-			query: query.Query{
+			query: datasource.Query{
 				SQL: "INSERT INTO `test_model`(`id`,`first_name`,`age`,`last_name`) VALUES(1,2,3,4)",
 			},
 			mockResult: func() driver.Result {
@@ -135,7 +136,7 @@ func (s *SingleSuite) TestDBExec() {
 		},
 		{
 			name: "res 2",
-			query: query.Query{
+			query: datasource.Query{
 				SQL: "INSERT INTO `test_model`(`id`,`first_name`,`age`,`last_name`) VALUES(1,2,3,4) (1,2,3,4)",
 			},
 			mockResult: func() driver.Result {
@@ -220,14 +221,4 @@ func ExampleDB_BeginTx() {
 	// Output:
 	// Begin
 	// Commit
-}
-
-func Example_memoryDB() {
-	_, err := MemoryDB()
-	if err == nil {
-		fmt.Printf("case1 memory db")
-	}
-
-	// Output:
-	// case1 memory db
 }

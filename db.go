@@ -21,8 +21,8 @@ import (
 	"github.com/ecodeclub/eorm/internal/datasource"
 	"github.com/ecodeclub/eorm/internal/datasource/single"
 	"github.com/ecodeclub/eorm/internal/dialect"
+	"github.com/ecodeclub/eorm/internal/errs"
 	"github.com/ecodeclub/eorm/internal/model"
-	"github.com/ecodeclub/eorm/internal/query"
 	"github.com/ecodeclub/eorm/internal/valuer"
 )
 
@@ -41,7 +41,7 @@ type DBOption func(db *DB)
 type DB struct {
 	//db *sql.DB
 	core
-	datasource.DataSource
+	ds datasource.DataSource
 }
 
 // DBWithMiddlewares 为 db 配置 Middleware
@@ -59,16 +59,16 @@ func DBOptionWithMetaRegistry(r model.MetaRegistry) DBOption {
 
 func UseReflection() DBOption {
 	return func(db *DB) {
-		db.valCreator = valuer.BasicTypeCreator{Creator: valuer.NewUnsafeValue}
+		db.valCreator = valuer.PrimitiveCreator{Creator: valuer.NewUnsafeValue}
 	}
 }
 
-func (db *DB) queryContext(ctx context.Context, q query.Query) (*sql.Rows, error) {
-	return db.DataSource.Query(ctx, q)
+func (db *DB) queryContext(ctx context.Context, q datasource.Query) (*sql.Rows, error) {
+	return db.ds.Query(ctx, q)
 }
 
-func (db *DB) execContext(ctx context.Context, q query.Query) (sql.Result, error) {
-	return db.DataSource.Exec(ctx, q)
+func (db *DB) execContext(ctx context.Context, q datasource.Query) (sql.Result, error) {
+	return db.ds.Exec(ctx, q)
 }
 
 // Open 创建一个 ORM 实例
@@ -83,11 +83,11 @@ func Open(driver string, ds datasource.DataSource, opts ...DBOption) (*DB, error
 			metaRegistry: model.NewMetaRegistry(),
 			dialect:      dl,
 			// 可以设为默认，因为原本这里也有默认
-			valCreator: valuer.BasicTypeCreator{
+			valCreator: valuer.PrimitiveCreator{
 				Creator: valuer.NewUnsafeValue,
 			},
 		},
-		DataSource: ds,
+		ds: ds,
 	}
 	for _, o := range opts {
 		o(orm)
@@ -95,9 +95,25 @@ func Open(driver string, ds datasource.DataSource, opts ...DBOption) (*DB, error
 	return orm, nil
 }
 
+func (db *DB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) {
+	inst, ok := db.ds.(datasource.TxBeginner)
+	if !ok {
+		return nil, errs.ErrNotCompleteTxBeginner
+	}
+	tx, err := inst.BeginTx(ctx, opts)
+	if err != nil {
+		return nil, err
+	}
+	ds, ok := tx.(datasource.DataSource)
+	if !ok {
+		return nil, errs.ErrNotCompleteDatasource
+	}
+	return &Tx{tx: tx, ds: ds, core: db.getCore()}, nil
+}
+
 // Close TODO
 func (db *DB) Close() error {
-	source, ok := db.DataSource.(*single.DB)
+	source, ok := db.ds.(*single.DB)
 	if ok {
 		return source.Close()
 	}

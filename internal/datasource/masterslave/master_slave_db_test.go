@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package slaves
+package masterslave
 
 import (
 	"context"
@@ -21,7 +21,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/ecodeclub/eorm/internal/query"
+	"github.com/ecodeclub/eorm/internal/datasource"
+	"github.com/ecodeclub/eorm/internal/datasource/masterslave/slaves"
 
 	"github.com/stretchr/testify/require"
 
@@ -123,9 +124,9 @@ func (ms *MasterSlaveSuite) TestMasterSlaveDbQuery() {
 	testCasesQuery := []struct {
 		name     string
 		ctx      context.Context
-		query    query.Query
+		query    datasource.Query
 		reqCnt   int
-		slaves   Slaves
+		slaves   slaves.Slaves
 		wantResp []string
 		wantErr  error
 	}{
@@ -133,7 +134,7 @@ func (ms *MasterSlaveSuite) TestMasterSlaveDbQuery() {
 			name:   "select default use slave",
 			ctx:    context.Background(),
 			reqCnt: 3,
-			query: query.Query{
+			query: datasource.Query{
 				SQL: "SELECT `first_name` FROM `test_model`",
 			},
 			slaves:   ms.newSlaves(ms.mockSlave1DB, ms.mockSlave2DB, ms.mockSlave3DB),
@@ -143,7 +144,7 @@ func (ms *MasterSlaveSuite) TestMasterSlaveDbQuery() {
 			name:   "use master",
 			reqCnt: 1,
 			ctx:    UseMaster(context.Background()),
-			query: query.Query{
+			query: datasource.Query{
 				SQL: "SELECT `first_name` FROM `test_model`",
 			},
 			slaves:   ms.newSlaves(ms.mockSlave1DB, ms.mockSlave2DB, ms.mockSlave3DB),
@@ -153,7 +154,7 @@ func (ms *MasterSlaveSuite) TestMasterSlaveDbQuery() {
 
 	for _, tc := range testCasesQuery {
 		ms.T().Run(tc.name, func(t *testing.T) {
-			db := NewMasterSlaveDB(ms.mockMasterDB, MasterSlaveWithSlaves(tc.slaves))
+			db := NewMasterSlaveDB(ms.mockMasterDB, MasterSlavesWithSlaves(tc.slaves))
 			//  TODO
 			//db, ok := source.(*masterSlavesDB)
 			//assert.True(t, ok)
@@ -191,9 +192,9 @@ func (ms *MasterSlaveSuite) TestMasterSlaveDbExec() {
 	testCasesExec := []struct {
 		name              string
 		ctx               context.Context
-		query             query.Query
+		query             datasource.Query
 		reqCnt            int
-		slaves            Slaves
+		slaves            slaves.Slaves
 		wantRowsAffected  []int64
 		wantLastInsertIds []int64
 		wantErr           error
@@ -202,7 +203,7 @@ func (ms *MasterSlaveSuite) TestMasterSlaveDbExec() {
 			name:   "null slave",
 			ctx:    context.Background(),
 			reqCnt: 1,
-			query: query.Query{
+			query: datasource.Query{
 				SQL:  "INSERT INTO `test_model`(`id`,`first_name`,`age`,`last_name`) VALUES(?,?,?,?)",
 				Args: []any{1, 2, 3, 4},
 			},
@@ -213,7 +214,7 @@ func (ms *MasterSlaveSuite) TestMasterSlaveDbExec() {
 			name:   "3 salves",
 			ctx:    context.Background(),
 			reqCnt: 3,
-			query: query.Query{
+			query: datasource.Query{
 				SQL:  "INSERT INTO `test_model`(`id`,`first_name`,`age`,`last_name`) VALUES(?,?,?,?)",
 				Args: []any{1, 2, 3, 4},
 			},
@@ -225,7 +226,7 @@ func (ms *MasterSlaveSuite) TestMasterSlaveDbExec() {
 			name:   "use master with 3 slaves",
 			reqCnt: 1,
 			ctx:    UseMaster(context.Background()),
-			query: query.Query{
+			query: datasource.Query{
 				SQL:  "INSERT INTO `test_model`(`id`,`first_name`,`age`,`last_name`) VALUES(?,?,?,?)",
 				Args: []any{1, 2, 3, 4},
 			},
@@ -237,7 +238,7 @@ func (ms *MasterSlaveSuite) TestMasterSlaveDbExec() {
 
 	for _, tc := range testCasesExec {
 		ms.T().Run(tc.name, func(t *testing.T) {
-			db := NewMasterSlaveDB(ms.mockMasterDB, MasterSlaveWithSlaves(tc.slaves))
+			db := NewMasterSlaveDB(ms.mockMasterDB, MasterSlavesWithSlaves(tc.slaves))
 			//  TODO
 			//db, ok := source.(*masterSlavesDB)
 			//assert.True(t, ok)
@@ -265,8 +266,8 @@ func (ms *MasterSlaveSuite) TestMasterSlaveDbExec() {
 	}
 }
 
-func (ms *MasterSlaveSuite) newSlaves(dbs ...*sql.DB) Slaves {
-	res, err := NewSlaves(dbs...)
+func (ms *MasterSlaveSuite) newSlaves(dbs ...*sql.DB) slaves.Slaves {
+	res, err := slaves.NewSlaves(dbs...)
 	require.NoError(ms.T(), err)
 	return res
 }

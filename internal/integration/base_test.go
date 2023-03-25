@@ -24,18 +24,19 @@ import (
 	"log"
 	"time"
 
+	"github.com/ecodeclub/eorm/internal/datasource/masterslave"
+	slaves2 "github.com/ecodeclub/eorm/internal/datasource/masterslave/slaves"
+	"github.com/ecodeclub/eorm/internal/datasource/masterslave/slaves/dns"
+
 	"github.com/ecodeclub/eorm/internal/datasource/shardingsource"
 
 	"github.com/ecodeclub/eorm/internal/datasource/single"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ecodeclub/eorm/internal/datasource/slaves/dns"
-
 	"github.com/ecodeclub/eorm"
 	"github.com/ecodeclub/eorm/internal/datasource"
 	"github.com/ecodeclub/eorm/internal/datasource/cluster"
-	"github.com/ecodeclub/eorm/internal/datasource/slaves"
 	"github.com/ecodeclub/eorm/internal/sharding"
 	"github.com/stretchr/testify/suite"
 )
@@ -78,7 +79,7 @@ type masterSalvesDriver struct {
 
 type ShardingSuite struct {
 	suite.Suite
-	slaves      slaves.Slaves
+	slaves      slaves2.Slaves
 	clusters    *clusterDrivers
 	shardingDB  *eorm.DB
 	algorithm   sharding.Algorithm
@@ -103,7 +104,7 @@ func (s *ShardingSuite) initDB() (*eorm.DB, error) {
 	clDrivers := s.clusters.clDrivers
 	sourceMap := make(map[string]datasource.DataSource, len(clDrivers))
 	for i, clus := range clDrivers {
-		msMap := make(map[string]*slaves.MasterSlavesDB, 8)
+		msMap := make(map[string]*masterslave.MasterSlavesDB, 8)
 		for j, d := range clus.msDrivers {
 			master, err := s.openDB(s.driver, d.masterdsn)
 			if err != nil {
@@ -117,11 +118,11 @@ func (s *ShardingSuite) initDB() (*eorm.DB, error) {
 				}
 				ss = append(ss, slave)
 			}
-			sl, err := slaves.NewSlaves(ss...)
+			sl, err := slaves2.NewSlaves(ss...)
 			require.NoError(s.T(), err)
 			s.slaves = &testBaseSlaves{Slaves: sl}
-			masterSlaveDB := slaves.NewMasterSlaveDB(
-				master, slaves.MasterSlaveWithSlaves(s.slaves))
+			masterSlaveDB := masterslave.NewMasterSlaveDB(
+				master, masterslave.MasterSlavesWithSlaves(s.slaves))
 			dbName := fmt.Sprintf(s.DBPattern, j)
 			msMap[dbName] = masterSlaveDB
 		}
@@ -171,7 +172,7 @@ func (s *MasterSlaveSuite) initDb() (*eorm.DB, error) {
 		return nil, err
 	}
 	s.testSlaves = newTestSlaves(ss)
-	return eorm.Open(s.driver, slaves.NewMasterSlaveDB(master, slaves.MasterSlaveWithSlaves(s.testSlaves)))
+	return eorm.Open(s.driver, masterslave.NewMasterSlaveDB(master, masterslave.MasterSlavesWithSlaves(s.testSlaves)))
 
 }
 
@@ -188,10 +189,10 @@ func (s *MasterSlaveSuite) initDb() (*eorm.DB, error) {
 //}
 
 type testBaseSlaves struct {
-	slaves.Slaves
+	slaves2.Slaves
 }
 
-func (s *testBaseSlaves) Next(ctx context.Context) (slaves.Slave, error) {
+func (s *testBaseSlaves) Next(ctx context.Context) (slaves2.Slave, error) {
 	slave, err := s.Slaves.Next(ctx)
 	if err != nil {
 		return slave, err
@@ -204,7 +205,7 @@ type testSlaves struct {
 	ch chan string
 }
 
-func newTestSlaves(s slaves.Slaves) *testSlaves {
+func newTestSlaves(s slaves2.Slaves) *testSlaves {
 	return &testSlaves{
 		testBaseSlaves: &testBaseSlaves{
 			Slaves: s,
@@ -213,7 +214,7 @@ func newTestSlaves(s slaves.Slaves) *testSlaves {
 	}
 }
 
-func (s *testSlaves) Next(ctx context.Context) (slaves.Slave, error) {
+func (s *testSlaves) Next(ctx context.Context) (slaves2.Slave, error) {
 	slave, err := s.Slaves.Next(ctx)
 	if err != nil {
 		return slave, err
@@ -222,13 +223,13 @@ func (s *testSlaves) Next(ctx context.Context) (slaves.Slave, error) {
 	return slave, err
 }
 
-type initSlaves func(driver string, slaveDsns ...string) (slaves.Slaves, error)
+type initSlaves func(driver string, slaveDsns ...string) (slaves2.Slaves, error)
 
-func newDnsSlaves(driver string, slaveDsns ...string) (slaves.Slaves, error) {
+func newDnsSlaves(driver string, slaveDsns ...string) (slaves2.Slaves, error) {
 	return dns.NewSlaves(slaveDsns[0])
 }
 
-func newRoundRobinSlaves(driver string, slaveDsns ...string) (slaves.Slaves, error) {
+func newRoundRobinSlaves(driver string, slaveDsns ...string) (slaves2.Slaves, error) {
 	ss := make([]*sql.DB, 0, len(slaveDsns))
 	for _, slaveDsn := range slaveDsns {
 		slave, err := sql.Open(driver, slaveDsn)
@@ -237,5 +238,5 @@ func newRoundRobinSlaves(driver string, slaveDsns ...string) (slaves.Slaves, err
 		}
 		ss = append(ss, slave)
 	}
-	return slaves.NewSlaves(ss...)
+	return slaves2.NewSlaves(ss...)
 }

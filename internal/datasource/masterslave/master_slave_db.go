@@ -12,22 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package slaves
+package masterslave
 
 import (
 	"context"
 	"database/sql"
 
+	slaves2 "github.com/ecodeclub/eorm/internal/datasource/masterslave/slaves"
+
 	"github.com/ecodeclub/eorm/internal/datasource"
 	"github.com/ecodeclub/eorm/internal/datasource/transaction"
-	"github.com/ecodeclub/eorm/internal/query"
 )
 
+var _ datasource.TxBeginner = &MasterSlavesDB{}
 var _ datasource.DataSource = &MasterSlavesDB{}
 
 type MasterSlavesDB struct {
 	master *sql.DB
-	slaves Slaves
+	slaves slaves2.Slaves
 }
 
 type key string
@@ -36,7 +38,7 @@ const (
 	master key = "master"
 )
 
-func (m *MasterSlavesDB) Query(ctx context.Context, query query.Query) (*sql.Rows, error) {
+func (m *MasterSlavesDB) Query(ctx context.Context, query datasource.Query) (*sql.Rows, error) {
 	_, ok := ctx.Value(master).(bool)
 	if ok {
 		return m.master.QueryContext(ctx, query.SQL, query.Args...)
@@ -48,11 +50,11 @@ func (m *MasterSlavesDB) Query(ctx context.Context, query query.Query) (*sql.Row
 	return slave.DB.QueryContext(ctx, query.SQL, query.Args...)
 }
 
-func (m *MasterSlavesDB) Exec(ctx context.Context, query query.Query) (sql.Result, error) {
+func (m *MasterSlavesDB) Exec(ctx context.Context, query datasource.Query) (sql.Result, error) {
 	return m.master.ExecContext(ctx, query.SQL, query.Args...)
 }
 
-func (m *MasterSlavesDB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*transaction.Tx, error) {
+func (m *MasterSlavesDB) BeginTx(ctx context.Context, opts *sql.TxOptions) (datasource.Tx, error) {
 	tx, err := m.master.BeginTx(ctx, opts)
 	if err != nil {
 		return nil, err
@@ -60,7 +62,7 @@ func (m *MasterSlavesDB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*tra
 	return transaction.BeginTx(tx, m), nil
 }
 
-func NewMasterSlaveDB(master *sql.DB, opts ...MasterSlaveDBOption) *MasterSlavesDB {
+func NewMasterSlaveDB(master *sql.DB, opts ...MasterSlavesDBOption) *MasterSlavesDB {
 	db := &MasterSlavesDB{
 		master: master,
 	}
@@ -70,9 +72,9 @@ func NewMasterSlaveDB(master *sql.DB, opts ...MasterSlaveDBOption) *MasterSlaves
 	return db
 }
 
-type MasterSlaveDBOption func(db *MasterSlavesDB)
+type MasterSlavesDBOption func(db *MasterSlavesDB)
 
-func MasterSlaveWithSlaves(s Slaves) MasterSlaveDBOption {
+func MasterSlavesWithSlaves(s slaves2.Slaves) MasterSlavesDBOption {
 	return func(db *MasterSlavesDB) {
 		db.slaves = s
 	}
@@ -80,14 +82,4 @@ func MasterSlaveWithSlaves(s Slaves) MasterSlaveDBOption {
 
 func UseMaster(ctx context.Context) context.Context {
 	return context.WithValue(ctx, master, true)
-}
-
-// MasterSlaveMemoryDB 返回一个基于内存的 MasterSlaveDB，它使用的是 sqlite3 内存模式。
-func MasterSlaveMemoryDB() *MasterSlavesDB {
-	db, err := sql.Open("sqlite3", "file:test.db?cache=shared&mode=memory")
-	if err != nil {
-		panic(err)
-	}
-	masterSlaveDB := NewMasterSlaveDB(db)
-	return masterSlaveDB
 }

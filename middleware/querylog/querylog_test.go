@@ -99,7 +99,7 @@ func TestMiddlewareBuilder_Build(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			mdls := tc.mdls
 			mdls = append(mdls, tc.builder.Build())
-			db, err := single.MemoryDB()
+			db, err := single.OpenDB("sqlite3", "file:test.db?cache=shared&mode=memory")
 			if err != nil {
 				t.Fatal(err)
 			}

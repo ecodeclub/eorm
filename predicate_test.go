@@ -23,7 +23,10 @@ import (
 )
 
 func TestPredicate_C(t *testing.T) {
-	db := memoryDB()
+	db, err := Open("sqlite3", memoryDB())
+	if err != nil {
+		t.Error(err)
+	}
 	testCases := []CommonTestCase{
 		{
 			name:    "empty",
@@ -172,7 +175,7 @@ type CommonTestCase struct {
 }
 
 func ExampleNot() {
-	db := memoryDB()
+	db, _ := Open("sqlite3", memoryDB())
 	query, _ := NewSelector[TestModel](db).Select(Columns("Id")).Where(Not(C("Id").EQ(18))).Build()
 	fmt.Println(query.string())
 	// Output:
@@ -181,7 +184,7 @@ func ExampleNot() {
 }
 
 func ExamplePredicate_And() {
-	db := memoryDB()
+	db, _ := Open("sqlite3", memoryDB())
 	query, _ := NewSelector[TestModel](db).Select(Columns("Id")).Where(C("Id").EQ(18).And(C("Age").GT(100))).Build()
 	fmt.Println(query.string())
 	// Output:
@@ -190,7 +193,7 @@ func ExamplePredicate_And() {
 }
 
 func ExamplePredicate_Or() {
-	db := memoryDB()
+	db, _ := Open("sqlite3", memoryDB())
 	query, _ := NewSelector[TestModel](db).Select(Columns("Id")).Where(C("Id").EQ(18).Or(C("Age").GT(100))).Build()
 	fmt.Println(query.string())
 	// Output:

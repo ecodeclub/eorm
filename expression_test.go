@@ -22,7 +22,10 @@ import (
 )
 
 func TestRawExpr_AsPredicate(t *testing.T) {
-	db := memoryDB()
+	db, err := Open("sqlite3", memoryDB())
+	if err != nil {
+		t.Error(err)
+	}
 	testCases := []CommonTestCase{
 		{
 			name:     "simple",
@@ -61,8 +64,9 @@ func TestRawExpr_AsPredicate(t *testing.T) {
 }
 
 func ExampleRawExpr_AsPredicate() {
+	db, _ := Open("sqlite3", memoryDB())
 	pred := Raw("`id`<?", 12).AsPredicate()
-	query, _ := NewSelector[TestModel](memoryDB()).Where(pred).Build()
+	query, _ := NewSelector[TestModel](db).Where(pred).Build()
 	fmt.Println(query.string())
 	// Output:
 	// SQL: SELECT `id`,`first_name`,`age`,`last_name` FROM `test_model` WHERE `id`<?;

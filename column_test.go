@@ -17,8 +17,8 @@ package eorm
 import "fmt"
 
 func ExampleC() {
-	db := memoryDB()
-	query, _ := NewSelector[TestModel](db).Select(C("Id")).Where(C("Id").EQ(18)).Build()
+	orm, _ := Open("sqlite3", memoryDB())
+	query, _ := NewSelector[TestModel](orm).Select(C("Id")).Where(C("Id").EQ(18)).Build()
 	fmt.Printf(`
 SQL: %s
 Args: %v
@@ -29,7 +29,7 @@ Args: %v
 }
 
 func ExampleColumn_EQ() {
-	db := memoryDB()
+	db, _ := Open("sqlite3", memoryDB())
 	query, _ := NewSelector[TestModel](db).Select(C("Id")).Where(C("Id").EQ(18)).Build()
 	fmt.Printf(`
 SQL: %s
@@ -41,7 +41,7 @@ Args: %v
 }
 
 func ExampleColumn_Add() {
-	db := memoryDB()
+	db, _ := Open("sqlite3", memoryDB())
 	tm := &TestModel{}
 	query, _ := NewUpdater[TestModel](db).Update(tm).Set(Assign("Age", C("Age").Add(1))).Build()
 	fmt.Printf(`
@@ -54,7 +54,7 @@ Args: %v
 }
 
 func ExampleColumn_As() {
-	db := memoryDB()
+	db, _ := Open("sqlite3", memoryDB())
 	query, _ := NewSelector[TestModel](db).Select(C("Id").As("my_id")).Build()
 	fmt.Printf(`
 SQL: %s
@@ -66,7 +66,7 @@ Args: %v
 }
 
 func ExampleColumn_GT() {
-	db := memoryDB()
+	db, _ := Open("sqlite3", memoryDB())
 	query, _ := NewSelector[TestModel](db).Select(C("Id")).Where(C("Id").GT(18)).Build()
 	fmt.Printf(`
 SQL: %s
@@ -78,7 +78,7 @@ Args: %v
 }
 
 func ExampleColumn_GTEQ() {
-	db := memoryDB()
+	db, _ := Open("sqlite3", memoryDB())
 	query, _ := NewSelector[TestModel](db).Select(C("Id")).Where(C("Id").GTEQ(18)).Build()
 	fmt.Printf(`
 SQL: %s
@@ -90,7 +90,7 @@ Args: %v
 }
 
 func ExampleColumn_LT() {
-	db := memoryDB()
+	db, _ := Open("sqlite3", memoryDB())
 	query, _ := NewSelector[TestModel](db).Select(C("Id")).Where(C("Id").LT(18)).Build()
 	fmt.Printf(`
 SQL: %s
@@ -102,7 +102,7 @@ Args: %v
 }
 
 func ExampleColumn_LTEQ() {
-	db := memoryDB()
+	db, _ := Open("sqlite3", memoryDB())
 	query, _ := NewSelector[TestModel](db).Select(C("Id")).Where(C("Id").LTEQ(18)).Build()
 	fmt.Printf(`
 SQL: %s
@@ -114,7 +114,7 @@ Args: %v
 }
 
 func ExampleColumn_Multi() {
-	db := memoryDB()
+	db, _ := Open("sqlite3", memoryDB())
 	tm := &TestModel{}
 	query, _ := NewUpdater[TestModel](db).Update(tm).Set(Assign("Age", C("Age").Multi(2))).Build()
 	fmt.Printf(`
@@ -127,7 +127,7 @@ Args: %v
 }
 
 func ExampleColumn_NEQ() {
-	db := memoryDB()
+	db, _ := Open("sqlite3", memoryDB())
 	query, _ := NewSelector[TestModel](db).Select(C("Id")).Where(C("Id").NEQ(18)).Build()
 	fmt.Printf(`
 SQL: %s
@@ -139,7 +139,7 @@ Args: %v
 }
 
 func ExampleColumns() {
-	db := memoryDB()
+	db, _ := Open("sqlite3", memoryDB())
 	query, _ := NewSelector[TestModel](db).Select(Columns("Id", "Age")).Build()
 	fmt.Printf(`
 SQL: %s

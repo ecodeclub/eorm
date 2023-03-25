@@ -68,7 +68,7 @@ func (u *Updater[T]) Build() (Query, error) {
 		return EmptyQuery, err
 	}
 
-	u.val = u.valCreator.NewBasicTypeValue(u.table, u.meta)
+	u.val = u.valCreator.NewPrimitiveValue(u.table, u.meta)
 	u.args = make([]interface{}, 0, len(u.meta.Columns))
 
 	u.writeString("UPDATE ")

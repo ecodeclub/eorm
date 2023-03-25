@@ -19,13 +19,10 @@ import (
 	"database/sql"
 
 	"github.com/ecodeclub/eorm/internal/datasource"
-	"github.com/ecodeclub/eorm/internal/query"
 )
 
-//type transaction interface {
-//	Commit() error
-//	Rollback() error
-//}
+var _ datasource.DataSource = &Tx{}
+var _ datasource.Tx = &Tx{}
 
 type Tx struct {
 	tx *sql.Tx
@@ -34,11 +31,11 @@ type Tx struct {
 	ds datasource.DataSource
 }
 
-func (t *Tx) Query(ctx context.Context, query query.Query) (*sql.Rows, error) {
+func (t *Tx) Query(ctx context.Context, query datasource.Query) (*sql.Rows, error) {
 	return t.tx.QueryContext(ctx, query.SQL, query.Args...)
 }
 
-func (t *Tx) Exec(ctx context.Context, query query.Query) (sql.Result, error) {
+func (t *Tx) Exec(ctx context.Context, query datasource.Query) (sql.Result, error) {
 	return t.tx.ExecContext(ctx, query.SQL, query.Args...)
 }
 

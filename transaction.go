@@ -21,21 +21,30 @@ import (
 	"github.com/ecodeclub/eorm/internal/datasource"
 )
 
-// Executor sql 语句执行器
-type Executor interface {
-	Exec(ctx context.Context) Result
+type Tx struct {
+	core
+	tx datasource.Tx
+	// TODO 事务是否要提供 close 方法
+	//db *sql.DB
+	ds datasource.DataSource
 }
 
-// QueryBuilder 普通 sql 构造抽象
-type QueryBuilder interface {
-	Build() (Query, error)
+func (t *Tx) getCore() core {
+	return t.core
 }
 
-// Session 代表一个抽象的概念，即会话
-type Session interface {
-	getCore() core
-	//queryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
-	//execContext(ctx context.Context, query string, args ...any) (sql.Result, error)
-	queryContext(ctx context.Context, query datasource.Query) (*sql.Rows, error)
-	execContext(ctx context.Context, query datasource.Query) (sql.Result, error)
+func (t *Tx) queryContext(ctx context.Context, query datasource.Query) (*sql.Rows, error) {
+	return t.ds.Query(ctx, query)
+}
+
+func (t *Tx) execContext(ctx context.Context, query datasource.Query) (sql.Result, error) {
+	return t.ds.Exec(ctx, query)
+}
+
+func (t *Tx) Commit() error {
+	return t.tx.Commit()
+}
+
+func (t *Tx) Rollback() error {
+	return t.tx.Rollback()
 }

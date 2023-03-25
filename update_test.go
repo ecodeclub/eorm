@@ -24,7 +24,7 @@ import (
 	"github.com/ecodeclub/eorm/internal/datasource/single"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	err "github.com/ecodeclub/eorm/internal/errs"
+	"github.com/ecodeclub/eorm/internal/errs"
 	"github.com/stretchr/testify/require"
 
 	"github.com/stretchr/testify/assert"
@@ -37,7 +37,10 @@ func TestUpdater_Set(t *testing.T) {
 		Age:       18,
 		LastName:  &sql.NullString{String: "Jerry", Valid: true},
 	}
-	orm := memoryDB()
+	orm, err := Open("sqlite3", memoryDB())
+	if err != nil {
+		t.Error(err)
+	}
 	testCases := []CommonTestCase{
 		{
 			name:     "no set and update",
@@ -64,7 +67,7 @@ func TestUpdater_Set(t *testing.T) {
 		{
 			name:    "set invalid columns",
 			builder: NewUpdater[TestModel](orm).Update(tm).Set(Columns("FirstNameInvalid", "Age")),
-			wantErr: err.NewInvalidFieldError("FirstNameInvalid"),
+			wantErr: errs.NewInvalidFieldError("FirstNameInvalid"),
 		},
 		{
 			name:     "set c2",
@@ -75,7 +78,7 @@ func TestUpdater_Set(t *testing.T) {
 		{
 			name:    "set invalid c2",
 			builder: NewUpdater[TestModel](orm).Update(tm).Set(C("FirstNameInvalid"), C("Age")),
-			wantErr: err.NewInvalidFieldError("FirstNameInvalid"),
+			wantErr: errs.NewInvalidFieldError("FirstNameInvalid"),
 		},
 		{
 			name:     "set assignment",
@@ -86,7 +89,7 @@ func TestUpdater_Set(t *testing.T) {
 		{
 			name:    "set invalid assignment",
 			builder: NewUpdater[TestModel](orm).Update(tm).Set(C("FirstName"), Assign("InvalidAge", 30)),
-			wantErr: err.NewInvalidFieldError("InvalidAge"),
+			wantErr: errs.NewInvalidFieldError("InvalidAge"),
 		},
 		{
 			name:     "set age+1",
@@ -158,7 +161,10 @@ func TestUpdater_SetForCombination(t *testing.T) {
 			LastName:  &sql.NullString{String: "Jerry", Valid: true},
 		},
 	}
-	orm := memoryDB()
+	orm, err := Open("sqlite3", memoryDB())
+	if err != nil {
+		t.Error(err)
+	}
 	testCases := []CommonTestCase{
 		{
 			name:     "no set",
@@ -175,7 +181,7 @@ func TestUpdater_SetForCombination(t *testing.T) {
 		{
 			name:    "set invalid columns",
 			builder: NewUpdater[User](orm).Update(u).Set(Columns("FirstNameInvalid", "Age")),
-			wantErr: err.NewInvalidFieldError("FirstNameInvalid"),
+			wantErr: errs.NewInvalidFieldError("FirstNameInvalid"),
 		},
 		{
 			name:     "set c2",
@@ -187,7 +193,7 @@ func TestUpdater_SetForCombination(t *testing.T) {
 		{
 			name:    "set invalid c2",
 			builder: NewUpdater[User](orm).Update(u).Set(C("FirstNameInvalid"), C("Age")),
-			wantErr: err.NewInvalidFieldError("FirstNameInvalid"),
+			wantErr: errs.NewInvalidFieldError("FirstNameInvalid"),
 		},
 
 		{
@@ -199,7 +205,7 @@ func TestUpdater_SetForCombination(t *testing.T) {
 		{
 			name:    "set invalid assignment",
 			builder: NewUpdater[User](orm).Update(u).Set(C("FirstName"), Assign("InvalidAge", 30)),
-			wantErr: err.NewInvalidFieldError("InvalidAge"),
+			wantErr: errs.NewInvalidFieldError("InvalidAge"),
 		},
 		{
 			name:     "set age+1",
@@ -337,7 +343,7 @@ func TestUpdater_Exec(t *testing.T) {
 }
 
 func ExampleUpdater_SkipNilValue() {
-	db := memoryDB()
+	db, _ := Open("sqlite3", memoryDB())
 	query, _ := NewUpdater[TestModel](db).Update(&TestModel{Id: 13}).SkipNilValue().Build()
 	fmt.Println(query.string())
 	// Output:
@@ -346,7 +352,7 @@ func ExampleUpdater_SkipNilValue() {
 }
 
 func ExampleUpdater_SkipZeroValue() {
-	db := memoryDB()
+	db, _ := Open("sqlite3", memoryDB())
 	query, _ := NewUpdater[TestModel](db).Update(&TestModel{Id: 13}).SkipZeroValue().Build()
 	fmt.Println(query.string())
 	// Output:

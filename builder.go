@@ -18,6 +18,8 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/ecodeclub/eorm/internal/datasource"
+
 	"github.com/ecodeclub/eorm/internal/errs"
 	"github.com/ecodeclub/eorm/internal/model"
 	"github.com/ecodeclub/eorm/internal/query"
@@ -72,7 +74,7 @@ func newQuerier[T any](sess Session, q Query, meta *model.TableMeta, typ string)
 // Exec 执行 SQL
 func (q Querier[T]) Exec(ctx context.Context) Result {
 	var handler HandleFunc = func(ctx context.Context, qc *QueryContext) *QueryResult {
-		res, err := q.Session.execContext(ctx, query.Query(qc.q))
+		res, err := q.Session.execContext(ctx, datasource.Query(qc.q))
 		return &QueryResult{Result: res, Err: err}
 	}
 

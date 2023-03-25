@@ -33,12 +33,12 @@ var (
 	ErrOnlyResultOneQuery         = errors.New("eorm: 只能生成一个 SQL")
 	ErrUnsupportedTooComplexQuery = errors.New("eorm: 暂未支持太复杂的查询")
 	ErrSlaveNotFound              = errors.New("eorm: slave不存在")
-	ErrMergerEmptyRows            = errors.New("eorm: sql.Rows 列表为空")
-	ErrMergerRowsIsNull           = errors.New("eorm: sql.Rows 列表中有元素为 nil")
 	ErrNotFoundTargetDataSource   = errors.New("eorm: 未发现目标 data source")
 	ErrNotFoundTargetDB           = errors.New("eorm: 未发现目标 DB")
-	ErrRepeatedSetDB              = errors.New("eorm: 重复设置 DB")
 	ErrNotGenShardingQuery        = errors.New("eorm: 未生成 sharding query")
+	ErrNotCompleteDatasource      = errors.New("eorm: 未实现 DataSource 接口")
+	ErrNotCompleteTxBeginner      = errors.New("eorm: 未实现 TxBeginner 接口")
+
 	// ErrInvalidQuery               = errors.New("eorm: 未知 query")
 
 	// ErrExcShardingAlgorithm       = errors.New("eorm: 执行 sharding algorithm 出错")

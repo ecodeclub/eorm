@@ -39,7 +39,10 @@ func TestInserter_Values(t *testing.T) {
 		FirstName: "Jerry",
 		Ctime:     n,
 	}
-	db := memoryDB()
+	db, err := Open("sqlite3", memoryDB())
+	if err != nil {
+		t.Error(err)
+	}
 	testCases := []CommonTestCase{
 		{
 			name:    "no examples of values",
@@ -163,7 +166,10 @@ func TestInserter_ValuesForCombination(t *testing.T) {
 			CreateTime: n,
 		},
 	}
-	db := memoryDB()
+	db, err := Open("sqlite3", memoryDB())
+	if err != nil {
+		t.Error(err)
+	}
 	testCases := []CommonTestCase{
 		{
 			name:    "no examples of values",
@@ -275,7 +281,10 @@ func TestInserter_ValuesForCombination(t *testing.T) {
 }
 
 func TestInserter_Exec(t *testing.T) {
-	orm := memoryDB()
+	orm, err := Open("sqlite3", memoryDB())
+	if err != nil {
+		t.Error(err)
+	}
 	testCases := []struct {
 		name         string
 		i            *Inserter[TestModel]
@@ -313,7 +322,7 @@ func TestInserter_Exec(t *testing.T) {
 }
 
 func ExampleInserter_Build() {
-	db := memoryDB()
+	db, _ := Open("sqlite3", memoryDB())
 	query, _ := NewInserter[TestModel](db).Values(&TestModel{
 		Id:  1,
 		Age: 18,
@@ -333,7 +342,7 @@ func ExampleInserter_Build() {
 }
 
 func ExampleInserter_Columns() {
-	db := memoryDB()
+	db, _ := Open("sqlite3", memoryDB())
 	query, _ := NewInserter[TestModel](db).Values(&TestModel{
 		Id:  1,
 		Age: 18,
@@ -357,7 +366,7 @@ func ExampleInserter_Columns() {
 }
 
 func ExampleInserter_Values() {
-	db := memoryDB()
+	db, _ := Open("sqlite3", memoryDB())
 	query, _ := NewInserter[TestModel](db).Values(&TestModel{
 		Id:  1,
 		Age: 18,
@@ -369,7 +378,7 @@ func ExampleInserter_Values() {
 }
 
 func ExampleNewInserter() {
-	db := memoryDB()
+	db, _ := Open("sqlite3", memoryDB())
 	tm := &TestModel{}
 	query, _ := NewInserter[TestModel](db).Values(tm).Build()
 	fmt.Printf("SQL: %s", query.SQL)

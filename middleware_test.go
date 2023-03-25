@@ -62,7 +62,7 @@ func Test_Middleware(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			db, err := single.MemoryDB()
+			db, err := single.OpenDB("sqlite3", "file:test.db?cache=shared&mode=memory")
 			if err != nil {
 				t.Error(err)
 			}
@@ -107,7 +107,7 @@ func Test_Middleware_order(t *testing.T) {
 			}
 		}
 	}
-	db, err := single.MemoryDB()
+	db, err := single.OpenDB("sqlite3", "file:test.db?cache=shared&mode=memory")
 	require.NoError(t, err)
 	orm, err := Open("sqlite3", db,
 		DBWithMiddlewares(mdl1, mdl2, mdl3, last))

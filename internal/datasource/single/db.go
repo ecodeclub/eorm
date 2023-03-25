@@ -21,20 +21,24 @@ import (
 	"log"
 	"time"
 
+	"github.com/ecodeclub/eorm/internal/datasource"
+
 	"github.com/ecodeclub/eorm/internal/datasource/transaction"
-	"github.com/ecodeclub/eorm/internal/query"
 )
+
+var _ datasource.DataSource = &DB{}
+var _ datasource.TxBeginner = &DB{}
 
 // DB represents a database
 type DB struct {
 	db *sql.DB
 }
 
-func (db *DB) Query(ctx context.Context, query query.Query) (*sql.Rows, error) {
+func (db *DB) Query(ctx context.Context, query datasource.Query) (*sql.Rows, error) {
 	return db.db.QueryContext(ctx, query.SQL, query.Args...)
 }
 
-func (db *DB) Exec(ctx context.Context, query query.Query) (sql.Result, error) {
+func (db *DB) Exec(ctx context.Context, query datasource.Query) (sql.Result, error) {
 	return db.db.ExecContext(ctx, query.SQL, query.Args...)
 }
 
@@ -50,7 +54,7 @@ func NewDB(db *sql.DB) *DB {
 	return &DB{db: db}
 }
 
-func (db *DB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*transaction.Tx, error) {
+func (db *DB) BeginTx(ctx context.Context, opts *sql.TxOptions) (datasource.Tx, error) {
 	tx, err := db.db.BeginTx(ctx, opts)
 	if err != nil {
 		return nil, err
@@ -72,9 +76,4 @@ func (db *DB) Wait() error {
 
 func (db *DB) Close() error {
 	return db.db.Close()
-}
-
-// MemoryDB 返回一个基于内存的 ORM，它使用的是 sqlite3 内存模式。
-func MemoryDB() (*DB, error) {
-	return OpenDB("sqlite3", "file:test.db?cache=shared&mode=memory")
 }

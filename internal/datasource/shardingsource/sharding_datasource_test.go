@@ -19,13 +19,14 @@ import (
 	"database/sql"
 	"testing"
 
+	"github.com/ecodeclub/eorm/internal/datasource/masterslave"
+	slaves2 "github.com/ecodeclub/eorm/internal/datasource/masterslave/slaves"
+
 	"github.com/ecodeclub/eorm/internal/errs"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/ecodeclub/eorm/internal/datasource"
 	"github.com/ecodeclub/eorm/internal/datasource/cluster"
-	"github.com/ecodeclub/eorm/internal/datasource/slaves"
-	"github.com/ecodeclub/eorm/internal/query"
 	"github.com/ecodeclub/eorm/internal/sharding"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -113,14 +114,14 @@ func (c *ShardingDataSourceSuite) initMock(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	db1 := slaves.NewMasterSlaveDB(c.mockMaster1DB, slaves.MasterSlaveWithSlaves(
+	db1 := masterslave.NewMasterSlaveDB(c.mockMaster1DB, masterslave.MasterSlavesWithSlaves(
 		c.newSlaves(c.mockSlave1DB, c.mockSlave2DB, c.mockSlave3DB)))
 
-	db2 := slaves.NewMasterSlaveDB(c.mockMaster2DB, slaves.MasterSlaveWithSlaves(
+	db2 := masterslave.NewMasterSlaveDB(c.mockMaster2DB, masterslave.MasterSlavesWithSlaves(
 		c.newSlaves(c.mockSlave4DB, c.mockSlave5DB, c.mockSlave6DB)))
 
-	clusterDB1 := cluster.NewClusterDB(map[string]*slaves.MasterSlavesDB{"db_0": db1})
-	clusterDB2 := cluster.NewClusterDB(map[string]*slaves.MasterSlavesDB{"db_0": db2})
+	clusterDB1 := cluster.NewClusterDB(map[string]*masterslave.MasterSlavesDB{"db_0": db1})
+	clusterDB2 := cluster.NewClusterDB(map[string]*masterslave.MasterSlavesDB{"db_0": db2})
 
 	c.DataSource = NewShardingDataSource(map[string]datasource.DataSource{
 		"0.db.cluster.company.com:3306": clusterDB1,
@@ -185,7 +186,7 @@ func (c *ShardingDataSourceSuite) TestClusterDbQuery() {
 		{
 			name:   "cluster0 use master",
 			reqCnt: 1,
-			ctx:    slaves.UseMaster(context.Background()),
+			ctx:    masterslave.UseMaster(context.Background()),
 			query: sharding.Query{
 				SQL:        "SELECT `first_name` FROM `test_model`",
 				DB:         "db_0",
@@ -196,7 +197,7 @@ func (c *ShardingDataSourceSuite) TestClusterDbQuery() {
 		{
 			name:   "cluster1 use master",
 			reqCnt: 1,
-			ctx:    slaves.UseMaster(context.Background()),
+			ctx:    masterslave.UseMaster(context.Background()),
 			query: sharding.Query{
 				SQL:        "SELECT `first_name` FROM `test_model`",
 				DB:         "db_0",
@@ -210,7 +211,7 @@ func (c *ShardingDataSourceSuite) TestClusterDbQuery() {
 		c.T().Run(tc.name, func(t *testing.T) {
 			var resp []string
 			for i := 1; i <= tc.reqCnt; i++ {
-				rows, queryErr := c.DataSource.Query(tc.ctx, query.Query(tc.query))
+				rows, queryErr := c.DataSource.Query(tc.ctx, datasource.Query(tc.query))
 				assert.Equal(t, queryErr, tc.wantErr)
 				if queryErr != nil {
 					return
@@ -243,7 +244,7 @@ func (c *ShardingDataSourceSuite) TestClusterDbExec() {
 		name              string
 		reqCnt            int
 		ctx               context.Context
-		slaves            slaves.Slaves
+		slaves            slaves2.Slaves
 		query             sharding.Query
 		wantRowsAffected  []int64
 		wantLastInsertIds []int64
@@ -263,7 +264,7 @@ func (c *ShardingDataSourceSuite) TestClusterDbExec() {
 		{
 			name:   "cluster0 exec",
 			reqCnt: 1,
-			ctx:    slaves.UseMaster(context.Background()),
+			ctx:    masterslave.UseMaster(context.Background()),
 			query: sharding.Query{
 				SQL:        "INSERT INTO `test_model`(`id`,`first_name`,`age`,`last_name`) VALUES(1,2,3,4)",
 				DB:         "db_0",
@@ -275,7 +276,7 @@ func (c *ShardingDataSourceSuite) TestClusterDbExec() {
 		{
 			name:   "cluster1 exec",
 			reqCnt: 1,
-			ctx:    slaves.UseMaster(context.Background()),
+			ctx:    masterslave.UseMaster(context.Background()),
 			query: sharding.Query{
 				SQL:        "INSERT INTO `test_model`(`id`,`first_name`,`age`,`last_name`) VALUES(1,2,3,4)",
 				DB:         "db_0",
@@ -291,7 +292,7 @@ func (c *ShardingDataSourceSuite) TestClusterDbExec() {
 			var resAffectID []int64
 			var resLastID []int64
 			for i := 1; i <= tc.reqCnt; i++ {
-				res, execErr := c.DataSource.Exec(tc.ctx, query.Query(tc.query))
+				res, execErr := c.DataSource.Exec(tc.ctx, datasource.Query(tc.query))
 				assert.Equal(t, execErr, tc.wantErr)
 				if execErr != nil {
 					return
@@ -313,8 +314,8 @@ func (c *ShardingDataSourceSuite) TestClusterDbExec() {
 	}
 }
 
-func (c *ShardingDataSourceSuite) newSlaves(dbs ...*sql.DB) slaves.Slaves {
-	res, err := slaves.NewSlaves(dbs...)
+func (c *ShardingDataSourceSuite) newSlaves(dbs ...*sql.DB) slaves2.Slaves {
+	res, err := slaves2.NewSlaves(dbs...)
 	require.NoError(c.T(), err)
 	return res
 }

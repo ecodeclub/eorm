@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ecodeclub/eorm/internal/datasource/slaves/dns/mysql"
+	"github.com/ecodeclub/eorm/internal/datasource/masterslave/slaves/dns/mysql"
 
 	"github.com/ecodeclub/eorm/internal/errs"
 

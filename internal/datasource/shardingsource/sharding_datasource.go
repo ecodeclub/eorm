@@ -21,7 +21,6 @@ import (
 	"github.com/ecodeclub/eorm/internal/datasource"
 
 	"github.com/ecodeclub/eorm/internal/errs"
-	"github.com/ecodeclub/eorm/internal/query"
 )
 
 var _ datasource.DataSource = &ShardingDataSource{}
@@ -30,7 +29,7 @@ type ShardingDataSource struct {
 	sources map[string]datasource.DataSource
 }
 
-func (s *ShardingDataSource) Query(ctx context.Context, query query.Query) (*sql.Rows, error) {
+func (s *ShardingDataSource) Query(ctx context.Context, query datasource.Query) (*sql.Rows, error) {
 	ds, ok := s.sources[query.Datasource]
 	if !ok {
 		return nil, errs.ErrNotFoundTargetDataSource
@@ -38,7 +37,7 @@ func (s *ShardingDataSource) Query(ctx context.Context, query query.Query) (*sql
 	return ds.Query(ctx, query)
 }
 
-func (s *ShardingDataSource) Exec(ctx context.Context, query query.Query) (sql.Result, error) {
+func (s *ShardingDataSource) Exec(ctx context.Context, query datasource.Query) (sql.Result, error) {
 	ds, ok := s.sources[query.Datasource]
 	if !ok {
 		return nil, errs.ErrNotFoundTargetDataSource

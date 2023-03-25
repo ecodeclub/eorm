@@ -18,22 +18,23 @@ import (
 	"context"
 	"reflect"
 
+	"github.com/ecodeclub/eorm/internal/datasource"
+
 	"github.com/ecodeclub/eorm/internal/dialect"
 	"github.com/ecodeclub/eorm/internal/errs"
 	"github.com/ecodeclub/eorm/internal/model"
-	"github.com/ecodeclub/eorm/internal/query"
 	"github.com/ecodeclub/eorm/internal/valuer"
 )
 
 type core struct {
 	metaRegistry model.MetaRegistry
 	dialect      dialect.Dialect
-	valCreator   valuer.BasicTypeCreator
+	valCreator   valuer.PrimitiveCreator
 	ms           []Middleware
 }
 
 func getHandler[T any](ctx context.Context, sess Session, c core, qc *QueryContext) *QueryResult {
-	rows, err := sess.queryContext(ctx, query.Query(qc.q))
+	rows, err := sess.queryContext(ctx, datasource.Query(qc.q))
 	if err != nil {
 		return &QueryResult{Err: err}
 	}
@@ -50,7 +51,7 @@ func getHandler[T any](ctx context.Context, sess Session, c core, qc *QueryConte
 		meta, _ = c.metaRegistry.Get(tp)
 	}
 
-	val := c.valCreator.NewBasicTypeValue(tp, meta)
+	val := c.valCreator.NewPrimitiveValue(tp, meta)
 	if err = val.SetColumns(rows); err != nil {
 		return &QueryResult{Err: err}
 	}
@@ -69,7 +70,7 @@ func get[T any](ctx context.Context, sess Session, core core, qc *QueryContext) 
 }
 
 func getMultiHandler[T any](ctx context.Context, sess Session, c core, qc *QueryContext) *QueryResult {
-	rows, err := sess.queryContext(ctx, query.Query(qc.q))
+	rows, err := sess.queryContext(ctx, datasource.Query(qc.q))
 	if err != nil {
 		return &QueryResult{Err: err}
 	}
@@ -86,7 +87,7 @@ func getMultiHandler[T any](ctx context.Context, sess Session, c core, qc *Query
 	}
 	for rows.Next() {
 		tp := new(T)
-		val := c.valCreator.NewBasicTypeValue(tp, meta)
+		val := c.valCreator.NewPrimitiveValue(tp, meta)
 		if err = val.SetColumns(rows); err != nil {
 			return &QueryResult{Err: err}
 		}

@@ -30,7 +30,7 @@ import (
 )
 
 func ExampleRawQuery() {
-	orm := memoryDB()
+	orm, _ := Open("sqlite3", memoryDB())
 	q := RawQuery[any](orm, `SELECT * FROM user_tab WHERE id = ?;`, 1)
 	fmt.Printf(`
 SQL: %s
@@ -42,7 +42,7 @@ Args: %v
 }
 
 func ExampleQuerier_Exec() {
-	orm := memoryDB()
+	orm, _ := Open("sqlite3", memoryDB())
 	// 在 Exec 的时候，泛型参数可以是任意的
 	q := RawQuery[any](orm, `CREATE TABLE IF NOT EXISTS groups (
    group_id INTEGER PRIMARY KEY,
@@ -62,15 +62,15 @@ func (q Query) string() string {
 
 func TestQuerier_Get(t *testing.T) {
 	t.Run("unsafe", func(t *testing.T) {
-		testQuerierGet(t, valuer.BasicTypeCreator{Creator: valuer.NewUnsafeValue})
+		testQuerierGet(t, valuer.PrimitiveCreator{Creator: valuer.NewUnsafeValue})
 	})
 
 	t.Run("reflect", func(t *testing.T) {
-		testQuerierGet(t, valuer.BasicTypeCreator{Creator: valuer.NewReflectValue})
+		testQuerierGet(t, valuer.PrimitiveCreator{Creator: valuer.NewReflectValue})
 	})
 }
 
-func testQuerierGet(t *testing.T, creator valuer.BasicTypeCreator) {
+func testQuerierGet(t *testing.T, creator valuer.PrimitiveCreator) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
 		t.Fatal(err)
@@ -152,14 +152,14 @@ func testQuerierGet(t *testing.T, creator valuer.BasicTypeCreator) {
 
 func TestQuerierGetMulti(t *testing.T) {
 	t.Run("unsafe", func(t *testing.T) {
-		testQuerier_GetMulti(t, valuer.BasicTypeCreator{Creator: valuer.NewUnsafeValue})
+		testQuerier_GetMulti(t, valuer.PrimitiveCreator{Creator: valuer.NewUnsafeValue})
 	})
 	t.Run("reflect", func(t *testing.T) {
-		testQuerier_GetMulti(t, valuer.BasicTypeCreator{Creator: valuer.NewReflectValue})
+		testQuerier_GetMulti(t, valuer.PrimitiveCreator{Creator: valuer.NewReflectValue})
 	})
 }
 
-func testQuerier_GetMulti(t *testing.T, creator valuer.BasicTypeCreator) {
+func testQuerier_GetMulti(t *testing.T, creator valuer.PrimitiveCreator) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
 		t.Fatal(err)

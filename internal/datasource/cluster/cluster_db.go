@@ -17,32 +17,30 @@ package cluster
 import (
 	"context"
 	"database/sql"
-	"sync"
 
 	"github.com/ecodeclub/eorm/internal/datasource"
-	"github.com/ecodeclub/eorm/internal/datasource/slaves"
+	"github.com/ecodeclub/eorm/internal/datasource/masterslave"
 	"github.com/ecodeclub/eorm/internal/errs"
-	"github.com/ecodeclub/eorm/internal/query"
 )
 
 var _ datasource.DataSource = &clusterDB{}
 
+// clusterDB 以 DB 名称作为索引目标数据库
 type clusterDB struct {
 	// DataSource  应实现为 *masterSlavesDB
-	MasterSlavesDBs map[string]*slaves.MasterSlavesDB
-	lock            sync.Mutex
+	masterSlavesDBs map[string]*masterslave.MasterSlavesDB
 }
 
-func (c *clusterDB) Query(ctx context.Context, query query.Query) (*sql.Rows, error) {
-	ms, ok := c.MasterSlavesDBs[query.DB]
+func (c *clusterDB) Query(ctx context.Context, query datasource.Query) (*sql.Rows, error) {
+	ms, ok := c.masterSlavesDBs[query.DB]
 	if !ok {
 		return nil, errs.ErrNotFoundTargetDB
 	}
 	return ms.Query(ctx, query)
 }
 
-func (c *clusterDB) Exec(ctx context.Context, query query.Query) (sql.Result, error) {
-	ms, ok := c.MasterSlavesDBs[query.DB]
+func (c *clusterDB) Exec(ctx context.Context, query datasource.Query) (sql.Result, error) {
+	ms, ok := c.masterSlavesDBs[query.DB]
 	if !ok {
 		return nil, errs.ErrNotFoundTargetDB
 	}
@@ -60,6 +58,6 @@ func (c *clusterDB) Exec(ctx context.Context, query query.Query) (sql.Result, er
 //	return nil
 //}
 
-func NewClusterDB(ms map[string]*slaves.MasterSlavesDB) datasource.DataSource {
-	return &clusterDB{MasterSlavesDBs: ms}
+func NewClusterDB(ms map[string]*masterslave.MasterSlavesDB) datasource.DataSource {
+	return &clusterDB{masterSlavesDBs: ms}
 }

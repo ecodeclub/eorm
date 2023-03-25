@@ -20,6 +20,9 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/ecodeclub/eorm/internal/datasource"
+	"github.com/ecodeclub/eorm/internal/datasource/masterslave"
+
 	"github.com/ecodeclub/eorm/internal/datasource/single"
 
 	"github.com/ecodeclub/eorm/internal/valuer"
@@ -51,15 +54,15 @@ func ExampleMiddleware() {
 
 // TODO tx 是否要维护 *sql.DB
 func ExampleDB_BeginTx() {
-	db, _ := single.MemoryDB()
-	tx, err := db.BeginTx(context.Background(), &sql.TxOptions{})
-	if err == nil {
-		fmt.Println("Begin")
-	}
-	orm, _ := Open("mysql", tx)
+	db, _ := single.OpenDB("sqlite3", "file:test.db?cache=shared&mode=memory")
+	orm, _ := Open("sqlite3", db)
 	defer func() {
 		_ = orm.Close()
 	}()
+	tx, err := orm.BeginTx(context.Background(), &sql.TxOptions{})
+	if err == nil {
+		fmt.Println("Begin")
+	}
 	// 或者 tx.Rollback()
 	err = tx.Commit()
 	if err == nil {
@@ -84,36 +87,32 @@ func ExampleOpen() {
 }
 
 func ExampleNewDeleter() {
-	db := memoryDB()
 	tm := &TestModel{}
-	query, _ := NewDeleter[TestModel](db).From(tm).Build()
+	orm, _ := Open("sqlite3", memoryDB())
+	query, _ := NewDeleter[TestModel](orm).From(tm).Build()
 	fmt.Printf("SQL: %s", query.SQL)
 	// Output:
 	// SQL: DELETE FROM `test_model`;
 }
 
 func ExampleNewUpdater() {
-	db := memoryDB()
 	tm := &TestModel{
 		Age: 18,
 	}
-	query, _ := NewUpdater[TestModel](db).Update(tm).Build()
+	orm, _ := Open("sqlite3", memoryDB())
+	query, _ := NewUpdater[TestModel](orm).Update(tm).Build()
 	fmt.Printf("SQL: %s", query.SQL)
 	// Output:
 	// SQL: UPDATE `test_model` SET `id`=?,`first_name`=?,`age`=?,`last_name`=?;
 }
 
 // memoryDB 返回一个基于内存的 ORM，它使用的是 sqlite3 内存模式。
-func memoryDB() *DB {
-	db, err := single.MemoryDB()
+func memoryDB() datasource.DataSource {
+	db, err := single.OpenDB("sqlite3", "file:test.db?cache=shared&mode=memory")
 	if err != nil {
 		panic(err)
 	}
-	orm, err := Open("sqlite3", db)
-	if err != nil {
-		panic(err)
-	}
-	return orm
+	return db
 }
 
 func memoryDBWithDB(dbName string) *DB {
@@ -162,7 +161,7 @@ func BenchmarkQuerier_Get(b *testing.B) {
 	}
 
 	b.Run("unsafe", func(b *testing.B) {
-		orm.valCreator = valuer.BasicTypeCreator{
+		orm.valCreator = valuer.PrimitiveCreator{
 			Creator: valuer.NewUnsafeValue,
 		}
 		for i := 0; i < b.N; i++ {
@@ -174,7 +173,7 @@ func BenchmarkQuerier_Get(b *testing.B) {
 	})
 
 	b.Run("reflect", func(b *testing.B) {
-		orm.valCreator = valuer.BasicTypeCreator{
+		orm.valCreator = valuer.PrimitiveCreator{
 			Creator: valuer.NewReflectValue,
 		}
 		for i := 0; i < b.N; i++ {
@@ -184,4 +183,14 @@ func BenchmarkQuerier_Get(b *testing.B) {
 			}
 		}
 	})
+}
+
+// MasterSlavesMemoryDB 返回一个基于内存的 MasterSlaveDB，它使用的是 sqlite3 内存模式。
+func MasterSlavesMemoryDB() *masterslave.MasterSlavesDB {
+	db, err := sql.Open("sqlite3", "file:test.db?cache=shared&mode=memory")
+	if err != nil {
+		panic(err)
+	}
+	masterSlaveDB := masterslave.NewMasterSlaveDB(db)
+	return masterSlaveDB
 }

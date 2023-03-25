@@ -18,6 +18,9 @@ import (
 	"context"
 	"testing"
 
+	"github.com/ecodeclub/eorm/internal/datasource/masterslave"
+	slaves2 "github.com/ecodeclub/eorm/internal/datasource/masterslave/slaves"
+
 	"github.com/ecodeclub/eorm/internal/datasource/shardingsource"
 
 	"github.com/ecodeclub/eorm/internal/datasource/cluster"
@@ -28,8 +31,6 @@ import (
 	"github.com/ecodeclub/eorm/internal/sharding"
 	"github.com/ecodeclub/eorm/internal/sharding/hash"
 	"github.com/ecodeclub/eorm/internal/test"
-
-	"github.com/ecodeclub/eorm/internal/datasource/slaves"
 
 	"github.com/ecodeclub/eorm/internal/model"
 	"github.com/stretchr/testify/assert"
@@ -49,10 +50,10 @@ func TestShardingSelector_shadow_Build(t *testing.T) {
 			Prefix: "shadow_",
 		}))
 	require.NoError(t, err)
-	m := map[string]*slaves.MasterSlavesDB{
-		"order_db_0": slaves.MasterSlaveMemoryDB(),
-		"order_db_1": slaves.MasterSlaveMemoryDB(),
-		"order_db_2": slaves.MasterSlaveMemoryDB(),
+	m := map[string]*masterslave.MasterSlavesDB{
+		"order_db_0": MasterSlavesMemoryDB(),
+		"order_db_1": MasterSlavesMemoryDB(),
+		"order_db_2": MasterSlavesMemoryDB(),
 	}
 	clusterDB := cluster.NewClusterDB(m)
 	ds := map[string]datasource.DataSource{
@@ -594,8 +595,8 @@ func TestShardingSelector_onlyDataSource_Build(t *testing.T) {
 			DsPattern:    &hash.Pattern{Name: "%d.db.cluster.company.com:3306", Base: 2},
 		}))
 	require.NoError(t, err)
-	m := map[string]*slaves.MasterSlavesDB{
-		"order_db": slaves.MasterSlaveMemoryDB(),
+	m := map[string]*masterslave.MasterSlavesDB{
+		"order_db": MasterSlavesMemoryDB(),
 	}
 	clusterDB := cluster.NewClusterDB(m)
 	ds := map[string]datasource.DataSource{
@@ -1035,10 +1036,10 @@ func TestShardingSelector_onlyTable_Build(t *testing.T) {
 			DsPattern:    &hash.Pattern{Name: "0.db.cluster.company.com:3306", NotSharding: true},
 		}))
 	require.NoError(t, err)
-	m := map[string]*slaves.MasterSlavesDB{
-		"order_db_0": slaves.MasterSlaveMemoryDB(),
-		"order_db_1": slaves.MasterSlaveMemoryDB(),
-		"order_db_2": slaves.MasterSlaveMemoryDB(),
+	m := map[string]*masterslave.MasterSlavesDB{
+		"order_db_0": MasterSlavesMemoryDB(),
+		"order_db_1": MasterSlavesMemoryDB(),
+		"order_db_2": MasterSlavesMemoryDB(),
 	}
 	clusterDB := cluster.NewClusterDB(m)
 	ds := map[string]datasource.DataSource{
@@ -1477,10 +1478,10 @@ func TestShardingSelector_onlyDB_Build(t *testing.T) {
 			DsPattern:    &hash.Pattern{Name: "0.db.cluster.company.com:3306", NotSharding: true},
 		}))
 	require.NoError(t, err)
-	m := map[string]*slaves.MasterSlavesDB{
-		"order_db_0": slaves.MasterSlaveMemoryDB(),
-		"order_db_1": slaves.MasterSlaveMemoryDB(),
-		"order_db_2": slaves.MasterSlaveMemoryDB(),
+	m := map[string]*masterslave.MasterSlavesDB{
+		"order_db_0": MasterSlavesMemoryDB(),
+		"order_db_1": MasterSlavesMemoryDB(),
+		"order_db_2": MasterSlavesMemoryDB(),
 	}
 	clusterDB := cluster.NewClusterDB(m)
 	ds := map[string]datasource.DataSource{
@@ -1919,10 +1920,10 @@ func TestShardingSelector_all_Build(t *testing.T) {
 			DsPattern:    &hash.Pattern{Name: "%d.db.cluster.company.com:3306", Base: 2},
 		}))
 	require.NoError(t, err)
-	m := map[string]*slaves.MasterSlavesDB{
-		"order_db_0": slaves.MasterSlaveMemoryDB(),
-		"order_db_1": slaves.MasterSlaveMemoryDB(),
-		"order_db_2": slaves.MasterSlaveMemoryDB(),
+	m := map[string]*masterslave.MasterSlavesDB{
+		"order_db_0": MasterSlavesMemoryDB(),
+		"order_db_1": MasterSlavesMemoryDB(),
+		"order_db_2": MasterSlavesMemoryDB(),
 	}
 	clusterDB := cluster.NewClusterDB(m)
 	ds := map[string]datasource.DataSource{
@@ -2609,10 +2610,10 @@ func TestShardingSelector_Build(t *testing.T) {
 		}))
 	require.NoError(t, err)
 
-	m := map[string]*slaves.MasterSlavesDB{
-		"order_db_0": slaves.MasterSlaveMemoryDB(),
-		"order_db_1": slaves.MasterSlaveMemoryDB(),
-		"order_db_2": slaves.MasterSlaveMemoryDB(),
+	m := map[string]*masterslave.MasterSlavesDB{
+		"order_db_0": MasterSlavesMemoryDB(),
+		"order_db_1": MasterSlavesMemoryDB(),
+		"order_db_2": MasterSlavesMemoryDB(),
 	}
 	clusterDB := cluster.NewClusterDB(m)
 	ds := map[string]datasource.DataSource{
@@ -2654,7 +2655,7 @@ func TestShardingSelector_Build(t *testing.T) {
 				require.NotNil(t, meta.ShardingAlgorithm)
 				db, err := Open("sqlite3",
 					shardingsource.NewShardingDataSource(map[string]datasource.DataSource{
-						"0.db.cluster.company.com:3306": slaves.MasterSlaveMemoryDB(),
+						"0.db.cluster.company.com:3306": MasterSlavesMemoryDB(),
 					}),
 					DBOptionWithMetaRegistry(reg))
 				require.NoError(t, err)
@@ -3196,10 +3197,10 @@ func TestSardingSelector_Get(t *testing.T) {
 	}
 	defer func() { _ = mockDB.Close() }()
 
-	rbSlaves, err := slaves.NewSlaves(mockDB)
+	rbSlaves, err := slaves2.NewSlaves(mockDB)
 	require.NoError(t, err)
-	masterSlaveDB := slaves.NewMasterSlaveDB(
-		mockDB, slaves.MasterSlaveWithSlaves(newMockSlaveNameGet(rbSlaves)))
+	masterSlaveDB := masterslave.NewMasterSlaveDB(
+		mockDB, masterslave.MasterSlavesWithSlaves(newMockSlaveNameGet(rbSlaves)))
 	require.NoError(t, err)
 
 	m := map[string]datasource.DataSource{
@@ -3307,16 +3308,16 @@ type Order struct {
 }
 
 type testSlaves struct {
-	slaves.Slaves
+	slaves2.Slaves
 }
 
-func newMockSlaveNameGet(s slaves.Slaves) *testSlaves {
+func newMockSlaveNameGet(s slaves2.Slaves) *testSlaves {
 	return &testSlaves{
 		Slaves: s,
 	}
 }
 
-func (s *testSlaves) Next(ctx context.Context) (slaves.Slave, error) {
+func (s *testSlaves) Next(ctx context.Context) (slaves2.Slave, error) {
 	slave, err := s.Slaves.Next(ctx)
 	if err != nil {
 		return slave, err

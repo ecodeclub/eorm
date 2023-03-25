@@ -24,8 +24,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ecodeclub/eorm/internal/datasource/slaves"
-	"github.com/ecodeclub/eorm/internal/datasource/slaves/dns/mysql"
+	"github.com/ecodeclub/eorm/internal/datasource/masterslave/slaves"
+	"github.com/ecodeclub/eorm/internal/datasource/masterslave/slaves/dns/mysql"
 
 	"github.com/ecodeclub/eorm/internal/errs"
 	_ "github.com/go-sql-driver/mysql"
