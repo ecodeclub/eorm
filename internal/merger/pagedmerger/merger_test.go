@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package limitmerger
+package pagedmerger
 
 import (
 	"context"
@@ -97,6 +97,12 @@ func (ms *MergerSuite) TestMerger_New() {
 			wantErr: errs.ErrMergerInvalidLimitOrOffset,
 		},
 		{
+			name:    "limit 等于0",
+			limit:   0,
+			offset:  10,
+			wantErr: errs.ErrMergerInvalidLimitOrOffset,
+		},
+		{
 			name:    "offset 小于0",
 			limit:   0,
 			offset:  -1,
@@ -144,7 +150,7 @@ func (ms *MergerSuite) TestMerger_Merge() {
 			ctx: func() (context.Context, context.CancelFunc) {
 				return context.WithCancel(context.Background())
 			},
-			limit:  0,
+			limit:  1,
 			offset: 0,
 		},
 		{
@@ -365,30 +371,6 @@ func (ms *MergerSuite) TestMerger_NextAndScan() {
 			wantVal: []TestModel{},
 			limit:   2,
 			offset:  100,
-		},
-		{
-			name: "limit 的值为0",
-			getMerger: func() (merger.Merger, error) {
-				return sortmerger.NewMerger(sortmerger.NewSortColumn[int]("id", sortmerger.ASC))
-			},
-			GetRowsList: func() []*sql.Rows {
-				cols := []string{"id", "name", "address"}
-				query := "SELECT * FROM `t1`"
-				ms.mock01.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(1, "abex", "cn").AddRow(5, "bruce", "cn"))
-				ms.mock02.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(3, "alex", "cn").AddRow(4, "x", "cn"))
-				ms.mock03.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(2, "a", "cn").AddRow(7, "b", "cn"))
-				dbs := []*sql.DB{ms.mockDB01, ms.mockDB02, ms.mockDB03}
-				rowsList := make([]*sql.Rows, 0, len(dbs))
-				for _, db := range dbs {
-					row, err := db.QueryContext(context.Background(), query)
-					require.NoError(ms.T(), err)
-					rowsList = append(rowsList, row)
-				}
-				return rowsList
-			},
-			wantVal: []TestModel{},
-			limit:   0,
-			offset:  0,
 		},
 		{
 			name: "offset 的值为0",

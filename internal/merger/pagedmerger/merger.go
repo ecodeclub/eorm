@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package limitmerger
+package pagedmerger
 
 import (
 	"context"
@@ -30,7 +30,7 @@ type Merger struct {
 }
 
 func NewMerger(m merger.Merger, offset int, limit int) (*Merger, error) {
-	if offset < 0 || limit < 0 {
+	if offset < 0 || limit <= 0 {
 		return nil, errs.ErrMergerInvalidLimitOrOffset
 	}
 
