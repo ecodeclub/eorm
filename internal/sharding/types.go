@@ -68,5 +68,6 @@ func (r Dst) NotEquals(l Dst) bool {
 }
 
 type Request struct {
+	Op       string
 	SkValues map[string]any
 }
