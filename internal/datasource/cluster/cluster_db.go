@@ -46,9 +46,9 @@ func (c *clusterDB) Exec(ctx context.Context, query datasource.Query) (sql.Resul
 	return ms.Exec(ctx, query)
 }
 
-func (*clusterDB) BeginTx(_ context.Context, _ *sql.TxOptions) (datasource.Tx, error) {
-	panic("`BeginTx` must be completed")
-}
+//func (*clusterDB) BeginTx(_ context.Context, _ *sql.TxOptions) (datasource.Tx, error) {
+//	panic("`BeginTx` must be completed")
+//}
 
 func NewClusterDB(ms map[string]*masterslave.MasterSlavesDB) datasource.DataSource {
 	return &clusterDB{masterSlavesDBs: ms}

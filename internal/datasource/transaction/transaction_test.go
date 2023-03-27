@@ -97,7 +97,7 @@ func (db *testMockDB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, er
 	if err != nil {
 		return nil, err
 	}
-	return BeginTx(tx, db), nil
+	return NewTx(tx, db), nil
 }
 
 func (db *testMockDB) Close() error {
@@ -166,7 +166,7 @@ func (s *TransactionSuite) TestDBQuery() {
 				s.mock1.ExpectCommit()
 				tx, err := s.mockDB1.BeginTx(context.Background(), &sql.TxOptions{})
 				assert.Nil(s.T(), err)
-				return BeginTx(tx, NewMockDB(s.mockDB1))
+				return NewTx(tx, NewMockDB(s.mockDB1))
 			}(),
 			wantResp: []string{"value"},
 		},
@@ -218,7 +218,7 @@ func (s *TransactionSuite) TestDBExec() {
 				s.mock1.ExpectRollback()
 				tx, err := s.mockDB1.BeginTx(context.Background(), &sql.TxOptions{})
 				assert.Nil(s.T(), err)
-				return BeginTx(tx, NewMockDB(s.mockDB1))
+				return NewTx(tx, NewMockDB(s.mockDB1))
 			}(),
 			lastInsertId: int64(2),
 			rowsAffected: int64(1),
@@ -235,7 +235,7 @@ func (s *TransactionSuite) TestDBExec() {
 				s.mock2.ExpectCommit()
 				tx, err := s.mockDB2.BeginTx(context.Background(), &sql.TxOptions{})
 				assert.Nil(s.T(), err)
-				return BeginTx(tx, NewMockDB(s.mockDB2))
+				return NewTx(tx, NewMockDB(s.mockDB2))
 			}(),
 			isCommit:     true,
 			lastInsertId: int64(2),
@@ -253,7 +253,7 @@ func (s *TransactionSuite) TestDBExec() {
 				s.mock3.ExpectCommit()
 				tx, err := s.mockDB3.BeginTx(context.Background(), &sql.TxOptions{})
 				assert.Nil(s.T(), err)
-				return BeginTx(tx, NewMockDB(s.mockDB3))
+				return NewTx(tx, NewMockDB(s.mockDB3))
 			}(),
 			isCommit:     true,
 			lastInsertId: int64(4),
@@ -300,7 +300,7 @@ func (m *mockDB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 	if err != nil {
 		return nil, err
 	}
-	return BeginTx(tx, m), nil
+	return NewTx(tx, m), nil
 }
 
 func NewMockDB(db *sql.DB) datasource.DataSource {
