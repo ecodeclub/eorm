@@ -59,7 +59,7 @@ func (db *DB) BeginTx(ctx context.Context, opts *sql.TxOptions) (datasource.Tx, 
 	if err != nil {
 		return nil, err
 	}
-	return transaction.BeginTx(tx, db), nil
+	return transaction.NewTx(tx, db), nil
 }
 
 // Wait 会等待数据库连接

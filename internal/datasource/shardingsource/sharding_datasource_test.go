@@ -17,6 +17,7 @@ package shardingsource
 import (
 	"context"
 	"database/sql"
+	"github.com/ecodeclub/eorm/internal/datasource/masterslave/slaves/roundrobin"
 	"testing"
 
 	"github.com/ecodeclub/eorm/internal/datasource/masterslave"
@@ -315,7 +316,7 @@ func (c *ShardingDataSourceSuite) TestClusterDbExec() {
 }
 
 func (c *ShardingDataSourceSuite) newSlaves(dbs ...*sql.DB) slaves2.Slaves {
-	res, err := slaves2.NewSlaves(dbs...)
+	res, err := roundrobin.NewSlaves(dbs...)
 	require.NoError(c.T(), err)
 	return res
 }

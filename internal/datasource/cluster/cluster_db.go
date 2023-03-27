@@ -17,7 +17,6 @@ package cluster
 import (
 	"context"
 	"database/sql"
-
 	"github.com/ecodeclub/eorm/internal/datasource"
 	"github.com/ecodeclub/eorm/internal/datasource/masterslave"
 	"github.com/ecodeclub/eorm/internal/errs"
@@ -47,16 +46,9 @@ func (c *clusterDB) Exec(ctx context.Context, query datasource.Query) (sql.Resul
 	return ms.Exec(ctx, query)
 }
 
-//func (c *clusterDB) Set(key string, db *slaves.MasterSlavesDB) error {
-//	c.lock.Lock()
-//	defer c.lock.Unlock()
-//	_, ok := c.MasterSlavesDBs[key]
-//	if ok {
-//		return errs.ErrRepeatedSetDB
-//	}
-//	c.MasterSlavesDBs[key] = db
-//	return nil
-//}
+func (*clusterDB) BeginTx(_ context.Context, _ *sql.TxOptions) (datasource.Tx, error) {
+	panic("`BeginTx` must be completed")
+}
 
 func NewClusterDB(ms map[string]*masterslave.MasterSlavesDB) datasource.DataSource {
 	return &clusterDB{masterSlavesDBs: ms}

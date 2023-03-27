@@ -59,7 +59,7 @@ func (m *MasterSlavesDB) BeginTx(ctx context.Context, opts *sql.TxOptions) (data
 	if err != nil {
 		return nil, err
 	}
-	return transaction.BeginTx(tx, m), nil
+	return transaction.NewTx(tx, m), nil
 }
 
 func NewMasterSlaveDB(master *sql.DB, opts ...MasterSlavesDBOption) *MasterSlavesDB {

@@ -12,11 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package slaves
+package roundrobin
 
 import (
 	"context"
 	"database/sql"
+	slaves2 "github.com/ecodeclub/eorm/internal/datasource/masterslave/slaves"
 	"strconv"
 	"sync/atomic"
 
@@ -24,27 +25,27 @@ import (
 )
 
 type slaves struct {
-	slaves []Slave
+	slaves []slaves2.Slave
 	cnt    uint32
 }
 
-func (r *slaves) Next(ctx context.Context) (Slave, error) {
+func (r *slaves) Next(ctx context.Context) (slaves2.Slave, error) {
 	if ctx.Err() != nil {
-		return Slave{}, ctx.Err()
+		return slaves2.Slave{}, ctx.Err()
 	}
 	if r == nil || len(r.slaves) == 0 {
-		return Slave{}, errs.ErrSlaveNotFound
+		return slaves2.Slave{}, errs.ErrSlaveNotFound
 	}
 	cnt := atomic.AddUint32(&r.cnt, 1)
 	index := int(cnt) % len(r.slaves)
 	return r.slaves[index], nil
 }
 
-func NewSlaves(dbs ...*sql.DB) (Slaves, error) {
+func NewSlaves(dbs ...*sql.DB) (slaves2.Slaves, error) {
 	r := &slaves{}
-	r.slaves = make([]Slave, 0, len(dbs))
+	r.slaves = make([]slaves2.Slave, 0, len(dbs))
 	for idx, db := range dbs {
-		s := Slave{
+		s := slaves2.Slave{
 			SlaveName: strconv.Itoa(idx),
 			DB:        db,
 		}

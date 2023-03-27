@@ -12,11 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package slaves
+package roundrobin
 
 import (
 	"context"
 	"database/sql"
+	slaves2 "github.com/ecodeclub/eorm/internal/datasource/masterslave/slaves"
 	"testing"
 	"time"
 
@@ -31,7 +32,7 @@ func TestSlaves_Next(t *testing.T) {
 	db3 := &sql.DB{}
 	testCases := []struct {
 		name   string
-		slaves func() Slaves
+		slaves func() slaves2.Slaves
 		ctx    context.Context
 
 		wantErr error
@@ -45,7 +46,7 @@ func TestSlaves_Next(t *testing.T) {
 				cancel()
 				return ctx
 			}(),
-			slaves: func() Slaves {
+			slaves: func() slaves2.Slaves {
 				res, err := NewSlaves(db1, db2, db3)
 				require.NoError(t, err)
 				return res
@@ -55,7 +56,7 @@ func TestSlaves_Next(t *testing.T) {
 		{
 			name: "no slaves",
 			ctx:  context.Background(),
-			slaves: func() Slaves {
+			slaves: func() slaves2.Slaves {
 				res, err := NewSlaves()
 				require.NoError(t, err)
 				return res
@@ -65,7 +66,7 @@ func TestSlaves_Next(t *testing.T) {
 		{
 			name: "index 0",
 			ctx:  context.Background(),
-			slaves: func() Slaves {
+			slaves: func() slaves2.Slaves {
 				res, err := NewSlaves(db1, db2, db3)
 				require.NoError(t, err)
 				return res
@@ -75,7 +76,7 @@ func TestSlaves_Next(t *testing.T) {
 		{
 			name: "index last",
 			ctx:  context.Background(),
-			slaves: func() Slaves {
+			slaves: func() slaves2.Slaves {
 				res, err := NewSlaves(db1, db2, db3)
 				require.NoError(t, err)
 				sl, ok := res.(*slaves)
@@ -88,7 +89,7 @@ func TestSlaves_Next(t *testing.T) {
 		{
 			name: "jump to first",
 			ctx:  context.Background(),
-			slaves: func() Slaves {
+			slaves: func() slaves2.Slaves {
 				res, err := NewSlaves(db1, db2, db3)
 				require.NoError(t, err)
 				sl, ok := res.(*slaves)

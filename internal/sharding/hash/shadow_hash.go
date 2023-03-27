@@ -50,7 +50,7 @@ func (h *ShadowHash) Sharding(ctx context.Context, req sharding.Request) (shardi
 	}
 	skVal, ok := req.SkValues[h.ShardingKey]
 	if !ok {
-		return sharding.EmptyResult, nil
+		return sharding.Result{Dsts: h.Broadcast(ctx)}, nil
 	}
 	dbName := h.DBPattern.Name
 	if !h.DBPattern.NotSharding && strings.Contains(dbName, "%d") {

@@ -21,6 +21,7 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"fmt"
+	"github.com/ecodeclub/eorm/internal/datasource/masterslave/slaves/roundrobin"
 	"log"
 	"time"
 
@@ -118,7 +119,7 @@ func (s *ShardingSuite) initDB() (*eorm.DB, error) {
 				}
 				ss = append(ss, slave)
 			}
-			sl, err := slaves2.NewSlaves(ss...)
+			sl, err := roundrobin.NewSlaves(ss...)
 			require.NoError(s.T(), err)
 			s.slaves = &testBaseSlaves{Slaves: sl}
 			masterSlaveDB := masterslave.NewMasterSlaveDB(
@@ -238,5 +239,5 @@ func newRoundRobinSlaves(driver string, slaveDsns ...string) (slaves2.Slaves, er
 		}
 		ss = append(ss, slave)
 	}
-	return slaves2.NewSlaves(ss...)
+	return roundrobin.NewSlaves(ss...)
 }

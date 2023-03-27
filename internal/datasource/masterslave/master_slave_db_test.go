@@ -19,6 +19,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"github.com/ecodeclub/eorm/internal/datasource/masterslave/slaves/roundrobin"
 	"testing"
 
 	"github.com/ecodeclub/eorm/internal/datasource"
@@ -267,7 +268,7 @@ func (ms *MasterSlaveSuite) TestMasterSlaveDbExec() {
 }
 
 func (ms *MasterSlaveSuite) newSlaves(dbs ...*sql.DB) slaves.Slaves {
-	res, err := slaves.NewSlaves(dbs...)
+	res, err := roundrobin.NewSlaves(dbs...)
 	require.NoError(ms.T(), err)
 	return res
 }

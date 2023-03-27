@@ -24,10 +24,9 @@ import (
 var _ datasource.DataSource = &Tx{}
 var _ datasource.Tx = &Tx{}
 
+// Tx TODO 事务是否要提供 close 方法
 type Tx struct {
 	tx *sql.Tx
-	// TODO 事务是否要提供 close 方法
-	//db *sql.DB
 	ds datasource.DataSource
 }
 
@@ -47,6 +46,6 @@ func (t *Tx) Rollback() error {
 	return t.tx.Rollback()
 }
 
-func BeginTx(tx *sql.Tx, ds datasource.DataSource) *Tx {
+func NewTx(tx *sql.Tx, ds datasource.DataSource) *Tx {
 	return &Tx{tx: tx, ds: ds}
 }

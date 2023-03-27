@@ -45,6 +45,10 @@ func (s *ShardingDataSource) Exec(ctx context.Context, query datasource.Query) (
 	return ds.Exec(ctx, query)
 }
 
+func (*ShardingDataSource) BeginTx(_ context.Context, _ *sql.TxOptions) (datasource.Tx, error) {
+	panic("`BeginTx` must be completed")
+}
+
 func NewShardingDataSource(m map[string]datasource.DataSource) datasource.DataSource {
 	return &ShardingDataSource{
 		sources: m,
