@@ -21,9 +21,10 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"fmt"
-	"github.com/ecodeclub/eorm/internal/datasource/masterslave/slaves/roundrobin"
 	"log"
 	"time"
+
+	"github.com/ecodeclub/eorm/internal/datasource/masterslave/slaves/roundrobin"
 
 	"github.com/ecodeclub/eorm/internal/datasource/masterslave"
 	slaves2 "github.com/ecodeclub/eorm/internal/datasource/masterslave/slaves"

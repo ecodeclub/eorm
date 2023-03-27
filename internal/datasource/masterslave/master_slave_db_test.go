@@ -19,8 +19,9 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"github.com/ecodeclub/eorm/internal/datasource/masterslave/slaves/roundrobin"
 	"testing"
+
+	"github.com/ecodeclub/eorm/internal/datasource/masterslave/slaves/roundrobin"
 
 	"github.com/ecodeclub/eorm/internal/datasource"
 	"github.com/ecodeclub/eorm/internal/datasource/masterslave/slaves"

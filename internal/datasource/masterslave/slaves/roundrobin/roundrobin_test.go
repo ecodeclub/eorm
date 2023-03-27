@@ -17,9 +17,10 @@ package roundrobin
 import (
 	"context"
 	"database/sql"
-	slaves2 "github.com/ecodeclub/eorm/internal/datasource/masterslave/slaves"
 	"testing"
 	"time"
+
+	slaves2 "github.com/ecodeclub/eorm/internal/datasource/masterslave/slaves"
 
 	"github.com/ecodeclub/eorm/internal/errs"
 	"github.com/stretchr/testify/assert"

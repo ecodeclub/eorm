@@ -16,8 +16,9 @@ package eorm
 
 import (
 	"context"
-	"github.com/ecodeclub/eorm/internal/datasource/masterslave/slaves/roundrobin"
 	"testing"
+
+	"github.com/ecodeclub/eorm/internal/datasource/masterslave/slaves/roundrobin"
 
 	"github.com/ecodeclub/eorm/internal/datasource/masterslave"
 	slaves2 "github.com/ecodeclub/eorm/internal/datasource/masterslave/slaves"

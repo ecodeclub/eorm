@@ -17,6 +17,7 @@ package cluster
 import (
 	"context"
 	"database/sql"
+
 	"github.com/ecodeclub/eorm/internal/datasource"
 	"github.com/ecodeclub/eorm/internal/datasource/masterslave"
 	"github.com/ecodeclub/eorm/internal/errs"

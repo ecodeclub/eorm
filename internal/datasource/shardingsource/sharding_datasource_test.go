@@ -17,8 +17,9 @@ package shardingsource
 import (
 	"context"
 	"database/sql"
-	"github.com/ecodeclub/eorm/internal/datasource/masterslave/slaves/roundrobin"
 	"testing"
+
+	"github.com/ecodeclub/eorm/internal/datasource/masterslave/slaves/roundrobin"
 
 	"github.com/ecodeclub/eorm/internal/datasource/masterslave"
 	slaves2 "github.com/ecodeclub/eorm/internal/datasource/masterslave/slaves"
