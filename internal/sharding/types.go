@@ -17,6 +17,7 @@ package sharding
 import (
 	"context"
 	"database/sql"
+	operator "github.com/ecodeclub/eorm/internal/operator"
 )
 
 var EmptyResult = Result{}
@@ -68,6 +69,6 @@ func (r Dst) NotEquals(l Dst) bool {
 }
 
 type Request struct {
-	Op       string
+	Op       operator.Op
 	SkValues map[string]any
 }

@@ -190,7 +190,7 @@ func (s *ShardingSelector[T]) findDstByPredicate(ctx context.Context, pre Predic
 		return s.meta.ShardingAlgorithm.Sharding(ctx,
 			sharding.Request{SkValues: map[string]any{col.name: right.val}})
 	default:
-		return sharding.EmptyResult, errs.NewUnsupportedOperatorError(pre.op.text)
+		return sharding.EmptyResult, errs.NewUnsupportedOperatorError(pre.op.Text)
 	}
 }
 
