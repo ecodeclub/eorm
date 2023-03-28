@@ -2724,7 +2724,7 @@ func TestShardingSelector_Build(t *testing.T) {
 				s := NewShardingSelector[Order](shardingDB).Where(C("UserId").GT(123))
 				return s
 			}(),
-			wantErr: errs.NewUnsupportedOperatorError(opGT.text),
+			wantErr: errs.NewUnsupportedOperatorError(opGT.Text),
 		},
 		{
 			name: "too complex expr",

@@ -181,14 +181,30 @@ func (s *ShardingSelector[T]) findDstByPredicate(ctx context.Context, pre Predic
 			return sharding.EmptyResult, err
 		}
 		return s.mergeOR(left, right), nil
-	case opEQ:
+	case opIn:
+		col, isCol := pre.left.(Column)
+		right, isVals := pre.right.(values)
+		if !isCol || !isVals {
+			return sharding.EmptyResult, errs.ErrUnsupportedTooComplexQuery
+		}
+		var dsts []sharding.Dst
+		for _, val := range right.data {
+			res, err := s.meta.ShardingAlgorithm.Sharding(ctx,
+				sharding.Request{Op: opEQ, SkValues: map[string]any{col.name: val}})
+			if err != nil {
+				return sharding.EmptyResult, err
+			}
+			dsts = append(dsts, res.Dsts...)
+		}
+		return sharding.Result{Dsts: dsts}, nil
+	case opEQ, opGT, opLT, opGTEQ, opLTEQ:
 		col, isCol := pre.left.(Column)
 		right, isVals := pre.right.(valueExpr)
 		if !isCol || !isVals {
 			return sharding.EmptyResult, errs.ErrUnsupportedTooComplexQuery
 		}
 		return s.meta.ShardingAlgorithm.Sharding(ctx,
-			sharding.Request{SkValues: map[string]any{col.name: right.val}})
+			sharding.Request{Op: pre.op, SkValues: map[string]any{col.name: right.val}})
 	default:
 		return sharding.EmptyResult, errs.NewUnsupportedOperatorError(pre.op.Text)
 	}
@@ -202,7 +218,7 @@ func (*ShardingSelector[T]) mergeAnd(left, right sharding.Result) sharding.Resul
 	return sharding.Result{Dsts: dsts}
 }
 
-// mergeAnd 两个分片结果的并集
+// mergeOR 两个分片结果的并集
 func (*ShardingSelector[T]) mergeOR(left, right sharding.Result) sharding.Result {
 	dsts := slice.UnionSetFunc[sharding.Dst](left.Dsts, right.Dsts, func(src, dst sharding.Dst) bool {
 		return src.Equals(dst)

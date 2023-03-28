@@ -14,6 +14,8 @@
 
 package eorm
 
+import operator "github.com/ecodeclub/eorm/internal/operator"
+
 // Expr is the top interface. It represents everything.
 type Expr interface {
 	expr() (string, error)
@@ -49,7 +51,7 @@ func (RawExpr) selected() {}
 
 type binaryExpr struct {
 	left  Expr
-	op    op
+	op    operator.Op
 	right Expr
 }
 
