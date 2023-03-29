@@ -39,7 +39,6 @@ type DBOption func(db *DB)
 
 // DB represents a database
 type DB struct {
-	//db *sql.DB
 	core
 	ds datasource.DataSource
 }

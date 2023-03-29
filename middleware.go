@@ -23,8 +23,7 @@ import (
 type QueryContext struct {
 	Type string
 	meta *model.TableMeta
-	// q    *Query
-	q Query
+	q    Query
 }
 
 func (qc *QueryContext) GetQuery() Query {

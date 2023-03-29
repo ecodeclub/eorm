@@ -54,3 +54,7 @@ func NewShardingDataSource(m map[string]datasource.DataSource) datasource.DataSo
 		sources: m,
 	}
 }
+
+func (s *ShardingDataSource) Close(ctx context.Context) error {
+	panic("`Close` must be completed")
+}

@@ -19,7 +19,6 @@ import (
 	"database/sql"
 	"sync"
 
-	"github.com/ecodeclub/eorm/internal/datasource"
 	"github.com/gotomicro/ekit/slice"
 
 	"github.com/ecodeclub/eorm/internal/sharding"
@@ -353,7 +352,7 @@ func (s *ShardingSelector[T]) Get(ctx context.Context) (*T, error) {
 	}
 	q := qs[0]
 	// TODO 利用 ctx 传递 DB name
-	row, err := s.db.queryContext(ctx, datasource.Query(q))
+	row, err := s.db.queryContext(ctx, q)
 	if err != nil {
 		return nil, err
 	}
@@ -381,7 +380,7 @@ func (s *ShardingSelector[T]) GetMulti(ctx context.Context) ([]*T, error) {
 			s.lock.Lock()
 			defer s.lock.Unlock()
 			// TODO 利用 ctx 传递 DB name
-			rows, err := s.db.queryContext(ctx, datasource.Query(q))
+			rows, err := s.db.queryContext(ctx, q)
 			if err == nil {
 				rowsSlice = append(rowsSlice, rows)
 			}

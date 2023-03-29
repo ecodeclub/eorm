@@ -18,8 +18,6 @@ import (
 	"context"
 	"reflect"
 
-	"github.com/ecodeclub/eorm/internal/datasource"
-
 	"github.com/ecodeclub/eorm/internal/dialect"
 	"github.com/ecodeclub/eorm/internal/errs"
 	"github.com/ecodeclub/eorm/internal/model"
@@ -34,7 +32,7 @@ type core struct {
 }
 
 func getHandler[T any](ctx context.Context, sess Session, c core, qc *QueryContext) *QueryResult {
-	rows, err := sess.queryContext(ctx, datasource.Query(qc.q))
+	rows, err := sess.queryContext(ctx, qc.q)
 	if err != nil {
 		return &QueryResult{Err: err}
 	}
@@ -70,7 +68,7 @@ func get[T any](ctx context.Context, sess Session, core core, qc *QueryContext) 
 }
 
 func getMultiHandler[T any](ctx context.Context, sess Session, c core, qc *QueryContext) *QueryResult {
-	rows, err := sess.queryContext(ctx, datasource.Query(qc.q))
+	rows, err := sess.queryContext(ctx, qc.q)
 	if err != nil {
 		return &QueryResult{Err: err}
 	}

@@ -149,7 +149,7 @@ func (c *ClusterSuite) TestClusterDbQuery() {
 			clusDB := NewClusterDB(tc.ms)
 			var resp []string
 			for i := 1; i <= tc.reqCnt; i++ {
-				rows, queryErr := clusDB.Query(tc.ctx, datasource.Query(tc.query))
+				rows, queryErr := clusDB.Query(tc.ctx, tc.query)
 				assert.Equal(t, queryErr, tc.wantErr)
 				if queryErr != nil {
 					return
@@ -261,7 +261,7 @@ func (c *ClusterSuite) TestClusterDbExec() {
 			var resAffectID []int64
 			for i := 1; i <= tc.reqCnt; i++ {
 				c.mockMaster.ExpectExec("^INSERT INTO (.+)").WillReturnResult(sqlmock.NewResult(1, 1))
-				res, execErr := db.Exec(tc.ctx, datasource.Query(tc.query))
+				res, execErr := db.Exec(tc.ctx, tc.query)
 				assert.Equal(t, execErr, tc.wantErr)
 				if execErr != nil {
 					return

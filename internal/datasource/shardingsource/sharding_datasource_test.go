@@ -213,7 +213,7 @@ func (c *ShardingDataSourceSuite) TestClusterDbQuery() {
 		c.T().Run(tc.name, func(t *testing.T) {
 			var resp []string
 			for i := 1; i <= tc.reqCnt; i++ {
-				rows, queryErr := c.DataSource.Query(tc.ctx, datasource.Query(tc.query))
+				rows, queryErr := c.DataSource.Query(tc.ctx, tc.query)
 				assert.Equal(t, queryErr, tc.wantErr)
 				if queryErr != nil {
 					return
@@ -294,7 +294,7 @@ func (c *ShardingDataSourceSuite) TestClusterDbExec() {
 			var resAffectID []int64
 			var resLastID []int64
 			for i := 1; i <= tc.reqCnt; i++ {
-				res, execErr := c.DataSource.Exec(tc.ctx, datasource.Query(tc.query))
+				res, execErr := c.DataSource.Exec(tc.ctx, tc.query)
 				assert.Equal(t, execErr, tc.wantErr)
 				if execErr != nil {
 					return

@@ -74,6 +74,6 @@ func (db *DB) Wait() error {
 	return err
 }
 
-func (db *DB) Close() error {
+func (db *DB) Close(context.Context) error {
 	return db.db.Close()
 }

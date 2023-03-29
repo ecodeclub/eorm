@@ -34,8 +34,6 @@ type QueryBuilder interface {
 // Session 代表一个抽象的概念，即会话
 type Session interface {
 	getCore() core
-	//queryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
-	//execContext(ctx context.Context, query string, args ...any) (sql.Result, error)
 	queryContext(ctx context.Context, query datasource.Query) (*sql.Rows, error)
 	execContext(ctx context.Context, query datasource.Query) (sql.Result, error)
 }

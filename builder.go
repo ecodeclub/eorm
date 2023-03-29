@@ -33,7 +33,7 @@ var _ Executor = &Deleter[any]{}
 var EmptyQuery = Query{}
 
 // Query 代表一个查询
-type Query query.Query
+type Query = query.Query
 
 // Querier 查询器，代表最基本的查询
 type Querier[T any] struct {

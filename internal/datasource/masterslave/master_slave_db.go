@@ -72,6 +72,10 @@ func NewMasterSlaveDB(master *sql.DB, opts ...MasterSlavesDBOption) *MasterSlave
 	return db
 }
 
+func (m *MasterSlavesDB) Close(ctx context.Context) error {
+	panic("`Close` must be completed")
+}
+
 type MasterSlavesDBOption func(db *MasterSlavesDB)
 
 func MasterSlavesWithSlaves(s slaves2.Slaves) MasterSlavesDBOption {

@@ -24,8 +24,6 @@ import (
 type Tx struct {
 	core
 	tx datasource.Tx
-	// TODO 事务是否要提供 close 方法
-	//db *sql.DB
 	ds datasource.DataSource
 }
 

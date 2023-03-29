@@ -39,7 +39,7 @@ type QueryBuilder interface {
 	Build(ctx context.Context) ([]Query, error)
 }
 
-type Query query.Query
+type Query = query.Query
 
 type Result struct {
 	Dsts []Dst
