@@ -187,16 +187,16 @@ func (s *ShardingSelector[T]) findDstByPredicate(ctx context.Context, pre Predic
 		if !isCol || !isVals {
 			return sharding.EmptyResult, errs.ErrUnsupportedTooComplexQuery
 		}
-		var dsts []sharding.Dst
+		var results []sharding.Result
 		for _, val := range right.data {
 			res, err := s.meta.ShardingAlgorithm.Sharding(ctx,
 				sharding.Request{Op: opEQ, SkValues: map[string]any{col.name: val}})
 			if err != nil {
 				return sharding.EmptyResult, err
 			}
-			dsts = append(dsts, res.Dsts...)
+			results = append(results, res)
 		}
-		return sharding.Result{Dsts: dsts}, nil
+		return s.mergeIN(results), nil
 	case opEQ, opGT, opLT, opGTEQ, opLTEQ:
 		col, isCol := pre.left.(Column)
 		right, isVals := pre.right.(valueExpr)
@@ -223,6 +223,17 @@ func (*ShardingSelector[T]) mergeOR(left, right sharding.Result) sharding.Result
 	dsts := slice.UnionSetFunc[sharding.Dst](left.Dsts, right.Dsts, func(src, dst sharding.Dst) bool {
 		return src.Equals(dst)
 	})
+	return sharding.Result{Dsts: dsts}
+}
+
+// mergeIN 多个分片结果的并集
+func (*ShardingSelector[T]) mergeIN(vals []sharding.Result) sharding.Result {
+	var dsts []sharding.Dst
+	for _, val := range vals {
+		dsts = slice.UnionSetFunc[sharding.Dst](dsts, val.Dsts, func(src, dst sharding.Dst) bool {
+			return src.Equals(dst)
+		})
+	}
 	return sharding.Result{Dsts: dsts}
 }
 

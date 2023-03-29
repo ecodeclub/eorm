@@ -17,6 +17,7 @@ package sharding
 import (
 	"context"
 	"database/sql"
+
 	operator "github.com/ecodeclub/eorm/internal/operator"
 )
 
