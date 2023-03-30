@@ -196,12 +196,12 @@ func (s *Slaves) Close() error {
 	var err error
 	s.once.Do(func() {
 		close(s.closeCh)
-		err = s.close()
+		err = s.closeDB()
 	})
 	return err
 }
 
-func (s *Slaves) close() error {
+func (s *Slaves) closeDB() error {
 	var resErrs []string
 	for _, inst := range s.slaves {
 		err := inst.Close()
