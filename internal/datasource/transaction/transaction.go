@@ -21,10 +21,8 @@ import (
 	"github.com/ecodeclub/eorm/internal/datasource"
 )
 
-var _ datasource.DataSource = &Tx{}
 var _ datasource.Tx = &Tx{}
 
-// Tx TODO 事务是否要提供 close 方法
 type Tx struct {
 	tx *sql.Tx
 	ds datasource.DataSource

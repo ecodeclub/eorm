@@ -17,12 +17,16 @@ package shardingsource
 import (
 	"context"
 	"database/sql"
+	"errors"
+	"fmt"
+	"strings"
 
 	"github.com/ecodeclub/eorm/internal/datasource"
 
 	"github.com/ecodeclub/eorm/internal/errs"
 )
 
+var _ datasource.TxBeginner = &ShardingDataSource{}
 var _ datasource.DataSource = &ShardingDataSource{}
 
 type ShardingDataSource struct {
@@ -55,6 +59,16 @@ func NewShardingDataSource(m map[string]datasource.DataSource) datasource.DataSo
 	}
 }
 
-func (s *ShardingDataSource) Close(ctx context.Context) error {
-	panic("`Close` must be completed")
+func (s *ShardingDataSource) Close() error {
+	var resErrs []string
+	for name, inst := range s.sources {
+		err := inst.Close()
+		if err != nil {
+			resErrs = append(resErrs, fmt.Sprintf("source name [%s] error: %s", name, err.Error()))
+		}
+	}
+	if resErrs != nil {
+		return errors.New(strings.Join(resErrs, "; "))
+	}
+	return nil
 }

@@ -17,6 +17,9 @@ package masterslave
 import (
 	"context"
 	"database/sql"
+	"errors"
+	"fmt"
+	"strings"
 
 	slaves2 "github.com/ecodeclub/eorm/internal/datasource/masterslave/slaves"
 
@@ -62,7 +65,7 @@ func (m *MasterSlavesDB) BeginTx(ctx context.Context, opts *sql.TxOptions) (data
 	return transaction.NewTx(tx, m), nil
 }
 
-func NewMasterSlaveDB(master *sql.DB, opts ...MasterSlavesDBOption) *MasterSlavesDB {
+func NewMasterSlavesDB(master *sql.DB, opts ...MasterSlavesDBOption) *MasterSlavesDB {
 	db := &MasterSlavesDB{
 		master: master,
 	}
@@ -72,8 +75,20 @@ func NewMasterSlaveDB(master *sql.DB, opts ...MasterSlavesDBOption) *MasterSlave
 	return db
 }
 
-func (m *MasterSlavesDB) Close(ctx context.Context) error {
-	panic("`Close` must be completed")
+func (m *MasterSlavesDB) Close() error {
+	var resErrs []string
+	if err := m.master.Close(); err != nil {
+		resErrs = append(resErrs, fmt.Sprintf("master error: %s", err.Error()))
+	}
+	if m.slaves != nil {
+		if err := m.slaves.Close(); err != nil {
+			resErrs = append(resErrs, err.Error())
+		}
+	}
+	if resErrs != nil {
+		return errors.New(strings.Join(resErrs, "; "))
+	}
+	return nil
 }
 
 type MasterSlavesDBOption func(db *MasterSlavesDB)

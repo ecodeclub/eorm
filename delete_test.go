@@ -32,10 +32,7 @@ import (
 )
 
 func TestDeleter_Build(t *testing.T) {
-	db, err := Open("sqlite3", memoryDB())
-	if err != nil {
-		t.Error(err)
-	}
+	db := memoryDB()
 	testCases := []CommonTestCase{
 		{
 			name:    "no where",
@@ -89,7 +86,7 @@ func TestDeleter_Exec(t *testing.T) {
 			},
 			delete: func(db *sql.DB, t *testing.T) Result {
 				defer func(db *sql.DB) { _ = db.Close() }(db)
-				orm, err := Open("mysql", single.NewDB(db))
+				orm, err := OpenDS("mysql", single.NewDB(db))
 				require.NoError(t, err)
 				deleter := NewDeleter[TestModel](orm)
 				result := deleter.From(&TestModel{}).Where(C("Invalid").EQ(1)).Exec(context.Background())
@@ -104,7 +101,7 @@ func TestDeleter_Exec(t *testing.T) {
 			},
 			delete: func(db *sql.DB, t *testing.T) Result {
 				defer func(db *sql.DB) { _ = db.Close() }(db)
-				orm, err := Open("mysql", single.NewDB(db))
+				orm, err := OpenDS("mysql", single.NewDB(db))
 				require.NoError(t, err)
 				deleter := NewDeleter[TestModel](orm)
 				result := deleter.From(&TestModel{}).Where(C("Id").EQ(1)).Exec(context.Background())
@@ -123,7 +120,7 @@ func TestDeleter_Exec(t *testing.T) {
 			delete: func(db *sql.DB, t *testing.T) Result {
 				defer func(db *sql.DB) { _ = db.Close() }(db)
 
-				orm, err := Open("mysql", single.NewDB(db))
+				orm, err := OpenDS("mysql", single.NewDB(db))
 				require.NoError(t, err)
 				tx, err := orm.BeginTx(context.Background(), &sql.TxOptions{})
 				require.NoError(t, err)
@@ -178,7 +175,7 @@ func TestDeleter_Exec(t *testing.T) {
 }
 
 func ExampleDeleter_Build() {
-	db, _ := Open("sqlite3", memoryDB())
+	db := memoryDB()
 	query, _ := NewDeleter[TestModel](db).From(&TestModel{}).Build()
 	fmt.Printf("SQL: %s", query.SQL)
 	// Output:
@@ -186,7 +183,7 @@ func ExampleDeleter_Build() {
 }
 
 func ExampleDeleter_From() {
-	db, _ := Open("sqlite3", memoryDB())
+	db := memoryDB()
 	query, _ := NewDeleter[TestModel](db).From(&TestModel{}).Build()
 	fmt.Printf("SQL: %s", query.SQL)
 	// Output:
@@ -194,7 +191,7 @@ func ExampleDeleter_From() {
 }
 
 func ExampleDeleter_Where() {
-	db, _ := Open("sqlite3", memoryDB())
+	db := memoryDB()
 	query, _ := NewDeleter[TestModel](db).Where(C("Id").EQ(12)).Build()
 	fmt.Printf("SQL: %s\nArgs: %v", query.SQL, query.Args)
 	// Output:

@@ -72,7 +72,15 @@ func (db *DB) execContext(ctx context.Context, q datasource.Query) (sql.Result, 
 
 // Open 创建一个 ORM 实例
 // 注意该实例是一个无状态的对象，你应该尽可能复用它
-func Open(driver string, ds datasource.DataSource, opts ...DBOption) (*DB, error) {
+func Open(driver string, dsn string, opts ...DBOption) (*DB, error) {
+	db, err := single.OpenDB(driver, dsn)
+	if err != nil {
+		return nil, err
+	}
+	return OpenDS(driver, db, opts...)
+}
+
+func OpenDS(driver string, ds datasource.DataSource, opts ...DBOption) (*DB, error) {
 	dl, err := dialect.Of(driver)
 	if err != nil {
 		return nil, err
@@ -103,21 +111,11 @@ func (db *DB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) {
 	if err != nil {
 		return nil, err
 	}
-	ds, ok := tx.(datasource.DataSource)
-	if !ok {
-		return nil, errs.ErrNotCompleteDatasource
-	}
-	return &Tx{tx: tx, ds: ds, core: db.getCore()}, nil
+	return &Tx{tx: tx, core: db.getCore()}, nil
 }
 
-// Close TODO
 func (db *DB) Close() error {
-	source, ok := db.ds.(*single.DB)
-	if ok {
-		return source.Close()
-	}
-	return nil
-	//return db.db.Close()
+	return db.ds.Close()
 }
 
 func (db *DB) getCore() core {

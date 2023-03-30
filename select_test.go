@@ -36,7 +36,7 @@ func TestRawQuery_Get_baseType(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = mockDB.Close() }()
-	db, err := Open("mysql", single.NewDB(mockDB))
+	db, err := OpenDS("mysql", single.NewDB(mockDB))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -142,7 +142,7 @@ func TestRawQuery_GetMulti_baseType(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = mockDB.Close() }()
-	db, err := Open("mysql", single.NewDB(mockDB))
+	db, err := OpenDS("mysql", single.NewDB(mockDB))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -283,7 +283,7 @@ func TestSelector_Get_baseType(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = mockDB.Close() }()
-	db, err := Open("mysql", single.NewDB(mockDB))
+	db, err := OpenDS("mysql", single.NewDB(mockDB))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -519,7 +519,7 @@ func TestSelector_GetMulti_baseType(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = mockDB.Close() }()
-	db, err := Open("mysql", single.NewDB(mockDB))
+	db, err := OpenDS("mysql", single.NewDB(mockDB))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -765,10 +765,7 @@ func TestSelector_GetMulti_baseType(t *testing.T) {
 }
 
 func TestSelectable(t *testing.T) {
-	db, err := Open("sqlite3", memoryDB())
-	if err != nil {
-		t.Error(err)
-	}
+	db := memoryDB()
 	testCases := []CommonTestCase{
 		{
 			name:    "simple",
@@ -1018,7 +1015,7 @@ func TestSelectable(t *testing.T) {
 }
 
 func TestSelectableCombination(t *testing.T) {
-	db, err := Open("sqlite3", memoryDB())
+	db, err := Open("sqlite3", "file:test.db?cache=shared&mode=memory")
 	if err != nil {
 		t.Error(err)
 	}
@@ -1148,15 +1145,15 @@ type TestCombinedModel struct {
 }
 
 func ExampleSelector_OrderBy() {
-	db, _ := Open("sqlite3", memoryDB())
+	db, _ := Open("sqlite3", "file:test.db?cache=shared&mode=memory")
 	query, _ := NewSelector[TestModel](db).OrderBy(ASC("Age")).Build()
-	fmt.Printf("case1\n%s", query.string())
+	fmt.Printf("case1\n%s", query.String())
 	query, _ = NewSelector[TestModel](db).OrderBy(ASC("Age", "Id")).Build()
-	fmt.Printf("case2\n%s", query.string())
+	fmt.Printf("case2\n%s", query.String())
 	query, _ = NewSelector[TestModel](db).OrderBy(ASC("Age"), ASC("Id")).Build()
-	fmt.Printf("case3\n%s", query.string())
+	fmt.Printf("case3\n%s", query.String())
 	query, _ = NewSelector[TestModel](db).OrderBy(ASC("Age"), DESC("Id")).Build()
-	fmt.Printf("case4\n%s", query.string())
+	fmt.Printf("case4\n%s", query.String())
 	// Output:
 	// case1
 	// SQL: SELECT `id`,`first_name`,`age`,`last_name` FROM `test_model` ORDER BY `age` ASC;
@@ -1173,9 +1170,9 @@ func ExampleSelector_OrderBy() {
 }
 
 func ExampleSelector_Having() {
-	db, _ := Open("sqlite3", memoryDB())
+	db := memoryDB()
 	query, _ := NewSelector[TestModel](db).Select(Columns("Id"), Columns("FirstName"), Avg("Age").As("avg_age")).GroupBy("FirstName").Having(Avg("Age").LT(20)).Build()
-	fmt.Printf("case1\n%s", query.string())
+	fmt.Printf("case1\n%s", query.String())
 	query, err := NewSelector[TestModel](db).Select(Columns("Id"), Columns("FirstName"), Avg("Age").As("avg_age")).GroupBy("FirstName").Having(C("Invalid").LT(20)).Build()
 	fmt.Printf("case2\n%s", err)
 	// Output:
@@ -1187,7 +1184,7 @@ func ExampleSelector_Having() {
 }
 
 func ExampleSelector_Select() {
-	db, _ := Open("sqlite3", memoryDB())
+	db := memoryDB()
 	tm := TableOf(&TestModel{}, "t1")
 	cases := []*Selector[TestModel]{
 		// case0: all columns are included
@@ -1204,7 +1201,7 @@ func ExampleSelector_Select() {
 
 	for index, tc := range cases {
 		query, _ := tc.Build()
-		fmt.Printf("case%d:\n%s", index, query.string())
+		fmt.Printf("case%d:\n%s", index, query.String())
 	}
 	// Output:
 	// case0:
@@ -1225,7 +1222,7 @@ func ExampleSelector_Select() {
 }
 
 func ExampleSelector_Distinct() {
-	db, _ := Open("sqlite3", memoryDB())
+	db := memoryDB()
 	cases := []*Selector[TestModel]{
 		// case0: disinct column
 		NewSelector[TestModel](db).Distinct().Select(C("FirstName")),
@@ -1237,7 +1234,7 @@ func ExampleSelector_Distinct() {
 
 	for index, tc := range cases {
 		query, _ := tc.Build()
-		fmt.Printf("case%d:\n%s", index, query.string())
+		fmt.Printf("case%d:\n%s", index, query.String())
 	}
 	// Output:
 	// case0:
@@ -1252,10 +1249,7 @@ func ExampleSelector_Distinct() {
 }
 
 func TestSelector_Join(t *testing.T) {
-	db, err := Open("sqlite3", memoryDB())
-	if err != nil {
-		t.Error(err)
-	}
+	db := memoryDB()
 	type Order struct {
 		Id        int
 		UsingCol1 string
@@ -1584,10 +1578,7 @@ func TestSelector_Join(t *testing.T) {
 }
 
 func TestSelector_Subquery(t *testing.T) {
-	db, err := Open("sqlite3", memoryDB())
-	if err != nil {
-		t.Error(err)
-	}
+	db := memoryDB()
 	type Order struct {
 		Id        int
 		UsingCol1 string

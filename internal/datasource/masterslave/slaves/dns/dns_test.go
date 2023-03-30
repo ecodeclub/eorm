@@ -29,6 +29,25 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func ExampleSlaves_Close() {
+	resolver := &mockResolver{
+		m: map[string][]string{
+			"slaves.mycompany.com": {"192.168.1.1", "192.168.1.2", "192.168.1.3"},
+		},
+		mu: &sync.RWMutex{},
+	}
+	sl, _ := NewSlaves("root:root@tcp(slaves.mycompany.com:13308)/integration_test",
+		withResolver(resolver))
+
+	err := sl.Close()
+	if err == nil {
+		fmt.Println("close")
+	}
+
+	// Output:
+	// close
+}
+
 type mockResolver struct {
 	mu *sync.RWMutex
 	m  map[string][]string
@@ -86,7 +105,8 @@ func TestGetSlaves(t *testing.T) {
 				return
 			}
 			assert.Equal(t, tc.wantSlavednss, s.getSlaveDsns())
-			s.Close()
+			err = s.Close()
+			assert.NoError(t, err)
 
 		})
 	}

@@ -26,8 +26,8 @@ import (
 	"github.com/ecodeclub/eorm/internal/datasource/transaction"
 )
 
-var _ datasource.DataSource = &DB{}
 var _ datasource.TxBeginner = &DB{}
+var _ datasource.DataSource = &DB{}
 
 // DB represents a database
 type DB struct {
@@ -74,6 +74,6 @@ func (db *DB) Wait() error {
 	return err
 }
 
-func (db *DB) Close(context.Context) error {
+func (db *DB) Close() error {
 	return db.db.Close()
 }

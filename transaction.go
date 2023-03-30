@@ -24,7 +24,6 @@ import (
 type Tx struct {
 	core
 	tx datasource.Tx
-	ds datasource.DataSource
 }
 
 func (t *Tx) getCore() core {
@@ -32,11 +31,11 @@ func (t *Tx) getCore() core {
 }
 
 func (t *Tx) queryContext(ctx context.Context, query datasource.Query) (*sql.Rows, error) {
-	return t.ds.Query(ctx, query)
+	return t.tx.Query(ctx, query)
 }
 
 func (t *Tx) execContext(ctx context.Context, query datasource.Query) (sql.Result, error) {
-	return t.ds.Exec(ctx, query)
+	return t.tx.Exec(ctx, query)
 }
 
 func (t *Tx) Commit() error {

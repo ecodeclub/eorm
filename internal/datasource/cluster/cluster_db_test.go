@@ -17,6 +17,7 @@ package cluster
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"testing"
 
 	"github.com/ecodeclub/eorm/internal/datasource/masterslave/slaves/roundrobin"
@@ -25,6 +26,7 @@ import (
 	slaves2 "github.com/ecodeclub/eorm/internal/datasource/masterslave/slaves"
 
 	"github.com/ecodeclub/eorm/internal/errs"
+	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/ecodeclub/eorm/internal/datasource"
@@ -33,6 +35,20 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
+
+func ExampleClusterDB_Close() {
+	db, _ := sql.Open("sqlite3", "file:test.db?cache=shared&mode=memory")
+	cl := NewClusterDB(map[string]*masterslave.MasterSlavesDB{
+		"db0": masterslave.NewMasterSlavesDB(db),
+	})
+	err := cl.Close()
+	if err == nil {
+		fmt.Println("close")
+	}
+
+	// Output:
+	// close
+}
 
 type ClusterSuite struct {
 	suite.Suite
@@ -89,7 +105,7 @@ func (c *ClusterSuite) TestClusterDbQuery() {
 	c.mockSlave2.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows([]string{"mark"}).AddRow("slave1_2"))
 	c.mockSlave3.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows([]string{"mark"}).AddRow("slave1_3"))
 
-	db := masterslave.NewMasterSlaveDB(c.mockMasterDB, masterslave.MasterSlavesWithSlaves(
+	db := masterslave.NewMasterSlavesDB(c.mockMasterDB, masterslave.MasterSlavesWithSlaves(
 		c.newSlaves(c.mockSlave1DB, c.mockSlave2DB, c.mockSlave3DB)))
 	testCasesQuery := []struct {
 		name     string
@@ -198,7 +214,7 @@ func (c *ClusterSuite) TestClusterDbExec() {
 				DB:  "order_db_1",
 			},
 			ms: func() map[string]*masterslave.MasterSlavesDB {
-				db := masterslave.NewMasterSlaveDB(c.mockMasterDB,
+				db := masterslave.NewMasterSlavesDB(c.mockMasterDB,
 					masterslave.MasterSlavesWithSlaves(c.newSlaves(nil)))
 				masterSlaves := map[string]*masterslave.MasterSlavesDB{"order_db_0": db}
 				return masterSlaves
@@ -214,7 +230,7 @@ func (c *ClusterSuite) TestClusterDbExec() {
 				DB:  "order_db_0",
 			},
 			ms: func() map[string]*masterslave.MasterSlavesDB {
-				db := masterslave.NewMasterSlaveDB(c.mockMasterDB,
+				db := masterslave.NewMasterSlavesDB(c.mockMasterDB,
 					masterslave.MasterSlavesWithSlaves(c.newSlaves(nil)))
 				masterSlaves := map[string]*masterslave.MasterSlavesDB{"order_db_0": db}
 				return masterSlaves
@@ -230,7 +246,7 @@ func (c *ClusterSuite) TestClusterDbExec() {
 				DB:  "order_db_1",
 			},
 			ms: func() map[string]*masterslave.MasterSlavesDB {
-				db := masterslave.NewMasterSlaveDB(c.mockMasterDB, masterslave.MasterSlavesWithSlaves(
+				db := masterslave.NewMasterSlavesDB(c.mockMasterDB, masterslave.MasterSlavesWithSlaves(
 					c.newSlaves(c.mockSlave1DB, c.mockSlave2DB, c.mockSlave3DB)))
 				masterSlaves := map[string]*masterslave.MasterSlavesDB{"order_db_1": db}
 				return masterSlaves
@@ -246,7 +262,7 @@ func (c *ClusterSuite) TestClusterDbExec() {
 				DB:  "order_db_2",
 			},
 			ms: func() map[string]*masterslave.MasterSlavesDB {
-				db := masterslave.NewMasterSlaveDB(c.mockMasterDB, masterslave.MasterSlavesWithSlaves(
+				db := masterslave.NewMasterSlavesDB(c.mockMasterDB, masterslave.MasterSlavesWithSlaves(
 					c.newSlaves(c.mockSlave1DB, c.mockSlave2DB, c.mockSlave3DB)))
 				masterSlaves := map[string]*masterslave.MasterSlavesDB{"order_db_2": db}
 				return masterSlaves

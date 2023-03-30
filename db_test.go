@@ -20,21 +20,14 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/ecodeclub/eorm/internal/datasource"
 	"github.com/ecodeclub/eorm/internal/datasource/masterslave"
-
-	"github.com/ecodeclub/eorm/internal/datasource/single"
 
 	"github.com/ecodeclub/eorm/internal/valuer"
 	_ "github.com/mattn/go-sqlite3"
 )
 
 func ExampleMiddleware() {
-	db, err := single.OpenDB("sqlite3", "file:test.db?cache=shared&mode=memory")
-	if err != nil {
-		panic(err)
-	}
-	orm, _ := Open("sqlite3", db,
+	db, _ := Open("sqlite3", "file:test.db?cache=shared&mode=memory",
 		DBWithMiddlewares(func(next HandleFunc) HandleFunc {
 			return func(ctx context.Context, queryContext *QueryContext) *QueryResult {
 				return &QueryResult{Result: "mdl1"}
@@ -47,15 +40,13 @@ func ExampleMiddleware() {
 	defer func() {
 		_ = db.Close()
 	}()
-	fmt.Println(len(orm.ms))
+	fmt.Println(len(db.ms))
 	// Output:
 	// 2
 }
 
-// TODO tx 是否要维护 *sql.DB
 func ExampleDB_BeginTx() {
-	db, _ := single.OpenDB("sqlite3", "file:test.db?cache=shared&mode=memory")
-	orm, _ := Open("sqlite3", db)
+	orm, _ := Open("sqlite3", "file:test.db?cache=shared&mode=memory")
 	defer func() {
 		_ = orm.Close()
 	}()
@@ -75,11 +66,7 @@ func ExampleDB_BeginTx() {
 
 func ExampleOpen() {
 	// case1 without DBOption
-	db, err := single.OpenDB("sqlite3", "file:test.db?cache=shared&mode=memory")
-	if err != nil {
-		panic(err)
-	}
-	orm, _ := Open("sqlite3", db)
+	orm, _ := Open("sqlite3", "file:test.db?cache=shared&mode=memory")
 	fmt.Printf("case1 dialect: %s\n", orm.dialect.Name)
 
 	// Output:
@@ -88,7 +75,7 @@ func ExampleOpen() {
 
 func ExampleNewDeleter() {
 	tm := &TestModel{}
-	orm, _ := Open("sqlite3", memoryDB())
+	orm := memoryDB()
 	query, _ := NewDeleter[TestModel](orm).From(tm).Build()
 	fmt.Printf("SQL: %s", query.SQL)
 	// Output:
@@ -99,7 +86,7 @@ func ExampleNewUpdater() {
 	tm := &TestModel{
 		Age: 18,
 	}
-	orm, _ := Open("sqlite3", memoryDB())
+	orm := memoryDB()
 	query, _ := NewUpdater[TestModel](orm).Update(tm).Build()
 	fmt.Printf("SQL: %s", query.SQL)
 	// Output:
@@ -107,8 +94,8 @@ func ExampleNewUpdater() {
 }
 
 // memoryDB 返回一个基于内存的 ORM，它使用的是 sqlite3 内存模式。
-func memoryDB() datasource.DataSource {
-	db, err := single.OpenDB("sqlite3", "file:test.db?cache=shared&mode=memory")
+func memoryDB() *DB {
+	db, err := Open("sqlite3", "file:test.db?cache=shared&mode=memory")
 	if err != nil {
 		panic(err)
 	}
@@ -116,11 +103,7 @@ func memoryDB() datasource.DataSource {
 }
 
 func memoryDBWithDB(dbName string) *DB {
-	db, err := single.OpenDB("sqlite3", fmt.Sprintf("file:%s.db?cache=shared&mode=memory", dbName))
-	if err != nil {
-		panic(err)
-	}
-	orm, err := Open("sqlite3", db)
+	orm, err := Open("sqlite3", fmt.Sprintf("file:%s.db?cache=shared&mode=memory", dbName))
 	if err != nil {
 		panic(err)
 	}
@@ -191,6 +174,6 @@ func MasterSlavesMemoryDB() *masterslave.MasterSlavesDB {
 	if err != nil {
 		panic(err)
 	}
-	masterSlaveDB := masterslave.NewMasterSlaveDB(db)
+	masterSlaveDB := masterslave.NewMasterSlavesDB(db)
 	return masterSlaveDB
 }

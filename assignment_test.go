@@ -17,7 +17,7 @@ package eorm
 import "fmt"
 
 func ExampleAssign() {
-	db, _ := Open("sqlite3", memoryDB())
+	db := memoryDB()
 	tm := &TestModel{}
 	examples := []struct {
 		assign    Assignment

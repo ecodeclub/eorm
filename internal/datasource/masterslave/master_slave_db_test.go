@@ -35,6 +35,21 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func ExampleMasterSlavesDB_Close() {
+	masterDB, _ := sql.Open("sqlite3", "file:test.db?cache=shared&mode=memory")
+	slaveDB1, _ := sql.Open("sqlite3", "file:test.db?cache=shared&mode=memory")
+	slaveDB2, _ := sql.Open("sqlite3", "file:test.db?cache=shared&mode=memory")
+	sl, _ := roundrobin.NewSlaves(slaveDB1, slaveDB2)
+	ms := NewMasterSlavesDB(masterDB, MasterSlavesWithSlaves(sl))
+	err := ms.Close()
+	if err == nil {
+		fmt.Println("close")
+	}
+
+	// Output:
+	// close
+}
+
 func TestMasterSlavesDB_BeginTx(t *testing.T) {
 	mockDB, mock, err := sqlmock.New()
 	if err != nil {
@@ -42,7 +57,7 @@ func TestMasterSlavesDB_BeginTx(t *testing.T) {
 	}
 	defer func() { _ = mockDB.Close() }()
 
-	db := NewMasterSlaveDB(mockDB)
+	db := NewMasterSlavesDB(mockDB)
 
 	// Begin 失败
 	mock.ExpectBegin().WillReturnError(errors.New("begin failed"))
@@ -58,7 +73,7 @@ func TestMasterSlavesDB_BeginTx(t *testing.T) {
 
 func ExampleMasterSlavesDB_BeginTx() {
 	sqlite3db, _ := sql.Open("sqlite3", "file:test.db?cache=shared&mode=memory")
-	db := NewMasterSlaveDB(sqlite3db)
+	db := NewMasterSlavesDB(sqlite3db)
 	tx, err := db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err == nil {
 		fmt.Println("Begin")
@@ -156,7 +171,7 @@ func (ms *MasterSlaveSuite) TestMasterSlaveDbQuery() {
 
 	for _, tc := range testCasesQuery {
 		ms.T().Run(tc.name, func(t *testing.T) {
-			db := NewMasterSlaveDB(ms.mockMasterDB, MasterSlavesWithSlaves(tc.slaves))
+			db := NewMasterSlavesDB(ms.mockMasterDB, MasterSlavesWithSlaves(tc.slaves))
 			//  TODO
 			//db, ok := source.(*masterSlavesDB)
 			//assert.True(t, ok)
@@ -240,7 +255,7 @@ func (ms *MasterSlaveSuite) TestMasterSlaveDbExec() {
 
 	for _, tc := range testCasesExec {
 		ms.T().Run(tc.name, func(t *testing.T) {
-			db := NewMasterSlaveDB(ms.mockMasterDB, MasterSlavesWithSlaves(tc.slaves))
+			db := NewMasterSlavesDB(ms.mockMasterDB, MasterSlavesWithSlaves(tc.slaves))
 			//  TODO
 			//db, ok := source.(*masterSlavesDB)
 			//assert.True(t, ok)

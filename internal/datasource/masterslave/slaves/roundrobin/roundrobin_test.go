@@ -17,15 +17,28 @@ package roundrobin
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"testing"
 	"time"
 
 	slaves2 "github.com/ecodeclub/eorm/internal/datasource/masterslave/slaves"
 
 	"github.com/ecodeclub/eorm/internal/errs"
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func ExampleSlaves_Close() {
+	db, _ := sql.Open("sqlite3", "file:test.db?cache=shared&mode=memory")
+	sl, _ := NewSlaves(db)
+	if err := sl.Close(); err == nil {
+		fmt.Println("close")
+	}
+
+	// Output:
+	// close
+}
 
 func TestSlaves_Next(t *testing.T) {
 	db1 := &sql.DB{}

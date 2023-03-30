@@ -39,10 +39,7 @@ func TestInserter_Values(t *testing.T) {
 		FirstName: "Jerry",
 		Ctime:     n,
 	}
-	db, err := Open("sqlite3", memoryDB())
-	if err != nil {
-		t.Error(err)
-	}
+	db := memoryDB()
 	testCases := []CommonTestCase{
 		{
 			name:    "no examples of values",
@@ -166,10 +163,7 @@ func TestInserter_ValuesForCombination(t *testing.T) {
 			CreateTime: n,
 		},
 	}
-	db, err := Open("sqlite3", memoryDB())
-	if err != nil {
-		t.Error(err)
-	}
+	db := memoryDB()
 	testCases := []CommonTestCase{
 		{
 			name:    "no examples of values",
@@ -281,10 +275,7 @@ func TestInserter_ValuesForCombination(t *testing.T) {
 }
 
 func TestInserter_Exec(t *testing.T) {
-	orm, err := Open("sqlite3", memoryDB())
-	if err != nil {
-		t.Error(err)
-	}
+	orm := memoryDB()
 	testCases := []struct {
 		name         string
 		i            *Inserter[TestModel]
@@ -322,15 +313,15 @@ func TestInserter_Exec(t *testing.T) {
 }
 
 func ExampleInserter_Build() {
-	db, _ := Open("sqlite3", memoryDB())
+	db := memoryDB()
 	query, _ := NewInserter[TestModel](db).Values(&TestModel{
 		Id:  1,
 		Age: 18,
 	}).Build()
-	fmt.Printf("case1\n%s", query.string())
+	fmt.Printf("case1\n%s", query.String())
 
 	query, _ = NewInserter[TestModel](db).Values(&TestModel{}).Build()
-	fmt.Printf("case2\n%s", query.string())
+	fmt.Printf("case2\n%s", query.String())
 
 	// Output:
 	// case1
@@ -342,18 +333,18 @@ func ExampleInserter_Build() {
 }
 
 func ExampleInserter_Columns() {
-	db, _ := Open("sqlite3", memoryDB())
+	db := memoryDB()
 	query, _ := NewInserter[TestModel](db).Values(&TestModel{
 		Id:  1,
 		Age: 18,
 	}).Columns("Id", "Age").Build()
-	fmt.Printf("case1\n%s", query.string())
+	fmt.Printf("case1\n%s", query.String())
 
 	query, _ = NewInserter[TestModel](db).Values(&TestModel{
 		Id:  1,
 		Age: 18,
 	}, &TestModel{}, &TestModel{FirstName: "Tom"}).Columns("Id", "Age").Build()
-	fmt.Printf("case2\n%s", query.string())
+	fmt.Printf("case2\n%s", query.String())
 
 	// Output:
 	// case1
@@ -366,19 +357,19 @@ func ExampleInserter_Columns() {
 }
 
 func ExampleInserter_Values() {
-	db, _ := Open("sqlite3", memoryDB())
+	db := memoryDB()
 	query, _ := NewInserter[TestModel](db).Values(&TestModel{
 		Id:  1,
 		Age: 18,
 	}, &TestModel{}).Build()
-	fmt.Println(query.string())
+	fmt.Println(query.String())
 	// Output:
 	// SQL: INSERT INTO `test_model`(`id`,`first_name`,`age`,`last_name`) VALUES(?,?,?,?),(?,?,?,?);
 	// Args: []interface {}{1, "", 18, (*sql.NullString)(nil), 0, "", 0, (*sql.NullString)(nil)}
 }
 
 func ExampleNewInserter() {
-	db, _ := Open("sqlite3", memoryDB())
+	db := memoryDB()
 	tm := &TestModel{}
 	query, _ := NewInserter[TestModel](db).Values(tm).Build()
 	fmt.Printf("SQL: %s", query.SQL)

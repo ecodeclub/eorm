@@ -17,7 +17,10 @@ package roundrobin
 import (
 	"context"
 	"database/sql"
+	"errors"
+	"fmt"
 	"strconv"
+	"strings"
 	"sync/atomic"
 
 	slaves2 "github.com/ecodeclub/eorm/internal/datasource/masterslave/slaves"
@@ -40,6 +43,21 @@ func (r *slaves) Next(ctx context.Context) (slaves2.Slave, error) {
 	cnt := atomic.AddUint32(&r.cnt, 1)
 	index := int(cnt) % len(r.slaves)
 	return r.slaves[index], nil
+}
+
+func (r *slaves) Close() error {
+	var resErrs []string
+	for _, inst := range r.slaves {
+		err := inst.Close()
+		if err != nil {
+			resErrs = append(resErrs,
+				fmt.Sprintf("slave DB name [%s] error: %s", inst.SlaveName, err.Error()))
+		}
+	}
+	if resErrs != nil {
+		return errors.New(strings.Join(resErrs, "; "))
+	}
+	return nil
 }
 
 func NewSlaves(dbs ...*sql.DB) (slaves2.Slaves, error) {

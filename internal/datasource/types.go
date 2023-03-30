@@ -21,19 +21,24 @@ import (
 	"github.com/ecodeclub/eorm/internal/query"
 )
 
+type Executor interface {
+	Query(ctx context.Context, query Query) (*sql.Rows, error)
+	Exec(ctx context.Context, query Query) (sql.Result, error)
+}
+
 type TxBeginner interface {
 	BeginTx(ctx context.Context, opts *sql.TxOptions) (Tx, error)
 }
 
 type Tx interface {
+	Executor
 	Commit() error
 	Rollback() error
 }
 
 type DataSource interface {
-	Query(ctx context.Context, query Query) (*sql.Rows, error)
-	Exec(ctx context.Context, query Query) (sql.Result, error)
-	//Close(ctx context.Context) error
+	Executor
+	Close() error
 }
 
 type Query = query.Query

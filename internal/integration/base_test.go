@@ -59,7 +59,7 @@ func (s *Suite) SetupSuite() {
 	if err = db.Wait(); err != nil {
 		t.Fatal(err)
 	}
-	orm, err := eorm.Open(s.driver, db)
+	orm, err := eorm.OpenDS(s.driver, db)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -123,7 +123,7 @@ func (s *ShardingSuite) initDB() (*eorm.DB, error) {
 			sl, err := roundrobin.NewSlaves(ss...)
 			require.NoError(s.T(), err)
 			s.slaves = &testBaseSlaves{Slaves: sl}
-			masterSlaveDB := masterslave.NewMasterSlaveDB(
+			masterSlaveDB := masterslave.NewMasterSlavesDB(
 				master, masterslave.MasterSlavesWithSlaves(s.slaves))
 			dbName := fmt.Sprintf(s.DBPattern, j)
 			msMap[dbName] = masterSlaveDB
@@ -133,7 +133,7 @@ func (s *ShardingSuite) initDB() (*eorm.DB, error) {
 	}
 	s.dataSources = sourceMap
 	dataSource := shardingsource.NewShardingDataSource(sourceMap)
-	return eorm.Open(s.driver, dataSource)
+	return eorm.OpenDS(s.driver, dataSource)
 }
 
 func (s *ShardingSuite) SetupSuite() {
@@ -174,7 +174,7 @@ func (s *MasterSlaveSuite) initDb() (*eorm.DB, error) {
 		return nil, err
 	}
 	s.testSlaves = newTestSlaves(ss)
-	return eorm.Open(s.driver, masterslave.NewMasterSlaveDB(master, masterslave.MasterSlavesWithSlaves(s.testSlaves)))
+	return eorm.OpenDS(s.driver, masterslave.NewMasterSlavesDB(master, masterslave.MasterSlavesWithSlaves(s.testSlaves)))
 
 }
 

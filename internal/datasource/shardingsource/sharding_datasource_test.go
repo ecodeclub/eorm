@@ -17,6 +17,7 @@ package shardingsource
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"testing"
 
 	"github.com/ecodeclub/eorm/internal/datasource/masterslave/slaves/roundrobin"
@@ -30,10 +31,28 @@ import (
 	"github.com/ecodeclub/eorm/internal/datasource"
 	"github.com/ecodeclub/eorm/internal/datasource/cluster"
 	"github.com/ecodeclub/eorm/internal/sharding"
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
+
+func ExampleShardingDataSource_Close() {
+	db, _ := sql.Open("sqlite3", "file:test.db?cache=shared&mode=memory")
+	cl := cluster.NewClusterDB(map[string]*masterslave.MasterSlavesDB{
+		"db0": masterslave.NewMasterSlavesDB(db),
+	})
+	ds := NewShardingDataSource(map[string]datasource.DataSource{
+		"source0": cl,
+	})
+	err := ds.Close()
+	if err == nil {
+		fmt.Println("close")
+	}
+
+	// Output:
+	// close
+}
 
 type ShardingDataSourceSuite struct {
 	suite.Suite
@@ -116,10 +135,10 @@ func (c *ShardingDataSourceSuite) initMock(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	db1 := masterslave.NewMasterSlaveDB(c.mockMaster1DB, masterslave.MasterSlavesWithSlaves(
+	db1 := masterslave.NewMasterSlavesDB(c.mockMaster1DB, masterslave.MasterSlavesWithSlaves(
 		c.newSlaves(c.mockSlave1DB, c.mockSlave2DB, c.mockSlave3DB)))
 
-	db2 := masterslave.NewMasterSlaveDB(c.mockMaster2DB, masterslave.MasterSlavesWithSlaves(
+	db2 := masterslave.NewMasterSlavesDB(c.mockMaster2DB, masterslave.MasterSlavesWithSlaves(
 		c.newSlaves(c.mockSlave4DB, c.mockSlave5DB, c.mockSlave6DB)))
 
 	clusterDB1 := cluster.NewClusterDB(map[string]*masterslave.MasterSlavesDB{"db_0": db1})

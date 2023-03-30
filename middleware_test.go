@@ -19,8 +19,6 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/ecodeclub/eorm/internal/datasource/single"
-
 	"github.com/stretchr/testify/require"
 
 	"github.com/stretchr/testify/assert"
@@ -62,11 +60,7 @@ func Test_Middleware(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			db, err := single.OpenDB("sqlite3", "file:test.db?cache=shared&mode=memory")
-			if err != nil {
-				t.Error(err)
-			}
-			orm, err := Open("sqlite3", db,
+			orm, err := Open("sqlite3", "file:test.db?cache=shared&mode=memory",
 				DBWithMiddlewares(tc.mdls...))
 			if err != nil {
 				t.Error(err)
@@ -107,9 +101,7 @@ func Test_Middleware_order(t *testing.T) {
 			}
 		}
 	}
-	db, err := single.OpenDB("sqlite3", "file:test.db?cache=shared&mode=memory")
-	require.NoError(t, err)
-	orm, err := Open("sqlite3", db,
+	orm, err := Open("sqlite3", "file:test.db?cache=shared&mode=memory",
 		DBWithMiddlewares(mdl1, mdl2, mdl3, last))
 	require.NoError(t, err)
 

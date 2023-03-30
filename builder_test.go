@@ -30,7 +30,7 @@ import (
 )
 
 func ExampleRawQuery() {
-	orm, _ := Open("sqlite3", memoryDB())
+	orm := memoryDB()
 	q := RawQuery[any](orm, `SELECT * FROM user_tab WHERE id = ?;`, 1)
 	fmt.Printf(`
 SQL: %s
@@ -42,7 +42,7 @@ Args: %v
 }
 
 func ExampleQuerier_Exec() {
-	orm, _ := Open("sqlite3", memoryDB())
+	orm := memoryDB()
 	// 在 Exec 的时候，泛型参数可以是任意的
 	q := RawQuery[any](orm, `CREATE TABLE IF NOT EXISTS groups (
    group_id INTEGER PRIMARY KEY,
@@ -54,10 +54,6 @@ func ExampleQuerier_Exec() {
 	}
 	// Output:
 	// SUCCESS
-}
-
-func (q Query) string() string {
-	return fmt.Sprintf("SQL: %s\nArgs: %#v\n", q.SQL, q.Args)
 }
 
 func TestQuerier_Get(t *testing.T) {
@@ -77,7 +73,7 @@ func testQuerierGet(t *testing.T, creator valuer.PrimitiveCreator) {
 	}
 	defer func() { _ = db.Close() }()
 
-	orm, err := Open("mysql", single.NewDB(db))
+	orm, err := OpenDS("mysql", single.NewDB(db))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -167,7 +163,7 @@ func testQuerier_GetMulti(t *testing.T, creator valuer.PrimitiveCreator) {
 	defer func() {
 		_ = db.Close()
 	}()
-	orm, err := Open("mysql", single.NewDB(db))
+	orm, err := OpenDS("mysql", single.NewDB(db))
 	if err != nil {
 		t.Fatal(err)
 	}

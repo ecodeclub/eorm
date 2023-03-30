@@ -17,9 +17,12 @@ package dns
 import (
 	"context"
 	"database/sql"
+	"errors"
+	"fmt"
 	"log"
 	"net"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -189,8 +192,26 @@ func (s *Slaves) getSlaves(ctx context.Context) error {
 	return nil
 }
 
-func (s *Slaves) Close() {
+func (s *Slaves) Close() error {
+	var err error
 	s.once.Do(func() {
 		close(s.closeCh)
+		err = s.close()
 	})
+	return err
+}
+
+func (s *Slaves) close() error {
+	var resErrs []string
+	for _, inst := range s.slaves {
+		err := inst.Close()
+		if err != nil {
+			resErrs = append(resErrs,
+				fmt.Sprintf("slave DB name [%s] error: %s", inst.SlaveName, err.Error()))
+		}
+	}
+	if resErrs != nil {
+		return errors.New(strings.Join(resErrs, "; "))
+	}
+	return nil
 }

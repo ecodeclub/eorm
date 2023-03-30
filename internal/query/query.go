@@ -14,9 +14,15 @@
 
 package query
 
+import "fmt"
+
 type Query struct {
 	SQL        string
 	Args       []any
 	DB         string
 	Datasource string
+}
+
+func (q Query) String() string {
+	return fmt.Sprintf("SQL: %s\nArgs: %#v\n", q.SQL, q.Args)
 }

@@ -36,7 +36,7 @@ func TestTx_Commit(t *testing.T) {
 	}
 	defer func() { _ = mockDB.Close() }()
 
-	db, err := Open("mysql", single.NewDB(mockDB))
+	db, err := OpenDS("mysql", single.NewDB(mockDB))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -63,7 +63,7 @@ func TestTx_Rollback(t *testing.T) {
 	}
 	defer func() { _ = mockDB.Close() }()
 
-	db, err := Open("mysql", single.NewDB(mockDB))
+	db, err := OpenDS("mysql", single.NewDB(mockDB))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -130,7 +130,7 @@ func TestTx_QueryContext(t *testing.T) {
 			defer func(db *sql.DB) { _ = db.Close() }(mockDB)
 			tc.mockOrder(mock)
 			source := tc.sourceFunc(mockDB, t)
-			orm, err := Open("mysql", source)
+			orm, err := OpenDS("mysql", source)
 			require.NoError(t, err)
 			tx, err := orm.BeginTx(context.Background(), &sql.TxOptions{})
 			require.NoError(t, err)
@@ -191,7 +191,7 @@ func TestTx_ExecContext(t *testing.T) {
 			},
 			sourceFunc: func(db *sql.DB, t *testing.T) datasource.DataSource {
 				clusterDB := cluster.NewClusterDB(map[string]*masterslave.MasterSlavesDB{
-					"db0": masterslave.NewMasterSlaveDB(db),
+					"db0": masterslave.NewMasterSlavesDB(db),
 				})
 				return clusterDB
 			},
@@ -279,7 +279,7 @@ func TestTx_ExecContext(t *testing.T) {
 			tc.mockOrder(mock)
 
 			source := tc.sourceFunc(mockDB, t)
-			orm, err := Open("mysql", source)
+			orm, err := OpenDS("mysql", source)
 			require.NoError(t, err)
 			tx, err := orm.BeginTx(context.Background(), &sql.TxOptions{})
 			assert.Equal(t, tc.wantBeginTxErr, err)

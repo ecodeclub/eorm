@@ -222,3 +222,14 @@ func ExampleDB_BeginTx() {
 	// Begin
 	// Commit
 }
+
+func ExampleDB_Close() {
+	db, _ := OpenDB("sqlite3", "file:test.db?cache=shared&mode=memory")
+	err := db.Close()
+	if err == nil {
+		fmt.Println("close")
+	}
+
+	// Output:
+	// close
+}

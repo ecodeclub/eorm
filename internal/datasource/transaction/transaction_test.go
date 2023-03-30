@@ -92,7 +92,7 @@ func openMockDB(driver string, db *sql.DB) *testMockDB {
 	return &testMockDB{driver: driver, db: db}
 }
 
-func (db *testMockDB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) {
+func (db *testMockDB) BeginTx(ctx context.Context, opts *sql.TxOptions) (datasource.Tx, error) {
 	tx, err := db.db.BeginTx(ctx, opts)
 	if err != nil {
 		return nil, err
@@ -173,7 +173,8 @@ func (s *TransactionSuite) TestDBQuery() {
 	}
 	for _, tc := range testCases {
 		s.T().Run(tc.name, func(t *testing.T) {
-			rows, queryErr := tc.tx.Query(context.Background(), tc.query)
+			tx := tc.tx
+			rows, queryErr := tx.Query(context.Background(), tc.query)
 			assert.Equal(t, queryErr, tc.wantErr)
 			if queryErr != nil {
 				return
@@ -190,7 +191,7 @@ func (s *TransactionSuite) TestDBQuery() {
 				assert.NotNil(t, val)
 				resp = append(resp, *val)
 			}
-			assert.Nil(t, tc.tx.Commit())
+			assert.Nil(t, tx.Commit())
 			assert.ElementsMatch(t, tc.wantResp, resp)
 		})
 	}
@@ -262,7 +263,8 @@ func (s *TransactionSuite) TestDBExec() {
 	}
 	for _, tc := range testCases {
 		s.T().Run(tc.name, func(t *testing.T) {
-			res, err := tc.tx.Exec(context.Background(), tc.query)
+			tx := tc.tx
+			res, err := tx.Exec(context.Background(), tc.query)
 			assert.Nil(t, err)
 			lastInsertId, err := res.LastInsertId()
 			assert.Nil(t, err)
@@ -270,9 +272,9 @@ func (s *TransactionSuite) TestDBExec() {
 			rowsAffected, err := res.RowsAffected()
 			assert.Nil(t, err)
 			if tc.isCommit {
-				assert.Nil(t, tc.tx.Commit())
+				assert.Nil(t, tx.Commit())
 			} else {
-				assert.Nil(t, tc.tx.Rollback())
+				assert.Nil(t, tx.Rollback())
 			}
 			assert.EqualValues(t, tc.rowsAffected, rowsAffected)
 		})
@@ -295,12 +297,16 @@ func (m *mockDB) Exec(ctx context.Context, query datasource.Query) (sql.Result, 
 	return m.db.ExecContext(ctx, query.SQL, query.Args...)
 }
 
-func (m *mockDB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) {
+func (m *mockDB) BeginTx(ctx context.Context, opts *sql.TxOptions) (datasource.Tx, error) {
 	tx, err := m.db.BeginTx(ctx, opts)
 	if err != nil {
 		return nil, err
 	}
 	return NewTx(tx, m), nil
+}
+
+func (m *mockDB) Close() error {
+	return m.db.Close()
 }
 
 func NewMockDB(db *sql.DB) datasource.DataSource {

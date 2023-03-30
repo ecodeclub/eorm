@@ -17,6 +17,9 @@ package cluster
 import (
 	"context"
 	"database/sql"
+	"errors"
+	"fmt"
+	"strings"
 
 	"github.com/ecodeclub/eorm/internal/datasource"
 	"github.com/ecodeclub/eorm/internal/datasource/masterslave"
@@ -51,8 +54,18 @@ func (c *clusterDB) Exec(ctx context.Context, query datasource.Query) (sql.Resul
 //	panic("`BeginTx` must be completed")
 //}
 
-func (c *clusterDB) Close(ctx context.Context) error {
-	panic("`Close` must be completed")
+func (c *clusterDB) Close() error {
+	var resErrs []string
+	for name, inst := range c.masterSlavesDBs {
+		err := inst.Close()
+		if err != nil {
+			resErrs = append(resErrs, fmt.Sprintf("DB name [%s] error: %s", name, err.Error()))
+		}
+	}
+	if resErrs != nil {
+		return errors.New(strings.Join(resErrs, "; "))
+	}
+	return nil
 }
 
 func NewClusterDB(ms map[string]*masterslave.MasterSlavesDB) datasource.DataSource {

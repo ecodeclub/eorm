@@ -37,10 +37,7 @@ func TestUpdater_Set(t *testing.T) {
 		Age:       18,
 		LastName:  &sql.NullString{String: "Jerry", Valid: true},
 	}
-	orm, err := Open("sqlite3", memoryDB())
-	if err != nil {
-		t.Error(err)
-	}
+	orm := memoryDB()
 	testCases := []CommonTestCase{
 		{
 			name:     "no set and update",
@@ -161,10 +158,7 @@ func TestUpdater_SetForCombination(t *testing.T) {
 			LastName:  &sql.NullString{String: "Jerry", Valid: true},
 		},
 	}
-	orm, err := Open("sqlite3", memoryDB())
-	if err != nil {
-		t.Error(err)
-	}
+	orm := memoryDB()
 	testCases := []CommonTestCase{
 		{
 			name:     "no set",
@@ -260,7 +254,6 @@ func TestUpdater_SetForCombination(t *testing.T) {
 }
 
 func TestUpdater_Exec(t *testing.T) {
-
 	tm := &TestModel{
 		Id:        12,
 		FirstName: "Tom",
@@ -310,7 +303,7 @@ func TestUpdater_Exec(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			orm, err := Open("mysql", single.NewDB(mockDB))
+			orm, err := OpenDS("mysql", single.NewDB(mockDB))
 			defer func(db *DB) { _ = db.Close() }(orm)
 			if err != nil {
 				t.Fatal(err)
@@ -343,18 +336,18 @@ func TestUpdater_Exec(t *testing.T) {
 }
 
 func ExampleUpdater_SkipNilValue() {
-	db, _ := Open("sqlite3", memoryDB())
+	db := memoryDB()
 	query, _ := NewUpdater[TestModel](db).Update(&TestModel{Id: 13}).SkipNilValue().Build()
-	fmt.Println(query.string())
+	fmt.Println(query.String())
 	// Output:
 	// SQL: UPDATE `test_model` SET `id`=?,`first_name`=?,`age`=?;
 	// Args: []interface {}{13, "", 0}
 }
 
 func ExampleUpdater_SkipZeroValue() {
-	db, _ := Open("sqlite3", memoryDB())
+	db := memoryDB()
 	query, _ := NewUpdater[TestModel](db).Update(&TestModel{Id: 13}).SkipZeroValue().Build()
-	fmt.Println(query.string())
+	fmt.Println(query.String())
 	// Output:
 	// SQL: UPDATE `test_model` SET `id`=?;
 	// Args: []interface {}{13}
