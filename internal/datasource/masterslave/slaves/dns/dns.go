@@ -17,15 +17,15 @@ package dns
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"log"
 	"net"
 	"strconv"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"go.uber.org/multierr"
 
 	"github.com/ecodeclub/eorm/internal/datasource/masterslave/slaves"
 	"github.com/ecodeclub/eorm/internal/datasource/masterslave/slaves/dns/mysql"
@@ -202,16 +202,15 @@ func (s *Slaves) Close() error {
 }
 
 func (s *Slaves) closeDB() error {
-	var resErrs []string
+	var resErrs []error
 	for _, inst := range s.slaves {
 		err := inst.Close()
 		if err != nil {
-			resErrs = append(resErrs,
-				fmt.Sprintf("slave DB name [%s] error: %s", inst.SlaveName, err.Error()))
+			resErrs = append(resErrs, fmt.Errorf("slave DB name [%s] error: %w", inst.SlaveName, err))
 		}
 	}
 	if resErrs != nil {
-		return errors.New(strings.Join(resErrs, "; "))
+		return multierr.Combine(resErrs...)
 	}
 	return nil
 }

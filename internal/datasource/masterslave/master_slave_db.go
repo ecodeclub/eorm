@@ -17,11 +17,10 @@ package masterslave
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
-	"strings"
 
 	slaves2 "github.com/ecodeclub/eorm/internal/datasource/masterslave/slaves"
+	"go.uber.org/multierr"
 
 	"github.com/ecodeclub/eorm/internal/datasource"
 	"github.com/ecodeclub/eorm/internal/datasource/transaction"
@@ -76,17 +75,17 @@ func NewMasterSlavesDB(master *sql.DB, opts ...MasterSlavesDBOption) *MasterSlav
 }
 
 func (m *MasterSlavesDB) Close() error {
-	var resErrs []string
+	var resErrs []error
 	if err := m.master.Close(); err != nil {
-		resErrs = append(resErrs, fmt.Sprintf("master error: %s", err.Error()))
+		resErrs = append(resErrs, fmt.Errorf("master error: %w", err))
 	}
 	if m.slaves != nil {
 		if err := m.slaves.Close(); err != nil {
-			resErrs = append(resErrs, err.Error())
+			resErrs = append(resErrs, err)
 		}
 	}
 	if resErrs != nil {
-		return errors.New(strings.Join(resErrs, "; "))
+		return multierr.Combine(resErrs...)
 	}
 	return nil
 }

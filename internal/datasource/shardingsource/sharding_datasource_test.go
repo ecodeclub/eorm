@@ -23,7 +23,7 @@ import (
 	"github.com/ecodeclub/eorm/internal/datasource/masterslave/slaves/roundrobin"
 
 	"github.com/ecodeclub/eorm/internal/datasource/masterslave"
-	slaves2 "github.com/ecodeclub/eorm/internal/datasource/masterslave/slaves"
+	"github.com/ecodeclub/eorm/internal/datasource/masterslave/slaves"
 
 	"github.com/ecodeclub/eorm/internal/errs"
 
@@ -265,7 +265,7 @@ func (c *ShardingDataSourceSuite) TestClusterDbExec() {
 		name              string
 		reqCnt            int
 		ctx               context.Context
-		slaves            slaves2.Slaves
+		slaves            slaves.Slaves
 		query             sharding.Query
 		wantRowsAffected  []int64
 		wantLastInsertIds []int64
@@ -335,7 +335,7 @@ func (c *ShardingDataSourceSuite) TestClusterDbExec() {
 	}
 }
 
-func (c *ShardingDataSourceSuite) newSlaves(dbs ...*sql.DB) slaves2.Slaves {
+func (c *ShardingDataSourceSuite) newSlaves(dbs ...*sql.DB) slaves.Slaves {
 	res, err := roundrobin.NewSlaves(dbs...)
 	require.NoError(c.T(), err)
 	return res

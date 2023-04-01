@@ -17,13 +17,12 @@ package cluster
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/ecodeclub/eorm/internal/datasource"
 	"github.com/ecodeclub/eorm/internal/datasource/masterslave"
 	"github.com/ecodeclub/eorm/internal/errs"
+	"go.uber.org/multierr"
 )
 
 var _ datasource.DataSource = &clusterDB{}
@@ -55,15 +54,15 @@ func (c *clusterDB) Exec(ctx context.Context, query datasource.Query) (sql.Resul
 //}
 
 func (c *clusterDB) Close() error {
-	var resErrs []string
+	var resErrs []error
 	for name, inst := range c.masterSlavesDBs {
 		err := inst.Close()
 		if err != nil {
-			resErrs = append(resErrs, fmt.Sprintf("DB name [%s] error: %s", name, err.Error()))
+			resErrs = append(resErrs, fmt.Errorf("DB name [%s] error: %w", name, err))
 		}
 	}
 	if resErrs != nil {
-		return errors.New(strings.Join(resErrs, "; "))
+		return multierr.Combine(resErrs...)
 	}
 	return nil
 }

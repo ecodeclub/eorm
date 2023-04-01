@@ -17,11 +17,10 @@ package shardingsource
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/ecodeclub/eorm/internal/datasource"
+	"go.uber.org/multierr"
 
 	"github.com/ecodeclub/eorm/internal/errs"
 )
@@ -60,15 +59,15 @@ func NewShardingDataSource(m map[string]datasource.DataSource) datasource.DataSo
 }
 
 func (s *ShardingDataSource) Close() error {
-	var resErrs []string
+	var resErrs []error
 	for name, inst := range s.sources {
 		err := inst.Close()
 		if err != nil {
-			resErrs = append(resErrs, fmt.Sprintf("source name [%s] error: %s", name, err.Error()))
+			resErrs = append(resErrs, fmt.Errorf("source name [%s] error: %w", name, err))
 		}
 	}
 	if resErrs != nil {
-		return errors.New(strings.Join(resErrs, "; "))
+		return multierr.Combine(resErrs...)
 	}
 	return nil
 }

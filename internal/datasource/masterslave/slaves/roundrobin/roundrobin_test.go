@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	slaves2 "github.com/ecodeclub/eorm/internal/datasource/masterslave/slaves"
+	"github.com/ecodeclub/eorm/internal/datasource/masterslave/slaves"
 
 	"github.com/ecodeclub/eorm/internal/errs"
 	_ "github.com/mattn/go-sqlite3"
@@ -46,7 +46,7 @@ func TestSlaves_Next(t *testing.T) {
 	db3 := &sql.DB{}
 	testCases := []struct {
 		name   string
-		slaves func() slaves2.Slaves
+		slaves func() slaves.Slaves
 		ctx    context.Context
 
 		wantErr error
@@ -60,7 +60,7 @@ func TestSlaves_Next(t *testing.T) {
 				cancel()
 				return ctx
 			}(),
-			slaves: func() slaves2.Slaves {
+			slaves: func() slaves.Slaves {
 				res, err := NewSlaves(db1, db2, db3)
 				require.NoError(t, err)
 				return res
@@ -70,7 +70,7 @@ func TestSlaves_Next(t *testing.T) {
 		{
 			name: "no slaves",
 			ctx:  context.Background(),
-			slaves: func() slaves2.Slaves {
+			slaves: func() slaves.Slaves {
 				res, err := NewSlaves()
 				require.NoError(t, err)
 				return res
@@ -80,7 +80,7 @@ func TestSlaves_Next(t *testing.T) {
 		{
 			name: "index 0",
 			ctx:  context.Background(),
-			slaves: func() slaves2.Slaves {
+			slaves: func() slaves.Slaves {
 				res, err := NewSlaves(db1, db2, db3)
 				require.NoError(t, err)
 				return res
@@ -90,11 +90,9 @@ func TestSlaves_Next(t *testing.T) {
 		{
 			name: "index last",
 			ctx:  context.Background(),
-			slaves: func() slaves2.Slaves {
-				res, err := NewSlaves(db1, db2, db3)
+			slaves: func() slaves.Slaves {
+				sl, err := NewSlaves(db1, db2, db3)
 				require.NoError(t, err)
-				sl, ok := res.(*slaves)
-				require.True(t, ok)
 				sl.cnt = 1
 				return sl
 			},
@@ -103,11 +101,9 @@ func TestSlaves_Next(t *testing.T) {
 		{
 			name: "jump to first",
 			ctx:  context.Background(),
-			slaves: func() slaves2.Slaves {
-				res, err := NewSlaves(db1, db2, db3)
+			slaves: func() slaves.Slaves {
+				sl, err := NewSlaves(db1, db2, db3)
 				require.NoError(t, err)
-				sl, ok := res.(*slaves)
-				require.True(t, ok)
 				sl.cnt = 2
 				return sl
 			},

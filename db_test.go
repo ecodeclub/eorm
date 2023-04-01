@@ -17,14 +17,42 @@ package eorm
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"testing"
+
+	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/ecodeclub/eorm/internal/datasource/single"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/ecodeclub/eorm/internal/datasource/masterslave"
 
 	"github.com/ecodeclub/eorm/internal/valuer"
 	_ "github.com/mattn/go-sqlite3"
 )
+
+func TestDB_BeginTx(t *testing.T) {
+	mockDB, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = mockDB.Close() }()
+
+	db, err := OpenDS("mysql", single.NewDB(mockDB))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Begin 失败
+	mock.ExpectBegin().WillReturnError(errors.New("begin failed"))
+	tx, err := db.BeginTx(context.Background(), &sql.TxOptions{})
+	assert.Equal(t, errors.New("begin failed"), err)
+	assert.Nil(t, tx)
+
+	mock.ExpectBegin()
+	tx, err = db.BeginTx(context.Background(), &sql.TxOptions{})
+	assert.Nil(t, err)
+	assert.NotNil(t, tx)
+}
 
 func ExampleMiddleware() {
 	db, _ := Open("sqlite3", "file:test.db?cache=shared&mode=memory",
@@ -46,11 +74,11 @@ func ExampleMiddleware() {
 }
 
 func ExampleDB_BeginTx() {
-	orm, _ := Open("sqlite3", "file:test.db?cache=shared&mode=memory")
+	db, _ := Open("sqlite3", "file:test.db?cache=shared&mode=memory")
 	defer func() {
-		_ = orm.Close()
+		_ = db.Close()
 	}()
-	tx, err := orm.BeginTx(context.Background(), &sql.TxOptions{})
+	tx, err := db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err == nil {
 		fmt.Println("Begin")
 	}
