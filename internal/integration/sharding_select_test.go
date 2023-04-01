@@ -22,6 +22,8 @@ import (
 	"testing"
 	"time"
 
+	Operator "github.com/ecodeclub/eorm/internal/operator"
+
 	"github.com/ecodeclub/eorm"
 	"github.com/ecodeclub/eorm/internal/model"
 	"github.com/ecodeclub/eorm/internal/sharding"
@@ -42,7 +44,7 @@ func (s *ShardingSelectTestSuite) SetupSuite() {
 	s.ShardingSuite.SetupSuite()
 	for _, item := range s.data {
 		shardingRes, err := s.algorithm.Sharding(
-			context.Background(), sharding.Request{SkValues: map[string]any{"OrderId": item.OrderId}})
+			context.Background(), sharding.Request{Op: Operator.OpEQ, SkValues: map[string]any{"OrderId": item.OrderId}})
 		require.NoError(t, err)
 		require.NotNil(t, shardingRes.Dsts)
 		for _, dst := range shardingRes.Dsts {
@@ -185,6 +187,147 @@ func (s *ShardingSelectTestSuite) TestSardingSelectorGetMulti() {
 				{OrderId: 234, ItemId: 12, UsingCol1: "Kevin", UsingCol2: "Durant"},
 			},
 		},
+		////////////////////
+		{
+			name: "where gt",
+			s: func() *eorm.ShardingSelector[test.OrderDetail] {
+				builder := eorm.NewShardingSelector[test.OrderDetail](s.shardingDB).
+					Where(eorm.C("OrderId").GT(1))
+				return builder
+			}(),
+			wantRes: []*test.OrderDetail{
+				{OrderId: 8, ItemId: 6, UsingCol1: "Kobe", UsingCol2: "Bryant"},
+				{OrderId: 11, ItemId: 8, UsingCol1: "James", UsingCol2: "Harden"},
+				{OrderId: 123, ItemId: 10, UsingCol1: "LeBron", UsingCol2: "James"},
+				{OrderId: 234, ItemId: 12, UsingCol1: "Kevin", UsingCol2: "Durant"},
+				{OrderId: 253, ItemId: 8, UsingCol1: "Stephen", UsingCol2: "Curry"},
+				{OrderId: 181, ItemId: 11, UsingCol1: "Kawhi", UsingCol2: "Leonard"},
+			},
+		},
+		{
+			name: "where lt",
+			s: func() *eorm.ShardingSelector[test.OrderDetail] {
+				builder := eorm.NewShardingSelector[test.OrderDetail](s.shardingDB).
+					Where(eorm.C("OrderId").LT(150))
+				return builder
+			}(),
+			wantRes: []*test.OrderDetail{
+				{OrderId: 8, ItemId: 6, UsingCol1: "Kobe", UsingCol2: "Bryant"},
+				{OrderId: 11, ItemId: 8, UsingCol1: "James", UsingCol2: "Harden"},
+				{OrderId: 123, ItemId: 10, UsingCol1: "LeBron", UsingCol2: "James"},
+			},
+		},
+		{
+			name: "where gt eq",
+			s: func() *eorm.ShardingSelector[test.OrderDetail] {
+				builder := eorm.NewShardingSelector[test.OrderDetail](s.shardingDB).
+					Where(eorm.C("OrderId").GTEQ(123))
+				return builder
+			}(),
+			wantRes: []*test.OrderDetail{
+				{OrderId: 123, ItemId: 10, UsingCol1: "LeBron", UsingCol2: "James"},
+				{OrderId: 234, ItemId: 12, UsingCol1: "Kevin", UsingCol2: "Durant"},
+				{OrderId: 253, ItemId: 8, UsingCol1: "Stephen", UsingCol2: "Curry"},
+				{OrderId: 181, ItemId: 11, UsingCol1: "Kawhi", UsingCol2: "Leonard"},
+			},
+		},
+		{
+			name: "where lt eq",
+			s: func() *eorm.ShardingSelector[test.OrderDetail] {
+				builder := eorm.NewShardingSelector[test.OrderDetail](s.shardingDB).
+					Where(eorm.C("OrderId").LTEQ(123))
+				return builder
+			}(),
+			wantRes: []*test.OrderDetail{
+				{OrderId: 8, ItemId: 6, UsingCol1: "Kobe", UsingCol2: "Bryant"},
+				{OrderId: 11, ItemId: 8, UsingCol1: "James", UsingCol2: "Harden"},
+				{OrderId: 123, ItemId: 10, UsingCol1: "LeBron", UsingCol2: "James"},
+			},
+		},
+		{
+			name: "where in",
+			s: func() *eorm.ShardingSelector[test.OrderDetail] {
+				builder := eorm.NewShardingSelector[test.OrderDetail](s.shardingDB).
+					Where(eorm.C("OrderId").In(8, 11, 123, 234))
+				return builder
+			}(),
+			wantRes: []*test.OrderDetail{
+				{OrderId: 8, ItemId: 6, UsingCol1: "Kobe", UsingCol2: "Bryant"},
+				{OrderId: 11, ItemId: 8, UsingCol1: "James", UsingCol2: "Harden"},
+				{OrderId: 123, ItemId: 10, UsingCol1: "LeBron", UsingCol2: "James"},
+				{OrderId: 234, ItemId: 12, UsingCol1: "Kevin", UsingCol2: "Durant"},
+			},
+		},
+		{
+			name: "where eq or gt",
+			s: func() *eorm.ShardingSelector[test.OrderDetail] {
+				builder := eorm.NewShardingSelector[test.OrderDetail](s.shardingDB).
+					Where(eorm.C("OrderId").EQ(8).
+						Or(eorm.C("OrderId").GT(240)))
+				return builder
+			}(),
+			wantRes: []*test.OrderDetail{
+				{OrderId: 8, ItemId: 6, UsingCol1: "Kobe", UsingCol2: "Bryant"},
+				{OrderId: 253, ItemId: 8, UsingCol1: "Stephen", UsingCol2: "Curry"},
+			},
+		},
+		{
+			name: "where in or eq",
+			s: func() *eorm.ShardingSelector[test.OrderDetail] {
+				builder := eorm.NewShardingSelector[test.OrderDetail](s.shardingDB).
+					Where(eorm.C("OrderId").In(8, 11, 123).
+						Or(eorm.C("OrderId").EQ(181)))
+				return builder
+			}(),
+			wantRes: []*test.OrderDetail{
+				{OrderId: 8, ItemId: 6, UsingCol1: "Kobe", UsingCol2: "Bryant"},
+				{OrderId: 11, ItemId: 8, UsingCol1: "James", UsingCol2: "Harden"},
+				{OrderId: 123, ItemId: 10, UsingCol1: "LeBron", UsingCol2: "James"},
+				{OrderId: 181, ItemId: 11, UsingCol1: "Kawhi", UsingCol2: "Leonard"},
+			},
+		},
+		{
+			name: "where in or gt",
+			s: func() *eorm.ShardingSelector[test.OrderDetail] {
+				builder := eorm.NewShardingSelector[test.OrderDetail](s.shardingDB).
+					Where(eorm.C("OrderId").In(8, 11).
+						Or(eorm.C("OrderId").GT(200)))
+				return builder
+			}(),
+			wantRes: []*test.OrderDetail{
+				{OrderId: 8, ItemId: 6, UsingCol1: "Kobe", UsingCol2: "Bryant"},
+				{OrderId: 11, ItemId: 8, UsingCol1: "James", UsingCol2: "Harden"},
+				{OrderId: 234, ItemId: 12, UsingCol1: "Kevin", UsingCol2: "Durant"},
+				{OrderId: 253, ItemId: 8, UsingCol1: "Stephen", UsingCol2: "Curry"},
+			},
+		},
+		{
+			name: "where between",
+			s: func() *eorm.ShardingSelector[test.OrderDetail] {
+				builder := eorm.NewShardingSelector[test.OrderDetail](s.shardingDB).
+					Where(eorm.C("OrderId").GTEQ(123).And(eorm.C("OrderId").LTEQ(253)))
+				return builder
+			}(),
+			wantRes: []*test.OrderDetail{
+				{OrderId: 123, ItemId: 10, UsingCol1: "LeBron", UsingCol2: "James"},
+				{OrderId: 234, ItemId: 12, UsingCol1: "Kevin", UsingCol2: "Durant"},
+				{OrderId: 253, ItemId: 8, UsingCol1: "Stephen", UsingCol2: "Curry"},
+				{OrderId: 181, ItemId: 11, UsingCol1: "Kawhi", UsingCol2: "Leonard"},
+			},
+		},
+		{
+			name: "where eq and lt or gt",
+			s: func() *eorm.ShardingSelector[test.OrderDetail] {
+				builder := eorm.NewShardingSelector[test.OrderDetail](s.shardingDB).
+					Where(eorm.C("OrderId").EQ(11).And(eorm.C("OrderId").LT(123)).
+						Or(eorm.C("OrderId").GT(234)))
+				return builder
+			}(),
+			wantRes: []*test.OrderDetail{
+				{OrderId: 11, ItemId: 8, UsingCol1: "James", UsingCol2: "Harden"},
+				{OrderId: 253, ItemId: 8, UsingCol1: "Stephen", UsingCol2: "Curry"},
+			},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -205,7 +348,7 @@ func (s *ShardingSelectTestSuite) TearDownSuite() {
 	t := s.T()
 	for _, item := range s.data {
 		shardingRes, err := s.algorithm.Sharding(
-			context.Background(), sharding.Request{SkValues: map[string]any{"OrderId": item.OrderId}})
+			context.Background(), sharding.Request{Op: Operator.OpEQ, SkValues: map[string]any{"OrderId": item.OrderId}})
 		require.NoError(t, err)
 		require.NotNil(t, shardingRes.Dsts)
 		for _, dst := range shardingRes.Dsts {
@@ -254,6 +397,8 @@ func TestMySQL8ShardingSelect(t *testing.T) {
 			},
 		},
 		data: []*test.OrderDetail{
+			{8, 6, "Kobe", "Bryant"},
+			{11, 8, "James", "Harden"},
 			{123, 10, "LeBron", "James"},
 			{234, 12, "Kevin", "Durant"},
 			{253, 8, "Stephen", "Curry"},

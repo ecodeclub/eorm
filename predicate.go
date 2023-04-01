@@ -21,8 +21,7 @@ import operator "github.com/ecodeclub/eorm/internal/operator"
 //	Text   string
 //}
 
-//type op Operator.Op
-//
+// type op Operator.Op
 var (
 	opLT      = operator.OpLT
 	opLTEQ    = operator.OpLTEQ

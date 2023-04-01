@@ -17,6 +17,7 @@ package eorm
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"sync"
 
 	"github.com/gotomicro/ekit/slice"
@@ -401,8 +402,10 @@ func (s *ShardingSelector[T]) GetMulti(ctx context.Context) ([]*T, error) {
 	}
 	var rowsSlice []*sql.Rows
 	var eg errgroup.Group
+	fmt.Println("--------------")
 	for _, query := range qs {
 		q := query
+		fmt.Println(q.SQL)
 		eg.Go(func() error {
 			s.lock.Lock()
 			defer s.lock.Unlock()
@@ -429,6 +432,7 @@ func (s *ShardingSelector[T]) GetMulti(ctx context.Context) ([]*T, error) {
 			res = append(res, tp)
 		}
 	}
+	fmt.Println("--------------")
 	return res, nil
 }
 
