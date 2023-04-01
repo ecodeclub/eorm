@@ -7,6 +7,7 @@ require (
 	github.com/go-sql-driver/mysql v1.6.0
 	github.com/gotomicro/ekit v0.0.6
 	github.com/mattn/go-sqlite3 v1.14.15
+	github.com/shopspring/decimal v1.3.1
 	github.com/stretchr/testify v1.7.1
 	github.com/valyala/bytebufferpool v1.0.0
 	go.uber.org/multierr v1.9.0
