@@ -77,7 +77,6 @@ func TestTx_Rollback(t *testing.T) {
 type testMockDB struct {
 	driver string
 	db     *sql.DB
-	ds     datasource.DataSource
 }
 
 func (*testMockDB) Query(_ context.Context, _ datasource.Query) (*sql.Rows, error) {
@@ -106,7 +105,6 @@ func (db *testMockDB) Close() error {
 
 type TransactionSuite struct {
 	suite.Suite
-	tx      *Tx
 	mockDB1 *sql.DB
 	mock1   sqlmock.Sqlmock
 

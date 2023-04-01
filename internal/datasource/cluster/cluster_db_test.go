@@ -36,7 +36,7 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-func ExampleClusterDB_Close() {
+func Example_clusterDB_Close() {
 	db, _ := sql.Open("sqlite3", "file:test.db?cache=shared&mode=memory")
 	cl := NewClusterDB(map[string]*masterslave.MasterSlavesDB{
 		"db0": masterslave.NewMasterSlavesDB(db),
