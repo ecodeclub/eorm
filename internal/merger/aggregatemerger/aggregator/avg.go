@@ -47,7 +47,7 @@ func (a *AVG[S, C]) ColumnName() string {
 	return a.colName
 }
 
-func NewAVG[S AggregateElement, C AggregateElement](sumName string, countName string, name string) *AVG[S, C] {
+func NewAVG[S AggregateElement, C AggregateElement](sumName string, countName string, alias string) *AVG[S, C] {
 	var sum S
 	var count C
 	sumTyp := reflect.TypeOf(sum)
@@ -65,6 +65,6 @@ func NewAVG[S AggregateElement, C AggregateElement](sumName string, countName st
 	}
 	return &AVG[S, C]{
 		colMap:  colMap,
-		colName: name,
+		colName: alias,
 	}
 }

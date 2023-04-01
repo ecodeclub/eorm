@@ -39,7 +39,7 @@ func (s *Count[T]) ColumnName() string {
 }
 
 // NewCount 第一个参数为数据库里的列名，第二个为返回的列名
-func NewCount[T AggregateElement](colName string, name string) *Count[T] {
+func NewCount[T AggregateElement](colName string, alias string) *Count[T] {
 	colMap := make(map[string]ColInfo, 1)
 	var t T
 	colMap["COUNT"] = ColInfo{
@@ -49,6 +49,6 @@ func NewCount[T AggregateElement](colName string, name string) *Count[T] {
 	}
 	return &Count[T]{
 		colMap:  colMap,
-		colName: name,
+		colName: alias,
 	}
 }

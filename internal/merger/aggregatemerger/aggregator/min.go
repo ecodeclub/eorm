@@ -24,16 +24,18 @@ type Min[T AggregateElement] struct {
 }
 
 func (m *Min[T]) Aggregate(columns [][]any) (any, error) {
-	ans := make([]T, 0, 1)
-	for _, col := range columns {
-		data, _ := col[0].(T)
-		if len(ans) == 0 {
-			ans = append(ans, data)
-		} else if ans[0] > data {
-			ans[0] = data
+	var ans T
+	for idx, col := range columns {
+		val := col[0].(T)
+		if idx == 0 {
+			ans = val
+			continue
+		}
+		if ans > val {
+			ans = val
 		}
 	}
-	return ans[0], nil
+	return ans, nil
 }
 
 func (m *Min[T]) ColumnInfo() map[string]ColInfo {
@@ -45,7 +47,7 @@ func (m *Min[T]) ColumnName() string {
 }
 
 // NewMin 第一个参数为数据库里的列名，第二个为返回的列名
-func NewMin[T AggregateElement](colName string, name string) *Min[T] {
+func NewMin[T AggregateElement](colName string, alias string) *Min[T] {
 	var t T
 	typ := reflect.TypeOf(t)
 	colMap := make(map[string]ColInfo, 1)
@@ -57,6 +59,6 @@ func NewMin[T AggregateElement](colName string, name string) *Min[T] {
 
 	return &Min[T]{
 		colMap:  colMap,
-		colName: name,
+		colName: alias,
 	}
 }

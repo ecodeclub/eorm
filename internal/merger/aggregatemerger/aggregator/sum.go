@@ -40,7 +40,7 @@ func (s *Sum[T]) ColumnName() string {
 }
 
 // NewSUM 第一个参数为数据库里的列名，第二个为返回的列名
-func NewSUM[T AggregateElement](colName string, name string) *Sum[T] {
+func NewSUM[T AggregateElement](colName string, alias string) *Sum[T] {
 	colMap := make(map[string]ColInfo, 1)
 	var t T
 	colMap["SUM"] = ColInfo{
@@ -51,6 +51,6 @@ func NewSUM[T AggregateElement](colName string, name string) *Sum[T] {
 
 	return &Sum[T]{
 		colMap:  colMap,
-		colName: name,
+		colName: alias,
 	}
 }
