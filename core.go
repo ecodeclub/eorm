@@ -33,6 +33,7 @@ type core struct {
 
 func getHandler[T any](ctx context.Context, sess Session, c core, qc *QueryContext) *QueryResult {
 	rows, err := sess.queryContext(ctx, qc.q.SQL, qc.q.Args...)
+	defer rows.Close()
 	if err != nil {
 		return &QueryResult{Err: err}
 	}
