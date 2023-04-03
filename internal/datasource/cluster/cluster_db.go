@@ -50,14 +50,14 @@ func (c *clusterDB) Exec(ctx context.Context, query datasource.Query) (sql.Resul
 }
 
 func (c *clusterDB) Close() error {
-	var resErrs []error
+	var err error
 	for name, inst := range c.masterSlavesDBs {
-		err := inst.Close()
-		if err != nil {
-			resErrs = append(resErrs, fmt.Errorf("DB name [%s] error: %w", name, err))
+		if er := inst.Close(); er != nil {
+			err = multierr.Combine(
+				err, fmt.Errorf("masterslave DB name [%s] error: %w", name, er))
 		}
 	}
-	return multierr.Combine(resErrs...)
+	return err
 }
 
 func NewClusterDB(ms map[string]*masterslave.MasterSlavesDB) datasource.DataSource {

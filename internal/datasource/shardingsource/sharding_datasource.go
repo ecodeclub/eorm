@@ -59,12 +59,12 @@ func NewShardingDataSource(m map[string]datasource.DataSource) datasource.DataSo
 }
 
 func (s *ShardingDataSource) Close() error {
-	var resErrs []error
+	var err error
 	for name, inst := range s.sources {
-		err := inst.Close()
-		if err != nil {
-			resErrs = append(resErrs, fmt.Errorf("source name [%s] error: %w", name, err))
+		if er := inst.Close(); er != nil {
+			err = multierr.Combine(
+				err, fmt.Errorf("source name [%s] error: %w", name, er))
 		}
 	}
-	return multierr.Combine(resErrs...)
+	return err
 }

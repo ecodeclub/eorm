@@ -202,12 +202,12 @@ func (s *Slaves) Close() error {
 }
 
 func (s *Slaves) closeDB() error {
-	var resErrs []error
+	var err error
 	for _, inst := range s.slaves {
-		err := inst.Close()
-		if err != nil {
-			resErrs = append(resErrs, fmt.Errorf("slave DB name [%s] error: %w", inst.SlaveName, err))
+		if er := inst.Close(); er != nil {
+			err = multierr.Combine(
+				err, fmt.Errorf("slave DB name [%s] error: %w", inst.SlaveName, er))
 		}
 	}
-	return multierr.Combine(resErrs...)
+	return err
 }

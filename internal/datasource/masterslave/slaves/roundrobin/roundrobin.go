@@ -46,14 +46,14 @@ func (r *Slaves) Next(ctx context.Context) (slaves.Slave, error) {
 }
 
 func (r *Slaves) Close() error {
-	var resErrs []error
+	var err error
 	for _, inst := range r.slaves {
-		err := inst.Close()
-		if err != nil {
-			resErrs = append(resErrs, fmt.Errorf("slave DB name [%s] error: %w", inst.SlaveName, err))
+		if er := inst.Close(); er != nil {
+			err = multierr.Combine(
+				err, fmt.Errorf("slave DB name [%s] error: %w", inst.SlaveName, er))
 		}
 	}
-	return multierr.Combine(resErrs...)
+	return err
 }
 
 func NewSlaves(dbs ...*sql.DB) (*Slaves, error) {

@@ -75,16 +75,17 @@ func NewMasterSlavesDB(master *sql.DB, opts ...MasterSlavesDBOption) *MasterSlav
 }
 
 func (m *MasterSlavesDB) Close() error {
-	var resErrs []error
-	if err := m.master.Close(); err != nil {
-		resErrs = append(resErrs, fmt.Errorf("master error: %w", err))
+	var err error
+	if er := m.master.Close(); er != nil {
+		err = multierr.Combine(
+			err, fmt.Errorf("master error: %w", er))
 	}
 	if m.slaves != nil {
-		if err := m.slaves.Close(); err != nil {
-			resErrs = append(resErrs, err)
+		if er := m.slaves.Close(); er != nil {
+			err = multierr.Combine(err, er)
 		}
 	}
-	return multierr.Combine(resErrs...)
+	return err
 }
 
 type MasterSlavesDBOption func(db *MasterSlavesDB)
