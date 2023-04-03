@@ -84,10 +84,7 @@ func (m *MasterSlavesDB) Close() error {
 			resErrs = append(resErrs, err)
 		}
 	}
-	if resErrs != nil {
-		return multierr.Combine(resErrs...)
-	}
-	return nil
+	return multierr.Combine(resErrs...)
 }
 
 type MasterSlavesDBOption func(db *MasterSlavesDB)

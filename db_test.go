@@ -94,8 +94,8 @@ func ExampleDB_BeginTx() {
 
 func ExampleOpen() {
 	// case1 without DBOption
-	orm, _ := Open("sqlite3", "file:test.db?cache=shared&mode=memory")
-	fmt.Printf("case1 dialect: %s\n", orm.dialect.Name)
+	db, _ := Open("sqlite3", "file:test.db?cache=shared&mode=memory")
+	fmt.Printf("case1 dialect: %s\n", db.dialect.Name)
 
 	// Output:
 	// case1 dialect: SQLite
@@ -103,8 +103,8 @@ func ExampleOpen() {
 
 func ExampleNewDeleter() {
 	tm := &TestModel{}
-	orm := memoryDB()
-	query, _ := NewDeleter[TestModel](orm).From(tm).Build()
+	db := memoryDB()
+	query, _ := NewDeleter[TestModel](db).From(tm).Build()
 	fmt.Printf("SQL: %s", query.SQL)
 	// Output:
 	// SQL: DELETE FROM `test_model`;
@@ -114,8 +114,8 @@ func ExampleNewUpdater() {
 	tm := &TestModel{
 		Age: 18,
 	}
-	orm := memoryDB()
-	query, _ := NewUpdater[TestModel](orm).Update(tm).Build()
+	db := memoryDB()
+	query, _ := NewUpdater[TestModel](db).Update(tm).Build()
 	fmt.Printf("SQL: %s", query.SQL)
 	// Output:
 	// SQL: UPDATE `test_model` SET `id`=?,`first_name`=?,`age`=?,`last_name`=?;
@@ -131,11 +131,11 @@ func memoryDB() *DB {
 }
 
 func memoryDBWithDB(dbName string) *DB {
-	orm, err := Open("sqlite3", fmt.Sprintf("file:%s.db?cache=shared&mode=memory", dbName))
+	db, err := Open("sqlite3", fmt.Sprintf("file:%s.db?cache=shared&mode=memory", dbName))
 	if err != nil {
 		panic(err)
 	}
-	return orm
+	return db
 }
 
 // go test -bench=BenchmarkQuerier_Get -benchmem -benchtime=10000x
@@ -149,12 +149,12 @@ func memoryDBWithDB(dbName string) *DB {
 // ok      github.com/ecodeclub/eorm       13.072s
 func BenchmarkQuerier_Get(b *testing.B) {
 	b.ReportAllocs()
-	orm := memoryDBWithDB("benchmarkQuerierGet")
+	db := memoryDBWithDB("benchmarkQuerierGet")
 	defer func() {
-		_ = orm.Close()
+		_ = db.Close()
 	}()
-	_ = RawQuery[any](orm, TestModel{}.CreateSQL()).Exec(context.Background())
-	res := NewInserter[TestModel](orm).Values(&TestModel{
+	_ = RawQuery[any](db, TestModel{}.CreateSQL()).Exec(context.Background())
+	res := NewInserter[TestModel](db).Values(&TestModel{
 		Id:        12,
 		FirstName: "Deng",
 		Age:       18,
@@ -172,11 +172,11 @@ func BenchmarkQuerier_Get(b *testing.B) {
 	}
 
 	b.Run("unsafe", func(b *testing.B) {
-		orm.valCreator = valuer.PrimitiveCreator{
+		db.valCreator = valuer.PrimitiveCreator{
 			Creator: valuer.NewUnsafeValue,
 		}
 		for i := 0; i < b.N; i++ {
-			_, err = NewSelector[TestModel](orm).From(TableOf(&TestModel{}, "t1")).Get(context.Background())
+			_, err = NewSelector[TestModel](db).From(TableOf(&TestModel{}, "t1")).Get(context.Background())
 			if err != nil {
 				b.Fatal(err)
 			}
@@ -184,11 +184,11 @@ func BenchmarkQuerier_Get(b *testing.B) {
 	})
 
 	b.Run("reflect", func(b *testing.B) {
-		orm.valCreator = valuer.PrimitiveCreator{
+		db.valCreator = valuer.PrimitiveCreator{
 			Creator: valuer.NewReflectValue,
 		}
 		for i := 0; i < b.N; i++ {
-			_, err = NewSelector[TestModel](orm).From(TableOf(&TestModel{}, "t1")).Get(context.Background())
+			_, err = NewSelector[TestModel](db).From(TableOf(&TestModel{}, "t1")).Get(context.Background())
 			if err != nil {
 				b.Fatal(err)
 			}

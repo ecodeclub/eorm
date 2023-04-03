@@ -70,7 +70,6 @@ func TestDeleter_Build(t *testing.T) {
 }
 
 func TestDeleter_Exec(t *testing.T) {
-
 	testCases := []struct {
 		name      string
 		mockOrder func(mock sqlmock.Sqlmock)

@@ -209,8 +209,5 @@ func (s *Slaves) closeDB() error {
 			resErrs = append(resErrs, fmt.Errorf("slave DB name [%s] error: %w", inst.SlaveName, err))
 		}
 	}
-	if resErrs != nil {
-		return multierr.Combine(resErrs...)
-	}
-	return nil
+	return multierr.Combine(resErrs...)
 }

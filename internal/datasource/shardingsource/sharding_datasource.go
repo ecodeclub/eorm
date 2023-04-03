@@ -66,8 +66,5 @@ func (s *ShardingDataSource) Close() error {
 			resErrs = append(resErrs, fmt.Errorf("source name [%s] error: %w", name, err))
 		}
 	}
-	if resErrs != nil {
-		return multierr.Combine(resErrs...)
-	}
-	return nil
+	return multierr.Combine(resErrs...)
 }

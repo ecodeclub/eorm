@@ -30,8 +30,8 @@ import (
 )
 
 func ExampleRawQuery() {
-	orm := memoryDB()
-	q := RawQuery[any](orm, `SELECT * FROM user_tab WHERE id = ?;`, 1)
+	db := memoryDB()
+	q := RawQuery[any](db, `SELECT * FROM user_tab WHERE id = ?;`, 1)
 	fmt.Printf(`
 SQL: %s
 Args: %v
@@ -42,9 +42,9 @@ Args: %v
 }
 
 func ExampleQuerier_Exec() {
-	orm := memoryDB()
+	db := memoryDB()
 	// 在 Exec 的时候，泛型参数可以是任意的
-	q := RawQuery[any](orm, `CREATE TABLE IF NOT EXISTS groups (
+	q := RawQuery[any](db, `CREATE TABLE IF NOT EXISTS groups (
    group_id INTEGER PRIMARY KEY,
    name TEXT NOT NULL
 )`)

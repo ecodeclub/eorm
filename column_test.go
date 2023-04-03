@@ -17,8 +17,8 @@ package eorm
 import "fmt"
 
 func ExampleC() {
-	orm := memoryDB()
-	query, _ := NewSelector[TestModel](orm).Select(C("Id")).Where(C("Id").EQ(18)).Build()
+	db := memoryDB()
+	query, _ := NewSelector[TestModel](db).Select(C("Id")).Where(C("Id").EQ(18)).Build()
 	fmt.Printf(`
 SQL: %s
 Args: %v

@@ -49,10 +49,6 @@ func (c *clusterDB) Exec(ctx context.Context, query datasource.Query) (sql.Resul
 	return ms.Exec(ctx, query)
 }
 
-//func (*clusterDB) BeginTx(_ context.Context, _ *sql.TxOptions) (datasource.Tx, error) {
-//	panic("`BeginTx` must be completed")
-//}
-
 func (c *clusterDB) Close() error {
 	var resErrs []error
 	for name, inst := range c.masterSlavesDBs {
@@ -61,10 +57,7 @@ func (c *clusterDB) Close() error {
 			resErrs = append(resErrs, fmt.Errorf("DB name [%s] error: %w", name, err))
 		}
 	}
-	if resErrs != nil {
-		return multierr.Combine(resErrs...)
-	}
-	return nil
+	return multierr.Combine(resErrs...)
 }
 
 func NewClusterDB(ms map[string]*masterslave.MasterSlavesDB) datasource.DataSource {
