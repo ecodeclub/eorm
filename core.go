@@ -33,11 +33,6 @@ type core struct {
 
 func getHandler[T any](ctx context.Context, sess Session, c core, qc *QueryContext) *QueryResult {
 	rows, err := sess.queryContext(ctx, qc.q.SQL, qc.q.Args...)
-	defer func() {
-		if rows != nil {
-			_ = rows.Close()
-		}
-	}()
 	if err != nil {
 		return &QueryResult{Err: err}
 	}
@@ -58,6 +53,8 @@ func getHandler[T any](ctx context.Context, sess Session, c core, qc *QueryConte
 	if err = val.SetColumns(rows); err != nil {
 		return &QueryResult{Err: err}
 	}
+
+	_ = rows.Close()
 	return &QueryResult{Result: tp}
 }
 
@@ -74,11 +71,6 @@ func get[T any](ctx context.Context, sess Session, core core, qc *QueryContext) 
 
 func getMultiHandler[T any](ctx context.Context, sess Session, c core, qc *QueryContext) *QueryResult {
 	rows, err := sess.queryContext(ctx, qc.q.SQL, qc.q.Args...)
-	defer func() {
-		if rows != nil {
-			_ = rows.Close()
-		}
-	}()
 	if err != nil {
 		return &QueryResult{Err: err}
 	}
@@ -101,6 +93,8 @@ func getMultiHandler[T any](ctx context.Context, sess Session, c core, qc *Query
 		}
 		res = append(res, tp)
 	}
+
+	_ = rows.Close()
 	return &QueryResult{Result: res}
 }
 
