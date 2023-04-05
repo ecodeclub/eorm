@@ -23,6 +23,8 @@ import (
 	"github.com/valyala/bytebufferpool"
 )
 
+var _ QueryBuilder = &Inserter[any]{}
+
 // Inserter is used to construct an insert query
 // More details check Build function
 type Inserter[T any] struct {
@@ -53,22 +55,22 @@ func (i *Inserter[T]) SkipPK() *Inserter[T] {
 // notes:
 // - All the values from function Values should have the same type.
 // - It will insert all columns including auto-increment primary key
-func (i *Inserter[T]) Build() (*Query, error) {
+func (i *Inserter[T]) Build() (Query, error) {
 	defer bytebufferpool.Put(i.buffer)
 	var err error
 	if len(i.values) == 0 {
-		return &Query{}, errors.New("插入0行")
+		return EmptyQuery, errors.New("插入0行")
 	}
 	i.writeString("INSERT INTO ")
 	i.meta, err = i.metaRegistry.Get(i.values[0])
 	if err != nil {
-		return &Query{}, err
+		return EmptyQuery, err
 	}
 	i.quote(i.meta.TableName)
 	i.writeString("(")
 	fields, err := i.buildColumns()
 	if err != nil {
-		return nil, err
+		return EmptyQuery, err
 	}
 	i.writeString(")")
 	i.writeString(" VALUES")
@@ -81,7 +83,7 @@ func (i *Inserter[T]) Build() (*Query, error) {
 		for j, v := range fields {
 			fdVal, err := refVal.Field(v.FieldName)
 			if err != nil {
-				return nil, err
+				return EmptyQuery, err
 			}
 			i.parameter(fdVal.Interface())
 			if j != len(fields)-1 {
@@ -91,7 +93,7 @@ func (i *Inserter[T]) Build() (*Query, error) {
 		i.writeString(")")
 	}
 	i.end()
-	return &Query{SQL: i.buffer.String(), Args: i.args}, nil
+	return Query{SQL: i.buffer.String(), Args: i.args}, nil
 }
 
 // Columns specifies the columns that need to be inserted

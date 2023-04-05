@@ -18,8 +18,11 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/ecodeclub/eorm/internal/datasource"
+
 	"github.com/ecodeclub/eorm/internal/errs"
 	"github.com/ecodeclub/eorm/internal/model"
+	"github.com/ecodeclub/eorm/internal/query"
 	"github.com/valyala/bytebufferpool"
 )
 
@@ -27,11 +30,10 @@ var _ Executor = &Inserter[any]{}
 var _ Executor = &Updater[any]{}
 var _ Executor = &Deleter[any]{}
 
+var EmptyQuery = Query{}
+
 // Query 代表一个查询
-type Query struct {
-	SQL  string
-	Args []any
-}
+type Query = query.Query
 
 // Querier 查询器，代表最基本的查询
 type Querier[T any] struct {
@@ -48,7 +50,7 @@ func RawQuery[T any](sess Session, sql string, args ...any) Querier[T] {
 		core:    sess.getCore(),
 		Session: sess,
 		qc: &QueryContext{
-			q: &Query{
+			q: Query{
 				SQL:  sql,
 				Args: args,
 			},
@@ -57,7 +59,7 @@ func RawQuery[T any](sess Session, sql string, args ...any) Querier[T] {
 	}
 }
 
-func newQuerier[T any](sess Session, q *Query, meta *model.TableMeta, typ string) Querier[T] {
+func newQuerier[T any](sess Session, q Query, meta *model.TableMeta, typ string) Querier[T] {
 	return Querier[T]{
 		core:    sess.getCore(),
 		Session: sess,
@@ -72,7 +74,7 @@ func newQuerier[T any](sess Session, q *Query, meta *model.TableMeta, typ string
 // Exec 执行 SQL
 func (q Querier[T]) Exec(ctx context.Context) Result {
 	var handler HandleFunc = func(ctx context.Context, qc *QueryContext) *QueryResult {
-		res, err := q.Session.execContext(ctx, qc.q.SQL, qc.q.Args...)
+		res, err := q.Session.execContext(ctx, datasource.Query(qc.q))
 		return &QueryResult{Result: res, Err: err}
 	}
 
@@ -326,16 +328,16 @@ func (b *builder) buildColumn(c Column) error {
 // buildSubquery 構建子查詢 SQL，
 // useAlias 決定是否顯示別名，即使有別名
 func (b *builder) buildSubquery(sub Subquery, useAlias bool) error {
-	query, err := sub.q.Build()
+	q, err := sub.q.Build()
 	if err != nil {
 		return err
 	}
 	b.writeByte('(')
 	// 拿掉最後 ';'
-	b.writeString(query.SQL[:len(query.SQL)-1])
+	b.writeString(q.SQL[:len(q.SQL)-1])
 	// 因為有 build() ，所以理應 args 也需要跟 SQL 一起處理
-	if len(query.Args) > 0 {
-		b.addArgs(query.Args...)
+	if len(q.Args) > 0 {
+		b.addArgs(q.Args...)
 	}
 	b.writeByte(')')
 	if useAlias {

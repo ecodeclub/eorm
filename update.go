@@ -25,6 +25,8 @@ import (
 	"github.com/valyala/bytebufferpool"
 )
 
+var _ QueryBuilder = &Updater[any]{}
+
 // Updater is the builder responsible for building UPDATE query
 type Updater[T any] struct {
 	builder
@@ -54,7 +56,7 @@ func (u *Updater[T]) Update(val *T) *Updater[T] {
 }
 
 // Build returns UPDATE query
-func (u *Updater[T]) Build() (*Query, error) {
+func (u *Updater[T]) Build() (Query, error) {
 	defer bytebufferpool.Put(u.buffer)
 	var err error
 	t := new(T)
@@ -63,7 +65,7 @@ func (u *Updater[T]) Build() (*Query, error) {
 	}
 	u.meta, err = u.metaRegistry.Get(t)
 	if err != nil {
-		return nil, err
+		return EmptyQuery, err
 	}
 
 	u.val = u.valCreator.NewPrimitiveValue(u.table, u.meta)
@@ -78,19 +80,19 @@ func (u *Updater[T]) Build() (*Query, error) {
 		err = u.buildAssigns()
 	}
 	if err != nil {
-		return nil, err
+		return EmptyQuery, err
 	}
 
 	if len(u.where) > 0 {
 		u.writeString(" WHERE ")
 		err = u.buildPredicates(u.where)
 		if err != nil {
-			return nil, err
+			return EmptyQuery, err
 		}
 	}
 
 	u.end()
-	return &Query{
+	return Query{
 		SQL:  u.buffer.String(),
 		Args: u.args,
 	}, nil

@@ -318,10 +318,10 @@ func ExampleInserter_Build() {
 		Id:  1,
 		Age: 18,
 	}).Build()
-	fmt.Printf("case1\n%s", query.string())
+	fmt.Printf("case1\n%s", query.String())
 
 	query, _ = NewInserter[TestModel](db).Values(&TestModel{}).Build()
-	fmt.Printf("case2\n%s", query.string())
+	fmt.Printf("case2\n%s", query.String())
 
 	// Output:
 	// case1
@@ -338,13 +338,13 @@ func ExampleInserter_Columns() {
 		Id:  1,
 		Age: 18,
 	}).Columns("Id", "Age").Build()
-	fmt.Printf("case1\n%s", query.string())
+	fmt.Printf("case1\n%s", query.String())
 
 	query, _ = NewInserter[TestModel](db).Values(&TestModel{
 		Id:  1,
 		Age: 18,
 	}, &TestModel{}, &TestModel{FirstName: "Tom"}).Columns("Id", "Age").Build()
-	fmt.Printf("case2\n%s", query.string())
+	fmt.Printf("case2\n%s", query.String())
 
 	// Output:
 	// case1
@@ -362,7 +362,7 @@ func ExampleInserter_Values() {
 		Id:  1,
 		Age: 18,
 	}, &TestModel{}).Build()
-	fmt.Println(query.string())
+	fmt.Println(query.String())
 	// Output:
 	// SQL: INSERT INTO `test_model`(`id`,`first_name`,`age`,`last_name`) VALUES(?,?,?,?),(?,?,?,?);
 	// Args: []interface {}{1, "", 18, (*sql.NullString)(nil), 0, "", 0, (*sql.NullString)(nil)}

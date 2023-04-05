@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package eorm
+package transaction
 
 import (
 	"context"
@@ -21,19 +21,29 @@ import (
 	"github.com/ecodeclub/eorm/internal/datasource"
 )
 
-// Executor sql 语句执行器
-type Executor interface {
-	Exec(ctx context.Context) Result
+var _ datasource.Tx = &Tx{}
+
+type Tx struct {
+	tx *sql.Tx
+	ds datasource.DataSource
 }
 
-// QueryBuilder 普通 sql 构造抽象
-type QueryBuilder interface {
-	Build() (Query, error)
+func (t *Tx) Query(ctx context.Context, query datasource.Query) (*sql.Rows, error) {
+	return t.tx.QueryContext(ctx, query.SQL, query.Args...)
 }
 
-// Session 代表一个抽象的概念，即会话
-type Session interface {
-	getCore() core
-	queryContext(ctx context.Context, query datasource.Query) (*sql.Rows, error)
-	execContext(ctx context.Context, query datasource.Query) (sql.Result, error)
+func (t *Tx) Exec(ctx context.Context, query datasource.Query) (sql.Result, error) {
+	return t.tx.ExecContext(ctx, query.SQL, query.Args...)
+}
+
+func (t *Tx) Commit() error {
+	return t.tx.Commit()
+}
+
+func (t *Tx) Rollback() error {
+	return t.tx.Rollback()
+}
+
+func NewTx(tx *sql.Tx, ds datasource.DataSource) *Tx {
+	return &Tx{tx: tx, ds: ds}
 }

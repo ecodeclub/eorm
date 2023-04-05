@@ -17,11 +17,11 @@ package eorm
 import (
 	"context"
 	"database/sql"
-	"database/sql/driver"
-	"log"
-	"time"
 
+	"github.com/ecodeclub/eorm/internal/datasource"
+	"github.com/ecodeclub/eorm/internal/datasource/single"
 	"github.com/ecodeclub/eorm/internal/dialect"
+	"github.com/ecodeclub/eorm/internal/errs"
 	"github.com/ecodeclub/eorm/internal/model"
 	"github.com/ecodeclub/eorm/internal/valuer"
 )
@@ -39,8 +39,8 @@ type DBOption func(db *DB)
 
 // DB represents a database
 type DB struct {
-	db *sql.DB
 	core
+	ds datasource.DataSource
 }
 
 // DBWithMiddlewares 为 db 配置 Middleware
@@ -50,31 +50,37 @@ func DBWithMiddlewares(ms ...Middleware) DBOption {
 	}
 }
 
+func DBOptionWithMetaRegistry(r model.MetaRegistry) DBOption {
+	return func(db *DB) {
+		db.metaRegistry = r
+	}
+}
+
 func UseReflection() DBOption {
 	return func(db *DB) {
 		db.valCreator = valuer.PrimitiveCreator{Creator: valuer.NewUnsafeValue}
 	}
 }
 
-func (db *DB) queryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
-	return db.db.QueryContext(ctx, query, args...)
+func (db *DB) queryContext(ctx context.Context, q datasource.Query) (*sql.Rows, error) {
+	return db.ds.Query(ctx, q)
 }
 
-func (db *DB) execContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
-	return db.db.ExecContext(ctx, query, args...)
+func (db *DB) execContext(ctx context.Context, q datasource.Query) (sql.Result, error) {
+	return db.ds.Exec(ctx, q)
 }
 
 // Open 创建一个 ORM 实例
 // 注意该实例是一个无状态的对象，你应该尽可能复用它
 func Open(driver string, dsn string, opts ...DBOption) (*DB, error) {
-	db, err := sql.Open(driver, dsn)
+	db, err := single.OpenDB(driver, dsn)
 	if err != nil {
 		return nil, err
 	}
-	return openDB(driver, db, opts...)
+	return OpenDS(driver, db, opts...)
 }
 
-func openDB(driver string, db *sql.DB, opts ...DBOption) (*DB, error) {
+func OpenDS(driver string, ds datasource.DataSource, opts ...DBOption) (*DB, error) {
 	dl, err := dialect.Of(driver)
 	if err != nil {
 		return nil, err
@@ -88,7 +94,7 @@ func openDB(driver string, db *sql.DB, opts ...DBOption) (*DB, error) {
 				Creator: valuer.NewUnsafeValue,
 			},
 		},
-		db: db,
+		ds: ds,
 	}
 	for _, o := range opts {
 		o(orm)
@@ -96,29 +102,20 @@ func openDB(driver string, db *sql.DB, opts ...DBOption) (*DB, error) {
 	return orm, nil
 }
 
-// BeginTx 开启事务
 func (db *DB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) {
-	tx, err := db.db.BeginTx(ctx, opts)
+	inst, ok := db.ds.(datasource.TxBeginner)
+	if !ok {
+		return nil, errs.ErrNotCompleteTxBeginner
+	}
+	tx, err := inst.BeginTx(ctx, opts)
 	if err != nil {
 		return nil, err
 	}
-	return &Tx{tx: tx, db: db.db, core: db.core}, nil
-}
-
-// Wait 会等待数据库连接
-// 注意只能用于测试
-func (db *DB) Wait() error {
-	err := db.db.Ping()
-	for err == driver.ErrBadConn {
-		log.Printf("等待数据库启动...")
-		err = db.db.Ping()
-		time.Sleep(time.Second)
-	}
-	return err
+	return &Tx{tx: tx, core: db.getCore()}, nil
 }
 
 func (db *DB) Close() error {
-	return db.db.Close()
+	return db.ds.Close()
 }
 
 func (db *DB) getCore() core {

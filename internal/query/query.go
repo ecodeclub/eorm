@@ -12,29 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package eorm
+package query
 
-import (
-	"context"
+import "fmt"
 
-	"github.com/ecodeclub/eorm/internal/model"
-)
-
-type QueryContext struct {
-	Type string
-	meta *model.TableMeta
-	q    Query
+type Query struct {
+	SQL        string
+	Args       []any
+	DB         string
+	Datasource string
 }
 
-func (qc *QueryContext) GetQuery() Query {
-	return qc.q
+func (q Query) String() string {
+	return fmt.Sprintf("SQL: %s\nArgs: %#v\n", q.SQL, q.Args)
 }
-
-type QueryResult struct {
-	Result any
-	Err    error
-}
-
-type Middleware func(next HandleFunc) HandleFunc
-
-type HandleFunc func(ctx context.Context, queryContext *QueryContext) *QueryResult

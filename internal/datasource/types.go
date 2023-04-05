@@ -12,29 +12,33 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package eorm
+package datasource
 
 import (
 	"context"
+	"database/sql"
 
-	"github.com/ecodeclub/eorm/internal/model"
+	"github.com/ecodeclub/eorm/internal/query"
 )
 
-type QueryContext struct {
-	Type string
-	meta *model.TableMeta
-	q    Query
+type Executor interface {
+	Query(ctx context.Context, query Query) (*sql.Rows, error)
+	Exec(ctx context.Context, query Query) (sql.Result, error)
 }
 
-func (qc *QueryContext) GetQuery() Query {
-	return qc.q
+type TxBeginner interface {
+	BeginTx(ctx context.Context, opts *sql.TxOptions) (Tx, error)
 }
 
-type QueryResult struct {
-	Result any
-	Err    error
+type Tx interface {
+	Executor
+	Commit() error
+	Rollback() error
 }
 
-type Middleware func(next HandleFunc) HandleFunc
+type DataSource interface {
+	Executor
+	Close() error
+}
 
-type HandleFunc func(ctx context.Context, queryContext *QueryContext) *QueryResult
+type Query = query.Query

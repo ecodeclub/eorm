@@ -17,11 +17,15 @@ package roundrobin
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"strconv"
 	"sync/atomic"
 
+	"go.uber.org/multierr"
+
+	"github.com/ecodeclub/eorm/internal/datasource/masterslave/slaves"
+
 	"github.com/ecodeclub/eorm/internal/errs"
-	"github.com/ecodeclub/eorm/internal/slaves"
 )
 
 type Slaves struct {
@@ -39,6 +43,17 @@ func (r *Slaves) Next(ctx context.Context) (slaves.Slave, error) {
 	cnt := atomic.AddUint32(&r.cnt, 1)
 	index := int(cnt) % len(r.slaves)
 	return r.slaves[index], nil
+}
+
+func (r *Slaves) Close() error {
+	var err error
+	for _, inst := range r.slaves {
+		if er := inst.Close(); er != nil {
+			err = multierr.Combine(
+				err, fmt.Errorf("slave DB name [%s] error: %w", inst.SlaveName, er))
+		}
+	}
+	return err
 }
 
 func NewSlaves(dbs ...*sql.DB) (*Slaves, error) {
