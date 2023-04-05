@@ -32,7 +32,7 @@ type core struct {
 }
 
 func getHandler[T any](ctx context.Context, sess Session, c core, qc *QueryContext) *QueryResult {
-	rows, err := sess.queryContext(ctx, qc.q.SQL, qc.q.Args...)
+	rows, err := sess.queryContext(ctx, qc.q)
 	if err != nil {
 		return &QueryResult{Err: err}
 	}
@@ -68,7 +68,7 @@ func get[T any](ctx context.Context, sess Session, core core, qc *QueryContext) 
 }
 
 func getMultiHandler[T any](ctx context.Context, sess Session, c core, qc *QueryContext) *QueryResult {
-	rows, err := sess.queryContext(ctx, qc.q.SQL, qc.q.Args...)
+	rows, err := sess.queryContext(ctx, qc.q)
 	if err != nil {
 		return &QueryResult{Err: err}
 	}

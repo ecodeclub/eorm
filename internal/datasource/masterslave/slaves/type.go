@@ -21,9 +21,14 @@ import (
 
 type Slaves interface {
 	Next(ctx context.Context) (Slave, error)
+	Close() error
 }
 
 type Slave struct {
 	SlaveName string
 	DB        *sql.DB
+}
+
+func (s Slave) Close() error {
+	return s.DB.Close()
 }

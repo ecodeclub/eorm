@@ -17,13 +17,28 @@ package roundrobin
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"testing"
 	"time"
 
+	"github.com/ecodeclub/eorm/internal/datasource/masterslave/slaves"
+
 	"github.com/ecodeclub/eorm/internal/errs"
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func ExampleSlaves_Close() {
+	db, _ := sql.Open("sqlite3", "file:test.db?cache=shared&mode=memory")
+	sl, _ := NewSlaves(db)
+	if err := sl.Close(); err == nil {
+		fmt.Println("close")
+	}
+
+	// Output:
+	// close
+}
 
 func TestSlaves_Next(t *testing.T) {
 	db1 := &sql.DB{}
@@ -31,7 +46,7 @@ func TestSlaves_Next(t *testing.T) {
 	db3 := &sql.DB{}
 	testCases := []struct {
 		name   string
-		slaves func() *Slaves
+		slaves func() slaves.Slaves
 		ctx    context.Context
 
 		wantErr error
@@ -45,7 +60,7 @@ func TestSlaves_Next(t *testing.T) {
 				cancel()
 				return ctx
 			}(),
-			slaves: func() *Slaves {
+			slaves: func() slaves.Slaves {
 				res, err := NewSlaves(db1, db2, db3)
 				require.NoError(t, err)
 				return res
@@ -55,7 +70,7 @@ func TestSlaves_Next(t *testing.T) {
 		{
 			name: "no slaves",
 			ctx:  context.Background(),
-			slaves: func() *Slaves {
+			slaves: func() slaves.Slaves {
 				res, err := NewSlaves()
 				require.NoError(t, err)
 				return res
@@ -65,7 +80,7 @@ func TestSlaves_Next(t *testing.T) {
 		{
 			name: "index 0",
 			ctx:  context.Background(),
-			slaves: func() *Slaves {
+			slaves: func() slaves.Slaves {
 				res, err := NewSlaves(db1, db2, db3)
 				require.NoError(t, err)
 				return res
@@ -75,22 +90,22 @@ func TestSlaves_Next(t *testing.T) {
 		{
 			name: "index last",
 			ctx:  context.Background(),
-			slaves: func() *Slaves {
-				res, err := NewSlaves(db1, db2, db3)
-				res.cnt = 1
+			slaves: func() slaves.Slaves {
+				sl, err := NewSlaves(db1, db2, db3)
 				require.NoError(t, err)
-				return res
+				sl.cnt = 1
+				return sl
 			},
 			wantDB: db3,
 		},
 		{
 			name: "jump to first",
 			ctx:  context.Background(),
-			slaves: func() *Slaves {
-				res, err := NewSlaves(db1, db2, db3)
-				res.cnt = 2
+			slaves: func() slaves.Slaves {
+				sl, err := NewSlaves(db1, db2, db3)
 				require.NoError(t, err)
-				return res
+				sl.cnt = 2
+				return sl
 			},
 			wantDB: db1,
 		},
