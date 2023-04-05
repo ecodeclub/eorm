@@ -36,6 +36,9 @@ func getHandler[T any](ctx context.Context, sess Session, c core, qc *QueryConte
 	if err != nil {
 		return &QueryResult{Err: err}
 	}
+	defer func() {
+		_ = rows.Close()
+	}()
 	if !rows.Next() {
 		return &QueryResult{Err: errs.ErrNoRows}
 	}
@@ -54,7 +57,6 @@ func getHandler[T any](ctx context.Context, sess Session, c core, qc *QueryConte
 		return &QueryResult{Err: err}
 	}
 
-	_ = rows.Close()
 	return &QueryResult{Result: tp}
 }
 
@@ -74,6 +76,9 @@ func getMultiHandler[T any](ctx context.Context, sess Session, c core, qc *Query
 	if err != nil {
 		return &QueryResult{Err: err}
 	}
+	defer func() {
+		_ = rows.Close()
+	}()
 	res := make([]*T, 0, 16)
 	meta := qc.meta
 	if meta == nil {
@@ -94,7 +99,6 @@ func getMultiHandler[T any](ctx context.Context, sess Session, c core, qc *Query
 		res = append(res, tp)
 	}
 
-	_ = rows.Close()
 	return &QueryResult{Result: res}
 }
 
