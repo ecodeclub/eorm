@@ -15,10 +15,9 @@
 package aggregator
 
 import (
-	"testing"
-
 	"github.com/ecodeclub/eorm/internal/merger/internal/errs"
 	"github.com/stretchr/testify/assert"
+	"testing"
 )
 
 func TestMax_Aggregate(t *testing.T) {
