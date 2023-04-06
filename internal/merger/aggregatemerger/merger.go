@@ -91,111 +91,107 @@ func (r *Rows) Next() bool {
 		r.mu.Unlock()
 		return false
 	}
-	aggregatorColumns := make([][][]any, 0, len(r.rowsList))
-	hasOpen := false
-	hasClosed := false
-	for idx, row := range r.rowsList {
-		aggregatorColumn, ok, err := r.getCols(row)
-		if err != nil {
-			r.lastErr = err
-			r.mu.Unlock()
-			_ = r.Close()
-			return false
-		}
-		if !ok && hasOpen || ok && hasClosed {
-			r.lastErr = errs.ErrMergerAggregateHasEmptyRows
-			r.mu.Unlock()
-			_ = r.Close()
-			return false
-		} else if !ok && idx == len(r.rowsList)-1 {
-			r.mu.Unlock()
-			_ = r.Close()
-			return false
-		}
-		if ok {
-			hasOpen = true
-		} else {
-			hasClosed = true
-		}
-		aggregatorColumns = append(aggregatorColumns, aggregatorColumn)
+	// 从rowsList里面获取数据
+	rowsData, ok, err := r.getColsInfo()
+	if err != nil {
+		r.lastErr = err
+		r.mu.Unlock()
+		_ = r.Close()
+		return false
+	}
+	if !ok {
+		r.mu.Unlock()
+		_ = r.Close()
+		return false
 	}
 	// 进行聚合函数计算
-	results := make([]any, 0, len(r.aggregators))
-	for idx, agg := range r.aggregators {
-		aggCols := make([][]any, 0, len(aggregatorColumns))
-		for i := 0; i < len(aggregatorColumns); i++ {
-			aggCols = append(aggCols, aggregatorColumns[i][idx])
-		}
-		res, err := agg.Aggregate(aggCols)
-		if err != nil {
-			r.lastErr = err
-			r.mu.Unlock()
-			_ = r.Close()
-			return false
-		}
-		results = append(results, res)
+	res, err := r.getAggregateInfo(rowsData)
+	if err != nil {
+		r.lastErr = err
+		r.mu.Unlock()
+		_ = r.Close()
+		return false
 	}
-	r.cur = results
+	r.cur = res
 	r.mu.Unlock()
 	return true
+
 }
 
-// getCols 从sqlRows里面获取数据
-func (r *Rows) getCols(row *sql.Rows) ([][]any, bool, error) {
-	colsData := make([][]any, 0, len(r.aggregators))
-	if row.Next() {
-		colMap := make(map[string][][]int)
-		for idx, agg := range r.aggregators {
-			infos := agg.ColumnInfo()
-			col := make([]any, len(infos))
-			for _, colInfo := range infos {
-				newColData := reflect.New(colInfo.Typ).Interface()
-				col[colInfo.Index] = newColData
-				if _, ok := colMap[colInfo.Name]; !ok {
-					colMap[colInfo.Name] = [][]int{[]int{idx, colInfo.Index}}
-				} else {
-					colMap[colInfo.Name] = append(colMap[colInfo.Name], []int{idx, colInfo.Index})
+// getAggregateInfo 进行aggregate运算
+func (r *Rows) getAggregateInfo(rowsData [][]any) ([]any, error) {
+	res := make([]any, 0, len(r.aggregators))
+	for _, agg := range r.aggregators {
+		aggDatas := make([][]any, 0, len(r.rowsList))
+		aggInfo := agg.ColumnInfo()
+		for _, rowData := range rowsData {
+			aggData := make([]any, 0, len(aggInfo))
+			for _, colInfo := range aggInfo {
+				index := colInfo.Index
+				if index >= len(rowData) || index < 0 {
+					return nil, errs.ErrMergerInvalidAggregateColumnIndex
 				}
+				aggData = append(aggData, rowData[index])
 			}
-			colsData = append(colsData, col)
+			aggDatas = append(aggDatas, aggData)
 		}
-		columnsInfo, err := row.ColumnTypes()
+		val, err := agg.Aggregate(aggDatas)
 		if err != nil {
-			return nil, false, err
+			return nil, err
 		}
-		res := make([]any, 0, len(columnsInfo))
-		for _, columnInfo := range columnsInfo {
-			val, ok := colMap[columnInfo.Name()]
-			if !ok {
-				res = append(res, &[]byte{})
-				continue
-			}
-			res = append(res, colsData[val[0][0]][val[0][1]])
-			if len(val) == 1 {
-				delete(colMap, columnInfo.Name())
-			} else {
-				colMap[columnInfo.Name()] = colMap[columnInfo.Name()][1:]
-			}
-		}
-		if len(colMap) != 0 {
-			return nil, false, errs.ErrMergerAggregateColumnNotFound
-		}
-		err = row.Scan(res...)
-		if err != nil {
-			return nil, false, err
-		}
-		for i := 0; i < len(colsData); i++ {
-			for j := 0; j < len(colsData[i]); j++ {
-				colsData[i][j] = reflect.ValueOf(colsData[i][j]).Elem().Interface()
-			}
-		}
-	} else {
-		if row.Err() != nil {
-			return nil, false, row.Err()
-		}
-		return nil, false, nil
+		res = append(res, val)
 	}
-	return colsData, true, nil
+	return res, nil
+}
+
+// getColInfo 从sqlRows里面获取数据
+func (r *Rows) getColsInfo() ([][]any, bool, error) {
+	rowsData := make([][]any, 0, len(r.rowsList))
+	hasClosed := false
+	hasOpen := false
+	for idx, row := range r.rowsList {
+		colsInfo, err := row.ColumnTypes()
+		if err != nil {
+			return nil, false, err
+		}
+		colsData := make([]any, 0, len(colsInfo))
+		if row.Next() {
+			if hasClosed {
+				return nil, false, errs.ErrMergerAggregateHasEmptyRows
+			}
+			for _, colInfo := range colsInfo {
+				typ := colInfo.ScanType()
+				// sqlite3的驱动返回的是指针。循环的去除指针
+				for typ.Kind() == reflect.Pointer {
+					typ = typ.Elem()
+				}
+				newData := reflect.New(typ).Interface()
+				colsData = append(colsData, newData)
+			}
+			err = row.Scan(colsData...)
+			if err != nil {
+				return nil, false, err
+			}
+			for i := 0; i < len(colsData); i++ {
+				colsData[i] = reflect.ValueOf(colsData[i]).Elem().Interface()
+			}
+			hasOpen = true
+		} else {
+			if row.Err() != nil {
+				return nil, false, row.Err()
+			}
+			if hasOpen {
+				return nil, false, errs.ErrMergerAggregateHasEmptyRows
+			}
+			hasClosed = true
+			if idx == len(r.rowsList)-1 {
+				return nil, false, nil
+			}
+
+		}
+		rowsData = append(rowsData, colsData)
+	}
+	return rowsData, true, nil
 }
 
 func (r *Rows) Scan(dest ...any) error {

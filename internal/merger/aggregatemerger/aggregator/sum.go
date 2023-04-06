@@ -16,41 +16,62 @@ package aggregator
 
 import (
 	"reflect"
+
+	"github.com/ecodeclub/eorm/internal/merger/internal/errs"
 )
 
-type Sum[T AggregateElement] struct {
-	colMap  map[string]ColInfo
-	colName string
+type Sum struct {
+	colInfos []ColInfo
+	alias    string
 }
 
-func (s *Sum[T]) Aggregate(cols [][]any) (any, error) {
+func (s *Sum) Aggregate(cols [][]any) (any, error) {
+	var kind reflect.Kind
+	if len(cols) >= 1 && len(cols[0]) >= 1 {
+		kind = reflect.TypeOf(cols[0][0]).Kind()
+	} else {
+		return nil, errs.ErrMergerAggregateParticipant
+	}
+	return sumAggregateFuncMapping[kind](cols)
+}
+
+func (s *Sum) ColumnInfo() []ColInfo {
+	return s.colInfos
+}
+func (s *Sum) ColumnName() string {
+	return s.alias
+}
+
+// NewSUM 第一个参数为数据库里的列名，第二个为返回的列名
+func NewSUM(info ColInfo, alias string) *Sum {
+	colInfos := []ColInfo{
+		info,
+	}
+	return &Sum{
+		colInfos: colInfos,
+		alias:    alias,
+	}
+}
+
+func sumAggregate[T AggregateElement](cols [][]any) (any, error) {
 	var sum T
 	for _, col := range cols {
-		colValue, _ := col[0].(T)
-		sum += colValue
+		sum += col[0].(T)
 	}
 	return sum, nil
 }
 
-func (s *Sum[T]) ColumnInfo() map[string]ColInfo {
-	return s.colMap
-}
-func (s *Sum[T]) ColumnName() string {
-	return s.colName
-}
-
-// NewSUM 第一个参数为数据库里的列名，第二个为返回的列名
-func NewSUM[T AggregateElement](colName string, alias string) *Sum[T] {
-	colMap := make(map[string]ColInfo, 1)
-	var t T
-	colMap["SUM"] = ColInfo{
-		Index: 0,
-		Name:  colName,
-		Typ:   reflect.TypeOf(t),
-	}
-
-	return &Sum[T]{
-		colMap:  colMap,
-		colName: alias,
-	}
+var sumAggregateFuncMapping = map[reflect.Kind]func([][]any) (any, error){
+	reflect.Int:     sumAggregate[int],
+	reflect.Int8:    sumAggregate[int8],
+	reflect.Int16:   sumAggregate[int16],
+	reflect.Int32:   sumAggregate[int32],
+	reflect.Int64:   sumAggregate[int64],
+	reflect.Uint8:   sumAggregate[uint8],
+	reflect.Uint16:  sumAggregate[uint16],
+	reflect.Uint32:  sumAggregate[uint32],
+	reflect.Uint64:  sumAggregate[uint64],
+	reflect.Float32: sumAggregate[float32],
+	reflect.Float64: sumAggregate[float64],
+	reflect.Uint:    sumAggregate[uint],
 }

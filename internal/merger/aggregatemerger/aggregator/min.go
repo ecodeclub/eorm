@@ -16,49 +16,70 @@ package aggregator
 
 import (
 	"reflect"
+
+	"github.com/ecodeclub/eorm/internal/merger/internal/errs"
 )
 
-type Min[T AggregateElement] struct {
-	colMap  map[string]ColInfo
-	colName string
+type Min struct {
+	colInfos []ColInfo
+	alias    string
 }
 
-func (m *Min[T]) Aggregate(columns [][]any) (any, error) {
-	var ans T
-	for idx, col := range columns {
-		val := col[0].(T)
+func (m *Min) Aggregate(cols [][]any) (any, error) {
+	var kind reflect.Kind
+	if len(cols) >= 1 && len(cols[0]) >= 1 {
+		kind = reflect.TypeOf(cols[0][0]).Kind()
+	} else {
+		return nil, errs.ErrMergerAggregateParticipant
+	}
+	return minFuncMapping[kind](cols)
+
+}
+
+func (m *Min) ColumnInfo() []ColInfo {
+	return m.colInfos
+}
+
+func (m *Min) ColumnName() string {
+	return m.alias
+}
+
+func NewMin(info ColInfo, alias string) *Min {
+	colInfos := []ColInfo{
+		info,
+	}
+	return &Min{
+		colInfos: colInfos,
+		alias:    alias,
+	}
+}
+
+func minAggregator[T AggregateElement](colsData [][]any) (any, error) {
+	var minData T
+	for idx, colData := range colsData {
+		data := colData[0].(T)
 		if idx == 0 {
-			ans = val
+			minData = data
 			continue
 		}
-		if ans > val {
-			ans = val
+		if minData > data {
+			minData = data
 		}
 	}
-	return ans, nil
+	return minData, nil
 }
 
-func (m *Min[T]) ColumnInfo() map[string]ColInfo {
-	return m.colMap
-}
-
-func (m *Min[T]) ColumnName() string {
-	return m.colName
-}
-
-// NewMin 第一个参数为数据库里的列名，第二个为返回的列名
-func NewMin[T AggregateElement](colName string, alias string) *Min[T] {
-	var t T
-	typ := reflect.TypeOf(t)
-	colMap := make(map[string]ColInfo, 1)
-	colMap["MIN"] = ColInfo{
-		Index: 0,
-		Name:  colName,
-		Typ:   typ,
-	}
-
-	return &Min[T]{
-		colMap:  colMap,
-		colName: alias,
-	}
+var minFuncMapping = map[reflect.Kind]func([][]any) (any, error){
+	reflect.Int:     minAggregator[int],
+	reflect.Int8:    minAggregator[int8],
+	reflect.Int16:   minAggregator[int16],
+	reflect.Int32:   minAggregator[int32],
+	reflect.Int64:   minAggregator[int64],
+	reflect.Uint8:   minAggregator[uint8],
+	reflect.Uint16:  minAggregator[uint16],
+	reflect.Uint32:  minAggregator[uint32],
+	reflect.Uint64:  minAggregator[uint64],
+	reflect.Float32: minAggregator[float32],
+	reflect.Float64: minAggregator[float64],
+	reflect.Uint:    minAggregator[uint],
 }

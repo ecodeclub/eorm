@@ -14,41 +14,64 @@
 
 package aggregator
 
-import "reflect"
+import (
+	"reflect"
 
-type Count[T AggregateElement] struct {
-	colMap  map[string]ColInfo
-	colName string
+	"github.com/ecodeclub/eorm/internal/merger/internal/errs"
+)
+
+type Count struct {
+	colInfos []ColInfo
+	alias    string
 }
 
-func (s *Count[T]) Aggregate(cols [][]any) (any, error) {
-	var totalCount T
-	for _, col := range cols {
-		colValue, _ := col[0].(T)
-		totalCount += colValue
+func (s *Count) Aggregate(cols [][]any) (any, error) {
+	var kind reflect.Kind
+	if len(cols) >= 1 && len(cols[0]) >= 1 {
+		kind = reflect.TypeOf(cols[0][0]).Kind()
+	} else {
+		return nil, errs.ErrMergerAggregateParticipant
 	}
-	return totalCount, nil
+	return CountAggregateFuncMapping[kind](cols)
 }
 
-func (s *Count[T]) ColumnInfo() map[string]ColInfo {
-	return s.colMap
+func (s *Count) ColumnInfo() []ColInfo {
+	return s.colInfos
 }
-
-func (s *Count[T]) ColumnName() string {
-	return s.colName
+func (s *Count) ColumnName() string {
+	return s.alias
 }
 
 // NewCount 第一个参数为数据库里的列名，第二个为返回的列名
-func NewCount[T AggregateElement](colName string, alias string) *Count[T] {
-	colMap := make(map[string]ColInfo, 1)
-	var t T
-	colMap["COUNT"] = ColInfo{
-		Index: 0,
-		Name:  colName,
-		Typ:   reflect.TypeOf(t),
+func NewCount(info ColInfo, alias string) *Count {
+	colInfos := []ColInfo{
+		info,
 	}
-	return &Count[T]{
-		colMap:  colMap,
-		colName: alias,
+	return &Count{
+		colInfos: colInfos,
+		alias:    alias,
 	}
+}
+
+func CountAggregate[T AggregateElement](cols [][]any) (any, error) {
+	var Count T
+	for _, col := range cols {
+		Count += col[0].(T)
+	}
+	return Count, nil
+}
+
+var CountAggregateFuncMapping = map[reflect.Kind]func([][]any) (any, error){
+	reflect.Int:     CountAggregate[int],
+	reflect.Int8:    CountAggregate[int8],
+	reflect.Int16:   CountAggregate[int16],
+	reflect.Int32:   CountAggregate[int32],
+	reflect.Int64:   CountAggregate[int64],
+	reflect.Uint8:   CountAggregate[uint8],
+	reflect.Uint16:  CountAggregate[uint16],
+	reflect.Uint32:  CountAggregate[uint32],
+	reflect.Uint64:  CountAggregate[uint64],
+	reflect.Float32: CountAggregate[float32],
+	reflect.Float64: CountAggregate[float64],
+	reflect.Uint:    CountAggregate[uint],
 }

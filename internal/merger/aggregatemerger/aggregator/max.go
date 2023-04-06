@@ -16,48 +16,70 @@ package aggregator
 
 import (
 	"reflect"
+
+	"github.com/ecodeclub/eorm/internal/merger/internal/errs"
 )
 
-type Max[T AggregateElement] struct {
-	colMap  map[string]ColInfo
-	colName string
+type Max struct {
+	colInfos []ColInfo
+	alias    string
 }
 
-func (m *Max[T]) Aggregate(columns [][]any) (any, error) {
-	var ans T
-	for idx, col := range columns {
-		val := col[0].(T)
+func (m *Max) Aggregate(cols [][]any) (any, error) {
+	var kind reflect.Kind
+	if len(cols) >= 1 && len(cols[0]) >= 1 {
+		kind = reflect.TypeOf(cols[0][0]).Kind()
+	} else {
+		return nil, errs.ErrMergerAggregateParticipant
+	}
+	return maxFuncMapping[kind](cols)
+
+}
+
+func (m *Max) ColumnInfo() []ColInfo {
+	return m.colInfos
+}
+
+func (m *Max) ColumnName() string {
+	return m.alias
+}
+
+func NewMax(info ColInfo, alias string) *Max {
+	colInfos := []ColInfo{
+		info,
+	}
+	return &Max{
+		colInfos: colInfos,
+		alias:    alias,
+	}
+}
+
+func maxAggregator[T AggregateElement](colsData [][]any) (any, error) {
+	var maxData T
+	for idx, colData := range colsData {
+		data := colData[0].(T)
 		if idx == 0 {
-			ans = val
+			maxData = data
 			continue
 		}
-		if ans < val {
-			ans = val
+		if maxData < data {
+			maxData = data
 		}
 	}
-	return ans, nil
+	return maxData, nil
 }
 
-func (m *Max[T]) ColumnInfo() map[string]ColInfo {
-	return m.colMap
-}
-
-func (m *Max[T]) ColumnName() string {
-	return m.colName
-}
-
-// NewMax 第一个参数为数据库里的列名，第二个为返回的列名
-func NewMax[T AggregateElement](colName string, alias string) *Max[T] {
-	var t T
-	typ := reflect.TypeOf(t)
-	colMap := make(map[string]ColInfo, 1)
-	colMap["MAX"] = ColInfo{
-		Index: 0,
-		Name:  colName,
-		Typ:   typ,
-	}
-	return &Max[T]{
-		colMap:  colMap,
-		colName: alias,
-	}
+var maxFuncMapping = map[reflect.Kind]func([][]any) (any, error){
+	reflect.Int:     maxAggregator[int],
+	reflect.Int8:    maxAggregator[int8],
+	reflect.Int16:   maxAggregator[int16],
+	reflect.Int32:   maxAggregator[int32],
+	reflect.Int64:   maxAggregator[int64],
+	reflect.Uint8:   maxAggregator[uint8],
+	reflect.Uint16:  maxAggregator[uint16],
+	reflect.Uint32:  maxAggregator[uint32],
+	reflect.Uint64:  maxAggregator[uint64],
+	reflect.Float32: maxAggregator[float32],
+	reflect.Float64: maxAggregator[float64],
+	reflect.Uint:    maxAggregator[uint],
 }

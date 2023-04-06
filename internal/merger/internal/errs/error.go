@@ -31,7 +31,9 @@ var (
 	ErrMergerAggregateColumnNotFound = errors.New("merger: 聚合函数列没有在数据库字段里找到")
 	ErrMergerNotSetAggregateColumn   = errors.New("merger: 聚合函数列未设置")
 	// ErrMergerAggregateHasEmptyRows 如果只有一个sqlRows并且为空的情况下是不会报错
-	ErrMergerAggregateHasEmptyRows = errors.New("merger: 聚合函数计算时rowsList有一个或多个为空")
+	ErrMergerAggregateHasEmptyRows       = errors.New("merger: 聚合函数计算时rowsList有一个或多个为空")
+	ErrMergerAggregateParticipant        = errors.New("merger: 聚合函数传参错误")
+	ErrMergerInvalidAggregateColumnIndex = errors.New("merger: colInfo的index不合法")
 )
 
 func NewRepeatSortColumn(column string) error {
