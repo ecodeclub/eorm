@@ -43,7 +43,6 @@ func (s *AVG) ColumnName() string {
 	return s.alias
 }
 
-// Newavg 第一个参数为数据库里的列名，第二个为返回的列名
 func NewAVG(sumInfo ColInfo, countInfo ColInfo, alias string) *AVG {
 	colInfos := []ColInfo{
 		sumInfo,

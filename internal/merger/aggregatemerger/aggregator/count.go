@@ -42,7 +42,6 @@ func (s *Count) ColumnName() string {
 	return s.alias
 }
 
-// NewCount 第一个参数为数据库里的列名，第二个为返回的列名
 func NewCount(info ColInfo, alias string) *Count {
 	colInfos := []ColInfo{
 		info,

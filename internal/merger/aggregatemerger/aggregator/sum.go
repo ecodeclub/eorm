@@ -42,7 +42,6 @@ func (s *Sum) ColumnName() string {
 	return s.alias
 }
 
-// NewSUM 第一个参数为数据库里的列名，第二个为返回的列名
 func NewSUM(info ColInfo, alias string) *Sum {
 	colInfos := []ColInfo{
 		info,
