@@ -22,9 +22,13 @@ import (
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/ecodeclub/eorm/internal/datasource/single"
+	"github.com/stretchr/testify/assert"
+
+	"github.com/ecodeclub/eorm/internal/datasource/masterslave"
+
 	"github.com/ecodeclub/eorm/internal/valuer"
 	_ "github.com/mattn/go-sqlite3"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestDB_BeginTx(t *testing.T) {
@@ -34,7 +38,7 @@ func TestDB_BeginTx(t *testing.T) {
 	}
 	defer func() { _ = mockDB.Close() }()
 
-	db, err := openDB("mysql", mockDB)
+	db, err := OpenDS("mysql", single.NewDB(mockDB))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,22 +52,6 @@ func TestDB_BeginTx(t *testing.T) {
 	tx, err = db.BeginTx(context.Background(), &sql.TxOptions{})
 	assert.Nil(t, err)
 	assert.NotNil(t, tx)
-}
-
-func TestDB_Wait(t *testing.T) {
-	mockDB, mock, err := sqlmock.New()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = mockDB.Close() }()
-
-	db, err := openDB("mysql", mockDB)
-	if err != nil {
-		t.Fatal(err)
-	}
-	mock.ExpectPing()
-	err = db.Wait()
-	assert.Nil(t, err)
 }
 
 func ExampleMiddleware() {
@@ -114,8 +102,8 @@ func ExampleOpen() {
 }
 
 func ExampleNewDeleter() {
-	db := memoryDB()
 	tm := &TestModel{}
+	db := memoryDB()
 	query, _ := NewDeleter[TestModel](db).From(tm).Build()
 	fmt.Printf("SQL: %s", query.SQL)
 	// Output:
@@ -123,10 +111,10 @@ func ExampleNewDeleter() {
 }
 
 func ExampleNewUpdater() {
-	db := memoryDB()
 	tm := &TestModel{
 		Age: 18,
 	}
+	db := memoryDB()
 	query, _ := NewUpdater[TestModel](db).Update(tm).Build()
 	fmt.Printf("SQL: %s", query.SQL)
 	// Output:
@@ -135,32 +123,19 @@ func ExampleNewUpdater() {
 
 // memoryDB 返回一个基于内存的 ORM，它使用的是 sqlite3 内存模式。
 func memoryDB() *DB {
-	orm, err := Open("sqlite3", "file:test.db?cache=shared&mode=memory")
+	db, err := Open("sqlite3", "file:test.db?cache=shared&mode=memory")
 	if err != nil {
 		panic(err)
 	}
-	return orm
+	return db
 }
 
-// memoryDB 返回一个基于内存的 MasterSlaveDB，它使用的是 sqlite3 内存模式。
-func masterSlaveMemoryDB() *MasterSlavesDB {
-	db, err := sql.Open("sqlite3", "file:test.db?cache=shared&mode=memory")
+func memoryDBWithDB(dbName string) *DB {
+	db, err := Open("sqlite3", fmt.Sprintf("file:%s.db?cache=shared&mode=memory", dbName))
 	if err != nil {
 		panic(err)
 	}
-	masterSlaveDB, err := OpenMasterSlaveDB("sqlite3", db)
-	if err != nil {
-		panic(err)
-	}
-	return masterSlaveDB
-}
-
-func memoryDBWithDB(db string) *DB {
-	orm, err := Open("sqlite3", fmt.Sprintf("file:%s.db?cache=shared&mode=memory", db))
-	if err != nil {
-		panic(err)
-	}
-	return orm
+	return db
 }
 
 // go test -bench=BenchmarkQuerier_Get -benchmem -benchtime=10000x
@@ -174,12 +149,12 @@ func memoryDBWithDB(db string) *DB {
 // ok      github.com/ecodeclub/eorm       13.072s
 func BenchmarkQuerier_Get(b *testing.B) {
 	b.ReportAllocs()
-	orm := memoryDBWithDB("benchmarkQuerierGet")
+	db := memoryDBWithDB("benchmarkQuerierGet")
 	defer func() {
-		_ = orm.Close()
+		_ = db.Close()
 	}()
-	_ = RawQuery[any](orm, TestModel{}.CreateSQL()).Exec(context.Background())
-	res := NewInserter[TestModel](orm).Values(&TestModel{
+	_ = RawQuery[any](db, TestModel{}.CreateSQL()).Exec(context.Background())
+	res := NewInserter[TestModel](db).Values(&TestModel{
 		Id:        12,
 		FirstName: "Deng",
 		Age:       18,
@@ -197,11 +172,11 @@ func BenchmarkQuerier_Get(b *testing.B) {
 	}
 
 	b.Run("unsafe", func(b *testing.B) {
-		orm.valCreator = valuer.PrimitiveCreator{
+		db.valCreator = valuer.PrimitiveCreator{
 			Creator: valuer.NewUnsafeValue,
 		}
 		for i := 0; i < b.N; i++ {
-			_, err = NewSelector[TestModel](orm).From(TableOf(&TestModel{}, "t1")).Get(context.Background())
+			_, err = NewSelector[TestModel](db).From(TableOf(&TestModel{}, "t1")).Get(context.Background())
 			if err != nil {
 				b.Fatal(err)
 			}
@@ -209,14 +184,24 @@ func BenchmarkQuerier_Get(b *testing.B) {
 	})
 
 	b.Run("reflect", func(b *testing.B) {
-		orm.valCreator = valuer.PrimitiveCreator{
+		db.valCreator = valuer.PrimitiveCreator{
 			Creator: valuer.NewReflectValue,
 		}
 		for i := 0; i < b.N; i++ {
-			_, err = NewSelector[TestModel](orm).From(TableOf(&TestModel{}, "t1")).Get(context.Background())
+			_, err = NewSelector[TestModel](db).From(TableOf(&TestModel{}, "t1")).Get(context.Background())
 			if err != nil {
 				b.Fatal(err)
 			}
 		}
 	})
+}
+
+// MasterSlavesMemoryDB 返回一个基于内存的 MasterSlaveDB，它使用的是 sqlite3 内存模式。
+func MasterSlavesMemoryDB() *masterslave.MasterSlavesDB {
+	db, err := sql.Open("sqlite3", "file:test.db?cache=shared&mode=memory")
+	if err != nil {
+		panic(err)
+	}
+	masterSlaveDB := masterslave.NewMasterSlavesDB(db)
+	return masterSlaveDB
 }

@@ -16,11 +16,6 @@ package eorm
 
 import operator "github.com/ecodeclub/eorm/internal/operator"
 
-//type op struct {
-//	Symbol string
-//	Text   string
-//}
-
 // type op Operator.Op
 var (
 	opLT      = operator.OpLT

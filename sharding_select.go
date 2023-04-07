@@ -17,7 +17,6 @@ package eorm
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"sync"
 
 	"github.com/gotomicro/ekit/slice"
@@ -32,11 +31,11 @@ import (
 type ShardingSelector[T any] struct {
 	selectorBuilder
 	table *T
-	db    *ShardingDB
+	db    Session
 	lock  sync.Mutex
 }
 
-func NewShardingSelector[T any](db *ShardingDB) *ShardingSelector[T] {
+func NewShardingSelector[T any](db Session) *ShardingSelector[T] {
 	return &ShardingSelector[T]{
 		selectorBuilder: selectorBuilder{
 			builder: builder{
@@ -48,7 +47,7 @@ func NewShardingSelector[T any](db *ShardingDB) *ShardingSelector[T] {
 	}
 }
 
-func (s *ShardingSelector[T]) Build(ctx context.Context) ([]*sharding.Query, error) {
+func (s *ShardingSelector[T]) Build(ctx context.Context) ([]sharding.Query, error) {
 	var err error
 	if s.meta == nil {
 		s.meta, err = s.metaRegistry.Get(new(T))
@@ -60,31 +59,31 @@ func (s *ShardingSelector[T]) Build(ctx context.Context) ([]*sharding.Query, err
 	if err != nil {
 		return nil, err
 	}
-	res := make([]*sharding.Query, 0, len(shardingRes.Dsts))
+	res := make([]sharding.Query, 0, len(shardingRes.Dsts))
 	defer bytebufferpool.Put(s.buffer)
 	for _, dst := range shardingRes.Dsts {
-		query, err := s.buildQuery(dst.DB, dst.Table, dst.Name)
+		q, err := s.buildQuery(dst.DB, dst.Table, dst.Name)
 		if err != nil {
 			return nil, err
 		}
-		res = append(res, query)
+		res = append(res, q)
 		s.args = make([]any, 0, 8)
 		s.buffer.Reset()
 	}
 	return res, nil
 }
 
-func (s *ShardingSelector[T]) buildQuery(db, tbl, ds string) (*sharding.Query, error) {
+func (s *ShardingSelector[T]) buildQuery(db, tbl, ds string) (sharding.Query, error) {
 	var err error
 	s.writeString("SELECT ")
 	if len(s.columns) == 0 {
 		if err = s.buildAllColumns(); err != nil {
-			return nil, err
+			return sharding.EmptyQuery, err
 		}
 	} else {
 		err = s.buildSelectedList()
 		if err != nil {
-			return nil, err
+			return sharding.EmptyQuery, err
 		}
 	}
 	s.writeString(" FROM ")
@@ -99,7 +98,7 @@ func (s *ShardingSelector[T]) buildQuery(db, tbl, ds string) (*sharding.Query, e
 			p = p.And(s.where[i])
 		}
 		if err = s.buildExpr(p); err != nil {
-			return nil, err
+			return sharding.EmptyQuery, err
 		}
 	}
 
@@ -107,7 +106,7 @@ func (s *ShardingSelector[T]) buildQuery(db, tbl, ds string) (*sharding.Query, e
 	if len(s.groupBy) > 0 {
 		err = s.buildGroupBy()
 		if err != nil {
-			return nil, err
+			return sharding.EmptyQuery, err
 		}
 	}
 
@@ -115,7 +114,7 @@ func (s *ShardingSelector[T]) buildQuery(db, tbl, ds string) (*sharding.Query, e
 	if len(s.orderBy) > 0 {
 		err = s.buildOrderBy()
 		if err != nil {
-			return nil, err
+			return sharding.EmptyQuery, err
 		}
 	}
 
@@ -127,7 +126,7 @@ func (s *ShardingSelector[T]) buildQuery(db, tbl, ds string) (*sharding.Query, e
 			p = p.And(s.having[i])
 		}
 		if err = s.buildExpr(p); err != nil {
-			return nil, err
+			return sharding.EmptyQuery, err
 		}
 	}
 
@@ -141,8 +140,7 @@ func (s *ShardingSelector[T]) buildQuery(db, tbl, ds string) (*sharding.Query, e
 		s.parameter(s.limit)
 	}
 	s.end()
-
-	return &sharding.Query{SQL: s.buffer.String(), Args: s.args, Datasource: ds, DB: db}, nil
+	return sharding.Query{SQL: s.buffer.String(), Args: s.args, Datasource: ds, DB: db}, nil
 }
 
 func (s *ShardingSelector[T]) findDsts(ctx context.Context) (sharding.Result, error) {
@@ -378,9 +376,9 @@ func (s *ShardingSelector[T]) Get(ctx context.Context) (*T, error) {
 	if len(qs) > 1 {
 		return nil, errs.ErrOnlyResultOneQuery
 	}
-	query := qs[0]
+	q := qs[0]
 	// TODO 利用 ctx 传递 DB name
-	row, err := s.db.queryContext(ctx, query)
+	row, err := s.db.queryContext(ctx, q)
 	if err != nil {
 		return nil, err
 	}
@@ -402,10 +400,8 @@ func (s *ShardingSelector[T]) GetMulti(ctx context.Context) ([]*T, error) {
 	}
 	var rowsSlice []*sql.Rows
 	var eg errgroup.Group
-	fmt.Println("--------------")
 	for _, query := range qs {
 		q := query
-		fmt.Println(q.SQL)
 		eg.Go(func() error {
 			s.lock.Lock()
 			defer s.lock.Unlock()
@@ -432,7 +428,6 @@ func (s *ShardingSelector[T]) GetMulti(ctx context.Context) ([]*T, error) {
 			res = append(res, tp)
 		}
 	}
-	fmt.Println("--------------")
 	return res, nil
 }
 

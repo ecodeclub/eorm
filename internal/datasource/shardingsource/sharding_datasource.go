@@ -12,23 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package datasource
+package shardingsource
 
 import (
 	"context"
 	"database/sql"
+	"fmt"
+
+	"github.com/ecodeclub/eorm/internal/datasource"
+	"go.uber.org/multierr"
 
 	"github.com/ecodeclub/eorm/internal/errs"
-	"github.com/ecodeclub/eorm/internal/sharding"
 )
 
-var _ sharding.DataSource = &ShardingDataSource{}
+var _ datasource.TxBeginner = &ShardingDataSource{}
+var _ datasource.DataSource = &ShardingDataSource{}
 
 type ShardingDataSource struct {
-	sources map[string]sharding.DataSource
+	sources map[string]datasource.DataSource
 }
 
-func (s *ShardingDataSource) Query(ctx context.Context, query *sharding.Query) (*sql.Rows, error) {
+func (s *ShardingDataSource) Query(ctx context.Context, query datasource.Query) (*sql.Rows, error) {
 	ds, ok := s.sources[query.Datasource]
 	if !ok {
 		return nil, errs.ErrNotFoundTargetDataSource
@@ -36,7 +40,7 @@ func (s *ShardingDataSource) Query(ctx context.Context, query *sharding.Query) (
 	return ds.Query(ctx, query)
 }
 
-func (s *ShardingDataSource) Exec(ctx context.Context, query *sharding.Query) (sql.Result, error) {
+func (s *ShardingDataSource) Exec(ctx context.Context, query datasource.Query) (sql.Result, error) {
 	ds, ok := s.sources[query.Datasource]
 	if !ok {
 		return nil, errs.ErrNotFoundTargetDataSource
@@ -44,8 +48,23 @@ func (s *ShardingDataSource) Exec(ctx context.Context, query *sharding.Query) (s
 	return ds.Exec(ctx, query)
 }
 
-func NewShardingDataSource(m map[string]sharding.DataSource) sharding.DataSource {
+func (*ShardingDataSource) BeginTx(_ context.Context, _ *sql.TxOptions) (datasource.Tx, error) {
+	panic("`BeginTx` must be completed")
+}
+
+func NewShardingDataSource(m map[string]datasource.DataSource) datasource.DataSource {
 	return &ShardingDataSource{
 		sources: m,
 	}
+}
+
+func (s *ShardingDataSource) Close() error {
+	var err error
+	for name, inst := range s.sources {
+		if er := inst.Close(); er != nil {
+			err = multierr.Combine(
+				err, fmt.Errorf("source name [%s] error: %w", name, er))
+		}
+	}
+	return err
 }

@@ -17,35 +17,25 @@ package eorm
 import (
 	"context"
 	"database/sql"
+
+	"github.com/ecodeclub/eorm/internal/datasource"
 )
 
-// var _ Session = &Tx{}
-var _ Session = &DB{}
-
-// Session 代表一个抽象的概念，即会话
-// 暂时做成私有的，后面考虑重构，因为这个东西用户可能有点难以理解
-type Session interface {
-	getCore() core
-	queryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
-	execContext(ctx context.Context, query string, args ...any) (sql.Result, error)
-}
-
 type Tx struct {
-	tx *sql.Tx
 	core
-	db *sql.DB
+	tx datasource.Tx
 }
 
 func (t *Tx) getCore() core {
 	return t.core
 }
 
-func (t *Tx) queryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
-	return t.tx.QueryContext(ctx, query, args...)
+func (t *Tx) queryContext(ctx context.Context, query datasource.Query) (*sql.Rows, error) {
+	return t.tx.Query(ctx, query)
 }
 
-func (t *Tx) execContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
-	return t.tx.ExecContext(ctx, query, args...)
+func (t *Tx) execContext(ctx context.Context, query datasource.Query) (sql.Result, error) {
+	return t.tx.Exec(ctx, query)
 }
 
 func (t *Tx) Commit() error {

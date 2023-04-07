@@ -16,12 +16,13 @@ package sharding
 
 import (
 	"context"
-	"database/sql"
 
 	operator "github.com/ecodeclub/eorm/internal/operator"
+	"github.com/ecodeclub/eorm/internal/query"
 )
 
 var EmptyResult = Result{}
+var EmptyQuery = Query{}
 
 type Algorithm interface {
 	// Sharding 返回分库分表之后目标库和目标表信息
@@ -34,22 +35,12 @@ type Algorithm interface {
 	ShardingKeys() []string
 }
 
-type DataSource interface {
-	Query(ctx context.Context, query *Query) (*sql.Rows, error)
-	Exec(ctx context.Context, query *Query) (sql.Result, error)
-}
-
 // QueryBuilder  sharding sql 构造抽象
 type QueryBuilder interface {
-	Build(ctx context.Context) ([]*Query, error)
+	Build(ctx context.Context) ([]Query, error)
 }
 
-type Query struct {
-	SQL        string
-	Args       []any
-	DB         string
-	Datasource string
-}
+type Query = query.Query
 
 type Result struct {
 	Dsts []Dst

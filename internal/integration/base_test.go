@@ -24,15 +24,22 @@ import (
 	"log"
 	"time"
 
+	"github.com/ecodeclub/eorm/internal/datasource/masterslave/slaves/roundrobin"
+
+	"github.com/ecodeclub/eorm/internal/datasource/masterslave"
+	slaves2 "github.com/ecodeclub/eorm/internal/datasource/masterslave/slaves"
+	"github.com/ecodeclub/eorm/internal/datasource/masterslave/slaves/dns"
+
+	"github.com/ecodeclub/eorm/internal/datasource/shardingsource"
+
+	"github.com/ecodeclub/eorm/internal/datasource/single"
+
 	"github.com/stretchr/testify/require"
 
-	"github.com/ecodeclub/eorm/internal/slaves/dns"
-
 	"github.com/ecodeclub/eorm"
+	"github.com/ecodeclub/eorm/internal/datasource"
+	"github.com/ecodeclub/eorm/internal/datasource/cluster"
 	"github.com/ecodeclub/eorm/internal/sharding"
-	"github.com/ecodeclub/eorm/internal/sharding/datasource"
-	"github.com/ecodeclub/eorm/internal/slaves"
-	"github.com/ecodeclub/eorm/internal/slaves/roundrobin"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -45,11 +52,15 @@ type Suite struct {
 
 func (s *Suite) SetupSuite() {
 	t := s.T()
-	orm, err := eorm.Open(s.driver, s.dsn)
+	db, err := single.OpenDB(s.driver, s.dsn)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err = orm.Wait(); err != nil {
+	if err = db.Wait(); err != nil {
+		t.Fatal(err)
+	}
+	orm, err := eorm.OpenDS(s.driver, db)
+	if err != nil {
 		t.Fatal(err)
 	}
 	s.orm = orm
@@ -70,11 +81,11 @@ type masterSalvesDriver struct {
 
 type ShardingSuite struct {
 	suite.Suite
-	slaves      slaves.Slaves
+	slaves      slaves2.Slaves
 	clusters    *clusterDrivers
-	shardingDB  *eorm.ShardingDB
+	shardingDB  *eorm.DB
 	algorithm   sharding.Algorithm
-	dataSources map[string]sharding.DataSource
+	dataSources map[string]datasource.DataSource
 	driver      string
 	DBPattern   string
 	DsPattern   string
@@ -91,12 +102,12 @@ func (s *ShardingSuite) openDB(dvr, dsn string) (*sql.DB, error) {
 	return db, err
 }
 
-func (s *ShardingSuite) initDB() (*eorm.ShardingDB, error) {
+func (s *ShardingSuite) initDB() (*eorm.DB, error) {
 	clDrivers := s.clusters.clDrivers
-	sourceMap := make(map[string]sharding.DataSource, len(clDrivers))
-	for i, cluster := range clDrivers {
-		msMap := make(map[string]*eorm.MasterSlavesDB, 8)
-		for j, d := range cluster.msDrivers {
+	sourceMap := make(map[string]datasource.DataSource, len(clDrivers))
+	for i, clus := range clDrivers {
+		msMap := make(map[string]*masterslave.MasterSlavesDB, 8)
+		for j, d := range clus.msDrivers {
 			master, err := s.openDB(s.driver, d.masterdsn)
 			if err != nil {
 				return nil, err
@@ -112,20 +123,17 @@ func (s *ShardingSuite) initDB() (*eorm.ShardingDB, error) {
 			sl, err := roundrobin.NewSlaves(ss...)
 			require.NoError(s.T(), err)
 			s.slaves = &testBaseSlaves{Slaves: sl}
-			masterSlaveDB, err := eorm.OpenMasterSlaveDB(
-				s.driver, master, eorm.MasterSlaveWithSlaves(s.slaves))
-			if err != nil {
-				return nil, err
-			}
+			masterSlaveDB := masterslave.NewMasterSlavesDB(
+				master, masterslave.MasterSlavesWithSlaves(s.slaves))
 			dbName := fmt.Sprintf(s.DBPattern, j)
 			msMap[dbName] = masterSlaveDB
 		}
 		sourceName := fmt.Sprintf(s.DsPattern, i)
-		sourceMap[sourceName] = eorm.OpenClusterDB(msMap)
+		sourceMap[sourceName] = cluster.NewClusterDB(msMap)
 	}
 	s.dataSources = sourceMap
-	dataSource := datasource.NewShardingDataSource(sourceMap)
-	return eorm.OpenShardingDB(s.driver, dataSource)
+	dataSource := shardingsource.NewShardingDataSource(sourceMap)
+	return eorm.OpenDS(s.driver, dataSource)
 }
 
 func (s *ShardingSuite) SetupSuite() {
@@ -142,7 +150,7 @@ type MasterSlaveSuite struct {
 	driver     string
 	masterDsn  string
 	slaveDsns  []string
-	orm        *eorm.MasterSlavesDB
+	orm        *eorm.DB
 	initSlaves initSlaves
 	*testSlaves
 }
@@ -156,7 +164,7 @@ func (s *MasterSlaveSuite) SetupSuite() {
 	s.orm = orm
 }
 
-func (s *MasterSlaveSuite) initDb() (*eorm.MasterSlavesDB, error) {
+func (s *MasterSlaveSuite) initDb() (*eorm.DB, error) {
 	master, err := sql.Open(s.driver, s.masterDsn)
 	if err != nil {
 		return nil, err
@@ -166,7 +174,7 @@ func (s *MasterSlaveSuite) initDb() (*eorm.MasterSlavesDB, error) {
 		return nil, err
 	}
 	s.testSlaves = newTestSlaves(ss)
-	return eorm.OpenMasterSlaveDB(s.driver, master, eorm.MasterSlaveWithSlaves(s.testSlaves))
+	return eorm.OpenDS(s.driver, masterslave.NewMasterSlavesDB(master, masterslave.MasterSlavesWithSlaves(s.testSlaves)))
 
 }
 
@@ -183,10 +191,10 @@ func (s *MasterSlaveSuite) initDb() (*eorm.MasterSlavesDB, error) {
 //}
 
 type testBaseSlaves struct {
-	slaves.Slaves
+	slaves2.Slaves
 }
 
-func (s *testBaseSlaves) Next(ctx context.Context) (slaves.Slave, error) {
+func (s *testBaseSlaves) Next(ctx context.Context) (slaves2.Slave, error) {
 	slave, err := s.Slaves.Next(ctx)
 	if err != nil {
 		return slave, err
@@ -199,7 +207,7 @@ type testSlaves struct {
 	ch chan string
 }
 
-func newTestSlaves(s slaves.Slaves) *testSlaves {
+func newTestSlaves(s slaves2.Slaves) *testSlaves {
 	return &testSlaves{
 		testBaseSlaves: &testBaseSlaves{
 			Slaves: s,
@@ -208,7 +216,7 @@ func newTestSlaves(s slaves.Slaves) *testSlaves {
 	}
 }
 
-func (s *testSlaves) Next(ctx context.Context) (slaves.Slave, error) {
+func (s *testSlaves) Next(ctx context.Context) (slaves2.Slave, error) {
 	slave, err := s.Slaves.Next(ctx)
 	if err != nil {
 		return slave, err
@@ -217,13 +225,13 @@ func (s *testSlaves) Next(ctx context.Context) (slaves.Slave, error) {
 	return slave, err
 }
 
-type initSlaves func(driver string, slaveDsns ...string) (slaves.Slaves, error)
+type initSlaves func(driver string, slaveDsns ...string) (slaves2.Slaves, error)
 
-func newDnsSlaves(driver string, slaveDsns ...string) (slaves.Slaves, error) {
+func newDnsSlaves(driver string, slaveDsns ...string) (slaves2.Slaves, error) {
 	return dns.NewSlaves(slaveDsns[0])
 }
 
-func newRoundRobinSlaves(driver string, slaveDsns ...string) (slaves.Slaves, error) {
+func newRoundRobinSlaves(driver string, slaveDsns ...string) (slaves2.Slaves, error) {
 	ss := make([]*sql.DB, 0, len(slaveDsns))
 	for _, slaveDsn := range slaveDsns {
 		slave, err := sql.Open(driver, slaveDsn)

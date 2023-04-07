@@ -22,10 +22,11 @@ import (
 	"testing"
 	"time"
 
-	Operator "github.com/ecodeclub/eorm/internal/operator"
-
 	"github.com/ecodeclub/eorm"
+	"github.com/ecodeclub/eorm/internal/datasource"
+	"github.com/ecodeclub/eorm/internal/datasource/masterslave"
 	"github.com/ecodeclub/eorm/internal/model"
+	operator "github.com/ecodeclub/eorm/internal/operator"
 	"github.com/ecodeclub/eorm/internal/sharding"
 	"github.com/ecodeclub/eorm/internal/sharding/hash"
 	"github.com/ecodeclub/eorm/internal/test"
@@ -44,7 +45,7 @@ func (s *ShardingSelectTestSuite) SetupSuite() {
 	s.ShardingSuite.SetupSuite()
 	for _, item := range s.data {
 		shardingRes, err := s.algorithm.Sharding(
-			context.Background(), sharding.Request{Op: Operator.OpEQ, SkValues: map[string]any{"OrderId": item.OrderId}})
+			context.Background(), sharding.Request{Op: operator.OpEQ, SkValues: map[string]any{"OrderId": item.OrderId}})
 		require.NoError(t, err)
 		require.NotNil(t, shardingRes.Dsts)
 		for _, dst := range shardingRes.Dsts {
@@ -53,13 +54,9 @@ func (s *ShardingSelectTestSuite) SetupSuite() {
 			args := []any{item.OrderId, item.ItemId, item.UsingCol1, item.UsingCol2}
 			source, ok := s.dataSources[dst.Name]
 			require.True(t, ok)
-			cluster, ok := source.(*eorm.ClusterDB)
-			require.True(t, ok)
-			db, ok := cluster.MasterSlavesDBs[dst.DB]
-			require.True(t, ok)
-			res := eorm.RawQuery[any](db, sql, args...).Exec(context.Background())
-			if res.Err() != nil {
-				t.Fatal(res.Err())
+			_, err := source.Exec(context.Background(), datasource.Query{SQL: sql, Args: args, DB: dst.DB})
+			if err != nil {
+				t.Fatal(err)
 			}
 		}
 	}
@@ -73,7 +70,7 @@ func (s *ShardingSelectTestSuite) TestSardingSelectorGet() {
 	_, err := r.Register(&test.OrderDetail{},
 		model.WithTableShardingAlgorithm(s.algorithm))
 	require.NoError(t, err)
-	eorm.ShardingDBOptionWithMetaRegistry(r)(s.shardingDB)
+	eorm.DBOptionWithMetaRegistry(r)(s.shardingDB)
 
 	testCases := []struct {
 		name    string
@@ -113,7 +110,7 @@ func (s *ShardingSelectTestSuite) TestSardingSelectorGet() {
 	for _, tc := range testCases {
 		s.T().Run(tc.name, func(t *testing.T) {
 			// TODO 从库测试目前有查不到数据的bug
-			ctx := eorm.UseMaster(context.Background())
+			ctx := masterslave.UseMaster(context.Background())
 			res, err := tc.s.Get(ctx)
 			assert.Equal(t, tc.wantErr, err)
 			if err != nil {
@@ -130,7 +127,7 @@ func (s *ShardingSelectTestSuite) TestSardingSelectorGetMulti() {
 	_, err := r.Register(&test.OrderDetail{},
 		model.WithTableShardingAlgorithm(s.algorithm))
 	require.NoError(t, err)
-	eorm.ShardingDBOptionWithMetaRegistry(r)(s.shardingDB)
+	eorm.DBOptionWithMetaRegistry(r)(s.shardingDB)
 
 	testCases := []struct {
 		name    string
@@ -187,7 +184,6 @@ func (s *ShardingSelectTestSuite) TestSardingSelectorGetMulti() {
 				{OrderId: 234, ItemId: 12, UsingCol1: "Kevin", UsingCol2: "Durant"},
 			},
 		},
-		////////////////////
 		{
 			name: "where gt",
 			s: func() *eorm.ShardingSelector[test.OrderDetail] {
@@ -333,7 +329,7 @@ func (s *ShardingSelectTestSuite) TestSardingSelectorGetMulti() {
 	for _, tc := range testCases {
 		s.T().Run(tc.name, func(t *testing.T) {
 			// TODO 从库测试目前有查不到数据的bug
-			ctx := eorm.UseMaster(context.Background())
+			ctx := masterslave.UseMaster(context.Background())
 			res, err := tc.s.GetMulti(ctx)
 			assert.Equal(t, tc.wantErr, err)
 			if err != nil {
@@ -348,7 +344,7 @@ func (s *ShardingSelectTestSuite) TearDownSuite() {
 	t := s.T()
 	for _, item := range s.data {
 		shardingRes, err := s.algorithm.Sharding(
-			context.Background(), sharding.Request{Op: Operator.OpEQ, SkValues: map[string]any{"OrderId": item.OrderId}})
+			context.Background(), sharding.Request{Op: operator.OpEQ, SkValues: map[string]any{"OrderId": item.OrderId}})
 		require.NoError(t, err)
 		require.NotNil(t, shardingRes.Dsts)
 		for _, dst := range shardingRes.Dsts {
@@ -356,14 +352,9 @@ func (s *ShardingSelectTestSuite) TearDownSuite() {
 			sql := fmt.Sprintf("DELETE FROM %s", tbl)
 			source, ok := s.dataSources[dst.Name]
 			require.True(t, ok)
-			cluster, ok := source.(*eorm.ClusterDB)
-			require.True(t, ok)
-			db, ok := cluster.MasterSlavesDBs[dst.DB]
-			require.True(t, ok)
-			res := eorm.RawQuery[any](db, sql).Exec(context.Background())
-			if res.Err() != nil {
-				fmt.Println(res.Err().Error())
-				t.Fatal(res.Err())
+			_, err := source.Exec(context.Background(), datasource.Query{SQL: sql, DB: dst.DB})
+			if err != nil {
+				t.Fatal(err)
 			}
 		}
 	}

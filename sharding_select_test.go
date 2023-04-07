@@ -19,15 +19,21 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/ecodeclub/eorm/internal/datasource/masterslave/slaves/roundrobin"
+
+	"github.com/ecodeclub/eorm/internal/datasource/masterslave"
+	"github.com/ecodeclub/eorm/internal/datasource/masterslave/slaves"
+
+	"github.com/ecodeclub/eorm/internal/datasource/shardingsource"
+
+	"github.com/ecodeclub/eorm/internal/datasource/cluster"
+
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/ecodeclub/eorm/internal/datasource"
 	"github.com/ecodeclub/eorm/internal/errs"
 	"github.com/ecodeclub/eorm/internal/sharding"
-	"github.com/ecodeclub/eorm/internal/sharding/datasource"
 	"github.com/ecodeclub/eorm/internal/sharding/hash"
-	"github.com/ecodeclub/eorm/internal/slaves/roundrobin"
 	"github.com/ecodeclub/eorm/internal/test"
-
-	"github.com/ecodeclub/eorm/internal/slaves"
 
 	"github.com/ecodeclub/eorm/internal/model"
 	"github.com/stretchr/testify/assert"
@@ -47,23 +53,23 @@ func TestShardingSelector_shadow_Build(t *testing.T) {
 			Prefix: "shadow_",
 		}))
 	require.NoError(t, err)
-	m := map[string]*MasterSlavesDB{
-		"order_db_0": masterSlaveMemoryDB(),
-		"order_db_1": masterSlaveMemoryDB(),
-		"order_db_2": masterSlaveMemoryDB(),
+	m := map[string]*masterslave.MasterSlavesDB{
+		"order_db_0": MasterSlavesMemoryDB(),
+		"order_db_1": MasterSlavesMemoryDB(),
+		"order_db_2": MasterSlavesMemoryDB(),
 	}
-	clusterDB := OpenClusterDB(m)
-	ds := map[string]sharding.DataSource{
+	clusterDB := cluster.NewClusterDB(m)
+	ds := map[string]datasource.DataSource{
 		"0.db.cluster.company.com:3306": clusterDB,
 	}
-	shardingDB, err := OpenShardingDB("sqlite3",
-		datasource.NewShardingDataSource(ds), ShardingDBOptionWithMetaRegistry(r))
+	shardingDB, err := OpenDS("sqlite3",
+		shardingsource.NewShardingDataSource(ds), DBOptionWithMetaRegistry(r))
 	require.NoError(t, err)
 
 	testCases := []struct {
 		name    string
 		builder sharding.QueryBuilder
-		qs      []*sharding.Query
+		qs      []sharding.Query
 		wantErr error
 	}{
 		{
@@ -72,7 +78,7 @@ func TestShardingSelector_shadow_Build(t *testing.T) {
 				s := NewShardingSelector[Order](shardingDB).Where(C("UserId").EQ(123))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `user_id`,`order_id`,`content`,`account` FROM `shadow_order_db_1`.`shadow_order_tab_0` WHERE `user_id`=?;",
 					Args:       []any{123},
@@ -87,7 +93,7 @@ func TestShardingSelector_shadow_Build(t *testing.T) {
 				s := NewShardingSelector[Order](shardingDB).Where(C("OrderId").EQ(123))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `user_id`,`order_id`,`content`,`account` FROM `shadow_order_db_0`.`shadow_order_tab_0` WHERE `order_id`=?;",
 					Args:       []any{123},
@@ -133,7 +139,7 @@ func TestShardingSelector_shadow_Build(t *testing.T) {
 					Select(Columns("Content", "OrderId")).Where(C("UserId").EQ(123))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `content`,`order_id` FROM `shadow_order_db_1`.`shadow_order_tab_0` WHERE `user_id`=?;",
 					Args:       []any{123},
@@ -158,7 +164,7 @@ func TestShardingSelector_shadow_Build(t *testing.T) {
 					Where(C("UserId").EQ(123)).OrderBy(ASC("UserId"), DESC("OrderId"))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_1`.`shadow_order_tab_0` WHERE `user_id`=? ORDER BY `user_id` ASC,`order_id` DESC;",
 					Args:       []any{123},
@@ -174,7 +180,7 @@ func TestShardingSelector_shadow_Build(t *testing.T) {
 					Where(C("UserId").EQ(123)).GroupBy("UserId", "OrderId")
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_1`.`shadow_order_tab_0` WHERE `user_id`=? GROUP BY `user_id`,`order_id`;",
 					Args:       []any{123},
@@ -191,7 +197,7 @@ func TestShardingSelector_shadow_Build(t *testing.T) {
 					Where(C("UserId").EQ(123)).GroupBy("OrderId").Having(C("OrderId").EQ(int64(18)))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_1`.`shadow_order_tab_0` WHERE `user_id`=? GROUP BY `order_id` HAVING `order_id`=?;",
 					Args:       []any{123, int64(18)},
@@ -208,7 +214,7 @@ func TestShardingSelector_shadow_Build(t *testing.T) {
 					Where(C("OrderId").EQ(int64(12)).And(C("UserId").EQ(123)))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_1`.`shadow_order_tab_0` WHERE (`order_id`=?) AND (`user_id`=?);",
 					Args:       []any{int64(12), 123},
@@ -225,7 +231,7 @@ func TestShardingSelector_shadow_Build(t *testing.T) {
 					Where(C("UserId").EQ(123).And(C("OrderId").EQ(int64(12))))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_1`.`shadow_order_tab_0` WHERE (`user_id`=?) AND (`order_id`=?);",
 					Args:       []any{123, int64(12)},
@@ -242,7 +248,7 @@ func TestShardingSelector_shadow_Build(t *testing.T) {
 					Where(C("UserId").EQ(123).Or(C("UserId").EQ(234)))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_1`.`shadow_order_tab_0` WHERE (`user_id`=?) OR (`user_id`=?);",
 					Args:       []any{123, 234},
@@ -265,7 +271,7 @@ func TestShardingSelector_shadow_Build(t *testing.T) {
 					Where(C("OrderId").EQ(int64(12)).Or(C("UserId").EQ(123)))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_0`.`shadow_order_tab_0` WHERE (`order_id`=?) OR (`user_id`=?);",
 					Args:       []any{int64(12), 123},
@@ -312,7 +318,7 @@ func TestShardingSelector_shadow_Build(t *testing.T) {
 					Where(C("UserId").EQ(123).Or(C("OrderId").EQ(int64(12))))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_0`.`shadow_order_tab_0` WHERE (`user_id`=?) OR (`order_id`=?);",
 					Args:       []any{123, int64(12)},
@@ -359,7 +365,7 @@ func TestShardingSelector_shadow_Build(t *testing.T) {
 					Where(C("UserId").EQ(123).And(C("OrderId").EQ(int64(12))).Or(C("UserId").EQ(234)))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_1`.`shadow_order_tab_0` WHERE ((`user_id`=?) AND (`order_id`=?)) OR (`user_id`=?);",
 					Args:       []any{123, int64(12), 234},
@@ -383,7 +389,7 @@ func TestShardingSelector_shadow_Build(t *testing.T) {
 						Or(C("UserId").EQ(234))))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_1`.`shadow_order_tab_0` WHERE (`user_id`=?) AND ((`order_id`=?) OR (`user_id`=?));",
 					Args:       []any{123, int64(12), 234},
@@ -400,7 +406,7 @@ func TestShardingSelector_shadow_Build(t *testing.T) {
 					Where(C("UserId").EQ(123).Or(C("UserId").EQ(181).And(C("UserId").EQ(234))))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_1`.`shadow_order_tab_0` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
 					Args:       []any{123, 181, 234},
@@ -418,7 +424,7 @@ func TestShardingSelector_shadow_Build(t *testing.T) {
 						And(C("OrderId").EQ(int64(24))))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_1`.`shadow_order_tab_0` WHERE ((`user_id`=?) OR (`user_id`=?)) AND (`order_id`=?);",
 					Args:       []any{123, 234, int64(24)},
@@ -442,7 +448,7 @@ func TestShardingSelector_shadow_Build(t *testing.T) {
 						And(C("UserId").EQ(234)))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_0`.`shadow_order_tab_0` WHERE ((`user_id`=?) OR (`order_id`=?)) AND (`user_id`=?);",
 					Args:       []any{123, int64(12), 234},
@@ -460,7 +466,7 @@ func TestShardingSelector_shadow_Build(t *testing.T) {
 						Or(C("UserId").EQ(234)))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_1`.`shadow_order_tab_0` WHERE ((`user_id`=?) OR (`user_id`=?)) OR (`user_id`=?);",
 					Args:       []any{123, 253, 234},
@@ -490,7 +496,7 @@ func TestShardingSelector_shadow_Build(t *testing.T) {
 						Or(C("UserId").EQ(234)))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_0`.`shadow_order_tab_0` WHERE ((`user_id`=?) OR (`order_id`=?)) OR (`user_id`=?);",
 					Args:       []any{123, int64(12), 234},
@@ -538,7 +544,7 @@ func TestShardingSelector_shadow_Build(t *testing.T) {
 						And(C("OrderId").EQ(int64(23))))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_1`.`shadow_order_tab_0` WHERE ((`user_id`=?) AND (`order_id`=?)) AND (`order_id`=?);",
 					Args:       []any{123, int64(12), int64(23)},
@@ -556,7 +562,7 @@ func TestShardingSelector_shadow_Build(t *testing.T) {
 						Or(C("UserId").EQ(234).And(C("OrderId").EQ(int64(18)))))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `shadow_order_db_1`.`shadow_order_tab_0` WHERE ((`user_id`=?) AND (`order_id`=?)) OR ((`user_id`=?) AND (`order_id`=?));",
 					Args:       []any{123, int64(12), 234, int64(18)},
@@ -579,7 +585,7 @@ func TestShardingSelector_shadow_Build(t *testing.T) {
 					Where(C("UserId").EQ(123).And(C("UserId").EQ(124)))
 				return s
 			}(),
-			qs: []*sharding.Query{},
+			qs: []sharding.Query{},
 		},
 	}
 
@@ -609,22 +615,22 @@ func TestShardingSelector_onlyDataSource_Build(t *testing.T) {
 			DsPattern:    &hash.Pattern{Name: dsPattern, Base: dsBase},
 		}))
 	require.NoError(t, err)
-	m := map[string]*MasterSlavesDB{
-		"order_db": masterSlaveMemoryDB(),
+	m := map[string]*masterslave.MasterSlavesDB{
+		"order_db": MasterSlavesMemoryDB(),
 	}
-	clusterDB := OpenClusterDB(m)
-	ds := map[string]sharding.DataSource{
+	clusterDB := cluster.NewClusterDB(m)
+	ds := map[string]datasource.DataSource{
 		"0.db.cluster.company.com:3306": clusterDB,
 		"1.db.cluster.company.com:3306": clusterDB,
 	}
-	shardingDB, err := OpenShardingDB("sqlite3",
-		datasource.NewShardingDataSource(ds), ShardingDBOptionWithMetaRegistry(r))
+	shardingDB, err := OpenDS("sqlite3",
+		shardingsource.NewShardingDataSource(ds), DBOptionWithMetaRegistry(r))
 	require.NoError(t, err)
 
 	testCases := []struct {
 		name    string
 		builder sharding.QueryBuilder
-		qs      []*sharding.Query
+		qs      []sharding.Query
 		wantErr error
 	}{
 		{
@@ -633,7 +639,7 @@ func TestShardingSelector_onlyDataSource_Build(t *testing.T) {
 				s := NewShardingSelector[Order](shardingDB).Where(C("UserId").EQ(123))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `user_id`,`order_id`,`content`,`account` FROM `order_db`.`order_tab` WHERE `user_id`=?;",
 					Args:       []any{123},
@@ -648,7 +654,7 @@ func TestShardingSelector_onlyDataSource_Build(t *testing.T) {
 				s := NewShardingSelector[Order](shardingDB).Where(C("OrderId").EQ(123))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `user_id`,`order_id`,`content`,`account` FROM `order_db`.`order_tab` WHERE `order_id`=?;",
 					Args:       []any{123},
@@ -670,7 +676,7 @@ func TestShardingSelector_onlyDataSource_Build(t *testing.T) {
 					Select(Columns("Content", "OrderId")).Where(C("UserId").EQ(123))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `content`,`order_id` FROM `order_db`.`order_tab` WHERE `user_id`=?;",
 					Args:       []any{123},
@@ -695,7 +701,7 @@ func TestShardingSelector_onlyDataSource_Build(t *testing.T) {
 					Where(C("UserId").EQ(123)).OrderBy(ASC("UserId"), DESC("OrderId"))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab` WHERE `user_id`=? ORDER BY `user_id` ASC,`order_id` DESC;",
 					Args:       []any{123},
@@ -711,7 +717,7 @@ func TestShardingSelector_onlyDataSource_Build(t *testing.T) {
 					Where(C("UserId").EQ(123)).GroupBy("UserId", "OrderId")
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab` WHERE `user_id`=? GROUP BY `user_id`,`order_id`;",
 					Args:       []any{123},
@@ -728,7 +734,7 @@ func TestShardingSelector_onlyDataSource_Build(t *testing.T) {
 					Where(C("UserId").EQ(123)).GroupBy("OrderId").Having(C("OrderId").EQ(int64(18)))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab` WHERE `user_id`=? GROUP BY `order_id` HAVING `order_id`=?;",
 					Args:       []any{123, int64(18)},
@@ -745,7 +751,7 @@ func TestShardingSelector_onlyDataSource_Build(t *testing.T) {
 					Where(C("OrderId").EQ(int64(12)).And(C("UserId").EQ(123)))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab` WHERE (`order_id`=?) AND (`user_id`=?);",
 					Args:       []any{int64(12), 123},
@@ -762,7 +768,7 @@ func TestShardingSelector_onlyDataSource_Build(t *testing.T) {
 					Where(C("UserId").EQ(123).And(C("OrderId").EQ(int64(12))))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab` WHERE (`user_id`=?) AND (`order_id`=?);",
 					Args:       []any{123, int64(12)},
@@ -779,7 +785,7 @@ func TestShardingSelector_onlyDataSource_Build(t *testing.T) {
 					Where(C("UserId").EQ(123).Or(C("UserId").EQ(234)))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab` WHERE (`user_id`=?) OR (`user_id`=?);",
 					Args:       []any{123, 234},
@@ -802,7 +808,7 @@ func TestShardingSelector_onlyDataSource_Build(t *testing.T) {
 					Where(C("OrderId").EQ(int64(12)).Or(C("UserId").EQ(123)))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab` WHERE (`order_id`=?) OR (`user_id`=?);",
 					Args:       []any{int64(12), 123},
@@ -825,7 +831,7 @@ func TestShardingSelector_onlyDataSource_Build(t *testing.T) {
 					Where(C("UserId").EQ(123).Or(C("OrderId").EQ(int64(12))))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab` WHERE (`user_id`=?) OR (`order_id`=?);",
 					Args:       []any{123, int64(12)},
@@ -848,7 +854,7 @@ func TestShardingSelector_onlyDataSource_Build(t *testing.T) {
 					Where(C("UserId").EQ(123).And(C("OrderId").EQ(int64(12))).Or(C("UserId").EQ(234)))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab` WHERE ((`user_id`=?) AND (`order_id`=?)) OR (`user_id`=?);",
 					Args:       []any{123, int64(12), 234},
@@ -872,7 +878,7 @@ func TestShardingSelector_onlyDataSource_Build(t *testing.T) {
 						Or(C("UserId").EQ(234))))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab` WHERE (`user_id`=?) AND ((`order_id`=?) OR (`user_id`=?));",
 					Args:       []any{123, int64(12), 234},
@@ -889,7 +895,7 @@ func TestShardingSelector_onlyDataSource_Build(t *testing.T) {
 					Where(C("UserId").EQ(123).Or(C("UserId").EQ(181).And(C("UserId").EQ(234))))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
 					Args:       []any{123, 181, 234},
@@ -907,7 +913,7 @@ func TestShardingSelector_onlyDataSource_Build(t *testing.T) {
 						And(C("OrderId").EQ(int64(24))))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab` WHERE ((`user_id`=?) OR (`user_id`=?)) AND (`order_id`=?);",
 					Args:       []any{123, 234, int64(24)},
@@ -931,7 +937,7 @@ func TestShardingSelector_onlyDataSource_Build(t *testing.T) {
 						And(C("UserId").EQ(234)))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab` WHERE ((`user_id`=?) OR (`order_id`=?)) AND (`user_id`=?);",
 					Args:       []any{123, int64(12), 234},
@@ -949,7 +955,7 @@ func TestShardingSelector_onlyDataSource_Build(t *testing.T) {
 						Or(C("UserId").EQ(234)))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab` WHERE ((`user_id`=?) OR (`user_id`=?)) OR (`user_id`=?);",
 					Args:       []any{123, 253, 234},
@@ -973,7 +979,7 @@ func TestShardingSelector_onlyDataSource_Build(t *testing.T) {
 						Or(C("UserId").EQ(234)))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab` WHERE ((`user_id`=?) OR (`order_id`=?)) OR (`user_id`=?);",
 					Args:       []any{123, int64(12), 234},
@@ -997,7 +1003,7 @@ func TestShardingSelector_onlyDataSource_Build(t *testing.T) {
 						And(C("OrderId").EQ(int64(23))))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab` WHERE ((`user_id`=?) AND (`order_id`=?)) AND (`order_id`=?);",
 					Args:       []any{123, int64(12), int64(23)},
@@ -1015,7 +1021,7 @@ func TestShardingSelector_onlyDataSource_Build(t *testing.T) {
 						Or(C("UserId").EQ(234).And(C("OrderId").EQ(int64(18)))))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab` WHERE ((`user_id`=?) AND (`order_id`=?)) OR ((`user_id`=?) AND (`order_id`=?));",
 					Args:       []any{123, int64(12), 234, int64(18)},
@@ -1037,12 +1043,12 @@ func TestShardingSelector_onlyDataSource_Build(t *testing.T) {
 					Select(C("OrderId"), C("Content")).Where(C("UserId").LT(1))
 				return s
 			}(),
-			qs: func() []*sharding.Query {
-				var res []*sharding.Query
+			qs: func() []sharding.Query {
+				var res []sharding.Query
 				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE `user_id`<?;"
 				for b := 0; b < dsBase; b++ {
 					dsName := fmt.Sprintf(dsPattern, b)
-					res = append(res, &sharding.Query{
+					res = append(res, sharding.Query{
 						SQL:        fmt.Sprintf(sql, dbPattern, tablePattern),
 						Args:       []any{1},
 						DB:         dbPattern,
@@ -1059,12 +1065,12 @@ func TestShardingSelector_onlyDataSource_Build(t *testing.T) {
 					Select(C("OrderId"), C("Content")).Where(C("UserId").LTEQ(1))
 				return s
 			}(),
-			qs: func() []*sharding.Query {
-				var res []*sharding.Query
+			qs: func() []sharding.Query {
+				var res []sharding.Query
 				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE `user_id`<=?;"
 				for b := 0; b < dsBase; b++ {
 					dsName := fmt.Sprintf(dsPattern, b)
-					res = append(res, &sharding.Query{
+					res = append(res, sharding.Query{
 						SQL:        fmt.Sprintf(sql, dbPattern, tablePattern),
 						Args:       []any{1},
 						DB:         dbPattern,
@@ -1081,7 +1087,7 @@ func TestShardingSelector_onlyDataSource_Build(t *testing.T) {
 					Select(C("OrderId"), C("Content")).Where(C("UserId").EQ(12).And(C("UserId").LT(133)))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab` WHERE (`user_id`=?) AND (`user_id`<?);",
 					Args:       []any{12, 133},
@@ -1097,12 +1103,12 @@ func TestShardingSelector_onlyDataSource_Build(t *testing.T) {
 					Select(C("OrderId"), C("Content")).Where(C("UserId").GT(1))
 				return s
 			}(),
-			qs: func() []*sharding.Query {
-				var res []*sharding.Query
+			qs: func() []sharding.Query {
+				var res []sharding.Query
 				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE `user_id`>?;"
 				for b := 0; b < dsBase; b++ {
 					dsName := fmt.Sprintf(dsPattern, b)
-					res = append(res, &sharding.Query{
+					res = append(res, sharding.Query{
 						SQL:        fmt.Sprintf(sql, dbPattern, tablePattern),
 						Args:       []any{1},
 						DB:         dbPattern,
@@ -1119,12 +1125,12 @@ func TestShardingSelector_onlyDataSource_Build(t *testing.T) {
 					Select(C("OrderId"), C("Content")).Where(C("UserId").GTEQ(1))
 				return s
 			}(),
-			qs: func() []*sharding.Query {
-				var res []*sharding.Query
+			qs: func() []sharding.Query {
+				var res []sharding.Query
 				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE `user_id`>=?;"
 				for b := 0; b < dsBase; b++ {
 					dsName := fmt.Sprintf(dsPattern, b)
-					res = append(res, &sharding.Query{
+					res = append(res, sharding.Query{
 						SQL:        fmt.Sprintf(sql, dbPattern, tablePattern),
 						Args:       []any{1},
 						DB:         dbPattern,
@@ -1141,7 +1147,7 @@ func TestShardingSelector_onlyDataSource_Build(t *testing.T) {
 					Select(C("OrderId"), C("Content")).Where(C("UserId").EQ(12).And(C("UserId").GT(133)))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab` WHERE (`user_id`=?) AND (`user_id`>?);",
 					Args:       []any{12, 133},
@@ -1159,12 +1165,12 @@ func TestShardingSelector_onlyDataSource_Build(t *testing.T) {
 						And(C("UserId").LT(133)).Or(C("UserId").GT(234)))
 				return s
 			}(),
-			qs: func() []*sharding.Query {
-				var res []*sharding.Query
+			qs: func() []sharding.Query {
+				var res []sharding.Query
 				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE ((`user_id`=?) AND (`user_id`<?)) OR (`user_id`>?);"
 				for b := 0; b < dsBase; b++ {
 					dsName := fmt.Sprintf(dsPattern, b)
-					res = append(res, &sharding.Query{
+					res = append(res, sharding.Query{
 						SQL:        fmt.Sprintf(sql, dbPattern, tablePattern),
 						Args:       []any{12, 133, 234},
 						DB:         dbPattern,
@@ -1182,7 +1188,7 @@ func TestShardingSelector_onlyDataSource_Build(t *testing.T) {
 					Where(C("UserId").In(12, 35, 101))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab` WHERE `user_id` IN (?,?,?);",
 					Args:       []any{12, 35, 101},
@@ -1205,7 +1211,7 @@ func TestShardingSelector_onlyDataSource_Build(t *testing.T) {
 					Where(C("UserId").In(12, 35, 101).And(C("UserId").EQ(234)))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab` WHERE (`user_id` IN (?,?,?)) AND (`user_id`=?);",
 					Args:       []any{12, 35, 101, 234},
@@ -1222,7 +1228,7 @@ func TestShardingSelector_onlyDataSource_Build(t *testing.T) {
 					Where(C("UserId").EQ(123).And(C("UserId").EQ(124)))
 				return s
 			}(),
-			qs: []*sharding.Query{},
+			qs: []sharding.Query{},
 		},
 	}
 
@@ -1251,23 +1257,23 @@ func TestShardingSelector_onlyTable_Build(t *testing.T) {
 			DsPattern:    &hash.Pattern{Name: dsPattern, NotSharding: true},
 		}))
 	require.NoError(t, err)
-	m := map[string]*MasterSlavesDB{
-		"order_db_0": masterSlaveMemoryDB(),
-		"order_db_1": masterSlaveMemoryDB(),
-		"order_db_2": masterSlaveMemoryDB(),
+	m := map[string]*masterslave.MasterSlavesDB{
+		"order_db_0": MasterSlavesMemoryDB(),
+		"order_db_1": MasterSlavesMemoryDB(),
+		"order_db_2": MasterSlavesMemoryDB(),
 	}
-	clusterDB := OpenClusterDB(m)
-	ds := map[string]sharding.DataSource{
+	clusterDB := cluster.NewClusterDB(m)
+	ds := map[string]datasource.DataSource{
 		"0.db.cluster.company.com:3306": clusterDB,
 	}
-	shardingDB, err := OpenShardingDB("sqlite3",
-		datasource.NewShardingDataSource(ds), ShardingDBOptionWithMetaRegistry(r))
+	shardingDB, err := OpenDS("sqlite3",
+		shardingsource.NewShardingDataSource(ds), DBOptionWithMetaRegistry(r))
 	require.NoError(t, err)
 
 	testCases := []struct {
 		name    string
 		builder sharding.QueryBuilder
-		qs      []*sharding.Query
+		qs      []sharding.Query
 		wantErr error
 	}{
 		{
@@ -1276,7 +1282,7 @@ func TestShardingSelector_onlyTable_Build(t *testing.T) {
 				s := NewShardingSelector[Order](shardingDB).Where(C("UserId").EQ(123))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `user_id`,`order_id`,`content`,`account` FROM `order_db`.`order_tab_0` WHERE `user_id`=?;",
 					Args:       []any{123},
@@ -1291,7 +1297,7 @@ func TestShardingSelector_onlyTable_Build(t *testing.T) {
 				s := NewShardingSelector[Order](shardingDB).Where(C("OrderId").EQ(123))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `user_id`,`order_id`,`content`,`account` FROM `order_db`.`order_tab_0` WHERE `order_id`=?;",
 					Args:       []any{123},
@@ -1319,7 +1325,7 @@ func TestShardingSelector_onlyTable_Build(t *testing.T) {
 					Select(Columns("Content", "OrderId")).Where(C("UserId").EQ(123))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `content`,`order_id` FROM `order_db`.`order_tab_0` WHERE `user_id`=?;",
 					Args:       []any{123},
@@ -1344,7 +1350,7 @@ func TestShardingSelector_onlyTable_Build(t *testing.T) {
 					Where(C("UserId").EQ(123)).OrderBy(ASC("UserId"), DESC("OrderId"))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_0` WHERE `user_id`=? ORDER BY `user_id` ASC,`order_id` DESC;",
 					Args:       []any{123},
@@ -1360,7 +1366,7 @@ func TestShardingSelector_onlyTable_Build(t *testing.T) {
 					Where(C("UserId").EQ(123)).GroupBy("UserId", "OrderId")
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_0` WHERE `user_id`=? GROUP BY `user_id`,`order_id`;",
 					Args:       []any{123},
@@ -1377,7 +1383,7 @@ func TestShardingSelector_onlyTable_Build(t *testing.T) {
 					Where(C("UserId").EQ(123)).GroupBy("OrderId").Having(C("OrderId").EQ(int64(18)))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_0` WHERE `user_id`=? GROUP BY `order_id` HAVING `order_id`=?;",
 					Args:       []any{123, int64(18)},
@@ -1394,7 +1400,7 @@ func TestShardingSelector_onlyTable_Build(t *testing.T) {
 					Where(C("OrderId").EQ(int64(12)).And(C("UserId").EQ(123)))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_0` WHERE (`order_id`=?) AND (`user_id`=?);",
 					Args:       []any{int64(12), 123},
@@ -1411,7 +1417,7 @@ func TestShardingSelector_onlyTable_Build(t *testing.T) {
 					Where(C("UserId").EQ(123).And(C("OrderId").EQ(int64(12))))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_0` WHERE (`user_id`=?) AND (`order_id`=?);",
 					Args:       []any{123, int64(12)},
@@ -1428,7 +1434,7 @@ func TestShardingSelector_onlyTable_Build(t *testing.T) {
 					Where(C("UserId").EQ(123).Or(C("UserId").EQ(234)))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_0` WHERE (`user_id`=?) OR (`user_id`=?);",
 					Args:       []any{123, 234},
@@ -1445,7 +1451,7 @@ func TestShardingSelector_onlyTable_Build(t *testing.T) {
 					Where(C("OrderId").EQ(int64(12)).Or(C("UserId").EQ(123)))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_0` WHERE (`order_id`=?) OR (`user_id`=?);",
 					Args:       []any{int64(12), 123},
@@ -1474,7 +1480,7 @@ func TestShardingSelector_onlyTable_Build(t *testing.T) {
 					Where(C("UserId").EQ(123).Or(C("OrderId").EQ(int64(12))))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_0` WHERE (`user_id`=?) OR (`order_id`=?);",
 					Args:       []any{123, int64(12)},
@@ -1503,7 +1509,7 @@ func TestShardingSelector_onlyTable_Build(t *testing.T) {
 					Where(C("UserId").EQ(123).And(C("OrderId").EQ(int64(12))).Or(C("UserId").EQ(234)))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_0` WHERE ((`user_id`=?) AND (`order_id`=?)) OR (`user_id`=?);",
 					Args:       []any{123, int64(12), 234},
@@ -1521,7 +1527,7 @@ func TestShardingSelector_onlyTable_Build(t *testing.T) {
 						Or(C("UserId").EQ(234))))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_0` WHERE (`user_id`=?) AND ((`order_id`=?) OR (`user_id`=?));",
 					Args:       []any{123, int64(12), 234},
@@ -1538,7 +1544,7 @@ func TestShardingSelector_onlyTable_Build(t *testing.T) {
 					Where(C("UserId").EQ(123).Or(C("UserId").EQ(181).And(C("UserId").EQ(234))))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_0` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
 					Args:       []any{123, 181, 234},
@@ -1555,7 +1561,7 @@ func TestShardingSelector_onlyTable_Build(t *testing.T) {
 					Where(C("UserId").EQ(123).Or(C("UserId").EQ(181).And(C("UserId").EQ(234))))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_0` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
 					Args:       []any{123, 181, 234},
@@ -1573,7 +1579,7 @@ func TestShardingSelector_onlyTable_Build(t *testing.T) {
 						And(C("OrderId").EQ(int64(24))))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_0` WHERE ((`user_id`=?) OR (`user_id`=?)) AND (`order_id`=?);",
 					Args:       []any{123, 234, int64(24)},
@@ -1591,7 +1597,7 @@ func TestShardingSelector_onlyTable_Build(t *testing.T) {
 						And(C("UserId").EQ(234)))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_0` WHERE ((`user_id`=?) OR (`order_id`=?)) AND (`user_id`=?);",
 					Args:       []any{123, int64(12), 234},
@@ -1609,7 +1615,7 @@ func TestShardingSelector_onlyTable_Build(t *testing.T) {
 						Or(C("UserId").EQ(234)))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_0` WHERE ((`user_id`=?) OR (`user_id`=?)) OR (`user_id`=?);",
 					Args:       []any{123, 253, 234},
@@ -1633,7 +1639,7 @@ func TestShardingSelector_onlyTable_Build(t *testing.T) {
 						Or(C("UserId").EQ(234)))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_0` WHERE ((`user_id`=?) OR (`order_id`=?)) OR (`user_id`=?);",
 					Args:       []any{123, int64(12), 234},
@@ -1663,7 +1669,7 @@ func TestShardingSelector_onlyTable_Build(t *testing.T) {
 						And(C("OrderId").EQ(int64(23))))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_0` WHERE ((`user_id`=?) AND (`order_id`=?)) AND (`order_id`=?);",
 					Args:       []any{123, int64(12), int64(23)},
@@ -1681,7 +1687,7 @@ func TestShardingSelector_onlyTable_Build(t *testing.T) {
 						Or(C("UserId").EQ(234).And(C("OrderId").EQ(int64(18)))))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_0` WHERE ((`user_id`=?) AND (`order_id`=?)) OR ((`user_id`=?) AND (`order_id`=?));",
 					Args:       []any{123, int64(12), 234, int64(18)},
@@ -1697,12 +1703,12 @@ func TestShardingSelector_onlyTable_Build(t *testing.T) {
 					Select(C("OrderId"), C("Content")).Where(C("UserId").LT(1))
 				return s
 			}(),
-			qs: func() []*sharding.Query {
-				var res []*sharding.Query
+			qs: func() []sharding.Query {
+				var res []sharding.Query
 				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE `user_id`<?;"
 				for b := 0; b < tableBase; b++ {
 					tableName := fmt.Sprintf(tablePattern, b)
-					res = append(res, &sharding.Query{
+					res = append(res, sharding.Query{
 						SQL:        fmt.Sprintf(sql, dbPattern, tableName),
 						Args:       []any{1},
 						DB:         dbPattern,
@@ -1719,12 +1725,12 @@ func TestShardingSelector_onlyTable_Build(t *testing.T) {
 					Select(C("OrderId"), C("Content")).Where(C("UserId").LTEQ(1))
 				return s
 			}(),
-			qs: func() []*sharding.Query {
-				var res []*sharding.Query
+			qs: func() []sharding.Query {
+				var res []sharding.Query
 				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE `user_id`<=?;"
 				for b := 0; b < tableBase; b++ {
 					tableName := fmt.Sprintf(tablePattern, b)
-					res = append(res, &sharding.Query{
+					res = append(res, sharding.Query{
 						SQL:        fmt.Sprintf(sql, dbPattern, tableName),
 						Args:       []any{1},
 						DB:         dbPattern,
@@ -1741,7 +1747,7 @@ func TestShardingSelector_onlyTable_Build(t *testing.T) {
 					Select(C("OrderId"), C("Content")).Where(C("UserId").EQ(12).And(C("UserId").LT(133)))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_0` WHERE (`user_id`=?) AND (`user_id`<?);",
 					Args:       []any{12, 133},
@@ -1757,12 +1763,12 @@ func TestShardingSelector_onlyTable_Build(t *testing.T) {
 					Select(C("OrderId"), C("Content")).Where(C("UserId").GT(1))
 				return s
 			}(),
-			qs: func() []*sharding.Query {
-				var res []*sharding.Query
+			qs: func() []sharding.Query {
+				var res []sharding.Query
 				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE `user_id`>?;"
 				for b := 0; b < tableBase; b++ {
 					tableName := fmt.Sprintf(tablePattern, b)
-					res = append(res, &sharding.Query{
+					res = append(res, sharding.Query{
 						SQL:        fmt.Sprintf(sql, dbPattern, tableName),
 						Args:       []any{1},
 						DB:         dbPattern,
@@ -1779,12 +1785,12 @@ func TestShardingSelector_onlyTable_Build(t *testing.T) {
 					Select(C("OrderId"), C("Content")).Where(C("UserId").GTEQ(1))
 				return s
 			}(),
-			qs: func() []*sharding.Query {
-				var res []*sharding.Query
+			qs: func() []sharding.Query {
+				var res []sharding.Query
 				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE `user_id`>=?;"
 				for b := 0; b < tableBase; b++ {
 					tableName := fmt.Sprintf(tablePattern, b)
-					res = append(res, &sharding.Query{
+					res = append(res, sharding.Query{
 						SQL:        fmt.Sprintf(sql, dbPattern, tableName),
 						Args:       []any{1},
 						DB:         dbPattern,
@@ -1801,7 +1807,7 @@ func TestShardingSelector_onlyTable_Build(t *testing.T) {
 					Select(C("OrderId"), C("Content")).Where(C("UserId").EQ(12).And(C("UserId").GT(133)))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_0` WHERE (`user_id`=?) AND (`user_id`>?);",
 					Args:       []any{12, 133},
@@ -1819,12 +1825,12 @@ func TestShardingSelector_onlyTable_Build(t *testing.T) {
 						And(C("UserId").LT(133)).Or(C("UserId").GT(234)))
 				return s
 			}(),
-			qs: func() []*sharding.Query {
-				var res []*sharding.Query
+			qs: func() []sharding.Query {
+				var res []sharding.Query
 				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE ((`user_id`=?) AND (`user_id`<?)) OR (`user_id`>?);"
 				for b := 0; b < tableBase; b++ {
 					tableName := fmt.Sprintf(tablePattern, b)
-					res = append(res, &sharding.Query{
+					res = append(res, sharding.Query{
 						SQL:        fmt.Sprintf(sql, dbPattern, tableName),
 						Args:       []any{12, 133, 234},
 						DB:         dbPattern,
@@ -1842,7 +1848,7 @@ func TestShardingSelector_onlyTable_Build(t *testing.T) {
 					Where(C("UserId").In(12, 35, 101))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_2` WHERE `user_id` IN (?,?,?);",
 					Args:       []any{12, 35, 101},
@@ -1865,7 +1871,7 @@ func TestShardingSelector_onlyTable_Build(t *testing.T) {
 					Where(C("UserId").In(12, 35, 101).And(C("UserId").EQ(234)))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_0` WHERE (`user_id` IN (?,?,?)) AND (`user_id`=?);",
 					Args:       []any{12, 35, 101, 234},
@@ -1882,7 +1888,7 @@ func TestShardingSelector_onlyTable_Build(t *testing.T) {
 					Where(C("UserId").EQ(123).And(C("UserId").EQ(124)))
 				return s
 			}(),
-			qs: []*sharding.Query{},
+			qs: []sharding.Query{},
 		},
 	}
 
@@ -1911,23 +1917,23 @@ func TestShardingSelector_onlyDB_Build(t *testing.T) {
 			DsPattern:    &hash.Pattern{Name: dsPattern, NotSharding: true},
 		}))
 	require.NoError(t, err)
-	m := map[string]*MasterSlavesDB{
-		"order_db_0": masterSlaveMemoryDB(),
-		"order_db_1": masterSlaveMemoryDB(),
-		"order_db_2": masterSlaveMemoryDB(),
+	m := map[string]*masterslave.MasterSlavesDB{
+		"order_db_0": MasterSlavesMemoryDB(),
+		"order_db_1": MasterSlavesMemoryDB(),
+		"order_db_2": MasterSlavesMemoryDB(),
 	}
-	clusterDB := OpenClusterDB(m)
-	ds := map[string]sharding.DataSource{
+	clusterDB := cluster.NewClusterDB(m)
+	ds := map[string]datasource.DataSource{
 		"0.db.cluster.company.com:3306": clusterDB,
 	}
-	shardingDB, err := OpenShardingDB("sqlite3",
-		datasource.NewShardingDataSource(ds), ShardingDBOptionWithMetaRegistry(r))
+	shardingDB, err := OpenDS("sqlite3",
+		shardingsource.NewShardingDataSource(ds), DBOptionWithMetaRegistry(r))
 	require.NoError(t, err)
 
 	testCases := []struct {
 		name    string
 		builder sharding.QueryBuilder
-		qs      []*sharding.Query
+		qs      []sharding.Query
 		wantErr error
 	}{
 		{
@@ -1936,7 +1942,7 @@ func TestShardingSelector_onlyDB_Build(t *testing.T) {
 				s := NewShardingSelector[Order](shardingDB).Where(C("UserId").EQ(123))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `user_id`,`order_id`,`content`,`account` FROM `order_db_1`.`order_tab` WHERE `user_id`=?;",
 					Args:       []any{123},
@@ -1951,7 +1957,7 @@ func TestShardingSelector_onlyDB_Build(t *testing.T) {
 				s := NewShardingSelector[Order](shardingDB).Where(C("OrderId").EQ(123))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `user_id`,`order_id`,`content`,`account` FROM `order_db_0`.`order_tab` WHERE `order_id`=?;",
 					Args:       []any{123},
@@ -1973,7 +1979,7 @@ func TestShardingSelector_onlyDB_Build(t *testing.T) {
 					Select(Columns("Content", "OrderId")).Where(C("UserId").EQ(123))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `content`,`order_id` FROM `order_db_1`.`order_tab` WHERE `user_id`=?;",
 					Args:       []any{123},
@@ -1998,7 +2004,7 @@ func TestShardingSelector_onlyDB_Build(t *testing.T) {
 					Where(C("UserId").EQ(123)).OrderBy(ASC("UserId"), DESC("OrderId"))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab` WHERE `user_id`=? ORDER BY `user_id` ASC,`order_id` DESC;",
 					Args:       []any{123},
@@ -2014,7 +2020,7 @@ func TestShardingSelector_onlyDB_Build(t *testing.T) {
 					Where(C("UserId").EQ(123)).GroupBy("UserId", "OrderId")
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab` WHERE `user_id`=? GROUP BY `user_id`,`order_id`;",
 					Args:       []any{123},
@@ -2031,7 +2037,7 @@ func TestShardingSelector_onlyDB_Build(t *testing.T) {
 					Where(C("UserId").EQ(123)).GroupBy("OrderId").Having(C("OrderId").EQ(int64(18)))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab` WHERE `user_id`=? GROUP BY `order_id` HAVING `order_id`=?;",
 					Args:       []any{123, int64(18)},
@@ -2048,7 +2054,7 @@ func TestShardingSelector_onlyDB_Build(t *testing.T) {
 					Where(C("OrderId").EQ(int64(12)).And(C("UserId").EQ(123)))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab` WHERE (`order_id`=?) AND (`user_id`=?);",
 					Args:       []any{int64(12), 123},
@@ -2065,7 +2071,7 @@ func TestShardingSelector_onlyDB_Build(t *testing.T) {
 					Where(C("UserId").EQ(123).And(C("OrderId").EQ(int64(12))))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab` WHERE (`user_id`=?) AND (`order_id`=?);",
 					Args:       []any{123, int64(12)},
@@ -2082,7 +2088,7 @@ func TestShardingSelector_onlyDB_Build(t *testing.T) {
 					Where(C("UserId").EQ(123).Or(C("UserId").EQ(234)))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab` WHERE (`user_id`=?) OR (`user_id`=?);",
 					Args:       []any{123, 234},
@@ -2105,7 +2111,7 @@ func TestShardingSelector_onlyDB_Build(t *testing.T) {
 					Where(C("OrderId").EQ(int64(12)).Or(C("UserId").EQ(123)))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab` WHERE (`order_id`=?) OR (`user_id`=?);",
 					Args:       []any{int64(12), 123},
@@ -2128,7 +2134,7 @@ func TestShardingSelector_onlyDB_Build(t *testing.T) {
 					Where(C("UserId").EQ(123).Or(C("OrderId").EQ(int64(12))))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab` WHERE (`user_id`=?) OR (`order_id`=?);",
 					Args:       []any{123, int64(12)},
@@ -2151,7 +2157,7 @@ func TestShardingSelector_onlyDB_Build(t *testing.T) {
 					Where(C("UserId").EQ(123).And(C("OrderId").EQ(int64(12))).Or(C("UserId").EQ(234)))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab` WHERE ((`user_id`=?) AND (`order_id`=?)) OR (`user_id`=?);",
 					Args:       []any{123, int64(12), 234},
@@ -2175,7 +2181,7 @@ func TestShardingSelector_onlyDB_Build(t *testing.T) {
 						Or(C("UserId").EQ(234))))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab` WHERE (`user_id`=?) AND ((`order_id`=?) OR (`user_id`=?));",
 					Args:       []any{123, int64(12), 234},
@@ -2192,7 +2198,7 @@ func TestShardingSelector_onlyDB_Build(t *testing.T) {
 					Where(C("UserId").EQ(123).Or(C("UserId").EQ(181).And(C("UserId").EQ(234))))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
 					Args:       []any{123, 181, 234},
@@ -2210,7 +2216,7 @@ func TestShardingSelector_onlyDB_Build(t *testing.T) {
 						And(C("OrderId").EQ(int64(24))))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab` WHERE ((`user_id`=?) OR (`user_id`=?)) AND (`order_id`=?);",
 					Args:       []any{123, 234, int64(24)},
@@ -2234,7 +2240,7 @@ func TestShardingSelector_onlyDB_Build(t *testing.T) {
 						And(C("UserId").EQ(234)))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab` WHERE ((`user_id`=?) OR (`order_id`=?)) AND (`user_id`=?);",
 					Args:       []any{123, int64(12), 234},
@@ -2252,7 +2258,7 @@ func TestShardingSelector_onlyDB_Build(t *testing.T) {
 						Or(C("UserId").EQ(234)))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab` WHERE ((`user_id`=?) OR (`user_id`=?)) OR (`user_id`=?);",
 					Args:       []any{123, 253, 234},
@@ -2276,7 +2282,7 @@ func TestShardingSelector_onlyDB_Build(t *testing.T) {
 						Or(C("UserId").EQ(234)))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab` WHERE ((`user_id`=?) OR (`order_id`=?)) OR (`user_id`=?);",
 					Args:       []any{123, int64(12), 234},
@@ -2300,7 +2306,7 @@ func TestShardingSelector_onlyDB_Build(t *testing.T) {
 						And(C("OrderId").EQ(int64(23))))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab` WHERE ((`user_id`=?) AND (`order_id`=?)) AND (`order_id`=?);",
 					Args:       []any{123, int64(12), int64(23)},
@@ -2318,7 +2324,7 @@ func TestShardingSelector_onlyDB_Build(t *testing.T) {
 						Or(C("UserId").EQ(234).And(C("OrderId").EQ(int64(18)))))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab` WHERE ((`user_id`=?) AND (`order_id`=?)) OR ((`user_id`=?) AND (`order_id`=?));",
 					Args:       []any{123, int64(12), 234, int64(18)},
@@ -2340,12 +2346,12 @@ func TestShardingSelector_onlyDB_Build(t *testing.T) {
 					Select(C("OrderId"), C("Content")).Where(C("UserId").LT(1))
 				return s
 			}(),
-			qs: func() []*sharding.Query {
-				var res []*sharding.Query
+			qs: func() []sharding.Query {
+				var res []sharding.Query
 				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE `user_id`<?;"
 				for b := 0; b < dbBase; b++ {
 					dbName := fmt.Sprintf(dbPattern, b)
-					res = append(res, &sharding.Query{
+					res = append(res, sharding.Query{
 						SQL:        fmt.Sprintf(sql, dbName, tablePattern),
 						Args:       []any{1},
 						DB:         dbName,
@@ -2362,12 +2368,12 @@ func TestShardingSelector_onlyDB_Build(t *testing.T) {
 					Select(C("OrderId"), C("Content")).Where(C("UserId").LTEQ(1))
 				return s
 			}(),
-			qs: func() []*sharding.Query {
-				var res []*sharding.Query
+			qs: func() []sharding.Query {
+				var res []sharding.Query
 				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE `user_id`<=?;"
 				for b := 0; b < dbBase; b++ {
 					dbName := fmt.Sprintf(dbPattern, b)
-					res = append(res, &sharding.Query{
+					res = append(res, sharding.Query{
 						SQL:        fmt.Sprintf(sql, dbName, tablePattern),
 						Args:       []any{1},
 						DB:         dbName,
@@ -2384,7 +2390,7 @@ func TestShardingSelector_onlyDB_Build(t *testing.T) {
 					Select(C("OrderId"), C("Content")).Where(C("UserId").EQ(12).And(C("UserId").LT(133)))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab` WHERE (`user_id`=?) AND (`user_id`<?);",
 					Args:       []any{12, 133},
@@ -2400,12 +2406,12 @@ func TestShardingSelector_onlyDB_Build(t *testing.T) {
 					Select(C("OrderId"), C("Content")).Where(C("UserId").GT(1))
 				return s
 			}(),
-			qs: func() []*sharding.Query {
-				var res []*sharding.Query
+			qs: func() []sharding.Query {
+				var res []sharding.Query
 				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE `user_id`>?;"
 				for b := 0; b < dbBase; b++ {
 					dbName := fmt.Sprintf(dbPattern, b)
-					res = append(res, &sharding.Query{
+					res = append(res, sharding.Query{
 						SQL:        fmt.Sprintf(sql, dbName, tablePattern),
 						Args:       []any{1},
 						DB:         dbName,
@@ -2422,12 +2428,12 @@ func TestShardingSelector_onlyDB_Build(t *testing.T) {
 					Select(C("OrderId"), C("Content")).Where(C("UserId").GTEQ(1))
 				return s
 			}(),
-			qs: func() []*sharding.Query {
-				var res []*sharding.Query
+			qs: func() []sharding.Query {
+				var res []sharding.Query
 				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE `user_id`>=?;"
 				for b := 0; b < dbBase; b++ {
 					dbName := fmt.Sprintf(dbPattern, b)
-					res = append(res, &sharding.Query{
+					res = append(res, sharding.Query{
 						SQL:        fmt.Sprintf(sql, dbName, tablePattern),
 						Args:       []any{1},
 						DB:         dbName,
@@ -2444,7 +2450,7 @@ func TestShardingSelector_onlyDB_Build(t *testing.T) {
 					Select(C("OrderId"), C("Content")).Where(C("UserId").EQ(12).And(C("UserId").GT(133)))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab` WHERE (`user_id`=?) AND (`user_id`>?);",
 					Args:       []any{12, 133},
@@ -2462,12 +2468,12 @@ func TestShardingSelector_onlyDB_Build(t *testing.T) {
 						And(C("UserId").LT(133)).Or(C("UserId").GT(234)))
 				return s
 			}(),
-			qs: func() []*sharding.Query {
-				var res []*sharding.Query
+			qs: func() []sharding.Query {
+				var res []sharding.Query
 				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE ((`user_id`=?) AND (`user_id`<?)) OR (`user_id`>?);"
 				for b := 0; b < dbBase; b++ {
 					dbName := fmt.Sprintf(dbPattern, b)
-					res = append(res, &sharding.Query{
+					res = append(res, sharding.Query{
 						SQL:        fmt.Sprintf(sql, dbName, tablePattern),
 						Args:       []any{12, 133, 234},
 						DB:         dbName,
@@ -2485,7 +2491,7 @@ func TestShardingSelector_onlyDB_Build(t *testing.T) {
 					Where(C("UserId").In(12, 35, 101))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab` WHERE `user_id` IN (?,?,?);",
 					Args:       []any{12, 35, 101},
@@ -2508,7 +2514,7 @@ func TestShardingSelector_onlyDB_Build(t *testing.T) {
 					Where(C("UserId").In(12, 35, 101).And(C("UserId").EQ(234)))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab` WHERE (`user_id` IN (?,?,?)) AND (`user_id`=?);",
 					Args:       []any{12, 35, 101, 234},
@@ -2525,7 +2531,7 @@ func TestShardingSelector_onlyDB_Build(t *testing.T) {
 					Where(C("UserId").In(12, 35, 101).Or(C("UserId").EQ(531)))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab` WHERE (`user_id` IN (?,?,?)) OR (`user_id`=?);",
 					Args:       []any{12, 35, 101, 531},
@@ -2548,12 +2554,12 @@ func TestShardingSelector_onlyDB_Build(t *testing.T) {
 					Where(C("UserId").In(12, 35, 101).Or(C("UserId").GT(531)))
 				return s
 			}(),
-			qs: func() []*sharding.Query {
-				var res []*sharding.Query
+			qs: func() []sharding.Query {
+				var res []sharding.Query
 				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE (`user_id` IN (?,?,?)) OR (`user_id`>?);"
 				for b := 0; b < dbBase; b++ {
 					dbName := fmt.Sprintf(dbPattern, b)
-					res = append(res, &sharding.Query{
+					res = append(res, sharding.Query{
 						SQL:        fmt.Sprintf(sql, dbName, tablePattern),
 						Args:       []any{12, 35, 101, 531},
 						DB:         dbName,
@@ -2571,7 +2577,7 @@ func TestShardingSelector_onlyDB_Build(t *testing.T) {
 					Where(C("UserId").EQ(123).And(C("UserId").EQ(124)))
 				return s
 			}(),
-			qs: []*sharding.Query{},
+			qs: []sharding.Query{},
 		},
 	}
 
@@ -2600,24 +2606,24 @@ func TestShardingSelector_all_Build(t *testing.T) {
 			DsPattern:    &hash.Pattern{Name: dsPattern, Base: dsBase},
 		}))
 	require.NoError(t, err)
-	m := map[string]*MasterSlavesDB{
-		"order_db_0": masterSlaveMemoryDB(),
-		"order_db_1": masterSlaveMemoryDB(),
-		"order_db_2": masterSlaveMemoryDB(),
+	m := map[string]*masterslave.MasterSlavesDB{
+		"order_db_0": MasterSlavesMemoryDB(),
+		"order_db_1": MasterSlavesMemoryDB(),
+		"order_db_2": MasterSlavesMemoryDB(),
 	}
-	clusterDB := OpenClusterDB(m)
-	ds := map[string]sharding.DataSource{
+	clusterDB := cluster.NewClusterDB(m)
+	ds := map[string]datasource.DataSource{
 		"0.db.cluster.company.com:3306": clusterDB,
 		"1.db.cluster.company.com:3306": clusterDB,
 	}
-	shardingDB, err := OpenShardingDB("sqlite3",
-		datasource.NewShardingDataSource(ds), ShardingDBOptionWithMetaRegistry(r))
+	shardingDB, err := OpenDS("sqlite3",
+		shardingsource.NewShardingDataSource(ds), DBOptionWithMetaRegistry(r))
 	require.NoError(t, err)
 
 	testCases := []struct {
 		name    string
 		builder sharding.QueryBuilder
-		qs      []*sharding.Query
+		qs      []sharding.Query
 		wantErr error
 	}{
 		{
@@ -2626,7 +2632,7 @@ func TestShardingSelector_all_Build(t *testing.T) {
 				s := NewShardingSelector[Order](shardingDB).Where(C("UserId").EQ(123))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `user_id`,`order_id`,`content`,`account` FROM `order_db_1`.`order_tab_0` WHERE `user_id`=?;",
 					Args:       []any{123},
@@ -2641,7 +2647,7 @@ func TestShardingSelector_all_Build(t *testing.T) {
 				s := NewShardingSelector[Order](shardingDB).Where(C("OrderId").EQ(123))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `user_id`,`order_id`,`content`,`account` FROM `order_db_0`.`order_tab_0` WHERE `order_id`=?;",
 					Args:       []any{123},
@@ -2723,7 +2729,7 @@ func TestShardingSelector_all_Build(t *testing.T) {
 					Select(Columns("Content", "OrderId")).Where(C("UserId").EQ(123))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `content`,`order_id` FROM `order_db_1`.`order_tab_0` WHERE `user_id`=?;",
 					Args:       []any{123},
@@ -2748,7 +2754,7 @@ func TestShardingSelector_all_Build(t *testing.T) {
 					Where(C("UserId").EQ(123)).OrderBy(ASC("UserId"), DESC("OrderId"))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE `user_id`=? ORDER BY `user_id` ASC,`order_id` DESC;",
 					Args:       []any{123},
@@ -2764,7 +2770,7 @@ func TestShardingSelector_all_Build(t *testing.T) {
 					Where(C("UserId").EQ(123)).GroupBy("UserId", "OrderId")
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE `user_id`=? GROUP BY `user_id`,`order_id`;",
 					Args:       []any{123},
@@ -2781,7 +2787,7 @@ func TestShardingSelector_all_Build(t *testing.T) {
 					Where(C("UserId").EQ(123)).GroupBy("OrderId").Having(C("OrderId").EQ(int64(18)))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE `user_id`=? GROUP BY `order_id` HAVING `order_id`=?;",
 					Args:       []any{123, int64(18)},
@@ -2798,7 +2804,7 @@ func TestShardingSelector_all_Build(t *testing.T) {
 					Where(C("OrderId").EQ(int64(12)).And(C("UserId").EQ(123)))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE (`order_id`=?) AND (`user_id`=?);",
 					Args:       []any{int64(12), 123},
@@ -2815,7 +2821,7 @@ func TestShardingSelector_all_Build(t *testing.T) {
 					Where(C("UserId").EQ(123).And(C("OrderId").EQ(int64(12))))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE (`user_id`=?) AND (`order_id`=?);",
 					Args:       []any{123, int64(12)},
@@ -2832,7 +2838,7 @@ func TestShardingSelector_all_Build(t *testing.T) {
 					Where(C("UserId").EQ(123).Or(C("UserId").EQ(234)))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE (`user_id`=?) OR (`user_id`=?);",
 					Args:       []any{123, 234},
@@ -2855,7 +2861,7 @@ func TestShardingSelector_all_Build(t *testing.T) {
 					Where(C("OrderId").EQ(int64(12)).Or(C("UserId").EQ(123)))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_0` WHERE (`order_id`=?) OR (`user_id`=?);",
 					Args:       []any{int64(12), 123},
@@ -2938,7 +2944,7 @@ func TestShardingSelector_all_Build(t *testing.T) {
 					Where(C("UserId").EQ(123).Or(C("OrderId").EQ(int64(12))))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_0` WHERE (`user_id`=?) OR (`order_id`=?);",
 					Args:       []any{123, int64(12)},
@@ -3021,7 +3027,7 @@ func TestShardingSelector_all_Build(t *testing.T) {
 					Where(C("UserId").EQ(123).And(C("OrderId").EQ(int64(12))).Or(C("UserId").EQ(234)))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE ((`user_id`=?) AND (`order_id`=?)) OR (`user_id`=?);",
 					Args:       []any{123, int64(12), 234},
@@ -3045,7 +3051,7 @@ func TestShardingSelector_all_Build(t *testing.T) {
 						Or(C("UserId").EQ(234))))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE (`user_id`=?) AND ((`order_id`=?) OR (`user_id`=?));",
 					Args:       []any{123, int64(12), 234},
@@ -3062,7 +3068,7 @@ func TestShardingSelector_all_Build(t *testing.T) {
 					Where(C("UserId").EQ(123).Or(C("UserId").EQ(181).And(C("UserId").EQ(234))))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
 					Args:       []any{123, 181, 234},
@@ -3080,7 +3086,7 @@ func TestShardingSelector_all_Build(t *testing.T) {
 						And(C("OrderId").EQ(int64(24))))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE ((`user_id`=?) OR (`user_id`=?)) AND (`order_id`=?);",
 					Args:       []any{123, 234, int64(24)},
@@ -3104,7 +3110,7 @@ func TestShardingSelector_all_Build(t *testing.T) {
 						And(C("UserId").EQ(234)))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_0` WHERE ((`user_id`=?) OR (`order_id`=?)) AND (`user_id`=?);",
 					Args:       []any{123, int64(12), 234},
@@ -3122,7 +3128,7 @@ func TestShardingSelector_all_Build(t *testing.T) {
 						Or(C("UserId").EQ(234)))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE ((`user_id`=?) OR (`user_id`=?)) OR (`user_id`=?);",
 					Args:       []any{123, 253, 234},
@@ -3152,7 +3158,7 @@ func TestShardingSelector_all_Build(t *testing.T) {
 						Or(C("UserId").EQ(234)))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_0` WHERE ((`user_id`=?) OR (`order_id`=?)) OR (`user_id`=?);",
 					Args:       []any{123, int64(12), 234},
@@ -3236,7 +3242,7 @@ func TestShardingSelector_all_Build(t *testing.T) {
 						And(C("OrderId").EQ(int64(23))))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE ((`user_id`=?) AND (`order_id`=?)) AND (`order_id`=?);",
 					Args:       []any{123, int64(12), int64(23)},
@@ -3254,7 +3260,7 @@ func TestShardingSelector_all_Build(t *testing.T) {
 						Or(C("UserId").EQ(234).And(C("OrderId").EQ(int64(18)))))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE ((`user_id`=?) AND (`order_id`=?)) OR ((`user_id`=?) AND (`order_id`=?));",
 					Args:       []any{123, int64(12), 234, int64(18)},
@@ -3276,8 +3282,8 @@ func TestShardingSelector_all_Build(t *testing.T) {
 					Select(C("OrderId"), C("Content")).Where(C("UserId").LT(1))
 				return s
 			}(),
-			qs: func() []*sharding.Query {
-				var res []*sharding.Query
+			qs: func() []sharding.Query {
+				var res []sharding.Query
 				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE `user_id`<?;"
 				for a := 0; a < dsBase; a++ {
 					dsName := fmt.Sprintf(dsPattern, a)
@@ -3285,7 +3291,7 @@ func TestShardingSelector_all_Build(t *testing.T) {
 						dbName := fmt.Sprintf(dbPattern, b)
 						for c := 0; c < tableBase; c++ {
 							tableName := fmt.Sprintf(tablePattern, c)
-							res = append(res, &sharding.Query{
+							res = append(res, sharding.Query{
 								SQL:        fmt.Sprintf(sql, dbName, tableName),
 								Args:       []any{1},
 								DB:         dbName,
@@ -3304,8 +3310,8 @@ func TestShardingSelector_all_Build(t *testing.T) {
 					Select(C("OrderId"), C("Content")).Where(C("UserId").LTEQ(1))
 				return s
 			}(),
-			qs: func() []*sharding.Query {
-				var res []*sharding.Query
+			qs: func() []sharding.Query {
+				var res []sharding.Query
 				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE `user_id`<=?;"
 				for a := 0; a < dsBase; a++ {
 					dsName := fmt.Sprintf(dsPattern, a)
@@ -3313,7 +3319,7 @@ func TestShardingSelector_all_Build(t *testing.T) {
 						dbName := fmt.Sprintf(dbPattern, b)
 						for c := 0; c < tableBase; c++ {
 							tableName := fmt.Sprintf(tablePattern, c)
-							res = append(res, &sharding.Query{
+							res = append(res, sharding.Query{
 								SQL:        fmt.Sprintf(sql, dbName, tableName),
 								Args:       []any{1},
 								DB:         dbName,
@@ -3332,7 +3338,7 @@ func TestShardingSelector_all_Build(t *testing.T) {
 					Select(C("OrderId"), C("Content")).Where(C("UserId").EQ(12).And(C("UserId").LT(133)))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_0` WHERE (`user_id`=?) AND (`user_id`<?);",
 					Args:       []any{12, 133},
@@ -3348,8 +3354,8 @@ func TestShardingSelector_all_Build(t *testing.T) {
 					Select(C("OrderId"), C("Content")).Where(C("UserId").GT(1))
 				return s
 			}(),
-			qs: func() []*sharding.Query {
-				var res []*sharding.Query
+			qs: func() []sharding.Query {
+				var res []sharding.Query
 				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE `user_id`>?;"
 				for a := 0; a < dsBase; a++ {
 					dsName := fmt.Sprintf(dsPattern, a)
@@ -3357,7 +3363,7 @@ func TestShardingSelector_all_Build(t *testing.T) {
 						dbName := fmt.Sprintf(dbPattern, b)
 						for c := 0; c < tableBase; c++ {
 							tableName := fmt.Sprintf(tablePattern, c)
-							res = append(res, &sharding.Query{
+							res = append(res, sharding.Query{
 								SQL:        fmt.Sprintf(sql, dbName, tableName),
 								Args:       []any{1},
 								DB:         dbName,
@@ -3376,8 +3382,8 @@ func TestShardingSelector_all_Build(t *testing.T) {
 					Select(C("OrderId"), C("Content")).Where(C("UserId").GTEQ(1))
 				return s
 			}(),
-			qs: func() []*sharding.Query {
-				var res []*sharding.Query
+			qs: func() []sharding.Query {
+				var res []sharding.Query
 				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE `user_id`>=?;"
 				for a := 0; a < dsBase; a++ {
 					dsName := fmt.Sprintf(dsPattern, a)
@@ -3385,7 +3391,7 @@ func TestShardingSelector_all_Build(t *testing.T) {
 						dbName := fmt.Sprintf(dbPattern, b)
 						for c := 0; c < tableBase; c++ {
 							tableName := fmt.Sprintf(tablePattern, c)
-							res = append(res, &sharding.Query{
+							res = append(res, sharding.Query{
 								SQL:        fmt.Sprintf(sql, dbName, tableName),
 								Args:       []any{1},
 								DB:         dbName,
@@ -3404,7 +3410,7 @@ func TestShardingSelector_all_Build(t *testing.T) {
 					Select(C("OrderId"), C("Content")).Where(C("UserId").EQ(12).And(C("UserId").GT(133)))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_0` WHERE (`user_id`=?) AND (`user_id`>?);",
 					Args:       []any{12, 133},
@@ -3422,8 +3428,8 @@ func TestShardingSelector_all_Build(t *testing.T) {
 						And(C("UserId").LT(133)).Or(C("UserId").GT(234)))
 				return s
 			}(),
-			qs: func() []*sharding.Query {
-				var res []*sharding.Query
+			qs: func() []sharding.Query {
+				var res []sharding.Query
 				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE ((`user_id`=?) AND (`user_id`<?)) OR (`user_id`>?);"
 				for a := 0; a < dsBase; a++ {
 					dsName := fmt.Sprintf(dsPattern, a)
@@ -3431,7 +3437,7 @@ func TestShardingSelector_all_Build(t *testing.T) {
 						dbName := fmt.Sprintf(dbPattern, b)
 						for c := 0; c < tableBase; c++ {
 							tableName := fmt.Sprintf(tablePattern, c)
-							res = append(res, &sharding.Query{
+							res = append(res, sharding.Query{
 								SQL:        fmt.Sprintf(sql, dbName, tableName),
 								Args:       []any{12, 133, 234},
 								DB:         dbName,
@@ -3451,7 +3457,7 @@ func TestShardingSelector_all_Build(t *testing.T) {
 					Where(C("UserId").In(12, 35, 101))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_0` WHERE `user_id` IN (?,?,?);",
 					Args:       []any{12, 35, 101},
@@ -3474,7 +3480,7 @@ func TestShardingSelector_all_Build(t *testing.T) {
 					Where(C("UserId").In(12, 35, 101).And(C("UserId").EQ(234)))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_0` WHERE (`user_id` IN (?,?,?)) AND (`user_id`=?);",
 					Args:       []any{12, 35, 101, 234},
@@ -3491,7 +3497,7 @@ func TestShardingSelector_all_Build(t *testing.T) {
 					Where(C("UserId").In(12, 35, 101).Or(C("UserId").EQ(531)))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_0` WHERE (`user_id` IN (?,?,?)) OR (`user_id`=?);",
 					Args:       []any{12, 35, 101, 531},
@@ -3520,8 +3526,8 @@ func TestShardingSelector_all_Build(t *testing.T) {
 					Where(C("UserId").In(12, 35, 101).Or(C("UserId").GT(531)))
 				return s
 			}(),
-			qs: func() []*sharding.Query {
-				var res []*sharding.Query
+			qs: func() []sharding.Query {
+				var res []sharding.Query
 				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE (`user_id` IN (?,?,?)) OR (`user_id`>?);"
 				for a := 0; a < dsBase; a++ {
 					dsName := fmt.Sprintf(dsPattern, a)
@@ -3529,7 +3535,7 @@ func TestShardingSelector_all_Build(t *testing.T) {
 						dbName := fmt.Sprintf(dbPattern, b)
 						for c := 0; c < tableBase; c++ {
 							tableName := fmt.Sprintf(tablePattern, c)
-							res = append(res, &sharding.Query{
+							res = append(res, sharding.Query{
 								SQL:        fmt.Sprintf(sql, dbName, tableName),
 								Args:       []any{12, 35, 101, 531},
 								DB:         dbName,
@@ -3549,7 +3555,7 @@ func TestShardingSelector_all_Build(t *testing.T) {
 					Where(C("UserId").EQ(123).And(C("UserId").EQ(124)))
 				return s
 			}(),
-			qs: []*sharding.Query{},
+			qs: []sharding.Query{},
 		},
 	}
 
@@ -3579,25 +3585,33 @@ func TestShardingSelector_Build(t *testing.T) {
 		}))
 	require.NoError(t, err)
 
-	m := map[string]*MasterSlavesDB{
-		"order_db_0": masterSlaveMemoryDB(),
-		"order_db_1": masterSlaveMemoryDB(),
-		"order_db_2": masterSlaveMemoryDB(),
+	m := map[string]*masterslave.MasterSlavesDB{
+		"order_db_0": MasterSlavesMemoryDB(),
+		"order_db_1": MasterSlavesMemoryDB(),
+		"order_db_2": MasterSlavesMemoryDB(),
 	}
-	clusterDB := OpenClusterDB(m)
-	ds := map[string]sharding.DataSource{
+	clusterDB := cluster.NewClusterDB(m)
+	ds := map[string]datasource.DataSource{
 		"0.db.cluster.company.com:3306": clusterDB,
 	}
-	shardingDB, err := OpenShardingDB("sqlite3",
-		datasource.NewShardingDataSource(ds), ShardingDBOptionWithMetaRegistry(r))
+	shardingDB, err := OpenDS("sqlite3",
+		shardingsource.NewShardingDataSource(ds), DBOptionWithMetaRegistry(r))
 	require.NoError(t, err)
 
 	testCases := []struct {
 		name    string
 		builder sharding.QueryBuilder
-		qs      []*sharding.Query
+		qs      []sharding.Query
 		wantErr error
 	}{
+		{
+			name: "too complex operator",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).Where(C("Content").Like("%kfc"))
+				return s
+			}(),
+			wantErr: errs.NewUnsupportedOperatorError(opLike.Text),
+		},
 		{
 			name: "too complex expr",
 			builder: func() sharding.QueryBuilder {
@@ -3614,11 +3628,11 @@ func TestShardingSelector_Build(t *testing.T) {
 					model.WithTableShardingAlgorithm(&hash.Hash{}))
 				require.NoError(t, err)
 				require.NotNil(t, meta.ShardingAlgorithm)
-				db, err := OpenShardingDB("sqlite3",
-					datasource.NewShardingDataSource(map[string]sharding.DataSource{
-						"0.db.cluster.company.com:3306": masterSlaveMemoryDB(),
+				db, err := OpenDS("sqlite3",
+					shardingsource.NewShardingDataSource(map[string]datasource.DataSource{
+						"0.db.cluster.company.com:3306": MasterSlavesMemoryDB(),
 					}),
-					ShardingDBOptionWithMetaRegistry(reg))
+					DBOptionWithMetaRegistry(reg))
 				require.NoError(t, err)
 				s := NewShardingSelector[Order](db).Where(C("UserId").EQ(123))
 				return s
@@ -3631,7 +3645,7 @@ func TestShardingSelector_Build(t *testing.T) {
 				s := NewShardingSelector[Order](shardingDB).Where(C("UserId").EQ(123))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `user_id`,`order_id`,`content`,`account` FROM `order_db_1`.`order_tab_0` WHERE `user_id`=?;",
 					Args:       []any{123},
@@ -3646,7 +3660,7 @@ func TestShardingSelector_Build(t *testing.T) {
 				s := NewShardingSelector[Order](shardingDB).Where(C("OrderId").EQ(123))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `user_id`,`order_id`,`content`,`account` FROM `order_db_0`.`order_tab_0` WHERE `order_id`=?;",
 					Args:       []any{123},
@@ -3692,7 +3706,7 @@ func TestShardingSelector_Build(t *testing.T) {
 					Select(Columns("Content", "OrderId")).Where(C("UserId").EQ(123))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `content`,`order_id` FROM `order_db_1`.`order_tab_0` WHERE `user_id`=?;",
 					Args:       []any{123},
@@ -3717,7 +3731,7 @@ func TestShardingSelector_Build(t *testing.T) {
 					Where(C("UserId").EQ(123)).OrderBy(ASC("UserId"), DESC("OrderId"))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE `user_id`=? ORDER BY `user_id` ASC,`order_id` DESC;",
 					Args:       []any{123},
@@ -3733,7 +3747,7 @@ func TestShardingSelector_Build(t *testing.T) {
 					Where(C("UserId").EQ(123)).GroupBy("UserId", "OrderId")
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE `user_id`=? GROUP BY `user_id`,`order_id`;",
 					Args:       []any{123},
@@ -3750,7 +3764,7 @@ func TestShardingSelector_Build(t *testing.T) {
 					Where(C("UserId").EQ(123)).GroupBy("OrderId").Having(C("OrderId").EQ(int64(18)))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE `user_id`=? GROUP BY `order_id` HAVING `order_id`=?;",
 					Args:       []any{123, int64(18)},
@@ -3767,7 +3781,7 @@ func TestShardingSelector_Build(t *testing.T) {
 					Where(C("OrderId").EQ(int64(12)).And(C("UserId").EQ(123)))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE (`order_id`=?) AND (`user_id`=?);",
 					Args:       []any{int64(12), 123},
@@ -3784,7 +3798,7 @@ func TestShardingSelector_Build(t *testing.T) {
 					Where(C("UserId").EQ(123).And(C("OrderId").EQ(int64(12))))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE (`user_id`=?) AND (`order_id`=?);",
 					Args:       []any{123, int64(12)},
@@ -3801,7 +3815,7 @@ func TestShardingSelector_Build(t *testing.T) {
 					Where(C("UserId").EQ(123).Or(C("UserId").EQ(234)))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE (`user_id`=?) OR (`user_id`=?);",
 					Args:       []any{123, 234},
@@ -3824,7 +3838,7 @@ func TestShardingSelector_Build(t *testing.T) {
 					Where(C("OrderId").EQ(int64(12)).Or(C("UserId").EQ(123)))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_0` WHERE (`order_id`=?) OR (`user_id`=?);",
 					Args:       []any{int64(12), 123},
@@ -3871,7 +3885,7 @@ func TestShardingSelector_Build(t *testing.T) {
 					Where(C("UserId").EQ(123).Or(C("OrderId").EQ(int64(12))))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_0` WHERE (`user_id`=?) OR (`order_id`=?);",
 					Args:       []any{123, int64(12)},
@@ -3918,7 +3932,7 @@ func TestShardingSelector_Build(t *testing.T) {
 					Where(C("UserId").EQ(123).And(C("OrderId").EQ(int64(12))).Or(C("UserId").EQ(234)))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE ((`user_id`=?) AND (`order_id`=?)) OR (`user_id`=?);",
 					Args:       []any{123, int64(12), 234},
@@ -3942,7 +3956,7 @@ func TestShardingSelector_Build(t *testing.T) {
 						Or(C("UserId").EQ(234))))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE (`user_id`=?) AND ((`order_id`=?) OR (`user_id`=?));",
 					Args:       []any{123, int64(12), 234},
@@ -3959,7 +3973,7 @@ func TestShardingSelector_Build(t *testing.T) {
 					Where(C("UserId").EQ(123).Or(C("UserId").EQ(181).And(C("UserId").EQ(234))))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE (`user_id`=?) OR ((`user_id`=?) AND (`user_id`=?));",
 					Args:       []any{123, 181, 234},
@@ -3977,7 +3991,7 @@ func TestShardingSelector_Build(t *testing.T) {
 						And(C("OrderId").EQ(int64(24))))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE ((`user_id`=?) OR (`user_id`=?)) AND (`order_id`=?);",
 					Args:       []any{123, 234, int64(24)},
@@ -4001,7 +4015,7 @@ func TestShardingSelector_Build(t *testing.T) {
 						And(C("UserId").EQ(234)))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_0` WHERE ((`user_id`=?) OR (`order_id`=?)) AND (`user_id`=?);",
 					Args:       []any{123, int64(12), 234},
@@ -4019,7 +4033,7 @@ func TestShardingSelector_Build(t *testing.T) {
 						Or(C("UserId").EQ(234)))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE ((`user_id`=?) OR (`user_id`=?)) OR (`user_id`=?);",
 					Args:       []any{123, 253, 234},
@@ -4049,7 +4063,7 @@ func TestShardingSelector_Build(t *testing.T) {
 						Or(C("UserId").EQ(234)))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_0` WHERE ((`user_id`=?) OR (`order_id`=?)) OR (`user_id`=?);",
 					Args:       []any{123, int64(12), 234},
@@ -4097,7 +4111,7 @@ func TestShardingSelector_Build(t *testing.T) {
 						And(C("OrderId").EQ(int64(23))))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE ((`user_id`=?) AND (`order_id`=?)) AND (`order_id`=?);",
 					Args:       []any{123, int64(12), int64(23)},
@@ -4115,7 +4129,7 @@ func TestShardingSelector_Build(t *testing.T) {
 						Or(C("UserId").EQ(234).And(C("OrderId").EQ(int64(18)))))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_0` WHERE ((`user_id`=?) AND (`order_id`=?)) OR ((`user_id`=?) AND (`order_id`=?));",
 					Args:       []any{123, int64(12), 234, int64(18)},
@@ -4137,14 +4151,14 @@ func TestShardingSelector_Build(t *testing.T) {
 					Select(C("OrderId"), C("Content")).Where(C("UserId").LT(1))
 				return s
 			}(),
-			qs: func() []*sharding.Query {
-				var res []*sharding.Query
+			qs: func() []sharding.Query {
+				var res []sharding.Query
 				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE `user_id`<?;"
 				for i := 0; i < dbBase; i++ {
 					dbName := fmt.Sprintf(dbPattern, i)
 					for j := 0; j < tableBase; j++ {
 						tableName := fmt.Sprintf(tablePattern, j)
-						res = append(res, &sharding.Query{
+						res = append(res, sharding.Query{
 							SQL:        fmt.Sprintf(sql, dbName, tableName),
 							Args:       []any{1},
 							DB:         dbName,
@@ -4162,14 +4176,14 @@ func TestShardingSelector_Build(t *testing.T) {
 					Select(C("OrderId"), C("Content")).Where(C("UserId").LTEQ(1))
 				return s
 			}(),
-			qs: func() []*sharding.Query {
-				var res []*sharding.Query
+			qs: func() []sharding.Query {
+				var res []sharding.Query
 				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE `user_id`<=?;"
 				for i := 0; i < dbBase; i++ {
 					dbName := fmt.Sprintf(dbPattern, i)
 					for j := 0; j < tableBase; j++ {
 						tableName := fmt.Sprintf(tablePattern, j)
-						res = append(res, &sharding.Query{
+						res = append(res, sharding.Query{
 							SQL:        fmt.Sprintf(sql, dbName, tableName),
 							Args:       []any{1},
 							DB:         dbName,
@@ -4187,14 +4201,14 @@ func TestShardingSelector_Build(t *testing.T) {
 					Select(C("OrderId"), C("Content")).Where(C("UserId").GT(1))
 				return s
 			}(),
-			qs: func() []*sharding.Query {
-				var res []*sharding.Query
+			qs: func() []sharding.Query {
+				var res []sharding.Query
 				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE `user_id`>?;"
 				for i := 0; i < dbBase; i++ {
 					dbName := fmt.Sprintf(dbPattern, i)
 					for j := 0; j < tableBase; j++ {
 						tableName := fmt.Sprintf(tablePattern, j)
-						res = append(res, &sharding.Query{
+						res = append(res, sharding.Query{
 							SQL:        fmt.Sprintf(sql, dbName, tableName),
 							Args:       []any{1},
 							DB:         dbName,
@@ -4212,14 +4226,14 @@ func TestShardingSelector_Build(t *testing.T) {
 					Select(C("OrderId"), C("Content")).Where(C("UserId").GTEQ(1))
 				return s
 			}(),
-			qs: func() []*sharding.Query {
-				var res []*sharding.Query
+			qs: func() []sharding.Query {
+				var res []sharding.Query
 				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE `user_id`>=?;"
 				for i := 0; i < dbBase; i++ {
 					dbName := fmt.Sprintf(dbPattern, i)
 					for j := 0; j < tableBase; j++ {
 						tableName := fmt.Sprintf(tablePattern, j)
-						res = append(res, &sharding.Query{
+						res = append(res, sharding.Query{
 							SQL:        fmt.Sprintf(sql, dbName, tableName),
 							Args:       []any{1},
 							DB:         dbName,
@@ -4239,14 +4253,14 @@ func TestShardingSelector_Build(t *testing.T) {
 						And(C("UserId").LT(133)).Or(C("UserId").GT(234)))
 				return s
 			}(),
-			qs: func() []*sharding.Query {
-				var res []*sharding.Query
+			qs: func() []sharding.Query {
+				var res []sharding.Query
 				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE ((`user_id`=?) AND (`user_id`<?)) OR (`user_id`>?);"
 				for i := 0; i < dbBase; i++ {
 					dbName := fmt.Sprintf(dbPattern, i)
 					for j := 0; j < tableBase; j++ {
 						tableName := fmt.Sprintf(tablePattern, j)
-						res = append(res, &sharding.Query{
+						res = append(res, sharding.Query{
 							SQL:        fmt.Sprintf(sql, dbName, tableName),
 							Args:       []any{12, 133, 234},
 							DB:         dbName,
@@ -4265,7 +4279,7 @@ func TestShardingSelector_Build(t *testing.T) {
 					Where(C("UserId").In(12, 35, 101))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_0` WHERE `user_id` IN (?,?,?);",
 					Args:       []any{12, 35, 101},
@@ -4288,7 +4302,7 @@ func TestShardingSelector_Build(t *testing.T) {
 					Where(C("UserId").In(12, 35, 101).And(C("UserId").EQ(234)))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_0` WHERE (`user_id` IN (?,?,?)) AND (`user_id`=?);",
 					Args:       []any{12, 35, 101, 234},
@@ -4305,7 +4319,7 @@ func TestShardingSelector_Build(t *testing.T) {
 					Where(C("UserId").In(12, 35, 101).Or(C("UserId").EQ(531)))
 				return s
 			}(),
-			qs: []*sharding.Query{
+			qs: []sharding.Query{
 				{
 					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_0` WHERE (`user_id` IN (?,?,?)) OR (`user_id`=?);",
 					Args:       []any{12, 35, 101, 531},
@@ -4334,14 +4348,14 @@ func TestShardingSelector_Build(t *testing.T) {
 					Where(C("UserId").In(12, 35, 101).Or(C("UserId").GT(531)))
 				return s
 			}(),
-			qs: func() []*sharding.Query {
-				var res []*sharding.Query
+			qs: func() []sharding.Query {
+				var res []sharding.Query
 				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE (`user_id` IN (?,?,?)) OR (`user_id`>?);"
 				for i := 0; i < dbBase; i++ {
 					dbName := fmt.Sprintf(dbPattern, i)
 					for j := 0; j < tableBase; j++ {
 						tableName := fmt.Sprintf(tablePattern, j)
-						res = append(res, &sharding.Query{
+						res = append(res, sharding.Query{
 							SQL:        fmt.Sprintf(sql, dbName, tableName),
 							Args:       []any{12, 35, 101, 531},
 							DB:         dbName,
@@ -4360,14 +4374,14 @@ func TestShardingSelector_Build(t *testing.T) {
 					Where(C("UserId").GTEQ(12).And(C("UserId").LTEQ(531)))
 				return s
 			}(),
-			qs: func() []*sharding.Query {
-				var res []*sharding.Query
+			qs: func() []sharding.Query {
+				var res []sharding.Query
 				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE (`user_id`>=?) AND (`user_id`<=?);"
 				for i := 0; i < dbBase; i++ {
 					dbName := fmt.Sprintf(dbPattern, i)
 					for j := 0; j < tableBase; j++ {
 						tableName := fmt.Sprintf(tablePattern, j)
-						res = append(res, &sharding.Query{
+						res = append(res, sharding.Query{
 							SQL:        fmt.Sprintf(sql, dbName, tableName),
 							Args:       []any{12, 531},
 							DB:         dbName,
@@ -4386,7 +4400,7 @@ func TestShardingSelector_Build(t *testing.T) {
 					Where(C("UserId").EQ(123).And(C("UserId").EQ(124)))
 				return s
 			}(),
-			qs: []*sharding.Query{},
+			qs: []sharding.Query{},
 		},
 	}
 
@@ -4423,15 +4437,15 @@ func TestShardingSelector_Get(t *testing.T) {
 
 	rbSlaves, err := roundrobin.NewSlaves(mockDB)
 	require.NoError(t, err)
-	masterSlaveDB, err := OpenMasterSlaveDB("mysql",
-		mockDB, MasterSlaveWithSlaves(newMockSlaveNameGet(rbSlaves)))
+	masterSlaveDB := masterslave.NewMasterSlavesDB(
+		mockDB, masterslave.MasterSlavesWithSlaves(newMockSlaveNameGet(rbSlaves)))
 	require.NoError(t, err)
 
-	m := map[string]sharding.DataSource{
+	m := map[string]datasource.DataSource{
 		"0.db.slave.company.com:3306": masterSlaveDB,
 	}
-	shardingDB, err := OpenShardingDB("mysql",
-		datasource.NewShardingDataSource(m), ShardingDBOptionWithMetaRegistry(r))
+	shardingDB, err := OpenDS("mysql",
+		shardingsource.NewShardingDataSource(m), DBOptionWithMetaRegistry(r))
 	require.NoError(t, err)
 
 	testCases := []struct {

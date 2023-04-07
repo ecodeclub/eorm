@@ -21,6 +21,8 @@ import (
 	"github.com/valyala/bytebufferpool"
 )
 
+var _ QueryBuilder = &Selector[any]{}
+
 // Selector select 构造器
 type Selector[T any] struct {
 	Session
@@ -53,12 +55,12 @@ func (s *Selector[T]) tableOf() any {
 }
 
 // Build returns Select Query
-func (s *Selector[T]) Build() (*Query, error) {
+func (s *Selector[T]) Build() (Query, error) {
 	defer bytebufferpool.Put(s.buffer)
 	var err error
 	s.meta, err = s.metaRegistry.Get(s.tableOf())
 	if err != nil {
-		return nil, err
+		return EmptyQuery, err
 	}
 	s.writeString("SELECT ")
 	if s.distinct {
@@ -68,28 +70,28 @@ func (s *Selector[T]) Build() (*Query, error) {
 		switch s.table.(type) {
 		case Table, nil:
 			if err = s.buildAllColumns(); err != nil {
-				return nil, err
+				return EmptyQuery, err
 			}
 		default:
-			return nil, errs.NewMustSpecifyColumnsError()
+			return EmptyQuery, errs.NewMustSpecifyColumnsError()
 		}
 	} else {
 		err = s.buildSelectedList()
 		if err != nil {
-			return nil, err
+			return EmptyQuery, err
 		}
 	}
 	s.writeString(" FROM ")
 
 	if err = s.buildTable(s.table); err != nil {
-		return nil, err
+		return EmptyQuery, err
 	}
 
 	if len(s.where) > 0 {
 		s.writeString(" WHERE ")
 		err = s.buildPredicates(s.where)
 		if err != nil {
-			return nil, err
+			return EmptyQuery, err
 		}
 	}
 
@@ -97,7 +99,7 @@ func (s *Selector[T]) Build() (*Query, error) {
 	if len(s.groupBy) > 0 {
 		err = s.buildGroupBy()
 		if err != nil {
-			return nil, err
+			return EmptyQuery, err
 		}
 	}
 
@@ -105,7 +107,7 @@ func (s *Selector[T]) Build() (*Query, error) {
 	if len(s.orderBy) > 0 {
 		err = s.buildOrderBy()
 		if err != nil {
-			return nil, err
+			return EmptyQuery, err
 		}
 	}
 
@@ -114,7 +116,7 @@ func (s *Selector[T]) Build() (*Query, error) {
 		s.writeString(" HAVING ")
 		err = s.buildPredicates(s.having)
 		if err != nil {
-			return nil, err
+			return EmptyQuery, err
 		}
 	}
 
@@ -128,7 +130,7 @@ func (s *Selector[T]) Build() (*Query, error) {
 		s.parameter(s.limit)
 	}
 	s.end()
-	return &Query{SQL: s.buffer.String(), Args: s.args}, nil
+	return Query{SQL: s.buffer.String(), Args: s.args}, nil
 }
 
 func (s *Selector[T]) buildTable(table TableReference) error {

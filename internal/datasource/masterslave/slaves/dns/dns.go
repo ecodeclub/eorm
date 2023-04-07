@@ -17,6 +17,7 @@ package dns
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"log"
 	"net"
 	"strconv"
@@ -24,10 +25,12 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ecodeclub/eorm/internal/errs"
-	"github.com/ecodeclub/eorm/internal/slaves"
-	"github.com/ecodeclub/eorm/internal/slaves/dns/mysql"
+	"go.uber.org/multierr"
 
+	"github.com/ecodeclub/eorm/internal/datasource/masterslave/slaves"
+	"github.com/ecodeclub/eorm/internal/datasource/masterslave/slaves/dns/mysql"
+
+	"github.com/ecodeclub/eorm/internal/errs"
 	_ "github.com/go-sql-driver/mysql"
 )
 
@@ -189,8 +192,22 @@ func (s *Slaves) getSlaves(ctx context.Context) error {
 	return nil
 }
 
-func (s *Slaves) Close() {
+func (s *Slaves) Close() error {
+	var err error
 	s.once.Do(func() {
 		close(s.closeCh)
+		err = s.closeDB()
 	})
+	return err
+}
+
+func (s *Slaves) closeDB() error {
+	var err error
+	for _, inst := range s.slaves {
+		if er := inst.Close(); er != nil {
+			err = multierr.Combine(
+				err, fmt.Errorf("slave DB name [%s] error: %w", inst.SlaveName, er))
+		}
+	}
+	return err
 }
