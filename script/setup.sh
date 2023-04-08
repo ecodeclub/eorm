@@ -34,7 +34,7 @@ test -x $TARGET_PUSH || chmod +x $TARGET_PUSH
 test -x $TARGET_COMMIT || chmod +x $TARGET_COMMIT
 
 echo "安装 golangci-lint..."
-go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.52.2
 
 echo "安装 goimports..."
 go install golang.org/x/tools/cmd/goimports@latest
