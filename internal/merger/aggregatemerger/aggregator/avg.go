@@ -20,53 +20,62 @@ import (
 	"github.com/ecodeclub/eorm/internal/merger/internal/errs"
 )
 
+// AVG 用于求平均值，通过sum/count求得。
+// AVG 我们并不能预期在不同的数据库上，精度会不会损失，自己损失的话会有多少的损失。这很大程度上跟数据库类型，数据库驱动实现都有关
 type AVG struct {
-	colInfos []ColInfo
-	alias    string
+	sumColumnInfo   ColumnInfo
+	countColumnInfo ColumnInfo
+	alias           string
 }
 
-func (s *AVG) Aggregate(cols [][]any) (any, error) {
-	var sumKind, countKind reflect.Kind
-	if len(cols) >= 1 && len(cols[0]) == 2 {
-		sumKind = reflect.TypeOf(cols[0][0]).Kind()
-		countKind = reflect.TypeOf(cols[0][1]).Kind()
-	} else {
-		return nil, errs.ErrMergerAggregateParticipant
-	}
-	return avgAggregateFuncMapping[[2]reflect.Kind{sumKind, countKind}](cols)
-}
-
-func (s *AVG) ColumnInfo() []ColInfo {
-	return s.colInfos
-}
-func (s *AVG) ColumnName() string {
-	return s.alias
-}
-
-func NewAVG(sumInfo ColInfo, countInfo ColInfo, alias string) *AVG {
-	colInfos := []ColInfo{
-		sumInfo,
-		countInfo,
-	}
+// NewAVG sumInfo是sum的信息，countInfo是count的信息，这两个顺序不能颠倒。
+func NewAVG(sumInfo ColumnInfo, countInfo ColumnInfo, alias string) *AVG {
 	return &AVG{
-		colInfos: colInfos,
-		alias:    alias,
+		sumColumnInfo:   sumInfo,
+		countColumnInfo: countInfo,
+		alias:           alias,
 	}
 }
 
-func avgAggregator[S AggregateElement, C AggregateElement](cols [][]any) (any, error) {
+func (a *AVG) Aggregate(cols [][]any) (any, error) {
+	sumIndex := a.sumColumnInfo.Index
+	countIndex := a.countColumnInfo.Index
+	if sumIndex >= len(cols[0]) || sumIndex < 0 || countIndex >= len(cols[0]) || countIndex < 0 {
+		return nil, errs.ErrMergerInvalidAggregateColumnIndex
+	}
+	ok, avgFunc := a.findSumAndCountReflectKindBy(cols[0][sumIndex], cols[0][countIndex])
+	if !ok {
+		return nil, errs.ErrMergerAggregateFuncNotFound
+	}
+	return avgFunc(cols, sumIndex, countIndex)
+
+}
+
+func (a *AVG) findSumAndCountReflectKindBy(sum, count any) (bool, func([][]any, int, int) (any, error)) {
+	sumKind := reflect.TypeOf(sum).Kind()
+	countKind := reflect.TypeOf(count).Kind()
+	val, ok := avgAggregateFuncMapping[[2]reflect.Kind{sumKind, countKind}]
+	return ok, val
+}
+
+func (a *AVG) ColumnName() string {
+	return a.alias
+}
+
+// avgAggregator cols就是上面Aggregate的入参cols可以参Aggregate的描述
+func avgAggregator[S AggregateElement, C AggregateElement](cols [][]any, sumIndex int, countIndex int) (any, error) {
 	var sum S
 	var count C
 	for _, col := range cols {
-		sum += col[0].(S)
-		count += col[1].(C)
+		sum += col[sumIndex].(S)
+		count += col[countIndex].(C)
 	}
 	val := float64(sum) / float64(count)
 	return val, nil
 
 }
 
-var avgAggregateFuncMapping = map[[2]reflect.Kind]func([][]any) (any, error){
+var avgAggregateFuncMapping = map[[2]reflect.Kind]func([][]any, int, int) (any, error){
 	[2]reflect.Kind{reflect.Int, reflect.Int}:     avgAggregator[int, int],
 	[2]reflect.Kind{reflect.Int, reflect.Int8}:    avgAggregator[int, int8],
 	[2]reflect.Kind{reflect.Int, reflect.Int16}:   avgAggregator[int, int16],

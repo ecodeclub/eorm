@@ -21,46 +21,44 @@ import (
 )
 
 type Sum struct {
-	colInfos []ColInfo
-	alias    string
+	sumColumnInfo ColumnInfo
+	alias         string
 }
 
 func (s *Sum) Aggregate(cols [][]any) (any, error) {
 	var kind reflect.Kind
-	if len(cols) >= 1 && len(cols[0]) >= 1 {
-		kind = reflect.TypeOf(cols[0][0]).Kind()
-	} else {
-		return nil, errs.ErrMergerAggregateParticipant
+	sumIndex := s.sumColumnInfo.Index
+	if sumIndex < 0 || sumIndex >= len(cols[0]) {
+		return nil, errs.ErrMergerInvalidAggregateColumnIndex
 	}
-	return sumAggregateFuncMapping[kind](cols)
+	kind = reflect.TypeOf(cols[0][sumIndex]).Kind()
+	sumFunc, ok := sumAggregateFuncMapping[kind]
+	if !ok {
+		return nil, errs.ErrMergerAggregateFuncNotFound
+	}
+	return sumFunc(cols, s.sumColumnInfo.Index)
 }
 
-func (s *Sum) ColumnInfo() []ColInfo {
-	return s.colInfos
-}
 func (s *Sum) ColumnName() string {
 	return s.alias
 }
 
-func NewSUM(info ColInfo, alias string) *Sum {
-	colInfos := []ColInfo{
-		info,
-	}
+func NewSUM(info ColumnInfo, alias string) *Sum {
 	return &Sum{
-		colInfos: colInfos,
-		alias:    alias,
+		sumColumnInfo: info,
+		alias:         alias,
 	}
 }
 
-func sumAggregate[T AggregateElement](cols [][]any) (any, error) {
+func sumAggregate[T AggregateElement](cols [][]any, sumIndex int) (any, error) {
 	var sum T
 	for _, col := range cols {
-		sum += col[0].(T)
+		sum += col[sumIndex].(T)
 	}
 	return sum, nil
 }
 
-var sumAggregateFuncMapping = map[reflect.Kind]func([][]any) (any, error){
+var sumAggregateFuncMapping = map[reflect.Kind]func([][]any, int) (any, error){
 	reflect.Int:     sumAggregate[int],
 	reflect.Int8:    sumAggregate[int8],
 	reflect.Int16:   sumAggregate[int16],

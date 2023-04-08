@@ -19,21 +19,19 @@ type AggregateElement interface {
 }
 
 type Aggregator interface {
-	// Aggregate 将多个列聚合
-	Aggregate([][]any) (any, error)
-	// ColumnInfo 返回需要进行聚合的列信息
-	ColumnInfo() []ColInfo
-	// ColumnName 返回
+	// Aggregate 将多个列聚合 cols表示sqlRows列表里的数据，聚合函数通过下标拿到需要的列
+	Aggregate(cols [][]any) (any, error)
+	// ColumnName 聚合函数的别名
 	ColumnName() string
 }
 
-type ColInfo struct {
+type ColumnInfo struct {
 	Index int
 	Name  string
 }
 
-func NewColInfo(index int, name string) ColInfo {
-	return ColInfo{
+func NewColInfo(index int, name string) ColumnInfo {
+	return ColumnInfo{
 		Index: index,
 		Name:  name,
 	}

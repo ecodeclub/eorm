@@ -21,46 +21,44 @@ import (
 )
 
 type Count struct {
-	colInfos []ColInfo
-	alias    string
+	countInfo ColumnInfo
+	alias     string
 }
 
 func (s *Count) Aggregate(cols [][]any) (any, error) {
 	var kind reflect.Kind
-	if len(cols) >= 1 && len(cols[0]) >= 1 {
-		kind = reflect.TypeOf(cols[0][0]).Kind()
-	} else {
-		return nil, errs.ErrMergerAggregateParticipant
+	countIndex := s.countInfo.Index
+	if countIndex < 0 || countIndex >= len(cols[0]) {
+		return nil, errs.ErrMergerInvalidAggregateColumnIndex
 	}
-	return CountAggregateFuncMapping[kind](cols)
+	kind = reflect.TypeOf(cols[0][countIndex]).Kind()
+	countFunc, ok := CountAggregateFuncMapping[kind]
+	if !ok {
+		return nil, errs.ErrMergerAggregateFuncNotFound
+	}
+	return countFunc(cols, s.countInfo.Index)
 }
 
-func (s *Count) ColumnInfo() []ColInfo {
-	return s.colInfos
-}
 func (s *Count) ColumnName() string {
 	return s.alias
 }
 
-func NewCount(info ColInfo, alias string) *Count {
-	colInfos := []ColInfo{
-		info,
-	}
+func NewCount(info ColumnInfo, alias string) *Count {
 	return &Count{
-		colInfos: colInfos,
-		alias:    alias,
+		countInfo: info,
+		alias:     alias,
 	}
 }
 
-func CountAggregate[T AggregateElement](cols [][]any) (any, error) {
-	var Count T
+func CountAggregate[T AggregateElement](cols [][]any, countIndex int) (any, error) {
+	var count T
 	for _, col := range cols {
-		Count += col[0].(T)
+		count += col[countIndex].(T)
 	}
-	return Count, nil
+	return count, nil
 }
 
-var CountAggregateFuncMapping = map[reflect.Kind]func([][]any) (any, error){
+var CountAggregateFuncMapping = map[reflect.Kind]func([][]any, int) (any, error){
 	reflect.Int:     CountAggregate[int],
 	reflect.Int8:    CountAggregate[int8],
 	reflect.Int16:   CountAggregate[int16],

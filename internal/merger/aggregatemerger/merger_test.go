@@ -318,36 +318,6 @@ func (ms *MergerSuite) TestRows_NextAndScan() {
 				}
 			},
 		},
-		// 3. ColumnInfo 的index超出范围
-		{
-			name: "index out of range",
-			sqlRows: func() []*sql.Rows {
-				cols := []string{"MIN(id)"}
-				query := "SELECT MIN(`id`) FROM `t1`"
-				ms.mock01.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(10))
-				ms.mock02.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(20))
-				ms.mock03.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(30))
-				dbs := []*sql.DB{ms.mockDB01, ms.mockDB02, ms.mockDB03}
-				rowsList := make([]*sql.Rows, 0, len(dbs))
-				for _, db := range dbs {
-					row, err := db.QueryContext(context.Background(), query)
-					require.NoError(ms.T(), err)
-					rowsList = append(rowsList, row)
-				}
-				return rowsList
-			},
-			wantErr: errs.ErrMergerInvalidAggregateColumnIndex,
-			res: func() []any {
-				return []any{
-					0,
-				}
-			}(),
-			aggregators: func() []aggregator.Aggregator {
-				return []aggregator.Aggregator{
-					aggregator.NewMin(aggregator.NewColInfo(10, "MIN(id)"), "MIN(id)"),
-				}
-			},
-		},
 
 		// 下面为RowList为有元素返回的行数为空
 

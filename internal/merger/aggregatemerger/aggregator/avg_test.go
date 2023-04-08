@@ -18,6 +18,7 @@ import (
 	"testing"
 
 	"github.com/ecodeclub/eorm/internal/merger/internal/errs"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -25,6 +26,7 @@ func TestAvg_Aggregate(t *testing.T) {
 	testcases := []struct {
 		name    string
 		input   [][]any
+		index   []int
 		wantVal any
 		wantErr error
 	}{
@@ -44,25 +46,50 @@ func TestAvg_Aggregate(t *testing.T) {
 					int64(2),
 				},
 			},
+			index:   []int{0, 1},
 			wantVal: float64(10),
 		},
 		{
-			name: "传入空切片",
+			name: "传入的参数非AggregateElement类型",
 			input: [][]any{
-				{},
+				{
+					"1",
+					"2",
+				},
+				{
+					"3",
+					"4",
+				},
 			},
-			wantErr: errs.ErrMergerAggregateParticipant,
+			index:   []int{0, 1},
+			wantErr: errs.ErrMergerAggregateFuncNotFound,
+		},
+		{
+			name: "columnInfo的index不合法",
+			input: [][]any{
+				{
+					int64(10),
+					int64(2),
+				},
+				{
+					int64(20),
+					int64(2),
+				},
+			},
+			index:   []int{0, 10},
+			wantErr: errs.ErrMergerInvalidAggregateColumnIndex,
 		},
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			avg := NewAVG(NewColInfo(0, "SUM(grade)"), NewColInfo(1, "COUNT(grade)"), "AVG(grade)")
+			avg := NewAVG(NewColInfo(tc.index[0], "SUM(grade)"), NewColInfo(tc.index[1], "COUNT(grade)"), "AVG(grade)")
 			val, err := avg.Aggregate(tc.input)
 			assert.Equal(t, tc.wantErr, err)
 			if err != nil {
 				return
 			}
 			assert.Equal(t, tc.wantVal, val)
+			assert.Equal(t, "AVG(grade)", avg.ColumnName())
 		})
 	}
 

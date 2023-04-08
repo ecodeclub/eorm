@@ -18,15 +18,17 @@ import (
 	"testing"
 
 	"github.com/ecodeclub/eorm/internal/merger/internal/errs"
+
 	"github.com/stretchr/testify/assert"
 )
 
 func TestCount_Aggregate(t *testing.T) {
 	testcases := []struct {
-		name    string
-		input   [][]any
-		wantVal any
-		wantErr error
+		name       string
+		input      [][]any
+		wantVal    any
+		wantErr    error
+		countIndex int
 	}{
 		{
 			name: "count正常合并",
@@ -41,25 +43,49 @@ func TestCount_Aggregate(t *testing.T) {
 					int64(30),
 				},
 			},
-			wantVal: int64(60),
+			wantVal:    int64(60),
+			countIndex: 0,
 		},
 		{
-			name: "传入空切片",
+			name: "传入的参数非AggregateElement类型",
 			input: [][]any{
-				{},
+				{
+					"1",
+				},
+				{
+					"3",
+				},
 			},
-			wantErr: errs.ErrMergerAggregateParticipant,
+			wantErr:    errs.ErrMergerAggregateFuncNotFound,
+			countIndex: 0,
+		},
+		{
+			name: "columnInfo的index不合法",
+			input: [][]any{
+				{
+					int64(10),
+				},
+				{
+					int64(20),
+				},
+				{
+					int64(30),
+				},
+			},
+			countIndex: 20,
+			wantErr:    errs.ErrMergerInvalidAggregateColumnIndex,
 		},
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			sum := NewCount(NewColInfo(0, "COUNT(id)"), "COUNT(id)")
-			val, err := sum.Aggregate(tc.input)
+			count := NewCount(NewColInfo(tc.countIndex, "COUNT(id)"), "COUNT(id)")
+			val, err := count.Aggregate(tc.input)
 			assert.Equal(t, tc.wantErr, err)
 			if err != nil {
 				return
 			}
 			assert.Equal(t, tc.wantVal, val)
+			assert.Equal(t, "COUNT(id)", count.ColumnName())
 		})
 	}
 

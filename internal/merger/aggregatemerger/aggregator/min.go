@@ -21,55 +21,41 @@ import (
 )
 
 type Min struct {
-	colInfos []ColInfo
-	alias    string
+	minColumnInfo ColumnInfo
+	alias         string
 }
 
 func (m *Min) Aggregate(cols [][]any) (any, error) {
 	var kind reflect.Kind
-	if len(cols) >= 1 && len(cols[0]) >= 1 {
-		kind = reflect.TypeOf(cols[0][0]).Kind()
-	} else {
-		return nil, errs.ErrMergerAggregateParticipant
+	minIndex := m.minColumnInfo.Index
+	if minIndex < 0 || minIndex >= len(cols[0]) {
+		return nil, errs.ErrMergerInvalidAggregateColumnIndex
 	}
-	return minFuncMapping[kind](cols)
+	kind = reflect.TypeOf(cols[0][minIndex]).Kind()
+	minFunc, ok := minFuncMapping[kind]
+	if !ok {
+		return nil, errs.ErrMergerAggregateFuncNotFound
+	}
+	return minFunc(cols, m.minColumnInfo.Index)
 
-}
-
-func (m *Min) ColumnInfo() []ColInfo {
-	return m.colInfos
 }
 
 func (m *Min) ColumnName() string {
 	return m.alias
 }
 
-func NewMin(info ColInfo, alias string) *Min {
-	colInfos := []ColInfo{
-		info,
-	}
+func NewMin(info ColumnInfo, alias string) *Min {
 	return &Min{
-		colInfos: colInfos,
-		alias:    alias,
+		minColumnInfo: info,
+		alias:         alias,
 	}
 }
 
-func minAggregator[T AggregateElement](colsData [][]any) (any, error) {
-	var minData T
-	for idx, colData := range colsData {
-		data := colData[0].(T)
-		if idx == 0 {
-			minData = data
-			continue
-		}
-		if minData > data {
-			minData = data
-		}
-	}
-	return minData, nil
+func minAggregator[T AggregateElement](colsData [][]any, minIndex int) (any, error) {
+	return findExtremeValue[T](colsData, minValue[T], minIndex)
 }
 
-var minFuncMapping = map[reflect.Kind]func([][]any) (any, error){
+var minFuncMapping = map[reflect.Kind]func([][]any, int) (any, error){
 	reflect.Int:     minAggregator[int],
 	reflect.Int8:    minAggregator[int8],
 	reflect.Int16:   minAggregator[int16],
@@ -82,4 +68,8 @@ var minFuncMapping = map[reflect.Kind]func([][]any) (any, error){
 	reflect.Float32: minAggregator[float32],
 	reflect.Float64: minAggregator[float64],
 	reflect.Uint:    minAggregator[uint],
+}
+
+func minValue[T AggregateElement](minData T, data T) bool {
+	return minData > data
 }

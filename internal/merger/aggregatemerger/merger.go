@@ -122,20 +122,7 @@ func (r *Rows) Next() bool {
 func (r *Rows) getAggregateInfo(rowsData [][]any) ([]any, error) {
 	res := make([]any, 0, len(r.aggregators))
 	for _, agg := range r.aggregators {
-		aggDatas := make([][]any, 0, len(r.rowsList))
-		aggInfo := agg.ColumnInfo()
-		for _, rowData := range rowsData {
-			aggData := make([]any, 0, len(aggInfo))
-			for _, colInfo := range aggInfo {
-				index := colInfo.Index
-				if index >= len(rowData) || index < 0 {
-					return nil, errs.ErrMergerInvalidAggregateColumnIndex
-				}
-				aggData = append(aggData, rowData[index])
-			}
-			aggDatas = append(aggDatas, aggData)
-		}
-		val, err := agg.Aggregate(aggDatas)
+		val, err := agg.Aggregate(rowsData)
 		if err != nil {
 			return nil, err
 		}
@@ -146,19 +133,26 @@ func (r *Rows) getAggregateInfo(rowsData [][]any) ([]any, error) {
 
 // getColInfo 从sqlRows里面获取数据
 func (r *Rows) getColsInfo() ([][]any, bool, error) {
+	// 所有sql.Rows的数据
 	rowsData := make([][]any, 0, len(r.rowsList))
 	hasClosed := false
 	hasOpen := false
+	// hasClosed表示前面的有sql.Rows他的Next的结果为false
+	// hasOpen 表示前面有sql.Rows他的Next的结果为true
+	// hasClosed和hasOpen是为了当出现有RowsList中有一个或多个sql.Rows出现返回行数为空的时候报错（全部为空不会报错）。
 	for idx, row := range r.rowsList {
 		colsInfo, err := row.ColumnTypes()
 		if err != nil {
 			return nil, false, err
 		}
+		// colsData 表示一个sql.Rows的数据
 		colsData := make([]any, 0, len(colsInfo))
 		if row.Next() {
+			// 当前面有sql.Rows他的Next结果为false，并且当前的sql.Rows为true。那就会报错sql.Rows列表里面有元素返回空行
 			if hasClosed {
 				return nil, false, errs.ErrMergerAggregateHasEmptyRows
 			}
+			// 拿到sql.Rows字段的类型然后初始化
 			for _, colInfo := range colsInfo {
 				typ := colInfo.ScanType()
 				// sqlite3的驱动返回的是指针。循环的去除指针
@@ -168,22 +162,28 @@ func (r *Rows) getColsInfo() ([][]any, bool, error) {
 				newData := reflect.New(typ).Interface()
 				colsData = append(colsData, newData)
 			}
+			// 通过Scan赋值
 			err = row.Scan(colsData...)
 			if err != nil {
 				return nil, false, err
 			}
+			// 去掉reflect.New的指针
 			for i := 0; i < len(colsData); i++ {
 				colsData[i] = reflect.ValueOf(colsData[i]).Elem().Interface()
 			}
+
 			hasOpen = true
 		} else {
+			// sql.Rows迭代过程中发生报错，返回报错
 			if row.Err() != nil {
 				return nil, false, row.Err()
 			}
+			// 前面有sql.Rows返回的行数非空，当前为空行返回报错
 			if hasOpen {
 				return nil, false, errs.ErrMergerAggregateHasEmptyRows
 			}
 			hasClosed = true
+			// 全部sql.Rows返回都是空，说明遍历完了，或者都没有查询到数据，不返回报错
 			if idx == len(r.rowsList)-1 {
 				return nil, false, nil
 			}

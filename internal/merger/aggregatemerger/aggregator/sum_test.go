@@ -18,15 +18,17 @@ import (
 	"testing"
 
 	"github.com/ecodeclub/eorm/internal/merger/internal/errs"
+
 	"github.com/stretchr/testify/assert"
 )
 
 func TestSum_Aggregate(t *testing.T) {
 	testcases := []struct {
-		name    string
-		input   [][]any
-		wantVal any
-		wantErr error
+		name     string
+		input    [][]any
+		wantVal  any
+		wantErr  error
+		sumIndex int
 	}{
 		{
 			name: "sum正常合并",
@@ -41,25 +43,50 @@ func TestSum_Aggregate(t *testing.T) {
 					int64(30),
 				},
 			},
-			wantVal: int64(60),
+			wantVal:  int64(60),
+			sumIndex: 0,
+		},
+
+		{
+			name: "传入的参数非AggregateElement类型",
+			input: [][]any{
+				{
+					"1",
+				},
+				{
+					"3",
+				},
+			},
+			wantErr:  errs.ErrMergerAggregateFuncNotFound,
+			sumIndex: 0,
 		},
 		{
-			name: "传入空切片",
+			name: "columnInfo的index不合法",
 			input: [][]any{
-				{},
+				{
+					int64(10),
+				},
+				{
+					int64(20),
+				},
+				{
+					int64(30),
+				},
 			},
-			wantErr: errs.ErrMergerAggregateParticipant,
+			sumIndex: 20,
+			wantErr:  errs.ErrMergerInvalidAggregateColumnIndex,
 		},
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			sum := NewSUM(NewColInfo(0, "SUM(id)"), "SUM(id)")
+			sum := NewSUM(NewColInfo(tc.sumIndex, "SUM(id)"), "SUM(id)")
 			val, err := sum.Aggregate(tc.input)
 			assert.Equal(t, tc.wantErr, err)
 			if err != nil {
 				return
 			}
 			assert.Equal(t, tc.wantVal, val)
+			assert.Equal(t, "SUM(id)", sum.ColumnName())
 		})
 	}
 

@@ -21,55 +21,41 @@ import (
 )
 
 type Max struct {
-	colInfos []ColInfo
-	alias    string
+	maxColumnInfo ColumnInfo
+	alias         string
 }
 
 func (m *Max) Aggregate(cols [][]any) (any, error) {
 	var kind reflect.Kind
-	if len(cols) >= 1 && len(cols[0]) >= 1 {
-		kind = reflect.TypeOf(cols[0][0]).Kind()
-	} else {
-		return nil, errs.ErrMergerAggregateParticipant
+	maxIndex := m.maxColumnInfo.Index
+	if maxIndex < 0 || maxIndex >= len(cols[0]) {
+		return nil, errs.ErrMergerInvalidAggregateColumnIndex
 	}
-	return maxFuncMapping[kind](cols)
+	kind = reflect.TypeOf(cols[0][maxIndex]).Kind()
 
-}
-
-func (m *Max) ColumnInfo() []ColInfo {
-	return m.colInfos
+	maxFunc, ok := maxFuncMapping[kind]
+	if !ok {
+		return nil, errs.ErrMergerAggregateFuncNotFound
+	}
+	return maxFunc(cols, m.maxColumnInfo.Index)
 }
 
 func (m *Max) ColumnName() string {
 	return m.alias
 }
 
-func NewMax(info ColInfo, alias string) *Max {
-	colInfos := []ColInfo{
-		info,
-	}
+func NewMax(info ColumnInfo, alias string) *Max {
 	return &Max{
-		colInfos: colInfos,
-		alias:    alias,
+		maxColumnInfo: info,
+		alias:         alias,
 	}
 }
 
-func maxAggregator[T AggregateElement](colsData [][]any) (any, error) {
-	var maxData T
-	for idx, colData := range colsData {
-		data := colData[0].(T)
-		if idx == 0 {
-			maxData = data
-			continue
-		}
-		if maxData < data {
-			maxData = data
-		}
-	}
-	return maxData, nil
+func maxAggregator[T AggregateElement](colsData [][]any, maxIndex int) (any, error) {
+	return findExtremeValue[T](colsData, maxValue[T], maxIndex)
 }
 
-var maxFuncMapping = map[reflect.Kind]func([][]any) (any, error){
+var maxFuncMapping = map[reflect.Kind]func([][]any, int) (any, error){
 	reflect.Int:     maxAggregator[int],
 	reflect.Int8:    maxAggregator[int8],
 	reflect.Int16:   maxAggregator[int16],
@@ -82,4 +68,25 @@ var maxFuncMapping = map[reflect.Kind]func([][]any) (any, error){
 	reflect.Float32: maxAggregator[float32],
 	reflect.Float64: maxAggregator[float64],
 	reflect.Uint:    maxAggregator[uint],
+}
+
+type ExtremeValueFunc[T AggregateElement] func(T, T) bool
+
+func findExtremeValue[T AggregateElement](colsData [][]any, extremeValueFunc ExtremeValueFunc[T], index int) (any, error) {
+	var ans T
+	for idx, colData := range colsData {
+		data := colData[index].(T)
+		if idx == 0 {
+			ans = data
+			continue
+		}
+		if extremeValueFunc(ans, data) {
+			ans = data
+		}
+	}
+	return ans, nil
+}
+
+func maxValue[T AggregateElement](maxData T, data T) bool {
+	return maxData < data
 }
