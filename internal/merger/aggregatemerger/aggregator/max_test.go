@@ -77,7 +77,7 @@ func TestMax_Aggregate(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			max := NewMax(NewColInfo(tc.maxIndex, "MAX(id)"), "MAX(id)")
+			max := NewMax(NewColInfo(tc.maxIndex, "MAX(id)"))
 			val, err := max.Aggregate(tc.input)
 			assert.Equal(t, tc.wantErr, err)
 			if err != nil {

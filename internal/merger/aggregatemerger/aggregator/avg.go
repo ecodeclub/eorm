@@ -21,19 +21,19 @@ import (
 )
 
 // AVG 用于求平均值，通过sum/count求得。
-// AVG 我们并不能预期在不同的数据库上，精度会不会损失，自己损失的话会有多少的损失。这很大程度上跟数据库类型，数据库驱动实现都有关
+// AVG 我们并不能预期在不同的数据库上，精度会不会损失，以及损失的话会有多少的损失。这很大程度上跟数据库类型，数据库驱动实现都有关
 type AVG struct {
 	sumColumnInfo   ColumnInfo
 	countColumnInfo ColumnInfo
-	alias           string
+	avgName         string
 }
 
-// NewAVG sumInfo是sum的信息，countInfo是count的信息，这两个顺序不能颠倒。
-func NewAVG(sumInfo ColumnInfo, countInfo ColumnInfo, alias string) *AVG {
+// NewAVG sumInfo是sum的信息，countInfo是count的信息，由于求avgName用于Rows的Column方法显示的名字。
+func NewAVG(sumInfo ColumnInfo, countInfo ColumnInfo, avgName string) *AVG {
 	return &AVG{
 		sumColumnInfo:   sumInfo,
 		countColumnInfo: countInfo,
-		alias:           alias,
+		avgName:         avgName,
 	}
 }
 
@@ -43,7 +43,7 @@ func (a *AVG) Aggregate(cols [][]any) (any, error) {
 	if sumIndex >= len(cols[0]) || sumIndex < 0 || countIndex >= len(cols[0]) || countIndex < 0 {
 		return nil, errs.ErrMergerInvalidAggregateColumnIndex
 	}
-	ok, avgFunc := a.findSumAndCountReflectKindBy(cols[0][sumIndex], cols[0][countIndex])
+	avgFunc, ok := a.findSumAndCountReflectKindBy(cols[0][sumIndex], cols[0][countIndex])
 	if !ok {
 		return nil, errs.ErrMergerAggregateFuncNotFound
 	}
@@ -51,19 +51,19 @@ func (a *AVG) Aggregate(cols [][]any) (any, error) {
 
 }
 
-func (a *AVG) findSumAndCountReflectKindBy(sum, count any) (bool, func([][]any, int, int) (any, error)) {
+func (a *AVG) findSumAndCountReflectKindBy(sum, count any) (func([][]any, int, int) (float64, error), bool) {
 	sumKind := reflect.TypeOf(sum).Kind()
 	countKind := reflect.TypeOf(count).Kind()
 	val, ok := avgAggregateFuncMapping[[2]reflect.Kind{sumKind, countKind}]
-	return ok, val
+	return val, ok
 }
 
 func (a *AVG) ColumnName() string {
-	return a.alias
+	return a.avgName
 }
 
 // avgAggregator cols就是上面Aggregate的入参cols可以参Aggregate的描述
-func avgAggregator[S AggregateElement, C AggregateElement](cols [][]any, sumIndex int, countIndex int) (any, error) {
+func avgAggregator[S AggregateElement, C AggregateElement](cols [][]any, sumIndex int, countIndex int) (float64, error) {
 	var sum S
 	var count C
 	for _, col := range cols {
@@ -75,7 +75,7 @@ func avgAggregator[S AggregateElement, C AggregateElement](cols [][]any, sumInde
 
 }
 
-var avgAggregateFuncMapping = map[[2]reflect.Kind]func([][]any, int, int) (any, error){
+var avgAggregateFuncMapping = map[[2]reflect.Kind]func([][]any, int, int) (float64, error){
 	[2]reflect.Kind{reflect.Int, reflect.Int}:     avgAggregator[int, int],
 	[2]reflect.Kind{reflect.Int, reflect.Int8}:    avgAggregator[int, int8],
 	[2]reflect.Kind{reflect.Int, reflect.Int16}:   avgAggregator[int, int16],

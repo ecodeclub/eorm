@@ -120,7 +120,7 @@ func (ms *MergerSuite) TestRows_NextAndScan() {
 			}(),
 			aggregators: func() []aggregator.Aggregator {
 				return []aggregator.Aggregator{
-					aggregator.NewSUM(aggregator.NewColInfo(0, "SUM(id)"), "SUM(id)"),
+					aggregator.NewSum(aggregator.NewColInfo(0, "SUM(id)")),
 				}
 			},
 		},
@@ -149,7 +149,7 @@ func (ms *MergerSuite) TestRows_NextAndScan() {
 			}(),
 			aggregators: func() []aggregator.Aggregator {
 				return []aggregator.Aggregator{
-					aggregator.NewMax(aggregator.NewColInfo(0, "MAX(id)"), "MAX(id)"),
+					aggregator.NewMax(aggregator.NewColInfo(0, "MAX(id)")),
 				}
 			},
 		},
@@ -178,7 +178,7 @@ func (ms *MergerSuite) TestRows_NextAndScan() {
 			}(),
 			aggregators: func() []aggregator.Aggregator {
 				return []aggregator.Aggregator{
-					aggregator.NewMin(aggregator.NewColInfo(0, "MIN(id)"), "MIN(id)"),
+					aggregator.NewMin(aggregator.NewColInfo(0, "MIN(id)")),
 				}
 			},
 		},
@@ -207,7 +207,7 @@ func (ms *MergerSuite) TestRows_NextAndScan() {
 			}(),
 			aggregators: func() []aggregator.Aggregator {
 				return []aggregator.Aggregator{
-					aggregator.NewCount(aggregator.NewColInfo(0, "COUNT(id)"), "COUNT(id)"),
+					aggregator.NewCount(aggregator.NewColInfo(0, "COUNT(id)")),
 				}
 			},
 		},
@@ -272,10 +272,10 @@ func (ms *MergerSuite) TestRows_NextAndScan() {
 			}(),
 			aggregators: func() []aggregator.Aggregator {
 				return []aggregator.Aggregator{
-					aggregator.NewCount(aggregator.NewColInfo(0, "COUNT(id)"), "COUNT(id)"),
-					aggregator.NewMax(aggregator.NewColInfo(1, "MAX(id)"), "MAX(id)"),
-					aggregator.NewMin(aggregator.NewColInfo(2, "MIN(id)"), "MIN(id)"),
-					aggregator.NewSUM(aggregator.NewColInfo(3, "SUM(id)"), "SUM(id)"),
+					aggregator.NewCount(aggregator.NewColInfo(0, "COUNT(id)")),
+					aggregator.NewMax(aggregator.NewColInfo(1, "MAX(id)")),
+					aggregator.NewMin(aggregator.NewColInfo(2, "MIN(id)")),
+					aggregator.NewSum(aggregator.NewColInfo(3, "SUM(id)")),
 					aggregator.NewAVG(aggregator.NewColInfo(4, "SUM(grade)"), aggregator.NewColInfo(5, "COUNT(grade)"), "AVG(grade)"),
 				}
 			},
@@ -309,12 +309,12 @@ func (ms *MergerSuite) TestRows_NextAndScan() {
 			aggregators: func() []aggregator.Aggregator {
 				return []aggregator.Aggregator{
 					aggregator.NewAVG(aggregator.NewColInfo(0, "SUM(grade)"), aggregator.NewColInfo(1, "COUNT(grade)"), "AVG(grade)"),
-					aggregator.NewSUM(aggregator.NewColInfo(2, "SUM(grade)"), "SUM(grade)"),
+					aggregator.NewSum(aggregator.NewColInfo(2, "SUM(grade)")),
 					aggregator.NewAVG(aggregator.NewColInfo(4, "SUM(grade)"), aggregator.NewColInfo(3, "COUNT(grade)"), "AVG(grade)"),
-					aggregator.NewMin(aggregator.NewColInfo(5, "MIN(id)"), "MIN(id)"),
-					aggregator.NewMin(aggregator.NewColInfo(6, "MIN(userid)"), "MIN(userid)"),
-					aggregator.NewMax(aggregator.NewColInfo(7, "MAX(id)"), "MAX(id)"),
-					aggregator.NewCount(aggregator.NewColInfo(8, "COUNT(id)"), "COUNT(id)"),
+					aggregator.NewMin(aggregator.NewColInfo(5, "MIN(id)")),
+					aggregator.NewMin(aggregator.NewColInfo(6, "MIN(userid)")),
+					aggregator.NewMax(aggregator.NewColInfo(7, "MAX(id)")),
+					aggregator.NewCount(aggregator.NewColInfo(8, "COUNT(id)")),
 				}
 			},
 		},
@@ -349,7 +349,7 @@ func (ms *MergerSuite) TestRows_NextAndScan() {
 			wantErr: errs.ErrMergerAggregateHasEmptyRows,
 			aggregators: func() []aggregator.Aggregator {
 				return []aggregator.Aggregator{
-					aggregator.NewSUM(aggregator.NewColInfo(0, "SUM(id)"), "SUM(id)"),
+					aggregator.NewSum(aggregator.NewColInfo(0, "SUM(id)")),
 				}
 			},
 		},
@@ -381,7 +381,7 @@ func (ms *MergerSuite) TestRows_NextAndScan() {
 			wantErr: errs.ErrMergerAggregateHasEmptyRows,
 			aggregators: func() []aggregator.Aggregator {
 				return []aggregator.Aggregator{
-					aggregator.NewSUM(aggregator.NewColInfo(0, "SUM(id)"), "SUM(id)"),
+					aggregator.NewSum(aggregator.NewColInfo(0, "SUM(id)")),
 				}
 			},
 		},
@@ -413,7 +413,7 @@ func (ms *MergerSuite) TestRows_NextAndScan() {
 			wantErr: errs.ErrMergerAggregateHasEmptyRows,
 			aggregators: func() []aggregator.Aggregator {
 				return []aggregator.Aggregator{
-					aggregator.NewSUM(aggregator.NewColInfo(0, "SUM(id)"), "SUM(id)"),
+					aggregator.NewSum(aggregator.NewColInfo(0, "SUM(id)")),
 				}
 			},
 		},
@@ -442,7 +442,7 @@ func (ms *MergerSuite) TestRows_NextAndScan() {
 			}(),
 			aggregators: func() []aggregator.Aggregator {
 				return []aggregator.Aggregator{
-					aggregator.NewSUM(aggregator.NewColInfo(0, "SUM(id)"), "SUM(id)"),
+					aggregator.NewSum(aggregator.NewColInfo(0, "SUM(id)")),
 				}
 			},
 		},
@@ -496,7 +496,7 @@ func (ms *MergerSuite) TestRows_NextAndErr() {
 			},
 			aggregators: func() []aggregator.Aggregator {
 				return []aggregator.Aggregator{
-					aggregator.NewCount(aggregator.NewColInfo(0, "COUNT(id)"), "COUNT(id)"),
+					aggregator.NewCount(aggregator.NewColInfo(0, "COUNT(id)")),
 				}
 			}(),
 			wantErr: nextMockErr,
@@ -520,7 +520,7 @@ func (ms *MergerSuite) TestRows_Close() {
 	ms.mock01.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(1))
 	ms.mock02.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(2).CloseError(newCloseMockErr("db02")))
 	ms.mock03.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(3).CloseError(newCloseMockErr("db03")))
-	merger := NewMerger(aggregator.NewSUM(aggregator.NewColInfo(0, "SUM(id)"), "SUM(id)"))
+	merger := NewMerger(aggregator.NewSum(aggregator.NewColInfo(0, "SUM(id)")))
 	dbs := []*sql.DB{ms.mockDB01, ms.mockDB02, ms.mockDB03}
 	rowsList := make([]*sql.Rows, 0, len(dbs))
 	for _, db := range dbs {
@@ -607,7 +607,7 @@ func (ms *MergerSuite) TestMerger_Merge() {
 		{
 			name: "超时",
 			merger: func() *Merger {
-				return NewMerger(aggregator.NewSUM(aggregator.NewColInfo(0, "SUM(id)"), "SUM(id)"))
+				return NewMerger(aggregator.NewSum(aggregator.NewColInfo(0, "SUM(id)")))
 			},
 			ctx: func() (context.Context, context.CancelFunc) {
 				ctx, cancel := context.WithTimeout(context.Background(), 0)
@@ -627,7 +627,7 @@ func (ms *MergerSuite) TestMerger_Merge() {
 		{
 			name: "sqlRows列表元素个数为0",
 			merger: func() *Merger {
-				return NewMerger(aggregator.NewSUM(aggregator.NewColInfo(0, "SUM(id)"), "SUM(id)"))
+				return NewMerger(aggregator.NewSum(aggregator.NewColInfo(0, "SUM(id)")))
 			},
 			ctx: func() (context.Context, context.CancelFunc) {
 				ctx, cancel := context.WithCancel(context.Background())
@@ -641,7 +641,7 @@ func (ms *MergerSuite) TestMerger_Merge() {
 		{
 			name: "sqlRows列表有nil",
 			merger: func() *Merger {
-				return NewMerger(aggregator.NewSUM(aggregator.NewColInfo(0, "SUM(id)"), "SUM(id)"))
+				return NewMerger(aggregator.NewSum(aggregator.NewColInfo(0, "SUM(id)")))
 			},
 			ctx: func() (context.Context, context.CancelFunc) {
 				ctx, cancel := context.WithCancel(context.Background())

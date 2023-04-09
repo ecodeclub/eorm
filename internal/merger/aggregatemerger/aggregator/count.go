@@ -22,7 +22,7 @@ import (
 
 type Count struct {
 	countInfo ColumnInfo
-	alias     string
+	countName string
 }
 
 func (s *Count) Aggregate(cols [][]any) (any, error) {
@@ -32,7 +32,7 @@ func (s *Count) Aggregate(cols [][]any) (any, error) {
 		return nil, errs.ErrMergerInvalidAggregateColumnIndex
 	}
 	kind = reflect.TypeOf(cols[0][countIndex]).Kind()
-	countFunc, ok := CountAggregateFuncMapping[kind]
+	countFunc, ok := countAggregateFuncMapping[kind]
 	if !ok {
 		return nil, errs.ErrMergerAggregateFuncNotFound
 	}
@@ -40,17 +40,17 @@ func (s *Count) Aggregate(cols [][]any) (any, error) {
 }
 
 func (s *Count) ColumnName() string {
-	return s.alias
+	return s.countName
 }
 
-func NewCount(info ColumnInfo, alias string) *Count {
+func NewCount(info ColumnInfo) *Count {
 	return &Count{
 		countInfo: info,
-		alias:     alias,
+		countName: info.Name,
 	}
 }
 
-func CountAggregate[T AggregateElement](cols [][]any, countIndex int) (any, error) {
+func countAggregate[T AggregateElement](cols [][]any, countIndex int) (any, error) {
 	var count T
 	for _, col := range cols {
 		count += col[countIndex].(T)
@@ -58,17 +58,17 @@ func CountAggregate[T AggregateElement](cols [][]any, countIndex int) (any, erro
 	return count, nil
 }
 
-var CountAggregateFuncMapping = map[reflect.Kind]func([][]any, int) (any, error){
-	reflect.Int:     CountAggregate[int],
-	reflect.Int8:    CountAggregate[int8],
-	reflect.Int16:   CountAggregate[int16],
-	reflect.Int32:   CountAggregate[int32],
-	reflect.Int64:   CountAggregate[int64],
-	reflect.Uint8:   CountAggregate[uint8],
-	reflect.Uint16:  CountAggregate[uint16],
-	reflect.Uint32:  CountAggregate[uint32],
-	reflect.Uint64:  CountAggregate[uint64],
-	reflect.Float32: CountAggregate[float32],
-	reflect.Float64: CountAggregate[float64],
-	reflect.Uint:    CountAggregate[uint],
+var countAggregateFuncMapping = map[reflect.Kind]func([][]any, int) (any, error){
+	reflect.Int:     countAggregate[int],
+	reflect.Int8:    countAggregate[int8],
+	reflect.Int16:   countAggregate[int16],
+	reflect.Int32:   countAggregate[int32],
+	reflect.Int64:   countAggregate[int64],
+	reflect.Uint8:   countAggregate[uint8],
+	reflect.Uint16:  countAggregate[uint16],
+	reflect.Uint32:  countAggregate[uint32],
+	reflect.Uint64:  countAggregate[uint64],
+	reflect.Float32: countAggregate[float32],
+	reflect.Float64: countAggregate[float64],
+	reflect.Uint:    countAggregate[uint],
 }

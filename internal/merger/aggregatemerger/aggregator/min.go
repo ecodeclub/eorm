@@ -22,7 +22,7 @@ import (
 
 type Min struct {
 	minColumnInfo ColumnInfo
-	alias         string
+	minName       string
 }
 
 func (m *Min) Aggregate(cols [][]any) (any, error) {
@@ -41,13 +41,13 @@ func (m *Min) Aggregate(cols [][]any) (any, error) {
 }
 
 func (m *Min) ColumnName() string {
-	return m.alias
+	return m.minName
 }
 
-func NewMin(info ColumnInfo, alias string) *Min {
+func NewMin(info ColumnInfo) *Min {
 	return &Min{
 		minColumnInfo: info,
-		alias:         alias,
+		minName:       info.Name,
 	}
 }
 

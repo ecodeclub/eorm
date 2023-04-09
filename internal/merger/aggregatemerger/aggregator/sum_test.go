@@ -79,7 +79,7 @@ func TestSum_Aggregate(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			sum := NewSUM(NewColInfo(tc.sumIndex, "SUM(id)"), "SUM(id)")
+			sum := NewSum(NewColInfo(tc.sumIndex, "SUM(id)"))
 			val, err := sum.Aggregate(tc.input)
 			assert.Equal(t, tc.wantErr, err)
 			if err != nil {

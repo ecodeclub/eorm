@@ -22,7 +22,7 @@ import (
 
 type Max struct {
 	maxColumnInfo ColumnInfo
-	alias         string
+	maxName       string
 }
 
 func (m *Max) Aggregate(cols [][]any) (any, error) {
@@ -41,13 +41,13 @@ func (m *Max) Aggregate(cols [][]any) (any, error) {
 }
 
 func (m *Max) ColumnName() string {
-	return m.alias
+	return m.maxName
 }
 
-func NewMax(info ColumnInfo, alias string) *Max {
+func NewMax(info ColumnInfo) *Max {
 	return &Max{
 		maxColumnInfo: info,
-		alias:         alias,
+		maxName:       info.Name,
 	}
 }
 
@@ -70,9 +70,9 @@ var maxFuncMapping = map[reflect.Kind]func([][]any, int) (any, error){
 	reflect.Uint:    maxAggregator[uint],
 }
 
-type ExtremeValueFunc[T AggregateElement] func(T, T) bool
+type extremeValueFunc[T AggregateElement] func(T, T) bool
 
-func findExtremeValue[T AggregateElement](colsData [][]any, extremeValueFunc ExtremeValueFunc[T], index int) (any, error) {
+func findExtremeValue[T AggregateElement](colsData [][]any, extremeValueFunc extremeValueFunc[T], index int) (any, error) {
 	var ans T
 	for idx, colData := range colsData {
 		data := colData[index].(T)

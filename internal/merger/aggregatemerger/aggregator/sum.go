@@ -22,7 +22,7 @@ import (
 
 type Sum struct {
 	sumColumnInfo ColumnInfo
-	alias         string
+	sumName       string
 }
 
 func (s *Sum) Aggregate(cols [][]any) (any, error) {
@@ -40,13 +40,13 @@ func (s *Sum) Aggregate(cols [][]any) (any, error) {
 }
 
 func (s *Sum) ColumnName() string {
-	return s.alias
+	return s.sumName
 }
 
-func NewSUM(info ColumnInfo, alias string) *Sum {
+func NewSum(info ColumnInfo) *Sum {
 	return &Sum{
 		sumColumnInfo: info,
-		alias:         alias,
+		sumName:       info.Name,
 	}
 }
 
