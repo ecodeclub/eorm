@@ -82,7 +82,7 @@ func TestAvg_Aggregate(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			avg := NewAVG(NewColInfo(tc.index[0], "SUM(grade)"), NewColInfo(tc.index[1], "COUNT(grade)"), "AVG(grade)")
+			avg := NewAVG(NewColumnInfo(tc.index[0], "SUM(grade)"), NewColumnInfo(tc.index[1], "COUNT(grade)"), "AVG(grade)")
 			val, err := avg.Aggregate(tc.input)
 			assert.Equal(t, tc.wantErr, err)
 			if err != nil {

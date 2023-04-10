@@ -22,37 +22,42 @@ import (
 
 type Min struct {
 	minColumnInfo ColumnInfo
-	minName       string
 }
 
 func (m *Min) Aggregate(cols [][]any) (any, error) {
+	minFunc, err := m.findMinFunc(cols[0])
+	if err != nil {
+		return nil, err
+	}
+	return minFunc(cols, m.minColumnInfo.Index)
+}
+
+func (m *Min) findMinFunc(col []any) (func([][]any, int) (any, error), error) {
 	var kind reflect.Kind
 	minIndex := m.minColumnInfo.Index
-	if minIndex < 0 || minIndex >= len(cols[0]) {
+	if minIndex < 0 || minIndex >= len(col) {
 		return nil, errs.ErrMergerInvalidAggregateColumnIndex
 	}
-	kind = reflect.TypeOf(cols[0][minIndex]).Kind()
+	kind = reflect.TypeOf(col[minIndex]).Kind()
 	minFunc, ok := minFuncMapping[kind]
 	if !ok {
 		return nil, errs.ErrMergerAggregateFuncNotFound
 	}
-	return minFunc(cols, m.minColumnInfo.Index)
-
+	return minFunc, nil
 }
 
 func (m *Min) ColumnName() string {
-	return m.minName
+	return m.minColumnInfo.Name
 }
 
 func NewMin(info ColumnInfo) *Min {
 	return &Min{
 		minColumnInfo: info,
-		minName:       info.Name,
 	}
 }
 
 func minAggregator[T AggregateElement](colsData [][]any, minIndex int) (any, error) {
-	return findExtremeValue[T](colsData, minValue[T], minIndex)
+	return findExtremeValue[T](colsData, isMinValue[T], minIndex)
 }
 
 var minFuncMapping = map[reflect.Kind]func([][]any, int) (any, error){
@@ -70,6 +75,6 @@ var minFuncMapping = map[reflect.Kind]func([][]any, int) (any, error){
 	reflect.Uint:    minAggregator[uint],
 }
 
-func minValue[T AggregateElement](minData T, data T) bool {
+func isMinValue[T AggregateElement](minData T, data T) bool {
 	return minData > data
 }

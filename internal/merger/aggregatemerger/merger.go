@@ -30,9 +30,10 @@ import (
 //go:linkname convertAssign database/sql.convertAssign
 func convertAssign(dest, src any) error
 
+// Merger 该实现不支持group by操作,并且聚合函数查询应该只返回一行数据。
 type Merger struct {
 	aggregators []aggregator.Aggregator
-	cols        []string
+	colNames    []string
 }
 
 func NewMerger(aggregators ...aggregator.Aggregator) *Merger {
@@ -42,7 +43,7 @@ func NewMerger(aggregators ...aggregator.Aggregator) *Merger {
 	}
 	return &Merger{
 		aggregators: aggregators,
-		cols:        cols,
+		colNames:    cols,
 	}
 }
 
@@ -64,7 +65,7 @@ func (m *Merger) Merge(ctx context.Context, results []*sql.Rows) (merger.Rows, e
 		rowsList:    results,
 		aggregators: m.aggregators,
 		mu:          &sync.RWMutex{},
-		columns:     m.cols,
+		columns:     m.colNames,
 	}, nil
 
 }
@@ -83,6 +84,7 @@ type Rows struct {
 	lastErr     error
 	cur         []any
 	columns     []string
+	hasNext     bool
 }
 
 func (r *Rows) Next() bool {
@@ -91,15 +93,16 @@ func (r *Rows) Next() bool {
 		r.mu.Unlock()
 		return false
 	}
-	// 从rowsList里面获取数据
-	rowsData, ok, err := r.getColsInfo()
-	if err != nil {
-		r.lastErr = err
+	if r.hasNext {
 		r.mu.Unlock()
 		_ = r.Close()
 		return false
 	}
-	if !ok {
+	// 从rowsList里面获取数据
+	rowsData, err := r.getColsInfo()
+	r.hasNext = true
+	if err != nil {
+		r.lastErr = err
 		r.mu.Unlock()
 		_ = r.Close()
 		return false
@@ -132,26 +135,17 @@ func (r *Rows) getAggregateInfo(rowsData [][]any) ([]any, error) {
 }
 
 // getColInfo 从sqlRows里面获取数据
-func (r *Rows) getColsInfo() ([][]any, bool, error) {
+func (r *Rows) getColsInfo() ([][]any, error) {
 	// 所有sql.Rows的数据
 	rowsData := make([][]any, 0, len(r.rowsList))
-	hasClosed := false
-	hasOpen := false
-	// hasClosed表示前面的有sql.Rows他的Next的结果为false
-	// hasOpen 表示前面有sql.Rows他的Next的结果为true
-	// hasClosed和hasOpen是为了当出现有RowsList中有一个或多个sql.Rows出现返回行数为空的时候报错（全部为空不会报错）。
-	for idx, row := range r.rowsList {
+	for _, row := range r.rowsList {
 		colsInfo, err := row.ColumnTypes()
 		if err != nil {
-			return nil, false, err
+			return nil, err
 		}
 		// colsData 表示一个sql.Rows的数据
 		colsData := make([]any, 0, len(colsInfo))
 		if row.Next() {
-			// 当前面有sql.Rows他的Next结果为false，并且当前的sql.Rows为true。那就会报错sql.Rows列表里面有元素返回空行
-			if hasClosed {
-				return nil, false, errs.ErrMergerAggregateHasEmptyRows
-			}
 			// 拿到sql.Rows字段的类型然后初始化
 			for _, colInfo := range colsInfo {
 				typ := colInfo.ScanType()
@@ -165,33 +159,22 @@ func (r *Rows) getColsInfo() ([][]any, bool, error) {
 			// 通过Scan赋值
 			err = row.Scan(colsData...)
 			if err != nil {
-				return nil, false, err
+				return nil, err
 			}
 			// 去掉reflect.New的指针
 			for i := 0; i < len(colsData); i++ {
 				colsData[i] = reflect.ValueOf(colsData[i]).Elem().Interface()
 			}
-
-			hasOpen = true
 		} else {
 			// sql.Rows迭代过程中发生报错，返回报错
 			if row.Err() != nil {
-				return nil, false, row.Err()
+				return nil, row.Err()
 			}
-			// 前面有sql.Rows返回的行数非空，当前为空行返回报错
-			if hasOpen {
-				return nil, false, errs.ErrMergerAggregateHasEmptyRows
-			}
-			hasClosed = true
-			// 全部sql.Rows返回都是空，说明遍历完了，或者都没有查询到数据，不返回报错
-			if idx == len(r.rowsList)-1 {
-				return nil, false, nil
-			}
-
+			return nil, errs.ErrMergerAggregateHasEmptyRows
 		}
 		rowsData = append(rowsData, colsData)
 	}
-	return rowsData, true, nil
+	return rowsData, nil
 }
 
 func (r *Rows) Scan(dest ...any) error {

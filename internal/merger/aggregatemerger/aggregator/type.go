@@ -30,7 +30,7 @@ type ColumnInfo struct {
 	Name  string
 }
 
-func NewColInfo(index int, name string) ColumnInfo {
+func NewColumnInfo(index int, name string) ColumnInfo {
 	return ColumnInfo{
 		Index: index,
 		Name:  name,

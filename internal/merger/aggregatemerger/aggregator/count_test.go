@@ -78,7 +78,7 @@ func TestCount_Aggregate(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			count := NewCount(NewColInfo(tc.countIndex, "COUNT(id)"))
+			count := NewCount(NewColumnInfo(tc.countIndex, "COUNT(id)"))
 			val, err := count.Aggregate(tc.input)
 			assert.Equal(t, tc.wantErr, err)
 			if err != nil {

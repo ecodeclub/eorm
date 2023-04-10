@@ -28,7 +28,7 @@ type AVG struct {
 	avgName         string
 }
 
-// NewAVG sumInfo是sum的信息，countInfo是count的信息，由于求avgName用于Rows的Column方法显示的名字。
+// NewAVG sumInfo是sum的信息，countInfo是count的信息，avgName用于Column方法
 func NewAVG(sumInfo ColumnInfo, countInfo ColumnInfo, avgName string) *AVG {
 	return &AVG{
 		sumColumnInfo:   sumInfo,
@@ -38,24 +38,27 @@ func NewAVG(sumInfo ColumnInfo, countInfo ColumnInfo, avgName string) *AVG {
 }
 
 func (a *AVG) Aggregate(cols [][]any) (any, error) {
+	// cols[0] 代表第一个sql.Rows，用于确定avgFunc
+	avgFunc, err := a.findSumAndCountReflectKindBy(cols[0])
+	if err != nil {
+		return nil, err
+	}
+	return avgFunc(cols, a.sumColumnInfo.Index, a.countColumnInfo.Index)
+}
+
+func (a *AVG) findSumAndCountReflectKindBy(col []any) (func([][]any, int, int) (float64, error), error) {
 	sumIndex := a.sumColumnInfo.Index
 	countIndex := a.countColumnInfo.Index
-	if sumIndex >= len(cols[0]) || sumIndex < 0 || countIndex >= len(cols[0]) || countIndex < 0 {
+	if sumIndex >= len(col) || sumIndex < 0 || countIndex >= len(col) || countIndex < 0 {
 		return nil, errs.ErrMergerInvalidAggregateColumnIndex
 	}
-	avgFunc, ok := a.findSumAndCountReflectKindBy(cols[0][sumIndex], cols[0][countIndex])
+	sumKind := reflect.TypeOf(col[sumIndex]).Kind()
+	countKind := reflect.TypeOf(col[countIndex]).Kind()
+	val, ok := avgAggregateFuncMapping[[2]reflect.Kind{sumKind, countKind}]
 	if !ok {
 		return nil, errs.ErrMergerAggregateFuncNotFound
 	}
-	return avgFunc(cols, sumIndex, countIndex)
-
-}
-
-func (a *AVG) findSumAndCountReflectKindBy(sum, count any) (func([][]any, int, int) (float64, error), bool) {
-	sumKind := reflect.TypeOf(sum).Kind()
-	countKind := reflect.TypeOf(count).Kind()
-	val, ok := avgAggregateFuncMapping[[2]reflect.Kind{sumKind, countKind}]
-	return val, ok
+	return val, nil
 }
 
 func (a *AVG) ColumnName() string {

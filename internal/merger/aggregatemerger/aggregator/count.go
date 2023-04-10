@@ -22,31 +22,36 @@ import (
 
 type Count struct {
 	countInfo ColumnInfo
-	countName string
 }
 
 func (s *Count) Aggregate(cols [][]any) (any, error) {
+	countFunc, err := s.findCountFunc(cols[0])
+	if err != nil {
+		return nil, err
+	}
+	return countFunc(cols, s.countInfo.Index)
+}
+func (s *Count) findCountFunc(col []any) (func([][]any, int) (any, error), error) {
 	var kind reflect.Kind
 	countIndex := s.countInfo.Index
-	if countIndex < 0 || countIndex >= len(cols[0]) {
+	if countIndex < 0 || countIndex >= len(col) {
 		return nil, errs.ErrMergerInvalidAggregateColumnIndex
 	}
-	kind = reflect.TypeOf(cols[0][countIndex]).Kind()
+	kind = reflect.TypeOf(col[countIndex]).Kind()
 	countFunc, ok := countAggregateFuncMapping[kind]
 	if !ok {
 		return nil, errs.ErrMergerAggregateFuncNotFound
 	}
-	return countFunc(cols, s.countInfo.Index)
+	return countFunc, nil
 }
 
 func (s *Count) ColumnName() string {
-	return s.countName
+	return s.countInfo.Name
 }
 
 func NewCount(info ColumnInfo) *Count {
 	return &Count{
 		countInfo: info,
-		countName: info.Name,
 	}
 }
 

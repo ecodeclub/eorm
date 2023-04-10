@@ -22,31 +22,37 @@ import (
 
 type Sum struct {
 	sumColumnInfo ColumnInfo
-	sumName       string
 }
 
 func (s *Sum) Aggregate(cols [][]any) (any, error) {
-	var kind reflect.Kind
-	sumIndex := s.sumColumnInfo.Index
-	if sumIndex < 0 || sumIndex >= len(cols[0]) {
-		return nil, errs.ErrMergerInvalidAggregateColumnIndex
-	}
-	kind = reflect.TypeOf(cols[0][sumIndex]).Kind()
-	sumFunc, ok := sumAggregateFuncMapping[kind]
-	if !ok {
-		return nil, errs.ErrMergerAggregateFuncNotFound
+	sumFunc, err := s.findSumFunc(cols[0])
+	if err != nil {
+		return nil, err
 	}
 	return sumFunc(cols, s.sumColumnInfo.Index)
 }
 
+func (s *Sum) findSumFunc(col []any) (func([][]any, int) (any, error), error) {
+	var kind reflect.Kind
+	sumIndex := s.sumColumnInfo.Index
+	if sumIndex < 0 || sumIndex >= len(col) {
+		return nil, errs.ErrMergerInvalidAggregateColumnIndex
+	}
+	kind = reflect.TypeOf(col[sumIndex]).Kind()
+	sumFunc, ok := sumAggregateFuncMapping[kind]
+	if !ok {
+		return nil, errs.ErrMergerAggregateFuncNotFound
+	}
+	return sumFunc, nil
+}
+
 func (s *Sum) ColumnName() string {
-	return s.sumName
+	return s.sumColumnInfo.Name
 }
 
 func NewSum(info ColumnInfo) *Sum {
 	return &Sum{
 		sumColumnInfo: info,
-		sumName:       info.Name,
 	}
 }
 
