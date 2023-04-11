@@ -67,7 +67,7 @@ func (s *ShardingSelector[T]) Build(ctx context.Context) ([]sharding.Query, erro
 			return nil, err
 		}
 		res = append(res, q)
-		s.args = make([]any, 0, 8)
+		s.args = nil
 		s.buffer.Reset()
 	}
 	return res, nil
@@ -181,11 +181,8 @@ func (s *ShardingSelector[T]) findDstByPredicate(ctx context.Context, pre Predic
 		}
 		return s.mergeOR(left, right), nil
 	case opIn:
-		col, isCol := pre.left.(Column)
-		right, isVals := pre.right.(values)
-		if !isCol || !isVals {
-			return sharding.EmptyResult, errs.ErrUnsupportedTooComplexQuery
-		}
+		col := pre.left.(Column)
+		right := pre.right.(values)
 		var results []sharding.Result
 		for _, val := range right.data {
 			res, err := s.meta.ShardingAlgorithm.Sharding(ctx,

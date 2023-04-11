@@ -16,6 +16,7 @@ package eorm
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 
@@ -3605,41 +3606,6 @@ func TestShardingSelector_Build(t *testing.T) {
 		wantErr error
 	}{
 		{
-			name: "too complex operator",
-			builder: func() sharding.QueryBuilder {
-				s := NewShardingSelector[Order](shardingDB).Where(C("Content").Like("%kfc"))
-				return s
-			}(),
-			wantErr: errs.NewUnsupportedOperatorError(opLike.Text),
-		},
-		{
-			name: "too complex expr",
-			builder: func() sharding.QueryBuilder {
-				s := NewShardingSelector[Order](shardingDB).Where(Avg("UserId").EQ([]int{1, 2, 3}))
-				return s
-			}(),
-			wantErr: errs.ErrUnsupportedTooComplexQuery,
-		},
-		{
-			name: "miss sharding key err",
-			builder: func() sharding.QueryBuilder {
-				reg := model.NewMetaRegistry()
-				meta, err := reg.Register(&Order{},
-					model.WithTableShardingAlgorithm(&hash.Hash{}))
-				require.NoError(t, err)
-				require.NotNil(t, meta.ShardingAlgorithm)
-				db, err := OpenDS("sqlite3",
-					shardingsource.NewShardingDataSource(map[string]datasource.DataSource{
-						"0.db.cluster.company.com:3306": MasterSlavesMemoryDB(),
-					}),
-					DBOptionWithMetaRegistry(reg))
-				require.NoError(t, err)
-				s := NewShardingSelector[Order](db).Where(C("UserId").EQ(123))
-				return s
-			}(),
-			wantErr: errs.ErrMissingShardingKey,
-		},
-		{
 			name: "only eq",
 			builder: func() sharding.QueryBuilder {
 				s := NewShardingSelector[Order](shardingDB).Where(C("UserId").EQ(123))
@@ -4393,6 +4359,54 @@ func TestShardingSelector_Build(t *testing.T) {
 			}(),
 		},
 		{
+			name: "not where",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content"))
+				return s
+			}(),
+			qs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "SELECT `order_id`,`content` FROM `%s`.`%s`;"
+				for i := 0; i < dbBase; i++ {
+					dbName := fmt.Sprintf(dbPattern, i)
+					for j := 0; j < tableBase; j++ {
+						tableName := fmt.Sprintf(tablePattern, j)
+						res = append(res, sharding.Query{
+							SQL:        fmt.Sprintf(sql, dbName, tableName),
+							DB:         dbName,
+							Datasource: dsPattern,
+						})
+					}
+				}
+				return res
+			}(),
+		},
+		{
+			name: "select from",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).From(&Order{})
+				return s
+			}(),
+			qs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "SELECT `order_id`,`content` FROM `%s`.`%s`;"
+				for i := 0; i < dbBase; i++ {
+					dbName := fmt.Sprintf(dbPattern, i)
+					for j := 0; j < tableBase; j++ {
+						tableName := fmt.Sprintf(tablePattern, j)
+						res = append(res, sharding.Query{
+							SQL:        fmt.Sprintf(sql, dbName, tableName),
+							DB:         dbName,
+							Datasource: dsPattern,
+						})
+					}
+				}
+				return res
+			}(),
+		},
+		{
 			name: "and empty",
 			builder: func() sharding.QueryBuilder {
 				s := NewShardingSelector[Order](shardingDB).
@@ -4415,6 +4429,117 @@ func TestShardingSelector_Build(t *testing.T) {
 			assert.ElementsMatch(t, c.qs, qs)
 		})
 	}
+}
+
+func TestShardingSelector_Build_Error(t *testing.T) {
+	r := model.NewMetaRegistry()
+	dbBase, tableBase := 2, 3
+	dbPattern, tablePattern, dsPattern := "order_db_%d", "order_tab_%d", "0.db.cluster.company.com:3306"
+	_, err := r.Register(&Order{},
+		model.WithTableShardingAlgorithm(&hash.Hash{
+			ShardingKey:  "UserId",
+			DBPattern:    &hash.Pattern{Name: dbPattern, Base: dbBase},
+			TablePattern: &hash.Pattern{Name: tablePattern, Base: tableBase},
+			DsPattern:    &hash.Pattern{Name: dsPattern, NotSharding: true},
+		}))
+	require.NoError(t, err)
+
+	m := map[string]*masterslave.MasterSlavesDB{
+		"order_db_0": MasterSlavesMemoryDB(),
+		"order_db_1": MasterSlavesMemoryDB(),
+		"order_db_2": MasterSlavesMemoryDB(),
+	}
+	clusterDB := cluster.NewClusterDB(m)
+	ds := map[string]datasource.DataSource{
+		"0.db.cluster.company.com:3306": clusterDB,
+	}
+	shardingDB, err := OpenDS("sqlite3",
+		shardingsource.NewShardingDataSource(ds), DBOptionWithMetaRegistry(r))
+	require.NoError(t, err)
+
+	testCases := []struct {
+		name    string
+		builder sharding.QueryBuilder
+		qs      []sharding.Query
+		wantErr error
+	}{
+		{
+			name: "invalid field err",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).Select(C("ccc"))
+				return s
+			}(),
+			wantErr: errs.NewInvalidFieldError("ccc"),
+		},
+		{
+			name: "group by invalid field err",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).Select(C("UserId")).GroupBy("ccc")
+				return s
+			}(),
+			wantErr: errs.NewInvalidFieldError("ccc"),
+		},
+		{
+			name: "order by invalid field err",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).Select(C("UserId")).OrderBy(ASC("ccc"))
+				return s
+			}(),
+			wantErr: errs.NewInvalidFieldError("ccc"),
+		},
+		{
+			name: "pointer only err",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[int64](shardingDB)
+				return s
+			}(),
+			wantErr: errs.ErrPointerOnly,
+		},
+		{
+			name: "too complex operator",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).Where(C("Content").Like("%kfc"))
+				return s
+			}(),
+			wantErr: errs.NewUnsupportedOperatorError(opLike.Text),
+		},
+		{
+			name: "too complex expr",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).Where(Avg("UserId").EQ(1))
+				return s
+			}(),
+			wantErr: errs.ErrUnsupportedTooComplexQuery,
+		},
+		{
+			name: "miss sharding key err",
+			builder: func() sharding.QueryBuilder {
+				reg := model.NewMetaRegistry()
+				meta, err := reg.Register(&Order{},
+					model.WithTableShardingAlgorithm(&hash.Hash{}))
+				require.NoError(t, err)
+				require.NotNil(t, meta.ShardingAlgorithm)
+				db, err := OpenDS("sqlite3",
+					shardingsource.NewShardingDataSource(map[string]datasource.DataSource{
+						"0.db.cluster.company.com:3306": MasterSlavesMemoryDB(),
+					}),
+					DBOptionWithMetaRegistry(reg))
+				require.NoError(t, err)
+				s := NewShardingSelector[Order](db).Where(C("UserId").EQ(123))
+				return s
+			}(),
+			wantErr: errs.ErrMissingShardingKey,
+		},
+	}
+
+	for _, tc := range testCases {
+		c := tc
+		t.Run(c.name, func(t *testing.T) {
+			_, err = c.builder.Build(context.Background())
+			assert.Equal(t, c.wantErr, err)
+		})
+	}
+
 }
 
 func TestShardingSelector_Get(t *testing.T) {
@@ -4456,21 +4581,72 @@ func TestShardingSelector_Get(t *testing.T) {
 		wantRes   *test.OrderDetail
 	}{
 		{
+			name: "invalid field err",
+			s: func() *ShardingSelector[test.OrderDetail] {
+				b := NewShardingSelector[test.OrderDetail](shardingDB).Select(C("ccc"))
+				return b
+			}(),
+			mockOrder: func(mock sqlmock.Sqlmock) {},
+			wantErr:   errs.NewInvalidFieldError("ccc"),
+		},
+		{
 			name: "not gen sharding query",
 			s: func() *ShardingSelector[test.OrderDetail] {
-				builder := NewShardingSelector[test.OrderDetail](shardingDB).
+				b := NewShardingSelector[test.OrderDetail](shardingDB).
 					Where(C("OrderId").EQ(12).And(C("OrderId").EQ(14)))
-				return builder
+				return b
 			}(),
 			mockOrder: func(mock sqlmock.Sqlmock) {},
 			wantErr:   errs.ErrNotGenShardingQuery,
 		},
 		{
+			name: "no rows err",
+			s: func() *ShardingSelector[test.OrderDetail] {
+				b := NewShardingSelector[test.OrderDetail](shardingDB).Select(C("UsingCol1")).
+					Where(C("OrderId").EQ(123))
+				return b
+			}(),
+			mockOrder: func(mock sqlmock.Sqlmock) {
+				rows := mock.NewRows([]string{"order_id", "item_id", "using_col1", "using_col2"})
+				mock.ExpectQuery("SELECT `using_col1` FROM `order_detail_db_1`.`order_detail_tab_0` WHERE `order_id`=? LIMIT ?;").
+					WithArgs(123, 1).WillReturnRows(rows)
+			},
+			wantErr: ErrNoRows,
+		},
+		{
+			name: "query err",
+			s: func() *ShardingSelector[test.OrderDetail] {
+				b := NewShardingSelector[test.OrderDetail](shardingDB).Select(C("UsingCol1")).
+					Where(C("OrderId").EQ(123))
+				return b
+			}(),
+			mockOrder: func(mock sqlmock.Sqlmock) {
+				mock.ExpectQuery("SELECT `using_col1` FROM `order_detail_db_1`.`order_detail_tab_0` WHERE `order_id`=? LIMIT ?;").
+					WithArgs(123, 1).WillReturnError(errors.New("query exception"))
+			},
+			wantErr: errors.New("query exception"),
+		},
+		{
+			name: "multi row err",
+			s: func() *ShardingSelector[test.OrderDetail] {
+				b := NewShardingSelector[test.OrderDetail](shardingDB).
+					Where(C("OrderId").EQ(123))
+				return b
+			}(),
+			mockOrder: func(mock sqlmock.Sqlmock) {
+				rows := mock.NewRows([]string{"order_id", "item_id", "using_col1", "using_col2", "using_col3"}).
+					AddRow(123, 10, "LeBron", "James", "de")
+				mock.ExpectQuery("SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail_db_1`.`order_detail_tab_0` WHERE `order_id`=? LIMIT ?;").
+					WithArgs(123, 1).WillReturnRows(rows)
+			},
+			wantErr: errs.ErrTooManyColumns,
+		},
+		{
 			name: "only result one query",
 			s: func() *ShardingSelector[test.OrderDetail] {
-				builder := NewShardingSelector[test.OrderDetail](shardingDB).
+				b := NewShardingSelector[test.OrderDetail](shardingDB).
 					Where(C("OrderId").EQ(123).Or(C("ItemId").EQ(12)))
-				return builder
+				return b
 			}(),
 			mockOrder: func(mock sqlmock.Sqlmock) {},
 			wantErr:   errs.ErrOnlyResultOneQuery,
@@ -4478,9 +4654,9 @@ func TestShardingSelector_Get(t *testing.T) {
 		{
 			name: "found tab 1",
 			s: func() *ShardingSelector[test.OrderDetail] {
-				builder := NewShardingSelector[test.OrderDetail](shardingDB).
+				b := NewShardingSelector[test.OrderDetail](shardingDB).
 					Where(C("OrderId").EQ(123))
-				return builder
+				return b
 			}(),
 			mockOrder: func(mock sqlmock.Sqlmock) {
 				rows := mock.NewRows([]string{"order_id", "item_id", "using_col1", "using_col2"}).
@@ -4494,9 +4670,9 @@ func TestShardingSelector_Get(t *testing.T) {
 		{
 			name: "found tab 2",
 			s: func() *ShardingSelector[test.OrderDetail] {
-				builder := NewShardingSelector[test.OrderDetail](shardingDB).
+				b := NewShardingSelector[test.OrderDetail](shardingDB).
 					Where(C("OrderId").EQ(234))
-				return builder
+				return b
 			}(),
 			mockOrder: func(mock sqlmock.Sqlmock) {
 				rows := mock.NewRows([]string{"order_id", "item_id", "using_col1", "using_col2"}).
@@ -4510,9 +4686,9 @@ func TestShardingSelector_Get(t *testing.T) {
 		{
 			name: "found tab and",
 			s: func() *ShardingSelector[test.OrderDetail] {
-				builder := NewShardingSelector[test.OrderDetail](shardingDB).
+				b := NewShardingSelector[test.OrderDetail](shardingDB).
 					Where(C("OrderId").EQ(234).And(C("ItemId").EQ(12)))
-				return builder
+				return b
 			}(),
 			mockOrder: func(mock sqlmock.Sqlmock) {
 				rows := mock.NewRows([]string{"order_id", "item_id", "using_col1", "using_col2"}).
