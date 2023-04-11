@@ -139,42 +139,49 @@ func (r *Rows) getColsInfo() ([][]any, error) {
 	// 所有sql.Rows的数据
 	rowsData := make([][]any, 0, len(r.rowsList))
 	for _, row := range r.rowsList {
-		colsInfo, err := row.ColumnTypes()
+		colData, err := r.getColInfo(row)
 		if err != nil {
 			return nil, err
 		}
-		// colsData 表示一个sql.Rows的数据
-		colsData := make([]any, 0, len(colsInfo))
-		if row.Next() {
-			// 拿到sql.Rows字段的类型然后初始化
-			for _, colInfo := range colsInfo {
-				typ := colInfo.ScanType()
-				// sqlite3的驱动返回的是指针。循环的去除指针
-				for typ.Kind() == reflect.Pointer {
-					typ = typ.Elem()
-				}
-				newData := reflect.New(typ).Interface()
-				colsData = append(colsData, newData)
-			}
-			// 通过Scan赋值
-			err = row.Scan(colsData...)
-			if err != nil {
-				return nil, err
-			}
-			// 去掉reflect.New的指针
-			for i := 0; i < len(colsData); i++ {
-				colsData[i] = reflect.ValueOf(colsData[i]).Elem().Interface()
-			}
-		} else {
-			// sql.Rows迭代过程中发生报错，返回报错
-			if row.Err() != nil {
-				return nil, row.Err()
-			}
-			return nil, errs.ErrMergerAggregateHasEmptyRows
-		}
-		rowsData = append(rowsData, colsData)
+		rowsData = append(rowsData, colData)
 	}
 	return rowsData, nil
+}
+func (r *Rows) getColInfo(row *sql.Rows) ([]any, error) {
+	colsInfo, err := row.ColumnTypes()
+	if err != nil {
+		return nil, err
+	}
+	// colsData 表示一个sql.Rows的数据
+	colsData := make([]any, 0, len(colsInfo))
+	if row.Next() {
+		// 拿到sql.Rows字段的类型然后初始化
+		for _, colInfo := range colsInfo {
+			typ := colInfo.ScanType()
+			// sqlite3的驱动返回的是指针。循环的去除指针
+			for typ.Kind() == reflect.Pointer {
+				typ = typ.Elem()
+			}
+			newData := reflect.New(typ).Interface()
+			colsData = append(colsData, newData)
+		}
+		// 通过Scan赋值
+		err = row.Scan(colsData...)
+		if err != nil {
+			return nil, err
+		}
+		// 去掉reflect.New的指针
+		for i := 0; i < len(colsData); i++ {
+			colsData[i] = reflect.ValueOf(colsData[i]).Elem().Interface()
+		}
+	} else {
+		// sql.Rows迭代过程中发生报错，返回报错
+		if row.Err() != nil {
+			return nil, row.Err()
+		}
+		return nil, errs.ErrMergerAggregateHasEmptyRows
+	}
+	return colsData, nil
 }
 
 func (r *Rows) Scan(dest ...any) error {

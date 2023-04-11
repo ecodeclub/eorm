@@ -19,6 +19,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"testing"
+
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/ecodeclub/eorm/internal/merger/aggregatemerger/aggregator"
 	"github.com/ecodeclub/eorm/internal/merger/internal/errs"
@@ -27,11 +29,11 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/multierr"
-	"testing"
 )
 
 var (
-	nextMockErr error = errors.New("rows: MockNextErr")
+	nextMockErr   error = errors.New("rows: MockNextErr")
+	aggregatorErr error = errors.New("aggregator: MockAggregatorErr")
 )
 
 func newCloseMockErr(dbName string) error {
@@ -112,7 +114,7 @@ func (ms *MergerSuite) TestRows_NextAndScan() {
 		wantErr     error
 	}{
 		{
-			name: "rowList中含有sqlLite",
+			name: "sqlite的ColumnType 使用了多级指针",
 			sqlRows: func() []*sql.Rows {
 				cols := []string{"SUM(id)"}
 				query := "SELECT SUM(`id`) FROM `t1`"
@@ -550,6 +552,31 @@ func (ms *MergerSuite) TestRows_NextAndErr() {
 			}(),
 			wantErr: nextMockErr,
 		},
+		{
+			name: "有一个aggregator返回error",
+			rowsList: func() []*sql.Rows {
+				cols := []string{"COUNT(id)"}
+				query := "SELECT COUNT(`id`) FROM `t1`"
+				ms.mock01.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(1))
+				ms.mock02.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(2))
+				ms.mock03.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(4))
+				ms.mock04.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(5))
+				dbs := []*sql.DB{ms.mockDB01, ms.mockDB02, ms.mockDB03, ms.mockDB04}
+				rowsList := make([]*sql.Rows, 0, len(dbs))
+				for _, db := range dbs {
+					row, err := db.QueryContext(context.Background(), query)
+					require.NoError(ms.T(), err)
+					rowsList = append(rowsList, row)
+				}
+				return rowsList
+			},
+			aggregators: func() []aggregator.Aggregator {
+				return []aggregator.Aggregator{
+					mockAggregate{},
+				}
+			}(),
+			wantErr: aggregatorErr,
+		},
 	}
 	for _, tc := range testcases {
 		ms.T().Run(tc.name, func(t *testing.T) {
@@ -558,6 +585,9 @@ func (ms *MergerSuite) TestRows_NextAndErr() {
 			require.NoError(t, err)
 			for rows.Next() {
 			}
+			count := int64(0)
+			err = rows.Scan(&count)
+			assert.Equal(t, tc.wantErr, err)
 			assert.Equal(t, tc.wantErr, rows.Err())
 		})
 	}
@@ -715,4 +745,15 @@ func (ms *MergerSuite) TestMerger_Merge() {
 			require.NotNil(t, r)
 		})
 	}
+}
+
+type mockAggregate struct {
+}
+
+func (m mockAggregate) Aggregate(cols [][]any) (any, error) {
+	return nil, aggregatorErr
+}
+
+func (m mockAggregate) ColumnName() string {
+	return "mockAggregate"
 }
