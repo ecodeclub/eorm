@@ -65,7 +65,9 @@ func (m *Merger) Merge(ctx context.Context, results []*sql.Rows) (merger.Rows, e
 		rowsList:    results,
 		aggregators: m.aggregators,
 		mu:          &sync.RWMutex{},
-		columns:     m.colNames,
+		//聚合函数AVG传递到各个sql.Rows时会被转化为SUM和COUNT，这是一个对外不可见的转化。
+		//所以merger.Rows的列名及顺序是由上方aggregator出现的顺序及ColumnName()的返回值决定的而不是sql.Rows。
+		columns: m.colNames,
 	}, nil
 
 }
@@ -98,8 +100,8 @@ func (r *Rows) Next() bool {
 		_ = r.Close()
 		return false
 	}
-	// 从rowsList里面获取数据
-	rowsData, err := r.getColsInfo()
+
+	rowsData, err := r.getSqlRowsData()
 	r.hasNext = true
 	if err != nil {
 		r.lastErr = err
@@ -108,7 +110,7 @@ func (r *Rows) Next() bool {
 		return false
 	}
 	// 进行聚合函数计算
-	res, err := r.getAggregateInfo(rowsData)
+	res, err := r.executeAggregateCalculation(rowsData)
 	if err != nil {
 		r.lastErr = err
 		r.mu.Unlock()
@@ -122,24 +124,25 @@ func (r *Rows) Next() bool {
 }
 
 // getAggregateInfo 进行aggregate运算
-func (r *Rows) getAggregateInfo(rowsData [][]any) ([]any, error) {
+func (r *Rows) executeAggregateCalculation(rowsData [][]any) ([]any, error) {
 	res := make([]any, 0, len(r.aggregators))
 	for _, agg := range r.aggregators {
 		val, err := agg.Aggregate(rowsData)
 		if err != nil {
 			return nil, err
 		}
+
 		res = append(res, val)
 	}
 	return res, nil
 }
 
-// getColInfo 从sqlRows里面获取数据
-func (r *Rows) getColsInfo() ([][]any, error) {
+// getSqlRowData 从sqlRows里面获取数据
+func (r *Rows) getSqlRowsData() ([][]any, error) {
 	// 所有sql.Rows的数据
 	rowsData := make([][]any, 0, len(r.rowsList))
 	for _, row := range r.rowsList {
-		colData, err := r.getColInfo(row)
+		colData, err := r.getSqlRowData(row)
 		if err != nil {
 			return nil, err
 		}
@@ -147,7 +150,7 @@ func (r *Rows) getColsInfo() ([][]any, error) {
 	}
 	return rowsData, nil
 }
-func (r *Rows) getColInfo(row *sql.Rows) ([]any, error) {
+func (r *Rows) getSqlRowData(row *sql.Rows) ([]any, error) {
 	colsInfo, err := row.ColumnTypes()
 	if err != nil {
 		return nil, err

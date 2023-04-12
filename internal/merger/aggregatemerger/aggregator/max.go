@@ -76,7 +76,7 @@ var maxFuncMapping = map[reflect.Kind]func([][]any, int) (any, error){
 
 type extremeValueFunc[T AggregateElement] func(T, T) bool
 
-func findExtremeValue[T AggregateElement](colsData [][]any, isExtremeValueFunc extremeValueFunc[T], index int) (any, error) {
+func findExtremeValue[T AggregateElement](colsData [][]any, isExtremeValue extremeValueFunc[T], index int) (any, error) {
 	var ans T
 	for idx, colData := range colsData {
 		data := colData[index].(T)
@@ -84,7 +84,7 @@ func findExtremeValue[T AggregateElement](colsData [][]any, isExtremeValueFunc e
 			ans = data
 			continue
 		}
-		if isExtremeValueFunc(ans, data) {
+		if isExtremeValue(ans, data) {
 			ans = data
 		}
 	}

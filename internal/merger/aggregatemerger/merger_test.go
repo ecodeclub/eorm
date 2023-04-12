@@ -110,25 +110,22 @@ func (ms *MergerSuite) TestRows_NextAndScan() {
 		sqlRows     func() []*sql.Rows
 		wantVal     []any
 		aggregators func() []aggregator.Aggregator
-		res         []any
+		gotVal      []any
 		wantErr     error
 	}{
 		{
 			name: "sqlite的ColumnType 使用了多级指针",
 			sqlRows: func() []*sql.Rows {
+				query1 := "insert into `t1` values (1,10),(2,20),(3,30)"
+				_, err := ms.db05.ExecContext(context.Background(), query1)
+				require.NoError(ms.T(), err)
 				cols := []string{"SUM(id)"}
 				query := "SELECT SUM(`id`) FROM `t1`"
 				ms.mock01.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(10))
 				ms.mock02.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(20))
 				ms.mock03.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(30))
-				query1 := "insert into `t1` values (1,10),(2,20),(3,30)"
-				_, err := ms.db05.ExecContext(context.Background(), query1)
-				require.NoError(ms.T(), err)
-				dbs := []*sql.DB{ms.mockDB01, ms.mockDB02, ms.mockDB03}
-				rowsList := make([]*sql.Rows, 0, len(dbs)+1)
-				rows, err := ms.db05.QueryContext(context.Background(), query)
-				require.NoError(ms.T(), err)
-				rowsList = append(rowsList, rows)
+				dbs := []*sql.DB{ms.mockDB01, ms.mockDB02, ms.mockDB03, ms.db05}
+				rowsList := make([]*sql.Rows, 0, len(dbs))
 				for _, db := range dbs {
 					row, err := db.QueryContext(context.Background(), query)
 					require.NoError(ms.T(), err)
@@ -137,7 +134,7 @@ func (ms *MergerSuite) TestRows_NextAndScan() {
 				return rowsList
 			},
 			wantVal: []any{int64(66)},
-			res: func() []any {
+			gotVal: func() []any {
 				return []any{
 					0,
 				}
@@ -149,7 +146,7 @@ func (ms *MergerSuite) TestRows_NextAndScan() {
 			},
 		},
 		{
-			name: "单个SUM",
+			name: "SUM(id)",
 			sqlRows: func() []*sql.Rows {
 				cols := []string{"SUM(id)"}
 				query := "SELECT SUM(`id`) FROM `t1`"
@@ -166,7 +163,7 @@ func (ms *MergerSuite) TestRows_NextAndScan() {
 				return rowsList
 			},
 			wantVal: []any{int64(60)},
-			res: func() []any {
+			gotVal: func() []any {
 				return []any{
 					0,
 				}
@@ -179,7 +176,7 @@ func (ms *MergerSuite) TestRows_NextAndScan() {
 		},
 
 		{
-			name: "单个MAX",
+			name: "MAX(id)",
 			sqlRows: func() []*sql.Rows {
 				cols := []string{"MAX(id)"}
 				query := "SELECT MAX(`id`) FROM `t1`"
@@ -196,7 +193,7 @@ func (ms *MergerSuite) TestRows_NextAndScan() {
 				return rowsList
 			},
 			wantVal: []any{int64(30)},
-			res: func() []any {
+			gotVal: func() []any {
 				return []any{
 					0,
 				}
@@ -208,7 +205,7 @@ func (ms *MergerSuite) TestRows_NextAndScan() {
 			},
 		},
 		{
-			name: "单个MIN",
+			name: "MIN(id)",
 			sqlRows: func() []*sql.Rows {
 				cols := []string{"MIN(id)"}
 				query := "SELECT MIN(`id`) FROM `t1`"
@@ -225,7 +222,7 @@ func (ms *MergerSuite) TestRows_NextAndScan() {
 				return rowsList
 			},
 			wantVal: []any{int64(10)},
-			res: func() []any {
+			gotVal: func() []any {
 				return []any{
 					0,
 				}
@@ -237,7 +234,7 @@ func (ms *MergerSuite) TestRows_NextAndScan() {
 			},
 		},
 		{
-			name: "单个count",
+			name: "COUNT(id)",
 			sqlRows: func() []*sql.Rows {
 				cols := []string{"COUNT(id)"}
 				query := "SELECT COUNT(`id`) FROM `t1`"
@@ -254,7 +251,7 @@ func (ms *MergerSuite) TestRows_NextAndScan() {
 				return rowsList
 			},
 			wantVal: []any{int64(40)},
-			res: func() []any {
+			gotVal: func() []any {
 				return []any{
 					0,
 				}
@@ -266,7 +263,7 @@ func (ms *MergerSuite) TestRows_NextAndScan() {
 			},
 		},
 		{
-			name: "AVG",
+			name: "AVG(grade)",
 			sqlRows: func() []*sql.Rows {
 				cols := []string{"SUM(grade)", "COUNT(grade)"}
 				query := "SELECT SUM(`grade`),COUNT(`grade`) FROM `t1`"
@@ -285,7 +282,7 @@ func (ms *MergerSuite) TestRows_NextAndScan() {
 			wantVal: []any{
 				float64(150),
 			},
-			res: func() []any {
+			gotVal: func() []any {
 				return []any{
 					float64(0),
 				}
@@ -300,7 +297,7 @@ func (ms *MergerSuite) TestRows_NextAndScan() {
 
 		// 1.每种聚合函数出现一次
 		{
-			name: "COUNT,MAX,MIN,SUM,AVG",
+			name: "COUNT(id),MAX(id),MIN(id),SUM(id),AVG(grade)",
 			sqlRows: func() []*sql.Rows {
 				cols := []string{"COUNT(id)", "MAX(id)", "MIN(id)", "SUM(id)", "SUM(grade)", "COUNT(grade)"}
 				query := "SELECT COUNT(`id`),MAX(`id`),MIN(`id`),SUM(`id`),SUM(`grade`),COUNT(`student`) FROM `t1`"
@@ -319,7 +316,7 @@ func (ms *MergerSuite) TestRows_NextAndScan() {
 			wantVal: []any{
 				int64(40), int64(40), int64(0), int64(600), float64(4600) / float64(50),
 			},
-			res: func() []any {
+			gotVal: func() []any {
 				return []any{
 					0, 0, 0, 0, float64(0),
 				}
@@ -334,9 +331,10 @@ func (ms *MergerSuite) TestRows_NextAndScan() {
 				}
 			},
 		},
-		// 2. 每种聚合函数出现多次，会有相同的聚合函数类型，且相同的聚合函数类型会有连续出现，和不连续出现。两个avg会包含sum列在前，和sum列在后的状态。并且有完全相同的列出现
+		// 2. 聚合函数出现一次或多次，会有相同的聚合函数类型，且相同的聚合函数类型会有连续出现，和不连续出现。
+		// 两个avg会包含sum列在前，和sum列在后的状态。并且有完全相同的列出现
 		{
-			name: "avg,sum,avg,min,min,max,count",
+			name: "AVG(grade),SUM(grade),AVG(grade),MIN(id),MIN(userid),MAX(id),COUNT(id)",
 			sqlRows: func() []*sql.Rows {
 				cols := []string{"SUM(grade)", "COUNT(grade)", "SUM(grade)", "COUNT(grade)", "SUM(grade)", "MIN(id)", "MIN(userid)", "MAX(id)", "COUNT(id)"}
 				query := "SELECT SUM(`grade`),COUNT(`grade`),SUM(`grade`),COUNT(`grade`),SUM(`grade`),MIN(`id`),MIN(`userid`),MAX(`id`),COUNT(`id`) FROM `t1`"
@@ -355,7 +353,7 @@ func (ms *MergerSuite) TestRows_NextAndScan() {
 			wantVal: []any{
 				float64(3800) / float64(40), int64(3800), float64(3800) / float64(40), int64(5), int64(6), int64(300), int64(700),
 			},
-			res: func() []any {
+			gotVal: func() []any {
 				return []any{
 					float64(0), 0, float64(0), 0, 0, 0, 0,
 				}
@@ -395,7 +393,7 @@ func (ms *MergerSuite) TestRows_NextAndScan() {
 				return rowsList
 			},
 			wantVal: []any{60},
-			res: func() []any {
+			gotVal: func() []any {
 				return []any{
 					0,
 				}
@@ -427,7 +425,7 @@ func (ms *MergerSuite) TestRows_NextAndScan() {
 				return rowsList
 			},
 			wantVal: []any{60},
-			res: func() []any {
+			gotVal: func() []any {
 				return []any{
 					0,
 				}
@@ -459,7 +457,7 @@ func (ms *MergerSuite) TestRows_NextAndScan() {
 				return rowsList
 			},
 			wantVal: []any{60},
-			res: func() []any {
+			gotVal: func() []any {
 				return []any{
 					0,
 				}
@@ -504,9 +502,9 @@ func (ms *MergerSuite) TestRows_NextAndScan() {
 			rows, err := m.Merge(context.Background(), tc.sqlRows())
 			require.NoError(t, err)
 			for rows.Next() {
-				kk := make([]any, 0, len(tc.res))
-				for i := 0; i < len(tc.res); i++ {
-					kk = append(kk, &tc.res[i])
+				kk := make([]any, 0, len(tc.gotVal))
+				for i := 0; i < len(tc.gotVal); i++ {
+					kk = append(kk, &tc.gotVal[i])
 				}
 				err = rows.Scan(kk...)
 				require.NoError(t, err)
@@ -515,7 +513,7 @@ func (ms *MergerSuite) TestRows_NextAndScan() {
 			if rows.Err() != nil {
 				return
 			}
-			assert.Equal(t, tc.wantVal, tc.res)
+			assert.Equal(t, tc.wantVal, tc.gotVal)
 		})
 	}
 }
@@ -572,7 +570,7 @@ func (ms *MergerSuite) TestRows_NextAndErr() {
 			},
 			aggregators: func() []aggregator.Aggregator {
 				return []aggregator.Aggregator{
-					mockAggregate{},
+					&mockAggregate{},
 				}
 			}(),
 			wantErr: aggregatorErr,
@@ -642,12 +640,19 @@ func (ms *MergerSuite) TestRows_Close() {
 }
 
 func (ms *MergerSuite) TestRows_Columns() {
-	cols := []string{"SUM(grade)", "COUNT(grade)"}
-	query := "SELECT SUM(`grade`),COUNT(`grade`) FROM `t1`"
-	ms.mock01.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(1, 1))
-	ms.mock02.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(2, 1))
-	ms.mock03.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(3, 1))
-	merger := NewMerger(aggregator.NewAVG(aggregator.NewColumnInfo(0, "SUM(grade)"), aggregator.NewColumnInfo(1, "COUNT(grade)"), "AVG(grade)"))
+	cols := []string{"SUM(grade)", "COUNT(grade)", "SUM(id)", "MIN(id)", "MAX(id)", "COUNT(id)"}
+	query := "SELECT SUM(`grade`),COUNT(`grade`),SUM(`id`),MIN(`id`),MAX(`id`),COUNT(`id`) FROM `t1`"
+	ms.mock01.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(1, 1, 2, 1, 3, 10))
+	ms.mock02.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(2, 1, 3, 2, 4, 11))
+	ms.mock03.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(3, 1, 4, 3, 5, 12))
+	aggregators := []aggregator.Aggregator{
+		aggregator.NewAVG(aggregator.NewColumnInfo(0, "SUM(grade)"), aggregator.NewColumnInfo(1, "COUNT(grade)"), "AVG(grade)"),
+		aggregator.NewSum(aggregator.NewColumnInfo(2, "SUM(id)")),
+		aggregator.NewMin(aggregator.NewColumnInfo(3, "MIN(id)")),
+		aggregator.NewMax(aggregator.NewColumnInfo(4, "MAX(id)")),
+		aggregator.NewCount(aggregator.NewColumnInfo(5, "COUNT(id)")),
+	}
+	merger := NewMerger(aggregators...)
 	dbs := []*sql.DB{ms.mockDB01, ms.mockDB02, ms.mockDB03}
 	rowsList := make([]*sql.Rows, 0, len(dbs))
 	for _, db := range dbs {
@@ -658,7 +663,7 @@ func (ms *MergerSuite) TestRows_Columns() {
 
 	rows, err := merger.Merge(context.Background(), rowsList)
 	require.NoError(ms.T(), err)
-	wantCols := []string{"AVG(grade)"}
+	wantCols := []string{"AVG(grade)", "SUM(id)", "MIN(id)", "MAX(id)", "COUNT(id)"}
 	ms.T().Run("Next没有迭代完", func(t *testing.T) {
 		for rows.Next() {
 			columns, err := rows.Columns()
@@ -748,12 +753,14 @@ func (ms *MergerSuite) TestMerger_Merge() {
 }
 
 type mockAggregate struct {
+	cols [][]any
 }
 
-func (m mockAggregate) Aggregate(cols [][]any) (any, error) {
+func (m *mockAggregate) Aggregate(cols [][]any) (any, error) {
+	m.cols = cols
 	return nil, aggregatorErr
 }
 
-func (m mockAggregate) ColumnName() string {
+func (m *mockAggregate) ColumnName() string {
 	return "mockAggregate"
 }

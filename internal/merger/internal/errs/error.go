@@ -20,16 +20,13 @@ import (
 )
 
 var (
-	ErrEmptySortColumns              = errors.New("merger: 排序列为空")
-	ErrMergerEmptyRows               = errors.New("merger: sql.Rows列表为空")
-	ErrMergerRowsIsNull              = errors.New("merger: sql.Rows列表中有元素为nil")
-	ErrMergerScanNotNext             = errors.New("merger: Scan之前没有调用Next方法")
-	ErrMergerRowsClosed              = errors.New("merger: Rows已经关闭")
-	ErrMergerRowsDiff                = errors.New("merger: sql.Rows列表中的字段不同")
-	ErrMergerInvalidLimitOrOffset    = errors.New("merger: offset或limit小于0")
-	ErrMergerInvalidAggregateElement = errors.New("merger: 聚合函数接收的数据类型错误")
-	ErrMergerNotSetAggregateColumn   = errors.New("merger: 聚合函数列未设置")
-	// ErrMergerAggregateHasEmptyRows 如果只有一个sqlRows并且为空的情况下是不会报错
+	ErrEmptySortColumns                  = errors.New("merger: 排序列为空")
+	ErrMergerEmptyRows                   = errors.New("merger: sql.Rows列表为空")
+	ErrMergerRowsIsNull                  = errors.New("merger: sql.Rows列表中有元素为nil")
+	ErrMergerScanNotNext                 = errors.New("merger: Scan之前没有调用Next方法")
+	ErrMergerRowsClosed                  = errors.New("merger: Rows已经关闭")
+	ErrMergerRowsDiff                    = errors.New("merger: sql.Rows列表中的字段不同")
+	ErrMergerInvalidLimitOrOffset        = errors.New("merger: offset或limit小于0")
 	ErrMergerAggregateHasEmptyRows       = errors.New("merger: 聚合函数计算时rowsList有一个或多个为空")
 	ErrMergerInvalidAggregateColumnIndex = errors.New("merger: ColumnInfo的index不合法")
 	ErrMergerAggregateFuncNotFound       = errors.New("merger: 聚合函数方法未找到")

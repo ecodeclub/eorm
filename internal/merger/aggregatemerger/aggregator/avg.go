@@ -39,14 +39,14 @@ func NewAVG(sumInfo ColumnInfo, countInfo ColumnInfo, avgName string) *AVG {
 
 func (a *AVG) Aggregate(cols [][]any) (any, error) {
 	// cols[0] 代表第一个sql.Rows，用于确定avgFunc
-	avgFunc, err := a.findSumAndCountReflectKindBy(cols[0])
+	avgFunc, err := a.findAvgFunc(cols[0])
 	if err != nil {
 		return nil, err
 	}
 	return avgFunc(cols, a.sumColumnInfo.Index, a.countColumnInfo.Index)
 }
 
-func (a *AVG) findSumAndCountReflectKindBy(col []any) (func([][]any, int, int) (float64, error), error) {
+func (a *AVG) findAvgFunc(col []any) (func([][]any, int, int) (float64, error), error) {
 	sumIndex := a.sumColumnInfo.Index
 	countIndex := a.countColumnInfo.Index
 	if sumIndex >= len(col) || sumIndex < 0 || countIndex >= len(col) || countIndex < 0 {
