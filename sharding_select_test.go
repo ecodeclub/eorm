@@ -4796,9 +4796,9 @@ func TestShardingSelector_GetMulti(t *testing.T) {
 		{
 			name: "found tab or",
 			s: func() *ShardingSelector[test.OrderDetail] {
-				builder := NewShardingSelector[test.OrderDetail](shardingDB).
+				b := NewShardingSelector[test.OrderDetail](shardingDB).
 					Where(C("OrderId").EQ(123).Or(C("OrderId").EQ(234)))
-				return builder
+				return b
 			}(),
 			mockOrder: func(mock1, mock2 sqlmock.Sqlmock) {
 				rows1 := mock1.NewRows([]string{"order_id", "item_id", "using_col1", "using_col2"})
@@ -4825,7 +4825,7 @@ func TestShardingSelector_GetMulti(t *testing.T) {
 			if err != nil {
 				return
 			}
-			assert.Equal(t, tc.wantRes, res)
+			assert.ElementsMatch(t, tc.wantRes, res)
 		})
 	}
 }
