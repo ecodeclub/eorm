@@ -4714,6 +4714,122 @@ func TestShardingSelector_Get(t *testing.T) {
 	}
 }
 
+func TestShardingSelector_GetMulti(t *testing.T) {
+	r := model.NewMetaRegistry()
+	_, err := r.Register(&test.OrderDetail{},
+		model.WithTableShardingAlgorithm(&hash.Hash{
+			ShardingKey:  "OrderId",
+			DBPattern:    &hash.Pattern{Name: "order_detail_db_%d", Base: 2},
+			TablePattern: &hash.Pattern{Name: "order_detail_tab_%d", Base: 3},
+			DsPattern:    &hash.Pattern{Name: "0.db.cluster.company.com:3306", NotSharding: true},
+		}))
+	require.NoError(t, err)
+
+	mockDB, mock, err := sqlmock.New(
+		sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = mockDB.Close() }()
+
+	rbSlaves, err := roundrobin.NewSlaves(mockDB)
+	require.NoError(t, err)
+	masterSlaveDB := masterslave.NewMasterSlavesDB(
+		mockDB, masterslave.MasterSlavesWithSlaves(newMockSlaveNameGet(rbSlaves)))
+	require.NoError(t, err)
+
+	mockDB2, mock2, err := sqlmock.New(
+		sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = mockDB2.Close() }()
+
+	rbSlaves2, err := roundrobin.NewSlaves(mockDB2)
+	require.NoError(t, err)
+	masterSlaveDB2 := masterslave.NewMasterSlavesDB(
+		mockDB2, masterslave.MasterSlavesWithSlaves(newMockSlaveNameGet(rbSlaves2)))
+	require.NoError(t, err)
+
+	clusterDB := cluster.NewClusterDB(map[string]*masterslave.MasterSlavesDB{
+		"order_detail_db_0": masterSlaveDB,
+		"order_detail_db_1": masterSlaveDB2,
+	})
+	ds := map[string]datasource.DataSource{
+		"0.db.cluster.company.com:3306": clusterDB,
+	}
+	shardingDB, err := OpenDS("mysql",
+		shardingsource.NewShardingDataSource(ds), DBOptionWithMetaRegistry(r))
+	require.NoError(t, err)
+
+	testCases := []struct {
+		name      string
+		s         *ShardingSelector[test.OrderDetail]
+		mockOrder func(mock1, mock2 sqlmock.Sqlmock)
+		wantErr   error
+		wantRes   []*test.OrderDetail
+	}{
+		{
+			name: "invalid field err",
+			s: func() *ShardingSelector[test.OrderDetail] {
+				b := NewShardingSelector[test.OrderDetail](shardingDB).Select(C("ccc"))
+				return b
+			}(),
+			mockOrder: func(mock1, mock2 sqlmock.Sqlmock) {},
+			wantErr:   errs.NewInvalidFieldError("ccc"),
+		},
+		{
+			name: "multi row err",
+			s: func() *ShardingSelector[test.OrderDetail] {
+				b := NewShardingSelector[test.OrderDetail](shardingDB).
+					Where(C("OrderId").EQ(123))
+				return b
+			}(),
+			mockOrder: func(mock1, mock2 sqlmock.Sqlmock) {
+				rows := mock2.NewRows([]string{"order_id", "item_id", "using_col1", "using_col2", "using_col3"}).
+					AddRow(123, 10, "LeBron", "James", "de")
+				mock2.ExpectQuery("SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail_db_1`.`order_detail_tab_0` WHERE `order_id`=?;").
+					WithArgs(123).WillReturnRows(rows)
+			},
+			wantErr: errs.ErrTooManyColumns,
+		},
+		{
+			name: "found tab or",
+			s: func() *ShardingSelector[test.OrderDetail] {
+				builder := NewShardingSelector[test.OrderDetail](shardingDB).
+					Where(C("OrderId").EQ(123).Or(C("OrderId").EQ(234)))
+				return builder
+			}(),
+			mockOrder: func(mock1, mock2 sqlmock.Sqlmock) {
+				rows1 := mock1.NewRows([]string{"order_id", "item_id", "using_col1", "using_col2"})
+				rows1.AddRow(234, 12, "Kevin", "Durant")
+				mock1.ExpectQuery("SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail_db_0`.`order_detail_tab_0` WHERE (`order_id`=?) OR (`order_id`=?);").
+					WithArgs(123, 234).WillReturnRows(rows1)
+				rows2 := mock2.NewRows([]string{"order_id", "item_id", "using_col1", "using_col2"})
+				rows2.AddRow(123, 10, "LeBron", "James")
+				mock2.ExpectQuery("SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail_db_1`.`order_detail_tab_0` WHERE (`order_id`=?) OR (`order_id`=?);").
+					WithArgs(123, 234).WillReturnRows(rows2)
+			},
+			wantRes: []*test.OrderDetail{
+				{OrderId: 123, ItemId: 10, UsingCol1: "LeBron", UsingCol2: "James"},
+				{OrderId: 234, ItemId: 12, UsingCol1: "Kevin", UsingCol2: "Durant"},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			tc.mockOrder(mock, mock2)
+			res, err := tc.s.GetMulti(context.Background())
+			assert.Equal(t, tc.wantErr, err)
+			if err != nil {
+				return
+			}
+			assert.Equal(t, tc.wantRes, res)
+		})
+	}
+}
+
 type Order struct {
 	UserId  int
 	OrderId int64
