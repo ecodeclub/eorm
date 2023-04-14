@@ -79,14 +79,14 @@ func (m *Merger) checkColumns(rows *sql.Rows) error {
 }
 
 type Rows struct {
-	rowsList      []*sql.Rows
-	aggregators   []aggregator.Aggregator
-	closed        bool
-	mu            *sync.RWMutex
-	lastErr       error
-	cur           []any
-	columns       []string
-	nextHasCalled bool
+	rowsList    []*sql.Rows
+	aggregators []aggregator.Aggregator
+	closed      bool
+	mu          *sync.RWMutex
+	lastErr     error
+	cur         []any
+	columns     []string
+	nextCalled  bool
 }
 
 func (r *Rows) Next() bool {
@@ -95,14 +95,14 @@ func (r *Rows) Next() bool {
 		r.mu.Unlock()
 		return false
 	}
-	if r.nextHasCalled {
+	if r.nextCalled {
 		r.mu.Unlock()
 		_ = r.Close()
 		return false
 	}
 
 	rowsData, err := r.getSqlRowsData()
-	r.nextHasCalled = true
+	r.nextCalled = true
 	if err != nil {
 		r.lastErr = err
 		r.mu.Unlock()
