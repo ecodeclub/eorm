@@ -17,6 +17,7 @@ package sharding
 import (
 	"context"
 
+	operator "github.com/ecodeclub/eorm/internal/operator"
 	"github.com/ecodeclub/eorm/internal/query"
 )
 
@@ -60,5 +61,6 @@ func (r Dst) NotEquals(l Dst) bool {
 }
 
 type Request struct {
+	Op       operator.Op
 	SkValues map[string]any
 }

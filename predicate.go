@@ -14,32 +14,27 @@
 
 package eorm
 
-type op struct {
-	symbol string
-	text   string
-}
+import operator "github.com/ecodeclub/eorm/internal/operator"
 
+// type op Operator.Op
 var (
-	opLT   = op{symbol: "<", text: "<"}
-	opLTEQ = op{symbol: "<=", text: "<="}
-	opGT   = op{symbol: ">", text: ">"}
-	opGTEQ = op{symbol: ">=", text: ">="}
-	opEQ   = op{symbol: "=", text: "="}
-	opNEQ  = op{symbol: "!=", text: "!="}
-	opAdd  = op{symbol: "+", text: "+"}
-	// opIn   = op{symbol: "IN", text: " IN "}
-	// opMinus = op{symbol:"-", text: "-"}
-	opMulti = op{symbol: "*", text: "*"}
-	// opDiv = op{symbol:"/", text: "/"}
-	opAnd     = op{symbol: "AND", text: " AND "}
-	opOr      = op{symbol: "OR", text: " OR "}
-	opNot     = op{symbol: "NOT", text: "NOT "}
-	opIn      = op{symbol: "IN", text: " IN "}
-	opNotIN   = op{symbol: "NOT IN", text: " NOT IN "}
-	opFalse   = op{symbol: "FALSE", text: "FALSE"}
-	opLike    = op{symbol: "LIKE", text: " LIKE "}
-	opNotLike = op{symbol: "NOT LIKE", text: " NOT LIKE "}
-	opExist   = op{symbol: "EXIST", text: "EXIST "}
+	opLT      = operator.OpLT
+	opLTEQ    = operator.OpLTEQ
+	opGT      = operator.OpGT
+	opGTEQ    = operator.OpGTEQ
+	opEQ      = operator.OpEQ
+	opNEQ     = operator.OpNEQ
+	opAdd     = operator.OpAdd
+	opMulti   = operator.OpMulti
+	opAnd     = operator.OpAnd
+	opOr      = operator.OpOr
+	opNot     = operator.OpNot
+	opIn      = operator.OpIn
+	opNotIN   = operator.OpNotIN
+	opFalse   = operator.OpFalse
+	opLike    = operator.OpLike
+	opNotLike = operator.OpNotLike
+	opExist   = operator.OpExist
 )
 
 // Predicate will be used in Where Or Having
