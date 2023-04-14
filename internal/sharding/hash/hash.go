@@ -17,9 +17,9 @@ package hash
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/ecodeclub/eorm/internal/errs"
+	operator "github.com/ecodeclub/eorm/internal/operator"
 	"github.com/ecodeclub/eorm/internal/sharding"
 )
 
@@ -34,7 +34,6 @@ type Hash struct {
 }
 
 func (h *Hash) Broadcast(ctx context.Context) []sharding.Dst {
-
 	if !h.DBPattern.NotSharding && h.TablePattern.NotSharding && h.DsPattern.NotSharding { // 只分库
 		return h.onlyDBroadcast(ctx)
 	} else if h.DBPattern.NotSharding && !h.TablePattern.NotSharding && h.DsPattern.NotSharding { // 只分表
@@ -124,21 +123,28 @@ func (h *Hash) Sharding(ctx context.Context, req sharding.Request) (sharding.Res
 	if !ok {
 		return sharding.Result{Dsts: h.Broadcast(ctx)}, nil
 	}
-	dbName := h.DBPattern.Name
-	if !h.DBPattern.NotSharding && strings.Contains(dbName, "%d") {
-		dbName = fmt.Sprintf(dbName, skVal.(int)%h.DBPattern.Base)
+	switch req.Op {
+	case operator.OpEQ:
+		dbName := h.DBPattern.Name
+		if !h.DBPattern.NotSharding {
+			dbName = fmt.Sprintf(dbName, skVal.(int)%h.DBPattern.Base)
+		}
+		tbName := h.TablePattern.Name
+		if !h.TablePattern.NotSharding {
+			tbName = fmt.Sprintf(tbName, skVal.(int)%h.TablePattern.Base)
+		}
+		dsName := h.DsPattern.Name
+		if !h.DsPattern.NotSharding {
+			dsName = fmt.Sprintf(dsName, skVal.(int)%h.DsPattern.Base)
+		}
+		return sharding.Result{
+			Dsts: []sharding.Dst{{Name: dsName, DB: dbName, Table: tbName}},
+		}, nil
+	case operator.OpGT, operator.OpLT, operator.OpGTEQ, operator.OpLTEQ:
+		return sharding.Result{Dsts: h.Broadcast(ctx)}, nil
+	default:
+		return sharding.EmptyResult, errs.NewUnsupportedOperatorError(req.Op.Text)
 	}
-	tbName := h.TablePattern.Name
-	if !h.TablePattern.NotSharding && strings.Contains(tbName, "%d") {
-		tbName = fmt.Sprintf(tbName, skVal.(int)%h.TablePattern.Base)
-	}
-	dsName := h.DsPattern.Name
-	if !h.DsPattern.NotSharding && strings.Contains(dsName, "%d") {
-		dsName = fmt.Sprintf(dsName, skVal.(int)%h.DsPattern.Base)
-	}
-	return sharding.Result{
-		Dsts: []sharding.Dst{{Name: dsName, DB: dbName, Table: tbName}},
-	}, nil
 }
 
 func (h *Hash) ShardingKeys() []string {

@@ -67,7 +67,7 @@ func (s *ShardingSelector[T]) Build(ctx context.Context) ([]sharding.Query, erro
 			return nil, err
 		}
 		res = append(res, q)
-		s.args = make([]any, 0, 8)
+		s.args = nil
 		s.buffer.Reset()
 	}
 	return res, nil
@@ -140,7 +140,6 @@ func (s *ShardingSelector[T]) buildQuery(db, tbl, ds string) (sharding.Query, er
 		s.parameter(s.limit)
 	}
 	s.end()
-
 	return sharding.Query{SQL: s.buffer.String(), Args: s.args, Datasource: ds, DB: db}, nil
 }
 
@@ -181,16 +180,29 @@ func (s *ShardingSelector[T]) findDstByPredicate(ctx context.Context, pre Predic
 			return sharding.EmptyResult, err
 		}
 		return s.mergeOR(left, right), nil
-	case opEQ:
+	case opIn:
+		col := pre.left.(Column)
+		right := pre.right.(values)
+		var results []sharding.Result
+		for _, val := range right.data {
+			res, err := s.meta.ShardingAlgorithm.Sharding(ctx,
+				sharding.Request{Op: opEQ, SkValues: map[string]any{col.name: val}})
+			if err != nil {
+				return sharding.EmptyResult, err
+			}
+			results = append(results, res)
+		}
+		return s.mergeIN(results), nil
+	case opEQ, opGT, opLT, opGTEQ, opLTEQ:
 		col, isCol := pre.left.(Column)
 		right, isVals := pre.right.(valueExpr)
 		if !isCol || !isVals {
 			return sharding.EmptyResult, errs.ErrUnsupportedTooComplexQuery
 		}
 		return s.meta.ShardingAlgorithm.Sharding(ctx,
-			sharding.Request{SkValues: map[string]any{col.name: right.val}})
+			sharding.Request{Op: pre.op, SkValues: map[string]any{col.name: right.val}})
 	default:
-		return sharding.EmptyResult, errs.NewUnsupportedOperatorError(pre.op.text)
+		return sharding.EmptyResult, errs.NewUnsupportedOperatorError(pre.op.Text)
 	}
 }
 
@@ -207,6 +219,17 @@ func (*ShardingSelector[T]) mergeOR(left, right sharding.Result) sharding.Result
 	dsts := slice.UnionSetFunc[sharding.Dst](left.Dsts, right.Dsts, func(src, dst sharding.Dst) bool {
 		return src.Equals(dst)
 	})
+	return sharding.Result{Dsts: dsts}
+}
+
+// mergeIN 多个分片结果的并集
+func (*ShardingSelector[T]) mergeIN(vals []sharding.Result) sharding.Result {
+	var dsts []sharding.Dst
+	for _, val := range vals {
+		dsts = slice.UnionSetFunc[sharding.Dst](dsts, val.Dsts, func(src, dst sharding.Dst) bool {
+			return src.Equals(dst)
+		})
+	}
 	return sharding.Result{Dsts: dsts}
 }
 
@@ -374,8 +397,8 @@ func (s *ShardingSelector[T]) GetMulti(ctx context.Context) ([]*T, error) {
 	}
 	var rowsSlice []*sql.Rows
 	var eg errgroup.Group
-	for _, qe := range qs {
-		q := qe
+	for _, query := range qs {
+		q := query
 		eg.Go(func() error {
 			s.lock.Lock()
 			defer s.lock.Unlock()

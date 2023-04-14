@@ -233,7 +233,7 @@ func (b *builder) buildBinaryExpr(e binaryExpr) error {
 	if err != nil {
 		return err
 	}
-	b.writeString(e.op.text)
+	b.writeString(e.op.Text)
 	return b.buildSubExpr(e.right)
 }
 
