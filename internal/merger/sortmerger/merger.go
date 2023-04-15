@@ -47,16 +47,12 @@ func convertAssign(dest, src any) error
 type SortColumn struct {
 	name  string
 	order Order
-	typ   reflect.Type
 }
 
-func NewSortColumn[T Ordered](colName string, order Order) SortColumn {
-	var t T
-	typ := reflect.TypeOf(t)
+func NewSortColumn(colName string, order Order) SortColumn {
 	return SortColumn{
 		name:  colName,
 		order: order,
-		typ:   typ,
 	}
 }
 
@@ -70,8 +66,8 @@ func (s sortColumns) Has(name string) bool {
 	return ok
 }
 
-func (s sortColumns) Find(name string) (SortColumn, int) {
-	return s.columns[s.colMap[name]], s.colMap[name]
+func (s sortColumns) Find(name string) int {
+	return s.colMap[name]
 }
 
 func (s sortColumns) Get(index int) SortColumn {
@@ -198,8 +194,12 @@ func newNode(row *sql.Rows, sortCols sortColumns, index int) (*node, error) {
 	for _, colInfo := range colsInfo {
 		colName := colInfo.Name()
 		if sortCols.Has(colName) {
-			sortCol, sortIndex := sortCols.Find(colName)
-			sortColumn := reflect.New(sortCol.typ).Interface()
+			sortIndex := sortCols.Find(colName)
+			colType := colInfo.ScanType()
+			for colType.Kind() == reflect.Ptr {
+				colType = colType.Elem()
+			}
+			sortColumn := reflect.New(colType).Interface()
 			sortColumns[sortIndex] = sortColumn
 			columns = append(columns, sortColumn)
 		} else {

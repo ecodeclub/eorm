@@ -72,7 +72,7 @@ func TestHeap(t *testing.T) {
 				})
 			},
 			sortCols: func() sortColumns {
-				sortCols, err := newSortColumns(NewSortColumn[int]("id", ASC))
+				sortCols, err := newSortColumns(NewSortColumn("id", ASC))
 				require.NoError(t, err)
 				return sortCols
 			},
@@ -98,7 +98,7 @@ func TestHeap(t *testing.T) {
 				})
 			},
 			sortCols: func() sortColumns {
-				sortCols, err := newSortColumns(NewSortColumn[int]("id", DESC))
+				sortCols, err := newSortColumns(NewSortColumn("id", DESC))
 				require.NoError(t, err)
 				return sortCols
 			},
@@ -144,7 +144,7 @@ func TestHeap(t *testing.T) {
 				})
 			},
 			sortCols: func() sortColumns {
-				sortCols, err := newSortColumns(NewSortColumn[int]("id", ASC), NewSortColumn[string]("name", DESC), NewSortColumn[int]("age", ASC))
+				sortCols, err := newSortColumns(NewSortColumn("id", ASC), NewSortColumn("name", DESC), NewSortColumn("age", ASC))
 				require.NoError(t, err)
 				return sortCols
 			},
@@ -190,7 +190,7 @@ func TestHeap(t *testing.T) {
 				})
 			},
 			sortCols: func() sortColumns {
-				sortCols, err := newSortColumns(NewSortColumn[int]("id", DESC), NewSortColumn[string]("name", ASC), NewSortColumn[int]("age", DESC))
+				sortCols, err := newSortColumns(NewSortColumn("id", DESC), NewSortColumn("name", ASC), NewSortColumn("age", DESC))
 				require.NoError(t, err)
 				return sortCols
 			},
@@ -236,7 +236,7 @@ func TestHeap(t *testing.T) {
 				})
 			},
 			sortCols: func() sortColumns {
-				sortCols, err := newSortColumns(NewSortColumn[int]("id", ASC), NewSortColumn[string]("name", ASC), NewSortColumn[int]("age", DESC))
+				sortCols, err := newSortColumns(NewSortColumn("id", ASC), NewSortColumn("name", ASC), NewSortColumn("age", DESC))
 				require.NoError(t, err)
 				return sortCols
 			},
@@ -282,7 +282,7 @@ func TestHeap(t *testing.T) {
 				})
 			},
 			sortCols: func() sortColumns {
-				sortCols, err := newSortColumns(NewSortColumn[int]("id", DESC), NewSortColumn[string]("name", DESC), NewSortColumn[int]("age", ASC))
+				sortCols, err := newSortColumns(NewSortColumn("id", DESC), NewSortColumn("name", DESC), NewSortColumn("age", ASC))
 				require.NoError(t, err)
 				return sortCols
 			},
@@ -328,7 +328,7 @@ func TestHeap(t *testing.T) {
 				})
 			},
 			sortCols: func() sortColumns {
-				sortCols, err := newSortColumns(NewSortColumn[int]("id", DESC), NewSortColumn[string]("name", DESC), NewSortColumn[int]("age", DESC))
+				sortCols, err := newSortColumns(NewSortColumn("id", DESC), NewSortColumn("name", DESC), NewSortColumn("age", DESC))
 				require.NoError(t, err)
 				return sortCols
 			},
@@ -374,7 +374,7 @@ func TestHeap(t *testing.T) {
 				})
 			},
 			sortCols: func() sortColumns {
-				sortCols, err := newSortColumns(NewSortColumn[int]("id", ASC), NewSortColumn[string]("name", ASC), NewSortColumn[int]("age", ASC))
+				sortCols, err := newSortColumns(NewSortColumn("id", ASC), NewSortColumn("name", ASC), NewSortColumn("age", ASC))
 				require.NoError(t, err)
 				return sortCols
 			},
