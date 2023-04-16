@@ -193,6 +193,25 @@ func (s *ShardingSelector[T]) findDstByPredicate(ctx context.Context, pre Predic
 			results = append(results, res)
 		}
 		return s.mergeIN(results), nil
+	case opNotIN:
+		col := pre.left.(Column)
+		right := pre.right.(values)
+		var results []sharding.Result
+		for _, val := range right.data {
+			res, err := s.meta.ShardingAlgorithm.Sharding(ctx,
+				sharding.Request{Op: opNEQ, SkValues: map[string]any{col.name: val}})
+			if err != nil {
+				return sharding.EmptyResult, err
+			}
+			results = append(results, res)
+		}
+		return s.mergeNotIN(results), nil
+	case opNot:
+		nPre, err := s.negatePredicate(pre.right.(Predicate))
+		if err != nil {
+			return sharding.EmptyResult, err
+		}
+		return s.findDstByPredicate(ctx, nPre)
 	case opEQ, opGT, opLT, opGTEQ, opLTEQ:
 		col, isCol := pre.left.(Column)
 		right, isVals := pre.right.(valueExpr)
@@ -203,6 +222,35 @@ func (s *ShardingSelector[T]) findDstByPredicate(ctx context.Context, pre Predic
 			sharding.Request{Op: pre.op, SkValues: map[string]any{col.name: right.val}})
 	default:
 		return sharding.EmptyResult, errs.NewUnsupportedOperatorError(pre.op.Text)
+	}
+}
+
+func (s *ShardingSelector[T]) negatePredicate(pre Predicate) (Predicate, error) {
+	switch pre.op {
+	case opAnd, opOr:
+		left, err := s.negatePredicate(pre.left.(Predicate))
+		if err != nil {
+			return EmptyPredicate, err
+		}
+		right, err := s.negatePredicate(pre.right.(Predicate))
+		if err != nil {
+			return EmptyPredicate, err
+		}
+		return Predicate{left: left, op: pre.op, right: right}, nil
+	case opEQ:
+		return Predicate{left: pre.left, op: opNEQ, right: pre.right}, nil
+	case opIn:
+		return Predicate{left: pre.left, op: opNotIN, right: pre.right}, nil
+	case opGT:
+		return Predicate{left: pre.left, op: opLTEQ, right: pre.right}, nil
+	case opLT:
+		return Predicate{left: pre.left, op: opGTEQ, right: pre.right}, nil
+	case opGTEQ:
+		return Predicate{left: pre.left, op: opLT, right: pre.right}, nil
+	case opLTEQ:
+		return Predicate{left: pre.left, op: opGT, right: pre.right}, nil
+	default:
+		return EmptyPredicate, errs.NewUnsupportedOperatorError(pre.op.Text)
 	}
 }
 
@@ -227,6 +275,17 @@ func (*ShardingSelector[T]) mergeIN(vals []sharding.Result) sharding.Result {
 	var dsts []sharding.Dst
 	for _, val := range vals {
 		dsts = slice.UnionSetFunc[sharding.Dst](dsts, val.Dsts, func(src, dst sharding.Dst) bool {
+			return src.Equals(dst)
+		})
+	}
+	return sharding.Result{Dsts: dsts}
+}
+
+// mergeNotIN 多个分片结果的交集
+func (*ShardingSelector[T]) mergeNotIN(vals []sharding.Result) sharding.Result {
+	dsts := vals[0].Dsts
+	for i := 0; i < len(vals); i++ {
+		dsts = slice.IntersectSetFunc[sharding.Dst](dsts, vals[i].Dsts, func(src, dst sharding.Dst) bool {
 			return src.Equals(dst)
 		})
 	}
