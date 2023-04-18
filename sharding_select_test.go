@@ -5667,9 +5667,19 @@ func TestShardingSelector_Build_Error(t *testing.T) {
 		wantErr error
 	}{
 		{
-			name: "not too complex operator",
+			name: "not and too complex operator",
 			builder: func() sharding.QueryBuilder {
-				s := NewShardingSelector[Order](shardingDB).Where(Not(C("Content").Like("%kfc")))
+				s := NewShardingSelector[Order](shardingDB).Where(Not(C("OrderId").
+					EQ(101).And(C("Content").Like("%kfc"))))
+				return s
+			}(),
+			wantErr: errs.NewUnsupportedOperatorError(opLike.Text),
+		},
+		{
+			name: "not or too complex operator",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).Where(Not(C("OrderId").
+					EQ(101).Or(C("Content").Like("%kfc"))))
 				return s
 			}(),
 			wantErr: errs.NewUnsupportedOperatorError(opLike.Text),
