@@ -324,6 +324,144 @@ func (s *ShardingSelectTestSuite) TestSardingSelectorGetMulti() {
 				{OrderId: 253, ItemId: 8, UsingCol1: "Stephen", UsingCol2: "Curry"},
 			},
 		},
+		{
+			name: "where not in",
+			s: func() *eorm.ShardingSelector[test.OrderDetail] {
+				builder := eorm.NewShardingSelector[test.OrderDetail](s.shardingDB).
+					Where(eorm.C("OrderId").NotIn(8, 123, 253))
+				return builder
+			}(),
+			wantRes: []*test.OrderDetail{
+				{OrderId: 11, ItemId: 8, UsingCol1: "James", UsingCol2: "Harden"},
+				{OrderId: 234, ItemId: 12, UsingCol1: "Kevin", UsingCol2: "Durant"},
+				{OrderId: 181, ItemId: 11, UsingCol1: "Kawhi", UsingCol2: "Leonard"},
+			},
+		},
+		{
+			name: "where not in and eq",
+			s: func() *eorm.ShardingSelector[test.OrderDetail] {
+				builder := eorm.NewShardingSelector[test.OrderDetail](s.shardingDB).
+					Where(eorm.C("OrderId").NotIn(8, 123, 253).
+						And(eorm.C("OrderId").EQ(11)))
+				return builder
+			}(),
+			wantRes: []*test.OrderDetail{
+				{OrderId: 11, ItemId: 8, UsingCol1: "James", UsingCol2: "Harden"},
+			},
+		},
+		{
+			name: "where not in or eq",
+			s: func() *eorm.ShardingSelector[test.OrderDetail] {
+				builder := eorm.NewShardingSelector[test.OrderDetail](s.shardingDB).
+					Where(eorm.C("OrderId").NotIn(8, 123, 253).
+						Or(eorm.C("OrderId").EQ(11)))
+
+				return builder
+			}(),
+			wantRes: []*test.OrderDetail{
+				{OrderId: 11, ItemId: 8, UsingCol1: "James", UsingCol2: "Harden"},
+				{OrderId: 234, ItemId: 12, UsingCol1: "Kevin", UsingCol2: "Durant"},
+				{OrderId: 181, ItemId: 11, UsingCol1: "Kawhi", UsingCol2: "Leonard"},
+			},
+		},
+		{
+			name: "where not in or gt",
+			s: func() *eorm.ShardingSelector[test.OrderDetail] {
+				builder := eorm.NewShardingSelector[test.OrderDetail](s.shardingDB).
+					Where(eorm.C("OrderId").NotIn(8, 123, 253).
+						Or(eorm.C("OrderId").GT(11)))
+				return builder
+			}(),
+			wantRes: []*test.OrderDetail{
+				{OrderId: 11, ItemId: 8, UsingCol1: "James", UsingCol2: "Harden"},
+				{OrderId: 123, ItemId: 10, UsingCol1: "LeBron", UsingCol2: "James"},
+				{OrderId: 234, ItemId: 12, UsingCol1: "Kevin", UsingCol2: "Durant"},
+				{OrderId: 253, ItemId: 8, UsingCol1: "Stephen", UsingCol2: "Curry"},
+				{OrderId: 181, ItemId: 11, UsingCol1: "Kawhi", UsingCol2: "Leonard"},
+			},
+		},
+		{
+			name: "where not gt",
+			s: func() *eorm.ShardingSelector[test.OrderDetail] {
+				builder := eorm.NewShardingSelector[test.OrderDetail](s.shardingDB).
+					Where(eorm.Not(eorm.C("OrderId").GT(181)))
+				return builder
+			}(),
+			wantRes: []*test.OrderDetail{
+				{OrderId: 8, ItemId: 6, UsingCol1: "Kobe", UsingCol2: "Bryant"},
+				{OrderId: 11, ItemId: 8, UsingCol1: "James", UsingCol2: "Harden"},
+				{OrderId: 123, ItemId: 10, UsingCol1: "LeBron", UsingCol2: "James"},
+				{OrderId: 181, ItemId: 11, UsingCol1: "Kawhi", UsingCol2: "Leonard"},
+			},
+		},
+		{
+			name: "where not lt",
+			s: func() *eorm.ShardingSelector[test.OrderDetail] {
+				builder := eorm.NewShardingSelector[test.OrderDetail](s.shardingDB).
+					Where(eorm.Not(eorm.C("OrderId").LT(181)))
+				return builder
+			}(),
+			wantRes: []*test.OrderDetail{
+				{OrderId: 181, ItemId: 11, UsingCol1: "Kawhi", UsingCol2: "Leonard"},
+				{OrderId: 234, ItemId: 12, UsingCol1: "Kevin", UsingCol2: "Durant"},
+				{OrderId: 253, ItemId: 8, UsingCol1: "Stephen", UsingCol2: "Curry"},
+			},
+		},
+		{
+			name: "where not (gt and lt)",
+			s: func() *eorm.ShardingSelector[test.OrderDetail] {
+				builder := eorm.NewShardingSelector[test.OrderDetail](s.shardingDB).
+					Where(eorm.Not(eorm.C("OrderId").GT(11).
+						And(eorm.C("OrderId").LT(230))))
+				return builder
+			}(),
+			wantRes: []*test.OrderDetail{
+				{OrderId: 8, ItemId: 6, UsingCol1: "Kobe", UsingCol2: "Bryant"},
+				{OrderId: 11, ItemId: 8, UsingCol1: "James", UsingCol2: "Harden"},
+				{OrderId: 234, ItemId: 12, UsingCol1: "Kevin", UsingCol2: "Durant"},
+				{OrderId: 253, ItemId: 8, UsingCol1: "Stephen", UsingCol2: "Curry"},
+			},
+		},
+		{
+			name: "where not (gt eq and lt eq)",
+			s: func() *eorm.ShardingSelector[test.OrderDetail] {
+				builder := eorm.NewShardingSelector[test.OrderDetail](s.shardingDB).
+					Where(eorm.Not(eorm.C("OrderId").GTEQ(11).
+						And(eorm.C("OrderId").LTEQ(240))))
+				return builder
+			}(),
+			wantRes: []*test.OrderDetail{
+				{OrderId: 8, ItemId: 6, UsingCol1: "Kobe", UsingCol2: "Bryant"},
+				{OrderId: 253, ItemId: 8, UsingCol1: "Stephen", UsingCol2: "Curry"},
+			},
+		},
+		{
+			name: "where not (in or gt)",
+			s: func() *eorm.ShardingSelector[test.OrderDetail] {
+				builder := eorm.NewShardingSelector[test.OrderDetail](s.shardingDB).
+					Where(eorm.Not(eorm.C("OrderId").In(8, 123, 253).
+						Or(eorm.C("OrderId").GT(200))))
+				return builder
+			}(),
+			wantRes: []*test.OrderDetail{
+				{OrderId: 11, ItemId: 8, UsingCol1: "James", UsingCol2: "Harden"},
+				{OrderId: 181, ItemId: 11, UsingCol1: "Kawhi", UsingCol2: "Leonard"},
+			},
+		},
+		{
+			name: "where not (in or eq)",
+			s: func() *eorm.ShardingSelector[test.OrderDetail] {
+				builder := eorm.NewShardingSelector[test.OrderDetail](s.shardingDB).
+					Where(eorm.Not(eorm.C("OrderId").In(8, 123).
+						Or(eorm.C("OrderId").EQ(253))))
+				return builder
+			}(),
+			wantRes: []*test.OrderDetail{
+				{OrderId: 11, ItemId: 8, UsingCol1: "James", UsingCol2: "Harden"},
+				{OrderId: 181, ItemId: 11, UsingCol1: "Kawhi", UsingCol2: "Leonard"},
+				{OrderId: 234, ItemId: 12, UsingCol1: "Kevin", UsingCol2: "Durant"},
+			},
+		},
 	}
 
 	for _, tc := range testCases {

@@ -212,7 +212,7 @@ func (s *ShardingSelector[T]) findDstByPredicate(ctx context.Context, pre Predic
 			return sharding.EmptyResult, err
 		}
 		return s.findDstByPredicate(ctx, nPre)
-	case opEQ, opGT, opLT, opGTEQ, opLTEQ:
+	case opEQ, opGT, opLT, opGTEQ, opLTEQ, opNEQ:
 		col, isCol := pre.left.(Column)
 		right, isVals := pre.right.(valueExpr)
 		if !isCol || !isVals {
@@ -227,7 +227,7 @@ func (s *ShardingSelector[T]) findDstByPredicate(ctx context.Context, pre Predic
 
 func (s *ShardingSelector[T]) negatePredicate(pre Predicate) (Predicate, error) {
 	switch pre.op {
-	case opAnd, opOr:
+	case opAnd:
 		left, err := s.negatePredicate(pre.left.(Predicate))
 		if err != nil {
 			return EmptyPredicate, err
@@ -236,19 +236,45 @@ func (s *ShardingSelector[T]) negatePredicate(pre Predicate) (Predicate, error) 
 		if err != nil {
 			return EmptyPredicate, err
 		}
-		return Predicate{left: left, op: pre.op, right: right}, nil
+		return Predicate{
+			left: left, op: opOr, right: right,
+		}, nil
+	case opOr:
+		left, err := s.negatePredicate(pre.left.(Predicate))
+		if err != nil {
+			return EmptyPredicate, err
+		}
+		right, err := s.negatePredicate(pre.right.(Predicate))
+		if err != nil {
+			return EmptyPredicate, err
+		}
+		return Predicate{
+			left: left, op: opAnd, right: right,
+		}, nil
 	case opEQ:
-		return Predicate{left: pre.left, op: opNEQ, right: pre.right}, nil
+		return Predicate{
+			left: pre.left, op: opNEQ, right: pre.right,
+		}, nil
 	case opIn:
-		return Predicate{left: pre.left, op: opNotIN, right: pre.right}, nil
+		return Predicate{
+			left: pre.left, op: opNotIN, right: pre.right,
+		}, nil
 	case opGT:
-		return Predicate{left: pre.left, op: opLTEQ, right: pre.right}, nil
+		return Predicate{
+			left: pre.left, op: opLTEQ, right: pre.right,
+		}, nil
 	case opLT:
-		return Predicate{left: pre.left, op: opGTEQ, right: pre.right}, nil
+		return Predicate{
+			left: pre.left, op: opGTEQ, right: pre.right,
+		}, nil
 	case opGTEQ:
-		return Predicate{left: pre.left, op: opLT, right: pre.right}, nil
+		return Predicate{
+			left: pre.left, op: opLT, right: pre.right,
+		}, nil
 	case opLTEQ:
-		return Predicate{left: pre.left, op: opGT, right: pre.right}, nil
+		return Predicate{
+			left: pre.left, op: opGT, right: pre.right,
+		}, nil
 	default:
 		return EmptyPredicate, errs.NewUnsupportedOperatorError(pre.op.Text)
 	}
