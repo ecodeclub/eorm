@@ -281,17 +281,6 @@ func (*ShardingSelector[T]) mergeIN(vals []sharding.Result) sharding.Result {
 	return sharding.Result{Dsts: dsts}
 }
 
-// mergeNotIN 多个分片结果的交集
-func (*ShardingSelector[T]) mergeNotIN(vals []sharding.Result) sharding.Result {
-	dsts := vals[0].Dsts
-	for i := 0; i < len(vals); i++ {
-		dsts = slice.IntersectSetFunc[sharding.Dst](dsts, vals[i].Dsts, func(src, dst sharding.Dst) bool {
-			return src.Equals(dst)
-		})
-	}
-	return sharding.Result{Dsts: dsts}
-}
-
 func (s *ShardingSelector[T]) buildAllColumns() error {
 	for i, cMeta := range s.meta.Columns {
 		_ = s.buildColumns(i, cMeta.FieldName)
