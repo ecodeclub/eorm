@@ -248,9 +248,7 @@ func (s *ShardingSelector[T]) negatePredicate(pre Predicate) (Predicate, error) 
 		if err != nil {
 			return emptyPredicate, err
 		}
-		return Predicate{
-			left: pre.left, op: nOp, right: pre.right,
-		}, nil
+		return Predicate{left: pre.left, op: nOp, right: pre.right}, nil
 	}
 }
 
