@@ -19,6 +19,8 @@ import (
 	"database/sql"
 	"sync"
 
+	operator "github.com/ecodeclub/eorm/internal/operator"
+
 	"github.com/gotomicro/ekit/slice"
 
 	"github.com/ecodeclub/eorm/internal/sharding"
@@ -193,25 +195,15 @@ func (s *ShardingSelector[T]) findDstByPredicate(ctx context.Context, pre Predic
 			results = append(results, res)
 		}
 		return s.mergeIN(results), nil
-	case opNotIN:
-		col := pre.left.(Column)
-		right := pre.right.(values)
-		var results []sharding.Result
-		for _, val := range right.data {
-			res, err := s.meta.ShardingAlgorithm.Sharding(ctx,
-				sharding.Request{Op: opNEQ, SkValues: map[string]any{col.name: val}})
-			if err != nil {
-				return sharding.EmptyResult, err
-			}
-			results = append(results, res)
-		}
-		return s.mergeNotIN(results), nil
 	case opNot:
 		nPre, err := s.negatePredicate(pre.right.(Predicate))
 		if err != nil {
 			return sharding.EmptyResult, err
 		}
 		return s.findDstByPredicate(ctx, nPre)
+	case opNotIN:
+		return s.meta.ShardingAlgorithm.Sharding(ctx,
+			sharding.Request{Op: opNotIN, SkValues: map[string]any{}})
 	case opEQ, opGT, opLT, opGTEQ, opLTEQ, opNEQ:
 		col, isCol := pre.left.(Column)
 		right, isVals := pre.right.(valueExpr)
@@ -230,11 +222,11 @@ func (s *ShardingSelector[T]) negatePredicate(pre Predicate) (Predicate, error) 
 	case opAnd:
 		left, err := s.negatePredicate(pre.left.(Predicate))
 		if err != nil {
-			return EmptyPredicate, err
+			return emptyPredicate, err
 		}
 		right, err := s.negatePredicate(pre.right.(Predicate))
 		if err != nil {
-			return EmptyPredicate, err
+			return emptyPredicate, err
 		}
 		return Predicate{
 			left: left, op: opOr, right: right,
@@ -242,41 +234,23 @@ func (s *ShardingSelector[T]) negatePredicate(pre Predicate) (Predicate, error) 
 	case opOr:
 		left, err := s.negatePredicate(pre.left.(Predicate))
 		if err != nil {
-			return EmptyPredicate, err
+			return emptyPredicate, err
 		}
 		right, err := s.negatePredicate(pre.right.(Predicate))
 		if err != nil {
-			return EmptyPredicate, err
+			return emptyPredicate, err
 		}
 		return Predicate{
 			left: left, op: opAnd, right: right,
 		}, nil
-	case opEQ:
-		return Predicate{
-			left: pre.left, op: opNEQ, right: pre.right,
-		}, nil
-	case opIn:
-		return Predicate{
-			left: pre.left, op: opNotIN, right: pre.right,
-		}, nil
-	case opGT:
-		return Predicate{
-			left: pre.left, op: opLTEQ, right: pre.right,
-		}, nil
-	case opLT:
-		return Predicate{
-			left: pre.left, op: opGTEQ, right: pre.right,
-		}, nil
-	case opGTEQ:
-		return Predicate{
-			left: pre.left, op: opLT, right: pre.right,
-		}, nil
-	case opLTEQ:
-		return Predicate{
-			left: pre.left, op: opGT, right: pre.right,
-		}, nil
 	default:
-		return EmptyPredicate, errs.NewUnsupportedOperatorError(pre.op.Text)
+		nOp, err := operator.NegateOp(pre.op)
+		if err != nil {
+			return emptyPredicate, err
+		}
+		return Predicate{
+			left: pre.left, op: nOp, right: pre.right,
+		}, nil
 	}
 }
 

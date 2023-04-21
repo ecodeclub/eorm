@@ -408,6 +408,57 @@ func (s *ShardingSelectTestSuite) TestSardingSelectorGetMulti() {
 			},
 		},
 		{
+			name: "where not gt eq",
+			s: func() *eorm.ShardingSelector[test.OrderDetail] {
+				builder := eorm.NewShardingSelector[test.OrderDetail](s.shardingDB).
+					Where(eorm.Not(eorm.C("OrderId").GTEQ(181)))
+				return builder
+			}(),
+			wantRes: []*test.OrderDetail{
+				{OrderId: 8, ItemId: 6, UsingCol1: "Kobe", UsingCol2: "Bryant"},
+				{OrderId: 11, ItemId: 8, UsingCol1: "James", UsingCol2: "Harden"},
+				{OrderId: 123, ItemId: 10, UsingCol1: "LeBron", UsingCol2: "James"},
+			},
+		},
+		{
+			name: "where not lt eq",
+			s: func() *eorm.ShardingSelector[test.OrderDetail] {
+				builder := eorm.NewShardingSelector[test.OrderDetail](s.shardingDB).
+					Where(eorm.Not(eorm.C("OrderId").LTEQ(181)))
+				return builder
+			}(),
+			wantRes: []*test.OrderDetail{
+				{OrderId: 234, ItemId: 12, UsingCol1: "Kevin", UsingCol2: "Durant"},
+				{OrderId: 253, ItemId: 8, UsingCol1: "Stephen", UsingCol2: "Curry"},
+			},
+		},
+		{
+			name: "where not eq",
+			s: func() *eorm.ShardingSelector[test.OrderDetail] {
+				builder := eorm.NewShardingSelector[test.OrderDetail](s.shardingDB).
+					Where(eorm.Not(eorm.C("OrderId").EQ(181)))
+				return builder
+			}(),
+			wantRes: []*test.OrderDetail{
+				{OrderId: 8, ItemId: 6, UsingCol1: "Kobe", UsingCol2: "Bryant"},
+				{OrderId: 11, ItemId: 8, UsingCol1: "James", UsingCol2: "Harden"},
+				{OrderId: 123, ItemId: 10, UsingCol1: "LeBron", UsingCol2: "James"},
+				{OrderId: 234, ItemId: 12, UsingCol1: "Kevin", UsingCol2: "Durant"},
+				{OrderId: 253, ItemId: 8, UsingCol1: "Stephen", UsingCol2: "Curry"},
+			},
+		},
+		{
+			name: "where not neq",
+			s: func() *eorm.ShardingSelector[test.OrderDetail] {
+				builder := eorm.NewShardingSelector[test.OrderDetail](s.shardingDB).
+					Where(eorm.Not(eorm.C("OrderId").NEQ(181)))
+				return builder
+			}(),
+			wantRes: []*test.OrderDetail{
+				{OrderId: 181, ItemId: 11, UsingCol1: "Kawhi", UsingCol2: "Leonard"},
+			},
+		},
+		{
 			name: "where not (gt and lt)",
 			s: func() *eorm.ShardingSelector[test.OrderDetail] {
 				builder := eorm.NewShardingSelector[test.OrderDetail](s.shardingDB).
@@ -460,6 +511,40 @@ func (s *ShardingSelectTestSuite) TestSardingSelectorGetMulti() {
 				{OrderId: 11, ItemId: 8, UsingCol1: "James", UsingCol2: "Harden"},
 				{OrderId: 181, ItemId: 11, UsingCol1: "Kawhi", UsingCol2: "Leonard"},
 				{OrderId: 234, ItemId: 12, UsingCol1: "Kevin", UsingCol2: "Durant"},
+			},
+		},
+		{
+			name: "where not (eq and eq)",
+			s: func() *eorm.ShardingSelector[test.OrderDetail] {
+				builder := eorm.NewShardingSelector[test.OrderDetail](s.shardingDB).
+					Where(eorm.Not(eorm.C("OrderId").EQ(11).
+						And(eorm.C("OrderId").EQ(234))))
+				return builder
+			}(),
+			wantRes: []*test.OrderDetail{
+				{OrderId: 8, ItemId: 6, UsingCol1: "Kobe", UsingCol2: "Bryant"},
+				{OrderId: 11, ItemId: 8, UsingCol1: "James", UsingCol2: "Harden"},
+				{OrderId: 123, ItemId: 10, UsingCol1: "LeBron", UsingCol2: "James"},
+				{OrderId: 234, ItemId: 12, UsingCol1: "Kevin", UsingCol2: "Durant"},
+				{OrderId: 253, ItemId: 8, UsingCol1: "Stephen", UsingCol2: "Curry"},
+				{OrderId: 181, ItemId: 11, UsingCol1: "Kawhi", UsingCol2: "Leonard"},
+			},
+		},
+		{
+			name: "where not (eq and eq not sharding key)",
+			s: func() *eorm.ShardingSelector[test.OrderDetail] {
+				builder := eorm.NewShardingSelector[test.OrderDetail](s.shardingDB).
+					Where(eorm.Not(eorm.C("OrderId").EQ(11).
+						And(eorm.C("ItemId").EQ(12))))
+				return builder
+			}(),
+			wantRes: []*test.OrderDetail{
+				{OrderId: 8, ItemId: 6, UsingCol1: "Kobe", UsingCol2: "Bryant"},
+				{OrderId: 11, ItemId: 8, UsingCol1: "James", UsingCol2: "Harden"},
+				{OrderId: 123, ItemId: 10, UsingCol1: "LeBron", UsingCol2: "James"},
+				{OrderId: 234, ItemId: 12, UsingCol1: "Kevin", UsingCol2: "Durant"},
+				{OrderId: 253, ItemId: 8, UsingCol1: "Stephen", UsingCol2: "Curry"},
+				{OrderId: 181, ItemId: 11, UsingCol1: "Kawhi", UsingCol2: "Leonard"},
 			},
 		},
 	}

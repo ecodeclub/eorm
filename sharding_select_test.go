@@ -5282,7 +5282,6 @@ func TestShardingSelector_Build(t *testing.T) {
 				return res
 			}(),
 		},
-		//// TODO
 		{
 			name: "where not in",
 			builder: func() sharding.QueryBuilder {
@@ -5431,6 +5430,101 @@ func TestShardingSelector_Build(t *testing.T) {
 			}(),
 		},
 		{
+			name: "where not gt eq",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").GTEQ(101)))
+				return s
+			}(),
+			qs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE NOT (`user_id`>=?);"
+				for i := 0; i < dbBase; i++ {
+					dbName := fmt.Sprintf(dbPattern, i)
+					for j := 0; j < tableBase; j++ {
+						tableName := fmt.Sprintf(tablePattern, j)
+						res = append(res, sharding.Query{
+							SQL:        fmt.Sprintf(sql, dbName, tableName),
+							Args:       []any{101},
+							DB:         dbName,
+							Datasource: dsPattern,
+						})
+					}
+				}
+				return res
+			}(),
+		},
+		{
+			name: "where not lt eq",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").LTEQ(101)))
+				return s
+			}(),
+			qs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE NOT (`user_id`<=?);"
+				for i := 0; i < dbBase; i++ {
+					dbName := fmt.Sprintf(dbPattern, i)
+					for j := 0; j < tableBase; j++ {
+						tableName := fmt.Sprintf(tablePattern, j)
+						res = append(res, sharding.Query{
+							SQL:        fmt.Sprintf(sql, dbName, tableName),
+							Args:       []any{101},
+							DB:         dbName,
+							Datasource: dsPattern,
+						})
+					}
+				}
+				return res
+			}(),
+		},
+		{
+			name: "where not eq",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").EQ(101)))
+				return s
+			}(),
+			qs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE NOT (`user_id`=?);"
+				for i := 0; i < dbBase; i++ {
+					dbName := fmt.Sprintf(dbPattern, i)
+					for j := 0; j < tableBase; j++ {
+						tableName := fmt.Sprintf(tablePattern, j)
+						res = append(res, sharding.Query{
+							SQL:        fmt.Sprintf(sql, dbName, tableName),
+							Args:       []any{101},
+							DB:         dbName,
+							Datasource: dsPattern,
+						})
+					}
+				}
+				return res
+			}(),
+		},
+		{
+			name: "where not neq",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").NEQ(101)))
+				return s
+			}(),
+			qs: []sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_2` WHERE NOT (`user_id`!=?);",
+					Args:       []any{101},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
 			name: "where not (gt and lt)",
 			builder: func() sharding.QueryBuilder {
 				s := NewShardingSelector[Order](shardingDB).
@@ -5534,7 +5628,58 @@ func TestShardingSelector_Build(t *testing.T) {
 				return res
 			}(),
 		},
-		//// TODO
+		{
+			name: "where not (eq and eq)",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").EQ(12).And(C("UserId").EQ(531))))
+				return s
+			}(),
+			qs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE NOT ((`user_id`=?) AND (`user_id`=?));"
+				for i := 0; i < dbBase; i++ {
+					dbName := fmt.Sprintf(dbPattern, i)
+					for j := 0; j < tableBase; j++ {
+						tableName := fmt.Sprintf(tablePattern, j)
+						res = append(res, sharding.Query{
+							SQL:        fmt.Sprintf(sql, dbName, tableName),
+							Args:       []any{12, 531},
+							DB:         dbName,
+							Datasource: dsPattern,
+						})
+					}
+				}
+				return res
+			}(),
+		},
+		{
+			name: "where not (eq and eq not sharding key)",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").EQ(12).And(C("OrderId").EQ(111))))
+				return s
+			}(),
+			qs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE NOT ((`user_id`=?) AND (`order_id`=?));"
+				for i := 0; i < dbBase; i++ {
+					dbName := fmt.Sprintf(dbPattern, i)
+					for j := 0; j < tableBase; j++ {
+						tableName := fmt.Sprintf(tablePattern, j)
+						res = append(res, sharding.Query{
+							SQL:        fmt.Sprintf(sql, dbName, tableName),
+							Args:       []any{12, 111},
+							DB:         dbName,
+							Datasource: dsPattern,
+						})
+					}
+				}
+				return res
+			}(),
+		},
 		{
 			name: "where between",
 			builder: func() sharding.QueryBuilder {
@@ -5667,7 +5812,25 @@ func TestShardingSelector_Build_Error(t *testing.T) {
 		wantErr error
 	}{
 		{
-			name: "not and too complex operator",
+			name: "not and left too complex operator",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).Where(Not(C("Content").
+					Like("%kfc").And(C("OrderId").EQ(101))))
+				return s
+			}(),
+			wantErr: errs.NewUnsupportedOperatorError(opLike.Text),
+		},
+		{
+			name: "not or left too complex operator",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).Where(Not(C("Content").
+					Like("%kfc").Or(C("OrderId").EQ(101))))
+				return s
+			}(),
+			wantErr: errs.NewUnsupportedOperatorError(opLike.Text),
+		},
+		{
+			name: "not and right too complex operator",
 			builder: func() sharding.QueryBuilder {
 				s := NewShardingSelector[Order](shardingDB).Where(Not(C("OrderId").
 					EQ(101).And(C("Content").Like("%kfc"))))
@@ -5676,7 +5839,7 @@ func TestShardingSelector_Build_Error(t *testing.T) {
 			wantErr: errs.NewUnsupportedOperatorError(opLike.Text),
 		},
 		{
-			name: "not or too complex operator",
+			name: "not or right too complex operator",
 			builder: func() sharding.QueryBuilder {
 				s := NewShardingSelector[Order](shardingDB).Where(Not(C("OrderId").
 					EQ(101).Or(C("Content").Like("%kfc"))))
