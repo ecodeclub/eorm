@@ -40,6 +40,8 @@ var (
 // Predicate will be used in Where Or Having
 type Predicate binaryExpr
 
+var emptyPredicate = Predicate{}
+
 func (Predicate) expr() (string, error) {
 	return "", nil
 }

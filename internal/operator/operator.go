@@ -14,10 +14,14 @@
 
 package Operator
 
+import "github.com/ecodeclub/eorm/internal/errs"
+
 type Op struct {
 	Symbol string
 	Text   string
 }
+
+var emptyOp = Op{}
 
 var (
 	OpLT   = Op{Symbol: "<", Text: "<"}
@@ -41,3 +45,26 @@ var (
 	OpNotLike = Op{Symbol: "NOT LIKE", Text: " NOT LIKE "}
 	OpExist   = Op{Symbol: "EXIST", Text: "EXIST "}
 )
+
+func NegateOp(op Op) (Op, error) {
+	switch op {
+	case OpNEQ:
+		return OpEQ, nil
+	case OpEQ:
+		return OpNEQ, nil
+	case OpIn:
+		return OpNotIN, nil
+	case OpNotIN:
+		return OpIn, nil
+	case OpGT:
+		return OpLTEQ, nil
+	case OpLT:
+		return OpGTEQ, nil
+	case OpGTEQ:
+		return OpLT, nil
+	case OpLTEQ:
+		return OpGT, nil
+	default:
+		return emptyOp, errs.NewUnsupportedOperatorError(op.Text)
+	}
+}

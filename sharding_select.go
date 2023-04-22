@@ -19,6 +19,8 @@ import (
 	"database/sql"
 	"sync"
 
+	operator "github.com/ecodeclub/eorm/internal/operator"
+
 	"github.com/gotomicro/ekit/slice"
 
 	"github.com/ecodeclub/eorm/internal/sharding"
@@ -193,7 +195,16 @@ func (s *ShardingSelector[T]) findDstByPredicate(ctx context.Context, pre Predic
 			results = append(results, res)
 		}
 		return s.mergeIN(results), nil
-	case opEQ, opGT, opLT, opGTEQ, opLTEQ:
+	case opNot:
+		nPre, err := s.negatePredicate(pre.right.(Predicate))
+		if err != nil {
+			return sharding.EmptyResult, err
+		}
+		return s.findDstByPredicate(ctx, nPre)
+	case opNotIN:
+		return s.meta.ShardingAlgorithm.Sharding(ctx,
+			sharding.Request{Op: opNotIN, SkValues: map[string]any{}})
+	case opEQ, opGT, opLT, opGTEQ, opLTEQ, opNEQ:
 		col, isCol := pre.left.(Column)
 		right, isVals := pre.right.(valueExpr)
 		if !isCol || !isVals {
@@ -203,6 +214,41 @@ func (s *ShardingSelector[T]) findDstByPredicate(ctx context.Context, pre Predic
 			sharding.Request{Op: pre.op, SkValues: map[string]any{col.name: right.val}})
 	default:
 		return sharding.EmptyResult, errs.NewUnsupportedOperatorError(pre.op.Text)
+	}
+}
+
+func (s *ShardingSelector[T]) negatePredicate(pre Predicate) (Predicate, error) {
+	switch pre.op {
+	case opAnd:
+		left, err := s.negatePredicate(pre.left.(Predicate))
+		if err != nil {
+			return emptyPredicate, err
+		}
+		right, err := s.negatePredicate(pre.right.(Predicate))
+		if err != nil {
+			return emptyPredicate, err
+		}
+		return Predicate{
+			left: left, op: opOr, right: right,
+		}, nil
+	case opOr:
+		left, err := s.negatePredicate(pre.left.(Predicate))
+		if err != nil {
+			return emptyPredicate, err
+		}
+		right, err := s.negatePredicate(pre.right.(Predicate))
+		if err != nil {
+			return emptyPredicate, err
+		}
+		return Predicate{
+			left: left, op: opAnd, right: right,
+		}, nil
+	default:
+		nOp, err := operator.NegateOp(pre.op)
+		if err != nil {
+			return emptyPredicate, err
+		}
+		return Predicate{left: pre.left, op: nOp, right: pre.right}, nil
 	}
 }
 

@@ -140,7 +140,8 @@ func (h *Hash) Sharding(ctx context.Context, req sharding.Request) (sharding.Res
 		return sharding.Result{
 			Dsts: []sharding.Dst{{Name: dsName, DB: dbName, Table: tbName}},
 		}, nil
-	case operator.OpGT, operator.OpLT, operator.OpGTEQ, operator.OpLTEQ:
+	case operator.OpGT, operator.OpLT, operator.OpGTEQ,
+		operator.OpLTEQ, operator.OpNEQ, operator.OpNotIN:
 		return sharding.Result{Dsts: h.Broadcast(ctx)}, nil
 	default:
 		return sharding.EmptyResult, errs.NewUnsupportedOperatorError(req.Op.Text)

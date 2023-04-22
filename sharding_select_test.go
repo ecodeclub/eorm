@@ -1222,6 +1222,230 @@ func TestShardingSelector_onlyDataSource_Build(t *testing.T) {
 			},
 		},
 		{
+			name: "where not in",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(C("UserId").NotIn(12, 35, 101))
+				return s
+			}(),
+			qs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE `user_id` NOT IN (?,?,?);"
+				for b := 0; b < dsBase; b++ {
+					dsName := fmt.Sprintf(dsPattern, b)
+					res = append(res, sharding.Query{
+						SQL:        fmt.Sprintf(sql, dbPattern, tablePattern),
+						Args:       []any{12, 35, 101},
+						DB:         dbPattern,
+						Datasource: dsName,
+					})
+				}
+				return res
+			}(),
+		},
+		{
+			name: "where not in and eq",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(C("UserId").NotIn(12, 35, 101).And(C("UserId").EQ(234)))
+				return s
+			}(),
+			qs: []sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab` WHERE (`user_id` NOT IN (?,?,?)) AND (`user_id`=?);",
+					Args:       []any{12, 35, 101, 234},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "where not in or eq",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(C("UserId").NotIn(12, 35, 101).Or(C("UserId").EQ(531)))
+				return s
+			}(),
+			qs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE (`user_id` NOT IN (?,?,?)) OR (`user_id`=?);"
+				for b := 0; b < dsBase; b++ {
+					dsName := fmt.Sprintf(dsPattern, b)
+					res = append(res, sharding.Query{
+						SQL:        fmt.Sprintf(sql, dbPattern, tablePattern),
+						Args:       []any{12, 35, 101, 531},
+						DB:         dbPattern,
+						Datasource: dsName,
+					})
+				}
+				return res
+			}(),
+		},
+		{
+			name: "where not in or gt",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(C("UserId").NotIn(12, 35, 101).Or(C("UserId").GT(531)))
+				return s
+			}(),
+			qs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE (`user_id` NOT IN (?,?,?)) OR (`user_id`>?);"
+				for b := 0; b < dsBase; b++ {
+					dsName := fmt.Sprintf(dsPattern, b)
+					res = append(res, sharding.Query{
+						SQL:        fmt.Sprintf(sql, dbPattern, tablePattern),
+						Args:       []any{12, 35, 101, 531},
+						DB:         dbPattern,
+						Datasource: dsName,
+					})
+				}
+				return res
+			}(),
+		},
+		{
+			name: "where not gt",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").GT(101)))
+				return s
+			}(),
+			qs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE NOT (`user_id`>?);"
+				for b := 0; b < dsBase; b++ {
+					dsName := fmt.Sprintf(dsPattern, b)
+					res = append(res, sharding.Query{
+						SQL:        fmt.Sprintf(sql, dbPattern, tablePattern),
+						Args:       []any{101},
+						DB:         dbPattern,
+						Datasource: dsName,
+					})
+				}
+				return res
+			}(),
+		},
+		{
+			name: "where not lt",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").LT(101)))
+				return s
+			}(),
+			qs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE NOT (`user_id`<?);"
+				for b := 0; b < dsBase; b++ {
+					dsName := fmt.Sprintf(dsPattern, b)
+					res = append(res, sharding.Query{
+						SQL:        fmt.Sprintf(sql, dbPattern, tablePattern),
+						Args:       []any{101},
+						DB:         dbPattern,
+						Datasource: dsName,
+					})
+				}
+				return res
+			}(),
+		},
+		{
+			name: "where not (gt and lt)",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").GT(12).And(C("UserId").LT(531))))
+				return s
+			}(),
+			qs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE NOT ((`user_id`>?) AND (`user_id`<?));"
+				for b := 0; b < dsBase; b++ {
+					dsName := fmt.Sprintf(dsPattern, b)
+					res = append(res, sharding.Query{
+						SQL:        fmt.Sprintf(sql, dbPattern, tablePattern),
+						Args:       []any{12, 531},
+						DB:         dbPattern,
+						Datasource: dsName,
+					})
+				}
+				return res
+			}(),
+		},
+		{
+			name: "where not (gt eq and lt eq)",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").GTEQ(12).And(C("UserId").LTEQ(531))))
+				return s
+			}(),
+			qs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE NOT ((`user_id`>=?) AND (`user_id`<=?));"
+				for b := 0; b < dsBase; b++ {
+					dsName := fmt.Sprintf(dsPattern, b)
+					res = append(res, sharding.Query{
+						SQL:        fmt.Sprintf(sql, dbPattern, tablePattern),
+						Args:       []any{12, 531},
+						DB:         dbPattern,
+						Datasource: dsName,
+					})
+				}
+				return res
+			}(),
+		},
+		{
+			name: "where not (in or gt)",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").In(12, 35, 101).Or(C("UserId").GT(531))))
+				return s
+			}(),
+			qs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE NOT ((`user_id` IN (?,?,?)) OR (`user_id`>?));"
+				for b := 0; b < dsBase; b++ {
+					dsName := fmt.Sprintf(dsPattern, b)
+					res = append(res, sharding.Query{
+						SQL:        fmt.Sprintf(sql, dbPattern, tablePattern),
+						Args:       []any{12, 35, 101, 531},
+						DB:         dbPattern,
+						Datasource: dsName,
+					})
+				}
+				return res
+			}(),
+		},
+		{
+			name: "where not (in or eq)",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").In(12, 35, 101).Or(C("UserId").EQ(531))))
+				return s
+			}(),
+			qs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE NOT ((`user_id` IN (?,?,?)) OR (`user_id`=?));"
+				for b := 0; b < dsBase; b++ {
+					dsName := fmt.Sprintf(dsPattern, b)
+					res = append(res, sharding.Query{
+						SQL:        fmt.Sprintf(sql, dbPattern, tablePattern),
+						Args:       []any{12, 35, 101, 531},
+						DB:         dbPattern,
+						Datasource: dsName,
+					})
+				}
+				return res
+			}(),
+		},
+		{
 			name: "and empty",
 			builder: func() sharding.QueryBuilder {
 				s := NewShardingSelector[Order](shardingDB).
@@ -1880,6 +2104,230 @@ func TestShardingSelector_onlyTable_Build(t *testing.T) {
 					Datasource: "0.db.cluster.company.com:3306",
 				},
 			},
+		},
+		{
+			name: "where not in",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(C("UserId").NotIn(12, 35, 101))
+				return s
+			}(),
+			qs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE `user_id` NOT IN (?,?,?);"
+				for b := 0; b < tableBase; b++ {
+					tableName := fmt.Sprintf(tablePattern, b)
+					res = append(res, sharding.Query{
+						SQL:        fmt.Sprintf(sql, dbPattern, tableName),
+						Args:       []any{12, 35, 101},
+						DB:         dbPattern,
+						Datasource: dsPattern,
+					})
+				}
+				return res
+			}(),
+		},
+		{
+			name: "where not in and eq",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(C("UserId").NotIn(12, 35, 101).And(C("UserId").EQ(234)))
+				return s
+			}(),
+			qs: []sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db`.`order_tab_0` WHERE (`user_id` NOT IN (?,?,?)) AND (`user_id`=?);",
+					Args:       []any{12, 35, 101, 234},
+					DB:         "order_db",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "where not in or eq",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(C("UserId").NotIn(12, 35, 101).Or(C("UserId").EQ(531)))
+				return s
+			}(),
+			qs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE (`user_id` NOT IN (?,?,?)) OR (`user_id`=?);"
+				for b := 0; b < tableBase; b++ {
+					tableName := fmt.Sprintf(tablePattern, b)
+					res = append(res, sharding.Query{
+						SQL:        fmt.Sprintf(sql, dbPattern, tableName),
+						Args:       []any{12, 35, 101, 531},
+						DB:         dbPattern,
+						Datasource: dsPattern,
+					})
+				}
+				return res
+			}(),
+		},
+		{
+			name: "where not in or gt",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(C("UserId").NotIn(12, 35, 101).Or(C("UserId").GT(531)))
+				return s
+			}(),
+			qs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE (`user_id` NOT IN (?,?,?)) OR (`user_id`>?);"
+				for b := 0; b < tableBase; b++ {
+					tableName := fmt.Sprintf(tablePattern, b)
+					res = append(res, sharding.Query{
+						SQL:        fmt.Sprintf(sql, dbPattern, tableName),
+						Args:       []any{12, 35, 101, 531},
+						DB:         dbPattern,
+						Datasource: dsPattern,
+					})
+				}
+				return res
+			}(),
+		},
+		{
+			name: "where not gt",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").GT(101)))
+				return s
+			}(),
+			qs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE NOT (`user_id`>?);"
+				for b := 0; b < tableBase; b++ {
+					tableName := fmt.Sprintf(tablePattern, b)
+					res = append(res, sharding.Query{
+						SQL:        fmt.Sprintf(sql, dbPattern, tableName),
+						Args:       []any{101},
+						DB:         dbPattern,
+						Datasource: dsPattern,
+					})
+				}
+				return res
+			}(),
+		},
+		{
+			name: "where not lt",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").LT(101)))
+				return s
+			}(),
+			qs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE NOT (`user_id`<?);"
+				for b := 0; b < tableBase; b++ {
+					tableName := fmt.Sprintf(tablePattern, b)
+					res = append(res, sharding.Query{
+						SQL:        fmt.Sprintf(sql, dbPattern, tableName),
+						Args:       []any{101},
+						DB:         dbPattern,
+						Datasource: dsPattern,
+					})
+				}
+				return res
+			}(),
+		},
+		{
+			name: "where not (gt and lt)",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").GT(12).And(C("UserId").LT(531))))
+				return s
+			}(),
+			qs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE NOT ((`user_id`>?) AND (`user_id`<?));"
+				for b := 0; b < tableBase; b++ {
+					tableName := fmt.Sprintf(tablePattern, b)
+					res = append(res, sharding.Query{
+						SQL:        fmt.Sprintf(sql, dbPattern, tableName),
+						Args:       []any{12, 531},
+						DB:         dbPattern,
+						Datasource: dsPattern,
+					})
+				}
+				return res
+			}(),
+		},
+		{
+			name: "where not (gt eq and lt eq)",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").GTEQ(12).And(C("UserId").LTEQ(531))))
+				return s
+			}(),
+			qs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE NOT ((`user_id`>=?) AND (`user_id`<=?));"
+				for b := 0; b < tableBase; b++ {
+					tableName := fmt.Sprintf(tablePattern, b)
+					res = append(res, sharding.Query{
+						SQL:        fmt.Sprintf(sql, dbPattern, tableName),
+						Args:       []any{12, 531},
+						DB:         dbPattern,
+						Datasource: dsPattern,
+					})
+				}
+				return res
+			}(),
+		},
+		{
+			name: "where not (in or gt)",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").In(12, 35, 101).Or(C("UserId").GT(531))))
+				return s
+			}(),
+			qs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE NOT ((`user_id` IN (?,?,?)) OR (`user_id`>?));"
+				for b := 0; b < tableBase; b++ {
+					tableName := fmt.Sprintf(tablePattern, b)
+					res = append(res, sharding.Query{
+						SQL:        fmt.Sprintf(sql, dbPattern, tableName),
+						Args:       []any{12, 35, 101, 531},
+						DB:         dbPattern,
+						Datasource: dsPattern,
+					})
+				}
+				return res
+			}(),
+		},
+		{
+			name: "where not (in or eq)",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").In(12, 35, 101).Or(C("UserId").EQ(531))))
+				return s
+			}(),
+			qs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE NOT ((`user_id` IN (?,?,?)) OR (`user_id`=?));"
+				for b := 0; b < tableBase; b++ {
+					tableName := fmt.Sprintf(tablePattern, b)
+					res = append(res, sharding.Query{
+						SQL:        fmt.Sprintf(sql, dbPattern, tableName),
+						Args:       []any{12, 35, 101, 531},
+						DB:         dbPattern,
+						Datasource: dsPattern,
+					})
+				}
+				return res
+			}(),
 		},
 		{
 			name: "and empty",
@@ -2558,6 +3006,230 @@ func TestShardingSelector_onlyDB_Build(t *testing.T) {
 			qs: func() []sharding.Query {
 				var res []sharding.Query
 				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE (`user_id` IN (?,?,?)) OR (`user_id`>?);"
+				for b := 0; b < dbBase; b++ {
+					dbName := fmt.Sprintf(dbPattern, b)
+					res = append(res, sharding.Query{
+						SQL:        fmt.Sprintf(sql, dbName, tablePattern),
+						Args:       []any{12, 35, 101, 531},
+						DB:         dbName,
+						Datasource: dsPattern,
+					})
+				}
+				return res
+			}(),
+		},
+		{
+			name: "where not in",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(C("UserId").NotIn(12, 35, 101))
+				return s
+			}(),
+			qs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE `user_id` NOT IN (?,?,?);"
+				for b := 0; b < dbBase; b++ {
+					dbName := fmt.Sprintf(dbPattern, b)
+					res = append(res, sharding.Query{
+						SQL:        fmt.Sprintf(sql, dbName, tablePattern),
+						Args:       []any{12, 35, 101},
+						DB:         dbName,
+						Datasource: dsPattern,
+					})
+				}
+				return res
+			}(),
+		},
+		{
+			name: "where not in and eq",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(C("UserId").NotIn(12, 35, 101).And(C("UserId").EQ(234)))
+				return s
+			}(),
+			qs: []sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab` WHERE (`user_id` NOT IN (?,?,?)) AND (`user_id`=?);",
+					Args:       []any{12, 35, 101, 234},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "where not in or eq",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(C("UserId").NotIn(12, 35, 101).Or(C("UserId").EQ(531)))
+				return s
+			}(),
+			qs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE (`user_id` NOT IN (?,?,?)) OR (`user_id`=?);"
+				for b := 0; b < dbBase; b++ {
+					dbName := fmt.Sprintf(dbPattern, b)
+					res = append(res, sharding.Query{
+						SQL:        fmt.Sprintf(sql, dbName, tablePattern),
+						Args:       []any{12, 35, 101, 531},
+						DB:         dbName,
+						Datasource: dsPattern,
+					})
+				}
+				return res
+			}(),
+		},
+		{
+			name: "where not in or gt",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(C("UserId").NotIn(12, 35, 101).Or(C("UserId").GT(531)))
+				return s
+			}(),
+			qs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE (`user_id` NOT IN (?,?,?)) OR (`user_id`>?);"
+				for b := 0; b < dbBase; b++ {
+					dbName := fmt.Sprintf(dbPattern, b)
+					res = append(res, sharding.Query{
+						SQL:        fmt.Sprintf(sql, dbName, tablePattern),
+						Args:       []any{12, 35, 101, 531},
+						DB:         dbName,
+						Datasource: dsPattern,
+					})
+				}
+				return res
+			}(),
+		},
+		{
+			name: "where not gt",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").GT(101)))
+				return s
+			}(),
+			qs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE NOT (`user_id`>?);"
+				for b := 0; b < dbBase; b++ {
+					dbName := fmt.Sprintf(dbPattern, b)
+					res = append(res, sharding.Query{
+						SQL:        fmt.Sprintf(sql, dbName, tablePattern),
+						Args:       []any{101},
+						DB:         dbName,
+						Datasource: dsPattern,
+					})
+				}
+				return res
+			}(),
+		},
+		{
+			name: "where not lt",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").LT(101)))
+				return s
+			}(),
+			qs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE NOT (`user_id`<?);"
+				for b := 0; b < dbBase; b++ {
+					dbName := fmt.Sprintf(dbPattern, b)
+					res = append(res, sharding.Query{
+						SQL:        fmt.Sprintf(sql, dbName, tablePattern),
+						Args:       []any{101},
+						DB:         dbName,
+						Datasource: dsPattern,
+					})
+				}
+				return res
+			}(),
+		},
+		{
+			name: "where not (gt and lt)",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").GT(12).And(C("UserId").LT(531))))
+				return s
+			}(),
+			qs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE NOT ((`user_id`>?) AND (`user_id`<?));"
+				for b := 0; b < dbBase; b++ {
+					dbName := fmt.Sprintf(dbPattern, b)
+					res = append(res, sharding.Query{
+						SQL:        fmt.Sprintf(sql, dbName, tablePattern),
+						Args:       []any{12, 531},
+						DB:         dbName,
+						Datasource: dsPattern,
+					})
+				}
+				return res
+			}(),
+		},
+		{
+			name: "where not (gt eq and lt eq)",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").GTEQ(12).And(C("UserId").LTEQ(531))))
+				return s
+			}(),
+			qs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE NOT ((`user_id`>=?) AND (`user_id`<=?));"
+				for b := 0; b < dbBase; b++ {
+					dbName := fmt.Sprintf(dbPattern, b)
+					res = append(res, sharding.Query{
+						SQL:        fmt.Sprintf(sql, dbName, tablePattern),
+						Args:       []any{12, 531},
+						DB:         dbName,
+						Datasource: dsPattern,
+					})
+				}
+				return res
+			}(),
+		},
+		{
+			name: "where not (in or gt)",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").In(12, 35, 101).Or(C("UserId").GT(531))))
+				return s
+			}(),
+			qs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE NOT ((`user_id` IN (?,?,?)) OR (`user_id`>?));"
+				for b := 0; b < dbBase; b++ {
+					dbName := fmt.Sprintf(dbPattern, b)
+					res = append(res, sharding.Query{
+						SQL:        fmt.Sprintf(sql, dbName, tablePattern),
+						Args:       []any{12, 35, 101, 531},
+						DB:         dbName,
+						Datasource: dsPattern,
+					})
+				}
+				return res
+			}(),
+		},
+		{
+			name: "where not (in or eq)",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").In(12, 35, 101).Or(C("UserId").EQ(531))))
+				return s
+			}(),
+			qs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE NOT ((`user_id` IN (?,?,?)) OR (`user_id`=?));"
 				for b := 0; b < dbBase; b++ {
 					dbName := fmt.Sprintf(dbPattern, b)
 					res = append(res, sharding.Query{
@@ -3549,6 +4221,284 @@ func TestShardingSelector_all_Build(t *testing.T) {
 			}(),
 		},
 		{
+			name: "where not in",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(C("UserId").NotIn(12, 35, 101))
+				return s
+			}(),
+			qs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE `user_id` NOT IN (?,?,?);"
+				for a := 0; a < dsBase; a++ {
+					dsName := fmt.Sprintf(dsPattern, a)
+					for b := 0; b < dbBase; b++ {
+						dbName := fmt.Sprintf(dbPattern, b)
+						for c := 0; c < tableBase; c++ {
+							tableName := fmt.Sprintf(tablePattern, c)
+							res = append(res, sharding.Query{
+								SQL:        fmt.Sprintf(sql, dbName, tableName),
+								Args:       []any{12, 35, 101},
+								DB:         dbName,
+								Datasource: dsName,
+							})
+						}
+					}
+				}
+				return res
+			}(),
+		},
+		{
+			name: "where not in and eq",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(C("UserId").NotIn(12, 35, 101).And(C("UserId").EQ(234)))
+				return s
+			}(),
+			qs: []sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_0` WHERE (`user_id` NOT IN (?,?,?)) AND (`user_id`=?);",
+					Args:       []any{12, 35, 101, 234},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "where not in or eq",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(C("UserId").NotIn(12, 35, 101).Or(C("UserId").EQ(531)))
+				return s
+			}(),
+			qs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE (`user_id` NOT IN (?,?,?)) OR (`user_id`=?);"
+				for a := 0; a < dsBase; a++ {
+					dsName := fmt.Sprintf(dsPattern, a)
+					for b := 0; b < dbBase; b++ {
+						dbName := fmt.Sprintf(dbPattern, b)
+						for c := 0; c < tableBase; c++ {
+							tableName := fmt.Sprintf(tablePattern, c)
+							res = append(res, sharding.Query{
+								SQL:        fmt.Sprintf(sql, dbName, tableName),
+								Args:       []any{12, 35, 101, 531},
+								DB:         dbName,
+								Datasource: dsName,
+							})
+						}
+					}
+				}
+				return res
+			}(),
+		},
+		{
+			name: "where not in or gt",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(C("UserId").NotIn(12, 35, 101).Or(C("UserId").GT(531)))
+				return s
+			}(),
+			qs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE (`user_id` NOT IN (?,?,?)) OR (`user_id`>?);"
+				for a := 0; a < dsBase; a++ {
+					dsName := fmt.Sprintf(dsPattern, a)
+					for b := 0; b < dbBase; b++ {
+						dbName := fmt.Sprintf(dbPattern, b)
+						for c := 0; c < tableBase; c++ {
+							tableName := fmt.Sprintf(tablePattern, c)
+							res = append(res, sharding.Query{
+								SQL:        fmt.Sprintf(sql, dbName, tableName),
+								Args:       []any{12, 35, 101, 531},
+								DB:         dbName,
+								Datasource: dsName,
+							})
+						}
+					}
+				}
+				return res
+			}(),
+		},
+		{
+			name: "where not gt",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").GT(101)))
+				return s
+			}(),
+			qs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE NOT (`user_id`>?);"
+				for a := 0; a < dsBase; a++ {
+					dsName := fmt.Sprintf(dsPattern, a)
+					for b := 0; b < dbBase; b++ {
+						dbName := fmt.Sprintf(dbPattern, b)
+						for c := 0; c < tableBase; c++ {
+							tableName := fmt.Sprintf(tablePattern, c)
+							res = append(res, sharding.Query{
+								SQL:        fmt.Sprintf(sql, dbName, tableName),
+								Args:       []any{101},
+								DB:         dbName,
+								Datasource: dsName,
+							})
+						}
+					}
+				}
+				return res
+			}(),
+		},
+		{
+			name: "where not lt",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").LT(101)))
+				return s
+			}(),
+			qs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE NOT (`user_id`<?);"
+				for a := 0; a < dsBase; a++ {
+					dsName := fmt.Sprintf(dsPattern, a)
+					for b := 0; b < dbBase; b++ {
+						dbName := fmt.Sprintf(dbPattern, b)
+						for c := 0; c < tableBase; c++ {
+							tableName := fmt.Sprintf(tablePattern, c)
+							res = append(res, sharding.Query{
+								SQL:        fmt.Sprintf(sql, dbName, tableName),
+								Args:       []any{101},
+								DB:         dbName,
+								Datasource: dsName,
+							})
+						}
+					}
+				}
+				return res
+			}(),
+		},
+		{
+			name: "where not (gt and lt)",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").GT(12).And(C("UserId").LT(531))))
+				return s
+			}(),
+			qs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE NOT ((`user_id`>?) AND (`user_id`<?));"
+				for a := 0; a < dsBase; a++ {
+					dsName := fmt.Sprintf(dsPattern, a)
+					for b := 0; b < dbBase; b++ {
+						dbName := fmt.Sprintf(dbPattern, b)
+						for c := 0; c < tableBase; c++ {
+							tableName := fmt.Sprintf(tablePattern, c)
+							res = append(res, sharding.Query{
+								SQL:        fmt.Sprintf(sql, dbName, tableName),
+								Args:       []any{12, 531},
+								DB:         dbName,
+								Datasource: dsName,
+							})
+						}
+					}
+				}
+				return res
+			}(),
+		},
+		{
+			name: "where not (gt eq and lt eq)",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").GTEQ(12).And(C("UserId").LTEQ(531))))
+				return s
+			}(),
+			qs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE NOT ((`user_id`>=?) AND (`user_id`<=?));"
+				for a := 0; a < dsBase; a++ {
+					dsName := fmt.Sprintf(dsPattern, a)
+					for b := 0; b < dbBase; b++ {
+						dbName := fmt.Sprintf(dbPattern, b)
+						for c := 0; c < tableBase; c++ {
+							tableName := fmt.Sprintf(tablePattern, c)
+							res = append(res, sharding.Query{
+								SQL:        fmt.Sprintf(sql, dbName, tableName),
+								Args:       []any{12, 531},
+								DB:         dbName,
+								Datasource: dsName,
+							})
+						}
+					}
+				}
+				return res
+			}(),
+		},
+		{
+			name: "where not (in or gt)",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").In(12, 35, 101).Or(C("UserId").GT(531))))
+				return s
+			}(),
+			qs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE NOT ((`user_id` IN (?,?,?)) OR (`user_id`>?));"
+				for a := 0; a < dsBase; a++ {
+					dsName := fmt.Sprintf(dsPattern, a)
+					for b := 0; b < dbBase; b++ {
+						dbName := fmt.Sprintf(dbPattern, b)
+						for c := 0; c < tableBase; c++ {
+							tableName := fmt.Sprintf(tablePattern, c)
+							res = append(res, sharding.Query{
+								SQL:        fmt.Sprintf(sql, dbName, tableName),
+								Args:       []any{12, 35, 101, 531},
+								DB:         dbName,
+								Datasource: dsName,
+							})
+						}
+					}
+				}
+				return res
+			}(),
+		},
+		{
+			name: "where not (in or eq)",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").In(12, 35, 101).Or(C("UserId").EQ(531))))
+				return s
+			}(),
+			qs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE NOT ((`user_id` IN (?,?,?)) OR (`user_id`=?));"
+				for a := 0; a < dsBase; a++ {
+					dsName := fmt.Sprintf(dsPattern, a)
+					for b := 0; b < dbBase; b++ {
+						dbName := fmt.Sprintf(dbPattern, b)
+						for c := 0; c < tableBase; c++ {
+							tableName := fmt.Sprintf(tablePattern, c)
+							res = append(res, sharding.Query{
+								SQL:        fmt.Sprintf(sql, dbName, tableName),
+								Args:       []any{12, 35, 101, 531},
+								DB:         dbName,
+								Datasource: dsName,
+							})
+						}
+					}
+				}
+				return res
+			}(),
+		},
+		{
 			name: "and empty",
 			builder: func() sharding.QueryBuilder {
 				s := NewShardingSelector[Order](shardingDB).
@@ -4333,6 +5283,404 @@ func TestShardingSelector_Build(t *testing.T) {
 			}(),
 		},
 		{
+			name: "where not in",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(C("UserId").NotIn(12, 35, 101))
+				return s
+			}(),
+			qs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE `user_id` NOT IN (?,?,?);"
+				for i := 0; i < dbBase; i++ {
+					dbName := fmt.Sprintf(dbPattern, i)
+					for j := 0; j < tableBase; j++ {
+						tableName := fmt.Sprintf(tablePattern, j)
+						res = append(res, sharding.Query{
+							SQL:        fmt.Sprintf(sql, dbName, tableName),
+							Args:       []any{12, 35, 101},
+							DB:         dbName,
+							Datasource: dsPattern,
+						})
+					}
+				}
+				return res
+			}(),
+		},
+		{
+			name: "where not in and eq",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(C("UserId").NotIn(12, 35, 101).And(C("UserId").EQ(234)))
+				return s
+			}(),
+			qs: []sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_0`.`order_tab_0` WHERE (`user_id` NOT IN (?,?,?)) AND (`user_id`=?);",
+					Args:       []any{12, 35, 101, 234},
+					DB:         "order_db_0",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "where not in or eq",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(C("UserId").NotIn(12, 35, 101).Or(C("UserId").EQ(531)))
+				return s
+			}(),
+			qs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE (`user_id` NOT IN (?,?,?)) OR (`user_id`=?);"
+				for i := 0; i < dbBase; i++ {
+					dbName := fmt.Sprintf(dbPattern, i)
+					for j := 0; j < tableBase; j++ {
+						tableName := fmt.Sprintf(tablePattern, j)
+						res = append(res, sharding.Query{
+							SQL:        fmt.Sprintf(sql, dbName, tableName),
+							Args:       []any{12, 35, 101, 531},
+							DB:         dbName,
+							Datasource: dsPattern,
+						})
+					}
+				}
+				return res
+			}(),
+		},
+		{
+			name: "where not in or gt",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(C("UserId").NotIn(12, 35, 101).Or(C("UserId").GT(531)))
+				return s
+			}(),
+			qs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE (`user_id` NOT IN (?,?,?)) OR (`user_id`>?);"
+				for i := 0; i < dbBase; i++ {
+					dbName := fmt.Sprintf(dbPattern, i)
+					for j := 0; j < tableBase; j++ {
+						tableName := fmt.Sprintf(tablePattern, j)
+						res = append(res, sharding.Query{
+							SQL:        fmt.Sprintf(sql, dbName, tableName),
+							Args:       []any{12, 35, 101, 531},
+							DB:         dbName,
+							Datasource: dsPattern,
+						})
+					}
+				}
+				return res
+			}(),
+		},
+		{
+			name: "where not gt",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").GT(101)))
+				return s
+			}(),
+			qs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE NOT (`user_id`>?);"
+				for i := 0; i < dbBase; i++ {
+					dbName := fmt.Sprintf(dbPattern, i)
+					for j := 0; j < tableBase; j++ {
+						tableName := fmt.Sprintf(tablePattern, j)
+						res = append(res, sharding.Query{
+							SQL:        fmt.Sprintf(sql, dbName, tableName),
+							Args:       []any{101},
+							DB:         dbName,
+							Datasource: dsPattern,
+						})
+					}
+				}
+				return res
+			}(),
+		},
+		{
+			name: "where not lt",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").LT(101)))
+				return s
+			}(),
+			qs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE NOT (`user_id`<?);"
+				for i := 0; i < dbBase; i++ {
+					dbName := fmt.Sprintf(dbPattern, i)
+					for j := 0; j < tableBase; j++ {
+						tableName := fmt.Sprintf(tablePattern, j)
+						res = append(res, sharding.Query{
+							SQL:        fmt.Sprintf(sql, dbName, tableName),
+							Args:       []any{101},
+							DB:         dbName,
+							Datasource: dsPattern,
+						})
+					}
+				}
+				return res
+			}(),
+		},
+		{
+			name: "where not gt eq",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").GTEQ(101)))
+				return s
+			}(),
+			qs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE NOT (`user_id`>=?);"
+				for i := 0; i < dbBase; i++ {
+					dbName := fmt.Sprintf(dbPattern, i)
+					for j := 0; j < tableBase; j++ {
+						tableName := fmt.Sprintf(tablePattern, j)
+						res = append(res, sharding.Query{
+							SQL:        fmt.Sprintf(sql, dbName, tableName),
+							Args:       []any{101},
+							DB:         dbName,
+							Datasource: dsPattern,
+						})
+					}
+				}
+				return res
+			}(),
+		},
+		{
+			name: "where not lt eq",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").LTEQ(101)))
+				return s
+			}(),
+			qs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE NOT (`user_id`<=?);"
+				for i := 0; i < dbBase; i++ {
+					dbName := fmt.Sprintf(dbPattern, i)
+					for j := 0; j < tableBase; j++ {
+						tableName := fmt.Sprintf(tablePattern, j)
+						res = append(res, sharding.Query{
+							SQL:        fmt.Sprintf(sql, dbName, tableName),
+							Args:       []any{101},
+							DB:         dbName,
+							Datasource: dsPattern,
+						})
+					}
+				}
+				return res
+			}(),
+		},
+		{
+			name: "where not eq",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").EQ(101)))
+				return s
+			}(),
+			qs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE NOT (`user_id`=?);"
+				for i := 0; i < dbBase; i++ {
+					dbName := fmt.Sprintf(dbPattern, i)
+					for j := 0; j < tableBase; j++ {
+						tableName := fmt.Sprintf(tablePattern, j)
+						res = append(res, sharding.Query{
+							SQL:        fmt.Sprintf(sql, dbName, tableName),
+							Args:       []any{101},
+							DB:         dbName,
+							Datasource: dsPattern,
+						})
+					}
+				}
+				return res
+			}(),
+		},
+		{
+			name: "where not neq",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").NEQ(101)))
+				return s
+			}(),
+			qs: []sharding.Query{
+				{
+					SQL:        "SELECT `order_id`,`content` FROM `order_db_1`.`order_tab_2` WHERE NOT (`user_id`!=?);",
+					Args:       []any{101},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+			},
+		},
+		{
+			name: "where not (gt and lt)",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").GT(12).And(C("UserId").LT(531))))
+				return s
+			}(),
+			qs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE NOT ((`user_id`>?) AND (`user_id`<?));"
+				for i := 0; i < dbBase; i++ {
+					dbName := fmt.Sprintf(dbPattern, i)
+					for j := 0; j < tableBase; j++ {
+						tableName := fmt.Sprintf(tablePattern, j)
+						res = append(res, sharding.Query{
+							SQL:        fmt.Sprintf(sql, dbName, tableName),
+							Args:       []any{12, 531},
+							DB:         dbName,
+							Datasource: dsPattern,
+						})
+					}
+				}
+				return res
+			}(),
+		},
+		{
+			name: "where not (gt eq and lt eq)",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").GTEQ(12).And(C("UserId").LTEQ(531))))
+				return s
+			}(),
+			qs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE NOT ((`user_id`>=?) AND (`user_id`<=?));"
+				for i := 0; i < dbBase; i++ {
+					dbName := fmt.Sprintf(dbPattern, i)
+					for j := 0; j < tableBase; j++ {
+						tableName := fmt.Sprintf(tablePattern, j)
+						res = append(res, sharding.Query{
+							SQL:        fmt.Sprintf(sql, dbName, tableName),
+							Args:       []any{12, 531},
+							DB:         dbName,
+							Datasource: dsPattern,
+						})
+					}
+				}
+				return res
+			}(),
+		},
+		{
+			name: "where not (in or gt)",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").In(12, 35, 101).Or(C("UserId").GT(531))))
+				return s
+			}(),
+			qs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE NOT ((`user_id` IN (?,?,?)) OR (`user_id`>?));"
+				for i := 0; i < dbBase; i++ {
+					dbName := fmt.Sprintf(dbPattern, i)
+					for j := 0; j < tableBase; j++ {
+						tableName := fmt.Sprintf(tablePattern, j)
+						res = append(res, sharding.Query{
+							SQL:        fmt.Sprintf(sql, dbName, tableName),
+							Args:       []any{12, 35, 101, 531},
+							DB:         dbName,
+							Datasource: dsPattern,
+						})
+					}
+				}
+				return res
+			}(),
+		},
+		{
+			name: "where not (in or eq)",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").In(12, 35, 101).Or(C("UserId").EQ(531))))
+				return s
+			}(),
+			qs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE NOT ((`user_id` IN (?,?,?)) OR (`user_id`=?));"
+				for i := 0; i < dbBase; i++ {
+					dbName := fmt.Sprintf(dbPattern, i)
+					for j := 0; j < tableBase; j++ {
+						tableName := fmt.Sprintf(tablePattern, j)
+						res = append(res, sharding.Query{
+							SQL:        fmt.Sprintf(sql, dbName, tableName),
+							Args:       []any{12, 35, 101, 531},
+							DB:         dbName,
+							Datasource: dsPattern,
+						})
+					}
+				}
+				return res
+			}(),
+		},
+		{
+			name: "where not (eq and eq)",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").EQ(12).And(C("UserId").EQ(531))))
+				return s
+			}(),
+			qs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE NOT ((`user_id`=?) AND (`user_id`=?));"
+				for i := 0; i < dbBase; i++ {
+					dbName := fmt.Sprintf(dbPattern, i)
+					for j := 0; j < tableBase; j++ {
+						tableName := fmt.Sprintf(tablePattern, j)
+						res = append(res, sharding.Query{
+							SQL:        fmt.Sprintf(sql, dbName, tableName),
+							Args:       []any{12, 531},
+							DB:         dbName,
+							Datasource: dsPattern,
+						})
+					}
+				}
+				return res
+			}(),
+		},
+		{
+			name: "where not (eq and eq not sharding key)",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).
+					Select(C("OrderId"), C("Content")).
+					Where(Not(C("UserId").EQ(12).And(C("OrderId").EQ(111))))
+				return s
+			}(),
+			qs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "SELECT `order_id`,`content` FROM `%s`.`%s` WHERE NOT ((`user_id`=?) AND (`order_id`=?));"
+				for i := 0; i < dbBase; i++ {
+					dbName := fmt.Sprintf(dbPattern, i)
+					for j := 0; j < tableBase; j++ {
+						tableName := fmt.Sprintf(tablePattern, j)
+						res = append(res, sharding.Query{
+							SQL:        fmt.Sprintf(sql, dbName, tableName),
+							Args:       []any{12, 111},
+							DB:         dbName,
+							Datasource: dsPattern,
+						})
+					}
+				}
+				return res
+			}(),
+		},
+		{
 			name: "where between",
 			builder: func() sharding.QueryBuilder {
 				s := NewShardingSelector[Order](shardingDB).
@@ -4463,6 +5811,42 @@ func TestShardingSelector_Build_Error(t *testing.T) {
 		qs      []sharding.Query
 		wantErr error
 	}{
+		{
+			name: "not and left too complex operator",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).Where(Not(C("Content").
+					Like("%kfc").And(C("OrderId").EQ(101))))
+				return s
+			}(),
+			wantErr: errs.NewUnsupportedOperatorError(opLike.Text),
+		},
+		{
+			name: "not or left too complex operator",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).Where(Not(C("Content").
+					Like("%kfc").Or(C("OrderId").EQ(101))))
+				return s
+			}(),
+			wantErr: errs.NewUnsupportedOperatorError(opLike.Text),
+		},
+		{
+			name: "not and right too complex operator",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).Where(Not(C("OrderId").
+					EQ(101).And(C("Content").Like("%kfc"))))
+				return s
+			}(),
+			wantErr: errs.NewUnsupportedOperatorError(opLike.Text),
+		},
+		{
+			name: "not or right too complex operator",
+			builder: func() sharding.QueryBuilder {
+				s := NewShardingSelector[Order](shardingDB).Where(Not(C("OrderId").
+					EQ(101).Or(C("Content").Like("%kfc"))))
+				return s
+			}(),
+			wantErr: errs.NewUnsupportedOperatorError(opLike.Text),
+		},
 		{
 			name: "invalid field err",
 			builder: func() sharding.QueryBuilder {
