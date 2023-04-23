@@ -17,11 +17,13 @@ package aggregator
 import (
 	"reflect"
 
+	"github.com/ecodeclub/eorm/internal/merger"
+
 	"github.com/ecodeclub/eorm/internal/merger/internal/errs"
 )
 
 type Max struct {
-	maxColumnInfo ColumnInfo
+	maxColumnInfo merger.ColumnInfo
 }
 
 func (m *Max) Aggregate(cols [][]any) (any, error) {
@@ -49,7 +51,7 @@ func (m *Max) ColumnName() string {
 	return m.maxColumnInfo.Name
 }
 
-func NewMax(info ColumnInfo) *Max {
+func NewMax(info merger.ColumnInfo) *Max {
 	return &Max{
 		maxColumnInfo: info,
 	}

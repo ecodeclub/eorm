@@ -1,10 +1,26 @@
-package groupbyMerger
+// Copyright 2021 ecodeclub
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package groupby_merger
 
 import (
 	"context"
 	"database/sql"
 	"errors"
 	"testing"
+
+	"github.com/ecodeclub/eorm/internal/merger"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/ecodeclub/eorm/internal/merger/aggregatemerger/aggregator"
@@ -72,18 +88,18 @@ func (ms *MergerSuite) TestAggregatorMerger_Merge() {
 		name           string
 		aggregators    []aggregator.Aggregator
 		rowsList       []*sql.Rows
-		GroupByColumns []GroupByColumn
+		GroupByColumns []merger.ColumnInfo
 		wantErr        error
 		ctx            func() (context.Context, context.CancelFunc)
 	}{
 		{
 			name: "正常案例",
 			aggregators: []aggregator.Aggregator{
-				aggregator.NewCount(aggregator.NewColumnInfo(2, "id")),
+				aggregator.NewCount(merger.NewColumnInfo(2, "id")),
 			},
-			GroupByColumns: []GroupByColumn{
-				NewGroupByColumn(0, "county"),
-				NewGroupByColumn(1, "gender"),
+			GroupByColumns: []merger.ColumnInfo{
+				merger.NewColumnInfo(0, "county"),
+				merger.NewColumnInfo(1, "gender"),
 			},
 			rowsList: func() []*sql.Rows {
 				query := "SELECT `county`,`gender`,SUM(`id`) FROM `t1` GROUP BY `country`,`gender`"
@@ -109,10 +125,10 @@ func (ms *MergerSuite) TestAggregatorMerger_Merge() {
 		{
 			name: "超时",
 			aggregators: []aggregator.Aggregator{
-				aggregator.NewCount(aggregator.NewColumnInfo(1, "id")),
+				aggregator.NewCount(merger.NewColumnInfo(1, "id")),
 			},
-			GroupByColumns: []GroupByColumn{
-				NewGroupByColumn(0, "user_name"),
+			GroupByColumns: []merger.ColumnInfo{
+				merger.NewColumnInfo(0, "user_name"),
 			},
 			rowsList: func() []*sql.Rows {
 				query := "SELECT `user_name`,SUM(`id`) FROM `t1` GROUP BY `user_name`"
@@ -138,10 +154,10 @@ func (ms *MergerSuite) TestAggregatorMerger_Merge() {
 		{
 			name: "rowsList为空",
 			aggregators: []aggregator.Aggregator{
-				aggregator.NewCount(aggregator.NewColumnInfo(1, "id")),
+				aggregator.NewCount(merger.NewColumnInfo(1, "id")),
 			},
-			GroupByColumns: []GroupByColumn{
-				NewGroupByColumn(0, "user_name"),
+			GroupByColumns: []merger.ColumnInfo{
+				merger.NewColumnInfo(0, "user_name"),
 			},
 			rowsList: func() []*sql.Rows {
 				return []*sql.Rows{}
@@ -155,10 +171,10 @@ func (ms *MergerSuite) TestAggregatorMerger_Merge() {
 		{
 			name: "rowsList中有nil",
 			aggregators: []aggregator.Aggregator{
-				aggregator.NewCount(aggregator.NewColumnInfo(1, "id")),
+				aggregator.NewCount(merger.NewColumnInfo(1, "id")),
 			},
-			GroupByColumns: []GroupByColumn{
-				NewGroupByColumn(0, "user_name"),
+			GroupByColumns: []merger.ColumnInfo{
+				merger.NewColumnInfo(0, "user_name"),
 			},
 			rowsList: func() []*sql.Rows {
 				return []*sql.Rows{nil}
@@ -172,10 +188,10 @@ func (ms *MergerSuite) TestAggregatorMerger_Merge() {
 		{
 			name: "rowsList中有sql.Rows返回错误",
 			aggregators: []aggregator.Aggregator{
-				aggregator.NewCount(aggregator.NewColumnInfo(1, "id")),
+				aggregator.NewCount(merger.NewColumnInfo(1, "id")),
 			},
-			GroupByColumns: []GroupByColumn{
-				NewGroupByColumn(0, "user_name"),
+			GroupByColumns: []merger.ColumnInfo{
+				merger.NewColumnInfo(0, "user_name"),
 			},
 			rowsList: func() []*sql.Rows {
 				query := "SELECT `user_name`,SUM(`id`) FROM `t1` GROUP BY `user_name`"
@@ -221,16 +237,16 @@ func (ms *MergerSuite) TestAggregatorRows_NextAndScan() {
 		rowsList       []*sql.Rows
 		wantVal        [][]any
 		gotVal         [][]any
-		GroupByColumns []GroupByColumn
+		GroupByColumns []merger.ColumnInfo
 		wantErr        error
 	}{
 		{
 			name: "同一组数据在不同的sql.Rows中",
 			aggregators: []aggregator.Aggregator{
-				aggregator.NewCount(aggregator.NewColumnInfo(1, "COUNT(id)")),
+				aggregator.NewCount(merger.NewColumnInfo(1, "COUNT(id)")),
 			},
-			GroupByColumns: []GroupByColumn{
-				NewGroupByColumn(0, "user_name"),
+			GroupByColumns: []merger.ColumnInfo{
+				merger.NewColumnInfo(0, "user_name"),
 			},
 			rowsList: func() []*sql.Rows {
 				query := "SELECT `user_name`,COUNT(`id`) FROM `t1` GROUP BY `user_name`"
@@ -261,10 +277,10 @@ func (ms *MergerSuite) TestAggregatorRows_NextAndScan() {
 		{
 			name: "同一组数据在同一个sql.Rows中",
 			aggregators: []aggregator.Aggregator{
-				aggregator.NewCount(aggregator.NewColumnInfo(1, "COUNT(id)")),
+				aggregator.NewCount(merger.NewColumnInfo(1, "COUNT(id)")),
 			},
-			GroupByColumns: []GroupByColumn{
-				NewGroupByColumn(0, "user_name"),
+			GroupByColumns: []merger.ColumnInfo{
+				merger.NewColumnInfo(0, "user_name"),
 			},
 			rowsList: func() []*sql.Rows {
 				query := "SELECT `user_name`,COUNT(`id`) FROM `t1` GROUP BY `user_name`"
@@ -299,11 +315,11 @@ func (ms *MergerSuite) TestAggregatorRows_NextAndScan() {
 		{
 			name: "多个分组列",
 			aggregators: []aggregator.Aggregator{
-				aggregator.NewSum(aggregator.NewColumnInfo(2, "SUM(id)")),
+				aggregator.NewSum(merger.NewColumnInfo(2, "SUM(id)")),
 			},
-			GroupByColumns: []GroupByColumn{
-				NewGroupByColumn(0, "county"),
-				NewGroupByColumn(1, "gender"),
+			GroupByColumns: []merger.ColumnInfo{
+				merger.NewColumnInfo(0, "county"),
+				merger.NewColumnInfo(1, "gender"),
 			},
 			rowsList: func() []*sql.Rows {
 				query := "SELECT `county`,`gender`,SUM(`id`) FROM `t1` GROUP BY `country`,`gender`"
@@ -352,12 +368,12 @@ func (ms *MergerSuite) TestAggregatorRows_NextAndScan() {
 		{
 			name: "多个聚合函数",
 			aggregators: []aggregator.Aggregator{
-				aggregator.NewSum(aggregator.NewColumnInfo(2, "SUM(id)")),
-				aggregator.NewAVG(aggregator.NewColumnInfo(3, "SUM(age)"), aggregator.NewColumnInfo(4, "COUNT(age)"), "AVG(age)"),
+				aggregator.NewSum(merger.NewColumnInfo(2, "SUM(id)")),
+				aggregator.NewAVG(merger.NewColumnInfo(3, "SUM(age)"), merger.NewColumnInfo(4, "COUNT(age)"), "AVG(age)"),
 			},
-			GroupByColumns: []GroupByColumn{
-				NewGroupByColumn(0, "county"),
-				NewGroupByColumn(1, "gender"),
+			GroupByColumns: []merger.ColumnInfo{
+				merger.NewColumnInfo(0, "county"),
+				merger.NewColumnInfo(1, "gender"),
 			},
 
 			rowsList: func() []*sql.Rows {
@@ -442,7 +458,7 @@ func (ms *MergerSuite) TestAggregatorRows_ScanAndErr() {
 		r, err := ms.mockDB01.QueryContext(context.Background(), query)
 		require.NoError(t, err)
 		rowsList := []*sql.Rows{r}
-		merger := NewAggregatorMerger([]aggregator.Aggregator{aggregator.NewSum(aggregator.NewColumnInfo(1, "SUM(id)"))}, []GroupByColumn{NewGroupByColumn(0, "userid")})
+		merger := NewAggregatorMerger([]aggregator.Aggregator{aggregator.NewSum(merger.NewColumnInfo(1, "SUM(id)"))}, []merger.ColumnInfo{merger.NewColumnInfo(0, "userid")})
 		rows, err := merger.Merge(context.Background(), rowsList)
 		require.NoError(t, err)
 		userid := 0
@@ -457,7 +473,7 @@ func (ms *MergerSuite) TestAggregatorRows_ScanAndErr() {
 		r, err := ms.mockDB01.QueryContext(context.Background(), query)
 		require.NoError(t, err)
 		rowsList := []*sql.Rows{r}
-		merger := NewAggregatorMerger([]aggregator.Aggregator{&mockAggregate{}}, []GroupByColumn{NewGroupByColumn(0, "userid")})
+		merger := NewAggregatorMerger([]aggregator.Aggregator{&mockAggregate{}}, []merger.ColumnInfo{merger.NewColumnInfo(0, "userid")})
 		rows, err := merger.Merge(context.Background(), rowsList)
 		require.NoError(t, err)
 		userid := 0
@@ -475,7 +491,7 @@ func (ms *MergerSuite) TestAggregatorRows_NextAndErr() {
 		rowsList       func() []*sql.Rows
 		wantErr        error
 		aggregators    []aggregator.Aggregator
-		GroupByColumns []GroupByColumn
+		GroupByColumns []merger.ColumnInfo
 	}{
 		{
 			name: "有一个aggregator返回error",
@@ -500,8 +516,8 @@ func (ms *MergerSuite) TestAggregatorRows_NextAndErr() {
 					&mockAggregate{},
 				}
 			}(),
-			GroupByColumns: []GroupByColumn{
-				NewGroupByColumn(0, "username"),
+			GroupByColumns: []merger.ColumnInfo{
+				merger.NewColumnInfo(0, "username"),
 			},
 			wantErr: aggregatorErr,
 		},
@@ -529,14 +545,14 @@ func (ms *MergerSuite) TestAggregatorRows_Columns() {
 	ms.mock02.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(2, 1, 3, 2, 4, 11, "dm"))
 	ms.mock03.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(3, 1, 4, 3, 5, 12, "xm"))
 	aggregators := []aggregator.Aggregator{
-		aggregator.NewAVG(aggregator.NewColumnInfo(0, "SUM(grade)"), aggregator.NewColumnInfo(1, "COUNT(grade)"), "AVG(grade)"),
-		aggregator.NewSum(aggregator.NewColumnInfo(2, "SUM(id)")),
-		aggregator.NewMin(aggregator.NewColumnInfo(3, "MIN(id)")),
-		aggregator.NewMax(aggregator.NewColumnInfo(4, "MAX(id)")),
-		aggregator.NewCount(aggregator.NewColumnInfo(5, "COUNT(id)")),
+		aggregator.NewAVG(merger.NewColumnInfo(0, "SUM(grade)"), merger.NewColumnInfo(1, "COUNT(grade)"), "AVG(grade)"),
+		aggregator.NewSum(merger.NewColumnInfo(2, "SUM(id)")),
+		aggregator.NewMin(merger.NewColumnInfo(3, "MIN(id)")),
+		aggregator.NewMax(merger.NewColumnInfo(4, "MAX(id)")),
+		aggregator.NewCount(merger.NewColumnInfo(5, "COUNT(id)")),
 	}
-	groupbyColumns := []GroupByColumn{
-		NewGroupByColumn(6, "userid"),
+	groupbyColumns := []merger.ColumnInfo{
+		merger.NewColumnInfo(6, "userid"),
 	}
 	merger := NewAggregatorMerger(aggregators, groupbyColumns)
 	dbs := []*sql.DB{ms.mockDB01, ms.mockDB02, ms.mockDB03}

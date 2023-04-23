@@ -33,3 +33,15 @@ type Rows interface {
 	Columns() ([]string, error)
 	Err() error
 }
+
+type ColumnInfo struct {
+	Index int
+	Name  string
+}
+
+func NewColumnInfo(index int, name string) ColumnInfo {
+	return ColumnInfo{
+		Index: index,
+		Name:  name,
+	}
+}

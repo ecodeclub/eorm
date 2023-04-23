@@ -20,7 +20,8 @@ import (
 	"database/sql"
 	"reflect"
 	"sync"
-	_ "unsafe"
+
+	"github.com/ecodeclub/eorm/internal/merger/utils"
 
 	"go.uber.org/multierr"
 
@@ -40,9 +41,6 @@ const (
 type Ordered interface {
 	~int | ~int8 | ~int16 | ~int32 | ~int64 | ~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 | ~float32 | ~float64 | ~string
 }
-
-//go:linkname convertAssign database/sql.convertAssign
-func convertAssign(dest, src any) error
 
 type SortColumn struct {
 	name  string
@@ -285,7 +283,7 @@ func (r *Rows) Scan(dest ...any) error {
 	}
 
 	for i := 0; i < len(dest); i++ {
-		err := convertAssign(dest[i], r.cur.columns[i])
+		err := utils.ConvertAssign(dest[i], r.cur.columns[i])
 		if err != nil {
 			return err
 		}

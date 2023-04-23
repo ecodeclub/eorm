@@ -17,11 +17,13 @@ package aggregator
 import (
 	"reflect"
 
+	"github.com/ecodeclub/eorm/internal/merger"
+
 	"github.com/ecodeclub/eorm/internal/merger/internal/errs"
 )
 
 type Count struct {
-	countInfo ColumnInfo
+	countInfo merger.ColumnInfo
 }
 
 func (s *Count) Aggregate(cols [][]any) (any, error) {
@@ -49,7 +51,7 @@ func (s *Count) ColumnName() string {
 	return s.countInfo.Name
 }
 
-func NewCount(info ColumnInfo) *Count {
+func NewCount(info merger.ColumnInfo) *Count {
 	return &Count{
 		countInfo: info,
 	}

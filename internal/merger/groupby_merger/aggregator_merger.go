@@ -1,4 +1,18 @@
-package groupbyMerger
+// Copyright 2021 ecodeclub
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package groupby_merger
 
 import (
 	"context"
@@ -7,34 +21,22 @@ import (
 	"sync"
 	_ "unsafe"
 
+	"github.com/ecodeclub/eorm/internal/merger/utils"
+	"go.uber.org/multierr"
+
 	"github.com/ecodeclub/eorm/internal/merger"
 	"github.com/ecodeclub/eorm/internal/merger/aggregatemerger/aggregator"
 	"github.com/ecodeclub/eorm/internal/merger/internal/errs"
 	"github.com/gotomicro/ekit/mapx"
 )
 
-//go:linkname convertAssign database/sql.convertAssign
-func convertAssign(dest, src any) error
-
-type GroupByColumn struct {
-	Index int
-	Name  string
-}
-
-func NewGroupByColumn(index int, name string) GroupByColumn {
-	return GroupByColumn{
-		Index: index,
-		Name:  name,
-	}
-}
-
 type AggregatorMerger struct {
 	aggregators  []aggregator.Aggregator
-	groupColumns []GroupByColumn
+	groupColumns []merger.ColumnInfo
 	columnsName  []string
 }
 
-func NewAggregatorMerger(aggregators []aggregator.Aggregator, groupColumns []GroupByColumn) *AggregatorMerger {
+func NewAggregatorMerger(aggregators []aggregator.Aggregator, groupColumns []merger.ColumnInfo) *AggregatorMerger {
 	cols := make([]string, 0, len(aggregators)+len(groupColumns))
 	for _, groubyCol := range groupColumns {
 		cols = append(cols, groubyCol.Name)
@@ -49,6 +51,8 @@ func NewAggregatorMerger(aggregators []aggregator.Aggregator, groupColumns []Gro
 		columnsName:  cols,
 	}
 }
+
+// Merge 该实现会全部拿取results里面的数据，由于sql.Rows数据拿完之后会自动关闭，所以这边隐式的关闭了所有的sql.Rows
 func (a *AggregatorMerger) Merge(ctx context.Context, results []*sql.Rows) (merger.Rows, error) {
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
@@ -80,7 +84,7 @@ func (a *AggregatorMerger) Merge(ctx context.Context, results []*sql.Rows) (merg
 	}, nil
 
 }
-func (m *AggregatorMerger) checkColumns(rows *sql.Rows) error {
+func (a *AggregatorMerger) checkColumns(rows *sql.Rows) error {
 	if rows == nil {
 		return errs.ErrMergerRowsIsNull
 	}
@@ -92,7 +96,7 @@ func (a *AggregatorMerger) getCols(rowsList []*sql.Rows) (*mapx.TreeMap[Key, [][
 	if err != nil {
 		return nil, nil, err
 	}
-	keys := make([]Key, 0)
+	keys := make([]Key, 0, 16)
 	for _, res := range rowsList {
 		colsData, err := a.getCol(res)
 		if err != nil {
@@ -124,32 +128,11 @@ func (a *AggregatorMerger) getCols(rowsList []*sql.Rows) (*mapx.TreeMap[Key, [][
 }
 
 func (a *AggregatorMerger) getCol(row *sql.Rows) ([][]any, error) {
-	colsInfo, err := row.ColumnTypes()
-	if err != nil {
-		return nil, err
-	}
-	// colsData 表示一个sql.Rows的数据
-	ans := make([][]any, 0)
+	ans := make([][]any, 0, 16)
 	for row.Next() {
-		colsData := make([]any, 0, len(colsInfo))
-		// 拿到sql.Rows字段的类型然后初始化
-		for _, colInfo := range colsInfo {
-			typ := colInfo.ScanType()
-			// sqlite3的驱动返回的是指针。循环的去除指针
-			for typ.Kind() == reflect.Pointer {
-				typ = typ.Elem()
-			}
-			newData := reflect.New(typ).Interface()
-			colsData = append(colsData, newData)
-		}
-		// 通过Scan赋值
-		err = row.Scan(colsData...)
+		colsData, err := utils.Scan(row)
 		if err != nil {
 			return nil, err
-		}
-		// 去掉reflect.New的指针
-		for i := 0; i < len(colsData); i++ {
-			colsData[i] = reflect.ValueOf(colsData[i]).Elem().Interface()
 		}
 		ans = append(ans, colsData)
 	}
@@ -164,7 +147,7 @@ func (a *AggregatorMerger) getCol(row *sql.Rows) ([][]any, error) {
 type AggregatorRows struct {
 	rowsList     []*sql.Rows
 	aggregators  []aggregator.Aggregator
-	groupColumns []GroupByColumn
+	groupColumns []merger.ColumnInfo
 	dataMap      *mapx.TreeMap[Key, [][]any]
 	cur          int
 	dataIndex    []Key
@@ -221,7 +204,7 @@ func (a *AggregatorRows) Scan(dest ...any) error {
 		return errs.ErrMergerScanNotNext
 	}
 	for i := 0; i < len(dest); i++ {
-		err := convertAssign(dest[i], a.curData[i])
+		err := utils.ConvertAssign(dest[i], a.curData[i])
 		if err != nil {
 			return err
 		}
@@ -234,7 +217,15 @@ func (a *AggregatorRows) Close() error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.closed = true
-	return nil
+	errorList := make([]error, 0, len(a.rowsList))
+	for i := 0; i < len(a.rowsList); i++ {
+		row := a.rowsList[i]
+		err := row.Close()
+		if err != nil {
+			errorList = append(errorList, err)
+		}
+	}
+	return multierr.Combine(errorList...)
 }
 
 // Columns 返回列的顺序先分组信息然后是聚合函数信息
