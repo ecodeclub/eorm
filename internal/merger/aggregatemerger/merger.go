@@ -17,9 +17,10 @@ package aggregatemerger
 import (
 	"context"
 	"database/sql"
-	"github.com/ecodeclub/eorm/internal/merger/utils"
 	"sync"
 	_ "unsafe"
+
+	"github.com/ecodeclub/eorm/internal/merger/utils"
 
 	"github.com/ecodeclub/eorm/internal/merger"
 	"github.com/ecodeclub/eorm/internal/merger/aggregatemerger/aggregator"

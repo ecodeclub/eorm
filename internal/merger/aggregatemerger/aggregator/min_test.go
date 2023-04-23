@@ -15,8 +15,9 @@
 package aggregator
 
 import (
-	"github.com/ecodeclub/eorm/internal/merger"
 	"testing"
+
+	"github.com/ecodeclub/eorm/internal/merger"
 
 	"github.com/ecodeclub/eorm/internal/merger/internal/errs"
 	"github.com/stretchr/testify/assert"
