@@ -17,12 +17,13 @@ package utils
 import (
 	"context"
 	"database/sql"
+	"testing"
+	"time"
+
 	"github.com/DATA-DOG/go-sqlmock"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"testing"
-	"time"
 )
 
 type ScanSuite struct {
