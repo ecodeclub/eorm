@@ -17,11 +17,13 @@ package aggregator
 import (
 	"reflect"
 
+	"github.com/ecodeclub/eorm/internal/merger"
+
 	"github.com/ecodeclub/eorm/internal/merger/internal/errs"
 )
 
 type Sum struct {
-	sumColumnInfo ColumnInfo
+	sumColumnInfo merger.ColumnInfo
 }
 
 func (s *Sum) Aggregate(cols [][]any) (any, error) {
@@ -50,7 +52,7 @@ func (s *Sum) ColumnName() string {
 	return s.sumColumnInfo.Name
 }
 
-func NewSum(info ColumnInfo) *Sum {
+func NewSum(info merger.ColumnInfo) *Sum {
 	return &Sum{
 		sumColumnInfo: info,
 	}

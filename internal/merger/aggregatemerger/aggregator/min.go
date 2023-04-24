@@ -17,11 +17,13 @@ package aggregator
 import (
 	"reflect"
 
+	"github.com/ecodeclub/eorm/internal/merger"
+
 	"github.com/ecodeclub/eorm/internal/merger/internal/errs"
 )
 
 type Min struct {
-	minColumnInfo ColumnInfo
+	minColumnInfo merger.ColumnInfo
 }
 
 func (m *Min) Aggregate(cols [][]any) (any, error) {
@@ -50,7 +52,7 @@ func (m *Min) ColumnName() string {
 	return m.minColumnInfo.Name
 }
 
-func NewMin(info ColumnInfo) *Min {
+func NewMin(info merger.ColumnInfo) *Min {
 	return &Min{
 		minColumnInfo: info,
 	}

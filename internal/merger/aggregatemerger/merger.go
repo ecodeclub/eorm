@@ -17,18 +17,16 @@ package aggregatemerger
 import (
 	"context"
 	"database/sql"
-	"reflect"
 	"sync"
 	_ "unsafe"
+
+	"github.com/ecodeclub/eorm/internal/merger/utils"
 
 	"github.com/ecodeclub/eorm/internal/merger"
 	"github.com/ecodeclub/eorm/internal/merger/aggregatemerger/aggregator"
 	"github.com/ecodeclub/eorm/internal/merger/internal/errs"
 	"go.uber.org/multierr"
 )
-
-//go:linkname convertAssign database/sql.convertAssign
-func convertAssign(dest, src any) error
 
 // Merger 该实现不支持group by操作,并且聚合函数查询应该只返回一行数据。
 type Merger struct {
@@ -151,31 +149,13 @@ func (r *Rows) getSqlRowsData() ([][]any, error) {
 	return rowsData, nil
 }
 func (r *Rows) getSqlRowData(row *sql.Rows) ([]any, error) {
-	colsInfo, err := row.ColumnTypes()
-	if err != nil {
-		return nil, err
-	}
-	// colsData 表示一个sql.Rows的数据
-	colsData := make([]any, 0, len(colsInfo))
+
+	var colsData []any
+	var err error
 	if row.Next() {
-		// 拿到sql.Rows字段的类型然后初始化
-		for _, colInfo := range colsInfo {
-			typ := colInfo.ScanType()
-			// sqlite3的驱动返回的是指针。循环的去除指针
-			for typ.Kind() == reflect.Pointer {
-				typ = typ.Elem()
-			}
-			newData := reflect.New(typ).Interface()
-			colsData = append(colsData, newData)
-		}
-		// 通过Scan赋值
-		err = row.Scan(colsData...)
+		colsData, err = utils.Scan(row)
 		if err != nil {
 			return nil, err
-		}
-		// 去掉reflect.New的指针
-		for i := 0; i < len(colsData); i++ {
-			colsData[i] = reflect.ValueOf(colsData[i]).Elem().Interface()
 		}
 	} else {
 		// sql.Rows迭代过程中发生报错，返回报错
@@ -201,7 +181,7 @@ func (r *Rows) Scan(dest ...any) error {
 		return errs.ErrMergerScanNotNext
 	}
 	for i := 0; i < len(dest); i++ {
-		err := convertAssign(dest[i], r.cur[i])
+		err := utils.ConvertAssign(dest[i], r.cur[i])
 		if err != nil {
 			return err
 		}

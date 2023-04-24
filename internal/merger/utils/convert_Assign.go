@@ -12,15 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package aggregator
+package utils
 
-type AggregateElement interface {
-	~int | ~int8 | ~int16 | ~int32 | ~int64 | ~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 | ~float32 | ~float64
-}
+import (
+	_ "database/sql"
+	_ "unsafe"
+)
 
-type Aggregator interface {
-	// Aggregate 将多个列聚合 cols表示sqlRows列表里的数据，聚合函数通过下标拿到需要的列
-	Aggregate(cols [][]any) (any, error)
-	// ColumnName 聚合函数的别名
-	ColumnName() string
-}
+//go:linkname ConvertAssign database/sql.convertAssign
+func ConvertAssign(dest, src any) error

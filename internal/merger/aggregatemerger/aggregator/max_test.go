@@ -17,6 +17,8 @@ package aggregator
 import (
 	"testing"
 
+	"github.com/ecodeclub/eorm/internal/merger"
+
 	"github.com/ecodeclub/eorm/internal/merger/internal/errs"
 	"github.com/stretchr/testify/assert"
 )
@@ -77,7 +79,7 @@ func TestMax_Aggregate(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			max := NewMax(NewColumnInfo(tc.maxIndex, "MAX(id)"))
+			max := NewMax(merger.NewColumnInfo(tc.maxIndex, "MAX(id)"))
 			val, err := max.Aggregate(tc.input)
 			assert.Equal(t, tc.wantErr, err)
 			if err != nil {
