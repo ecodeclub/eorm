@@ -14,7 +14,10 @@
 
 package sortmerger
 
-import "reflect"
+import (
+	"database/sql"
+	"reflect"
+)
 
 var compareFuncMapping = map[reflect.Kind]func(any, any, Order) int{
 	reflect.Int:     compare[int],
@@ -30,6 +33,7 @@ var compareFuncMapping = map[reflect.Kind]func(any, any, Order) int{
 	reflect.Float64: compare[float64],
 	reflect.String:  compare[string],
 	reflect.Uint:    compare[uint],
+	reflect.Struct:  compareNullable,
 }
 
 type Heap struct {
@@ -89,6 +93,92 @@ func compare[T Ordered](ii any, jj any, order Order) int {
 	} else if i > j && order || i < j && !order {
 		return 1
 	} else {
+		return 0
+	}
+}
+
+func compareNullable(ii any, jj any, order Order) int {
+	switch ii.(type) {
+	case sql.NullString:
+		i, j := ii.(sql.NullString), jj.(sql.NullString)
+		if !i.Valid && !j.Valid {
+			return 0
+		}
+		if !i.Valid && order == ASC || !j.Valid && order == DESC {
+			return -1
+		} else if !i.Valid && order == DESC || !j.Valid && order == ASC {
+			return 1
+		}
+		return compare[string](i.String, j.String, order)
+	case sql.NullFloat64:
+		i, j := ii.(sql.NullFloat64), jj.(sql.NullFloat64)
+		if !i.Valid && !j.Valid {
+			return 0
+		}
+		if !i.Valid && order == ASC || !j.Valid && order == DESC {
+			return -1
+		} else if !i.Valid && order == DESC || !j.Valid && order == ASC {
+			return 1
+		}
+		return compare[float64](i.Float64, j.Float64, order)
+	case sql.NullInt64:
+		i, j := ii.(sql.NullInt64), jj.(sql.NullInt64)
+		if !i.Valid && !j.Valid {
+			return 0
+		}
+		if !i.Valid && order == ASC || !j.Valid && order == DESC {
+			return -1
+		} else if !i.Valid && order == DESC || !j.Valid && order == ASC {
+			return 1
+		}
+		return compare[int64](i.Int64, j.Int64, order)
+	case sql.NullInt16:
+		i, j := ii.(sql.NullInt16), jj.(sql.NullInt16)
+		if !i.Valid && !j.Valid {
+			return 0
+		}
+		if !i.Valid && order == ASC || !j.Valid && order == DESC {
+			return -1
+		} else if !i.Valid && order == DESC || !j.Valid && order == ASC {
+			return 1
+		}
+		return compare[int16](i.Int16, j.Int16, order)
+	case sql.NullInt32:
+		i, j := ii.(sql.NullInt32), jj.(sql.NullInt32)
+		if !i.Valid && !j.Valid {
+			return 0
+		}
+		if !i.Valid && order == ASC || !j.Valid && order == DESC {
+			return -1
+		} else if !i.Valid && order == DESC || !j.Valid && order == ASC {
+			return 1
+		}
+		return compare[int32](i.Int32, j.Int32, order)
+	case sql.NullByte:
+		i, j := ii.(sql.NullByte), jj.(sql.NullByte)
+		if !i.Valid && !j.Valid {
+			return 0
+		}
+		if !i.Valid && order == ASC || !j.Valid && order == DESC {
+			return -1
+		} else if !i.Valid && order == DESC || !j.Valid && order == ASC {
+			return 1
+		}
+		return compare[byte](i.Byte, j.Byte, order)
+	case sql.NullTime:
+		i, j := ii.(sql.NullTime), jj.(sql.NullTime)
+		if !i.Valid && !j.Valid {
+			return 0
+		}
+		if !i.Valid && order == ASC || !j.Valid && order == DESC {
+			return -1
+		} else if !i.Valid && order == DESC || !j.Valid && order == ASC {
+			return 1
+		}
+		vali := i.Time.UnixMilli()
+		valj := j.Time.UnixMilli()
+		return compare[int64](vali, valj, order)
+	default:
 		return 0
 	}
 }
