@@ -283,7 +283,7 @@ func (r *Rows) Scan(dest ...any) error {
 	for i := 0; i < len(dest); i++ {
 		typ := reflect.TypeOf(r.cur.columns[i])
 		if typ.Kind() == reflect.Struct {
-			err = convertNullAble(dest[i], r.cur.columns[i])
+			err = utils.ConvertNullable(dest[i], r.cur.columns[i])
 		} else {
 			err = utils.ConvertAssign(dest[i], r.cur.columns[i])
 		}
@@ -322,109 +322,4 @@ func (r *Rows) Columns() ([]string, error) {
 		return nil, errs.ErrMergerRowsClosed
 	}
 	return r.columns, nil
-}
-
-func convertNullAble(dest any, src any) error {
-	switch src.(type) {
-	case sql.NullInt64:
-		newSrc := src.(sql.NullInt64)
-		newDest, ok := dest.(*sql.NullInt64)
-		if !ok {
-			return errs.ErrMergerNullAble
-		}
-		if !newSrc.Valid {
-			newDest.Valid = false
-			return nil
-		}
-		newDest.Valid = true
-		newDest.Int64 = newSrc.Int64
-
-	case sql.NullFloat64:
-		newSrc := src.(sql.NullFloat64)
-		newDest, ok := dest.(*sql.NullFloat64)
-		if !ok {
-			return errs.ErrMergerNullAble
-		}
-		if !newSrc.Valid {
-			newDest.Valid = false
-			return nil
-		}
-		newDest.Valid = true
-		newDest.Float64 = newSrc.Float64
-	case sql.NullString:
-		newSrc := src.(sql.NullString)
-		newDest, ok := dest.(*sql.NullString)
-		if !ok {
-			return errs.ErrMergerNullAble
-		}
-		if !newSrc.Valid {
-			newDest.Valid = false
-			return nil
-		}
-		newDest.Valid = true
-		newDest.String = newSrc.String
-	case sql.NullTime:
-		newSrc := src.(sql.NullTime)
-		newDest, ok := dest.(*sql.NullTime)
-		if !ok {
-			return errs.ErrMergerNullAble
-		}
-		if !newSrc.Valid {
-			newDest.Valid = false
-			return nil
-		}
-		newDest.Valid = true
-		newDest.Time = newSrc.Time
-	case sql.NullByte:
-		newSrc := src.(sql.NullByte)
-		newDest, ok := dest.(*sql.NullByte)
-		if !ok {
-			return errs.ErrMergerNullAble
-		}
-		if !newSrc.Valid {
-			newDest.Valid = false
-			return nil
-		}
-		newDest.Valid = true
-		newDest.Byte = newSrc.Byte
-	case sql.NullBool:
-		newSrc := src.(sql.NullBool)
-		newDest, ok := dest.(*sql.NullBool)
-		if !ok {
-			return errs.ErrMergerNullAble
-		}
-		if !newSrc.Valid {
-			newDest.Valid = false
-			return nil
-		}
-		newDest.Valid = true
-		newDest.Bool = newSrc.Bool
-	case sql.NullInt16:
-		newSrc := src.(sql.NullInt16)
-		newDest, ok := dest.(*sql.NullInt16)
-		if !ok {
-			return errs.ErrMergerNullAble
-		}
-		if !newSrc.Valid {
-			newDest.Valid = false
-			return nil
-		}
-		newDest.Valid = true
-		newDest.Int16 = newSrc.Int16
-	case sql.NullInt32:
-		newSrc := src.(sql.NullInt32)
-		newDest, ok := dest.(*sql.NullInt32)
-		if !ok {
-			return errs.ErrMergerNullAble
-		}
-		if !newSrc.Valid {
-			newDest.Valid = false
-			return nil
-		}
-		newDest.Valid = true
-		newDest.Int32 = newSrc.Int32
-	default:
-		return utils.ConvertAssign(dest, src)
-	}
-	return nil
 }

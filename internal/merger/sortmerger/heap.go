@@ -15,8 +15,9 @@
 package sortmerger
 
 import (
-	"database/sql"
+	"database/sql/driver"
 	"reflect"
+	"time"
 )
 
 var compareFuncMapping = map[reflect.Kind]func(any, any, Order) int{
@@ -33,7 +34,6 @@ var compareFuncMapping = map[reflect.Kind]func(any, any, Order) int{
 	reflect.Float64: compare[float64],
 	reflect.String:  compare[string],
 	reflect.Uint:    compare[uint],
-	reflect.Struct:  compareNullable,
 }
 
 type Heap struct {
@@ -49,8 +49,14 @@ func (h *Heap) Less(i, j int) bool {
 	for k := 0; k < h.sortColumns.Len(); k++ {
 		valueI := h.h[i].sortCols[k]
 		valueJ := h.h[j].sortCols[k]
-		kind := reflect.TypeOf(valueI).Kind()
-		cp := compareFuncMapping[kind]
+		_, ok := valueJ.(driver.Valuer)
+		var cp func(any, any, Order) int
+		if ok {
+			cp = compareNullable
+		} else {
+			kind := reflect.TypeOf(valueI).Kind()
+			cp = compareFuncMapping[kind]
+		}
 		res := cp(valueI, valueJ, h.sortColumns.Get(k).order)
 		if res == 0 {
 			continue
@@ -97,88 +103,26 @@ func compare[T Ordered](ii any, jj any, order Order) int {
 	}
 }
 
-func compareNullable(ii any, jj any, order Order) int {
-	switch ii.(type) {
-	case sql.NullString:
-		i, j := ii.(sql.NullString), jj.(sql.NullString)
-		if !i.Valid && !j.Valid {
-			return 0
-		}
-		if !i.Valid && order == ASC || !j.Valid && order == DESC {
-			return -1
-		} else if !i.Valid && order == DESC || !j.Valid && order == ASC {
-			return 1
-		}
-		return compare[string](i.String, j.String, order)
-	case sql.NullFloat64:
-		i, j := ii.(sql.NullFloat64), jj.(sql.NullFloat64)
-		if !i.Valid && !j.Valid {
-			return 0
-		}
-		if !i.Valid && order == ASC || !j.Valid && order == DESC {
-			return -1
-		} else if !i.Valid && order == DESC || !j.Valid && order == ASC {
-			return 1
-		}
-		return compare[float64](i.Float64, j.Float64, order)
-	case sql.NullInt64:
-		i, j := ii.(sql.NullInt64), jj.(sql.NullInt64)
-		if !i.Valid && !j.Valid {
-			return 0
-		}
-		if !i.Valid && order == ASC || !j.Valid && order == DESC {
-			return -1
-		} else if !i.Valid && order == DESC || !j.Valid && order == ASC {
-			return 1
-		}
-		return compare[int64](i.Int64, j.Int64, order)
-	case sql.NullInt16:
-		i, j := ii.(sql.NullInt16), jj.(sql.NullInt16)
-		if !i.Valid && !j.Valid {
-			return 0
-		}
-		if !i.Valid && order == ASC || !j.Valid && order == DESC {
-			return -1
-		} else if !i.Valid && order == DESC || !j.Valid && order == ASC {
-			return 1
-		}
-		return compare[int16](i.Int16, j.Int16, order)
-	case sql.NullInt32:
-		i, j := ii.(sql.NullInt32), jj.(sql.NullInt32)
-		if !i.Valid && !j.Valid {
-			return 0
-		}
-		if !i.Valid && order == ASC || !j.Valid && order == DESC {
-			return -1
-		} else if !i.Valid && order == DESC || !j.Valid && order == ASC {
-			return 1
-		}
-		return compare[int32](i.Int32, j.Int32, order)
-	case sql.NullByte:
-		i, j := ii.(sql.NullByte), jj.(sql.NullByte)
-		if !i.Valid && !j.Valid {
-			return 0
-		}
-		if !i.Valid && order == ASC || !j.Valid && order == DESC {
-			return -1
-		} else if !i.Valid && order == DESC || !j.Valid && order == ASC {
-			return 1
-		}
-		return compare[byte](i.Byte, j.Byte, order)
-	case sql.NullTime:
-		i, j := ii.(sql.NullTime), jj.(sql.NullTime)
-		if !i.Valid && !j.Valid {
-			return 0
-		}
-		if !i.Valid && order == ASC || !j.Valid && order == DESC {
-			return -1
-		} else if !i.Valid && order == DESC || !j.Valid && order == ASC {
-			return 1
-		}
-		vali := i.Time.UnixMilli()
-		valj := j.Time.UnixMilli()
-		return compare[int64](vali, valj, order)
-	default:
+func compareNullable(ii, jj any, order Order) int {
+	i := ii.(driver.Valuer)
+	j := jj.(driver.Valuer)
+	iVal, _ := i.Value()
+	jVal, _ := j.Value()
+	// 如果i,j都为空返回0
+	if iVal == nil && jVal == nil {
 		return 0
 	}
+	// 如果val返回为空永远是最小值
+	if iVal == nil && order == ASC || jVal == nil && order == DESC {
+		return -1
+	} else if iVal == nil && order == DESC || jVal == nil && order == ASC {
+		return 1
+	}
+	vali, ok := iVal.(time.Time)
+	if ok {
+		valj := jVal.(time.Time)
+		return compare[int64](vali.UnixMilli(), valj.UnixMilli(), order)
+	}
+	kind := reflect.TypeOf(iVal).Kind()
+	return compareFuncMapping[kind](iVal, jVal, order)
 }
