@@ -16,10 +16,11 @@ package utils
 
 import (
 	"database/sql"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestConvertNullable(t *testing.T) {
@@ -62,8 +63,8 @@ func TestConvertNullable(t *testing.T) {
 		{
 			name:    "sql.NUllByte的valid的false",
 			src:     sql.NullByte{Valid: false, Byte: 'a'},
-			dest:    &sql.NullByte{Valid: false, Byte: ' '},
-			wantVal: &sql.NullByte{Valid: false, Byte: ' '},
+			dest:    &sql.NullByte{Valid: false, Byte: 0},
+			wantVal: &sql.NullByte{Valid: false, Byte: 0},
 		},
 		{
 			name:    "sql.NUllInt32",
@@ -136,7 +137,7 @@ func TestConvertNullable(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			err := ConvertNullable(tc.dest, tc.src)
+			err := assertNullable(tc.dest, tc.src)
 			require.NoError(t, err)
 			assert.Equal(t, tc.dest, tc.wantVal)
 		})

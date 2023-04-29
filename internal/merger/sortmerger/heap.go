@@ -94,9 +94,9 @@ type node struct {
 
 func compare[T Ordered](ii any, jj any, order Order) int {
 	i, j := ii.(T), jj.(T)
-	if i < j && order || i > j && !order {
+	if i < j && order == ASC || i > j && order == DESC {
 		return -1
-	} else if i > j && order || i < j && !order {
+	} else if i > j && order == ASC || i < j && order == DESC {
 		return 1
 	} else {
 		return 0
@@ -109,15 +109,15 @@ func compareNullable(ii, jj any, order Order) int {
 	iVal, _ := i.Value()
 	jVal, _ := j.Value()
 	// 如果i,j都为空返回0
+	// 如果val返回为空永远是最小值
 	if iVal == nil && jVal == nil {
 		return 0
-	}
-	// 如果val返回为空永远是最小值
-	if iVal == nil && order == ASC || jVal == nil && order == DESC {
+	} else if iVal == nil && order == ASC || jVal == nil && order == DESC {
 		return -1
 	} else if iVal == nil && order == DESC || jVal == nil && order == ASC {
 		return 1
 	}
+
 	vali, ok := iVal.(time.Time)
 	if ok {
 		valj := jVal.(time.Time)

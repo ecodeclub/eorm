@@ -281,12 +281,7 @@ func (r *Rows) Scan(dest ...any) error {
 	}
 	var err error
 	for i := 0; i < len(dest); i++ {
-		typ := reflect.TypeOf(r.cur.columns[i])
-		if typ.Kind() == reflect.Struct {
-			err = utils.ConvertNullable(dest[i], r.cur.columns[i])
-		} else {
-			err = utils.ConvertAssign(dest[i], r.cur.columns[i])
-		}
+		err = utils.ConvertAssign(dest[i], r.cur.columns[i])
 		if err != nil {
 			return err
 		}

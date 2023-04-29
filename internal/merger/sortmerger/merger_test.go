@@ -1264,14 +1264,14 @@ func (ms *NullAbleMergerSuite) TearDownTest() {
 	_ = ms.db03.Close()
 }
 
-func (ms *NullAbleMergerSuite) TestRows_NullAble() {
+func (ms *NullAbleMergerSuite) TestRows_Nullable() {
 	testcases := []struct {
 		name        string
 		rowsList    func() []*sql.Rows
 		sortColumns []SortColumn
 		wantErr     error
 		afterFunc   func()
-		wantVal     []NullAble
+		wantVal     []Nullable
 	}{
 		{
 			name: "多个nullable类型排序 age asc,name desc",
@@ -1286,20 +1286,20 @@ func (ms *NullAbleMergerSuite) TestRows_NullAble() {
 					_, err := ms.db01.ExecContext(context.Background(), sql)
 					require.NoError(ms.T(), err)
 				}
-				db2InSertSql := []string{
+				db2InsertSql := []string{
 					"insert into t1  (id, age, name) values (5, 5, 'zwl')",
 					"insert into t1  (id, age, name) values (6, 20, 'dm')",
 				}
-				for _, sql := range db2InSertSql {
+				for _, sql := range db2InsertSql {
 					_, err := ms.db02.ExecContext(context.Background(), sql)
 					require.NoError(ms.T(), err)
 				}
-				db3InSertSql := []string{
+				db3InsertSql := []string{
 					"insert into t1  (id, name) values (7, 'xq')",
 					"insert into t1  (id, age) values (8, 5)",
 					"insert into t1  (id, age,name) values (9, 10,'xx')",
 				}
-				for _, sql := range db3InSertSql {
+				for _, sql := range db3InsertSql {
 					_, err := ms.db03.ExecContext(context.Background(), sql)
 					require.NoError(ms.T(), err)
 				}
@@ -1324,8 +1324,8 @@ func (ms *NullAbleMergerSuite) TestRows_NullAble() {
 					require.NoError(ms.T(), err)
 				}
 			},
-			wantVal: func() []NullAble {
-				return []NullAble{
+			wantVal: func() []Nullable {
+				return []Nullable{
 					{
 						Id:   sql.NullInt64{Valid: true, Int64: 1},
 						Age:  sql.NullInt64{Valid: false, Int64: 0},
@@ -1381,9 +1381,9 @@ func (ms *NullAbleMergerSuite) TestRows_NullAble() {
 			require.NoError(t, err)
 			rows, err := merger.Merge(context.Background(), tc.rowsList())
 			require.NoError(t, err)
-			res := make([]NullAble, 0, len(tc.wantVal))
+			res := make([]Nullable, 0, len(tc.wantVal))
 			for rows.Next() {
-				nullT := NullAble{}
+				nullT := Nullable{}
 				err := rows.Scan(&nullT.Id, &nullT.Age, &nullT.Name)
 				require.NoError(ms.T(), err)
 				res = append(res, nullT)
@@ -1395,7 +1395,7 @@ func (ms *NullAbleMergerSuite) TestRows_NullAble() {
 	}
 }
 
-type NullAble struct {
+type Nullable struct {
 	Id   sql.NullInt64
 	Age  sql.NullInt64
 	Name sql.NullString
