@@ -134,10 +134,70 @@ func TestConvertNullable(t *testing.T) {
 			dest:    &sql.NullTime{Valid: false, Time: time.Time{}},
 			wantVal: &sql.NullTime{Valid: false, Time: time.Time{}},
 		},
+		{
+			name:    "使用sql.NullInt32接收sql.NullInt64",
+			src:     sql.NullInt64{Valid: true, Int64: 5},
+			dest:    &sql.NullInt32{Valid: false, Int32: 0},
+			wantVal: &sql.NullInt32{Valid: true, Int32: 5},
+		},
+		{
+			name:    "使用sql.NullInt16接收sql.NullInt64",
+			src:     sql.NullInt64{Valid: true, Int64: 5},
+			dest:    &sql.NullInt16{Valid: false, Int16: 0},
+			wantVal: &sql.NullInt16{Valid: true, Int16: 5},
+		},
+		{
+			name:    "使用sql.NullInt32接收sql.NullInt64,Valid为false",
+			src:     sql.NullInt64{Valid: false, Int64: 0},
+			dest:    &sql.NullInt32{Valid: false, Int32: 0},
+			wantVal: &sql.NullInt32{Valid: false, Int32: 0},
+		},
+		{
+			name:    "使用sql.NullInt16接收sql.NullInt64,Valid为false",
+			src:     sql.NullInt64{Valid: false, Int64: 0},
+			dest:    &sql.NullInt16{Valid: false, Int16: 0},
+			wantVal: &sql.NullInt16{Valid: false, Int16: 0},
+		},
+		{
+			name: "使用int32接收sql.NullInt64",
+			src:  sql.NullInt64{Valid: true, Int64: 5},
+			dest: func() *int32 {
+				var val int32
+				return &val
+			}(),
+			wantVal: func() *int32 {
+				val := int32(5)
+				return &val
+			}(),
+		},
+		{
+			name: "使用int16接收sql.NullInt64",
+			src:  sql.NullInt64{Valid: true, Int64: 5},
+			dest: func() *int16 {
+				var val int16
+				return &val
+			}(),
+			wantVal: func() *int16 {
+				val := int16(5)
+				return &val
+			}(),
+		},
+		{
+			name: "使用float32接收sql.Nullfloat64",
+			src:  sql.NullFloat64{Valid: true, Float64: 5},
+			dest: func() *float32 {
+				var val float32
+				return &val
+			}(),
+			wantVal: func() *float32 {
+				val := float32(5)
+				return &val
+			}(),
+		},
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			err := assertNullable(tc.dest, tc.src)
+			err := ConvertAssign(tc.dest, tc.src)
 			require.NoError(t, err)
 			assert.Equal(t, tc.dest, tc.wantVal)
 		})

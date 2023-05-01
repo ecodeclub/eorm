@@ -15,43 +15,21 @@
 package utils
 
 import (
-	"database/sql"
-	_ "database/sql"
 	"database/sql/driver"
-	"reflect"
 	_ "unsafe"
-
-	"github.com/ecodeclub/eorm/internal/merger/internal/errs"
 )
 
 //go:linkname convertAssign database/sql.convertAssign
 func convertAssign(dest, src any) error
 
 func ConvertAssign(dest, src any) error {
-	kind := reflect.TypeOf(src).Kind()
-	if kind == reflect.Struct {
-		return assertNullable(dest, src)
+	srcVal, ok := src.(driver.Valuer)
+	var err error
+	if ok {
+		src, err = srcVal.Value()
+		if err != nil {
+			return err
+		}
 	}
 	return convertAssign(dest, src)
-}
-
-func assertNullable(dest, src any) error {
-	destScanner, ok := dest.(ScannerAndValuer)
-	if !ok {
-		return errs.ErrMergerNullAble
-	}
-	srcValuer, ok := src.(driver.Valuer)
-	if !ok {
-		return errs.ErrMergerNullAble
-	}
-	val, err := srcValuer.Value()
-	if err != nil {
-		return err
-	}
-	return destScanner.Scan(val)
-}
-
-type ScannerAndValuer interface {
-	sql.Scanner
-	driver.Valuer
 }
