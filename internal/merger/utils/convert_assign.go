@@ -19,17 +19,17 @@ import (
 	_ "unsafe"
 )
 
-//go:linkname convertAssign database/sql.convertAssign
-func convertAssign(dest, src any) error
+//go:linkname sqlConvertAssign database/sql.convertAssign
+func sqlConvertAssign(dest, src any) error
 
 func ConvertAssign(dest, src any) error {
 	srcVal, ok := src.(driver.Valuer)
-	var err error
 	if ok {
+		var err error
 		src, err = srcVal.Value()
 		if err != nil {
 			return err
 		}
 	}
-	return convertAssign(dest, src)
+	return sqlConvertAssign(dest, src)
 }
