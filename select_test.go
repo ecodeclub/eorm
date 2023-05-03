@@ -290,20 +290,18 @@ func TestSelector_Get_baseType(t *testing.T) {
 
 	testCases := []struct {
 		name      string
-		queryRes  func(t *testing.T) any
+		queryRes  func(t *testing.T) (any, error)
 		mockErr   error
 		mockOrder func(mock sqlmock.Sqlmock)
-		wantErr   error
+		wantErr   string
 		wantVal   any
 	}{
 		{
 			name: "res int",
-			queryRes: func(t *testing.T) any {
+			queryRes: func(t *testing.T) (any, error) {
 				tm := TableOf(&TestModel{}, "t1")
 				queryer := NewSelector[int](db).Select(C("Age")).From(tm)
-				result, err := queryer.Get(context.Background())
-				require.NoError(t, err)
-				return result
+				return queryer.Get(context.Background())
 			},
 			mockOrder: func(mock sqlmock.Sqlmock) {
 				rows := mock.NewRows([]string{"age"}).AddRow(10)
@@ -318,12 +316,10 @@ func TestSelector_Get_baseType(t *testing.T) {
 		},
 		{
 			name: "res int32",
-			queryRes: func(t *testing.T) any {
+			queryRes: func(t *testing.T) (any, error) {
 				tm := TableOf(&TestModel{}, "t1")
 				queryer := NewSelector[int32](db).Select(C("Age")).From(tm)
-				result, err := queryer.Get(context.Background())
-				require.NoError(t, err)
-				return result
+				return queryer.Get(context.Background())
 			},
 			mockOrder: func(mock sqlmock.Sqlmock) {
 				rows := mock.NewRows([]string{"age"}).AddRow(10)
@@ -338,12 +334,10 @@ func TestSelector_Get_baseType(t *testing.T) {
 		},
 		{
 			name: "res int64",
-			queryRes: func(t *testing.T) any {
+			queryRes: func(t *testing.T) (any, error) {
 				tm := TableOf(&TestModel{}, "t1")
 				queryer := NewSelector[int64](db).Select(C("Age")).From(tm)
-				result, err := queryer.Get(context.Background())
-				require.NoError(t, err)
-				return result
+				return queryer.Get(context.Background())
 			},
 			mockOrder: func(mock sqlmock.Sqlmock) {
 				rows := mock.NewRows([]string{"age"}).AddRow(10)
@@ -358,12 +352,10 @@ func TestSelector_Get_baseType(t *testing.T) {
 		},
 		{
 			name: "avg res float32",
-			queryRes: func(t *testing.T) any {
+			queryRes: func(t *testing.T) (any, error) {
 				tm := TableOf(&TestModel{}, "t1")
 				queryer := NewSelector[float32](db).Select(C("Age")).From(tm)
-				result, err := queryer.Get(context.Background())
-				require.NoError(t, err)
-				return result
+				return queryer.Get(context.Background())
 			},
 			mockOrder: func(mock sqlmock.Sqlmock) {
 				rows := mock.NewRows([]string{"age"}).AddRow(10.2)
@@ -378,12 +370,10 @@ func TestSelector_Get_baseType(t *testing.T) {
 		},
 		{
 			name: "avg res float64",
-			queryRes: func(t *testing.T) any {
+			queryRes: func(t *testing.T) (any, error) {
 				tm := TableOf(&TestModel{}, "t1")
 				queryer := NewSelector[float64](db).Select(C("Age")).From(tm)
-				result, err := queryer.Get(context.Background())
-				require.NoError(t, err)
-				return result
+				return queryer.Get(context.Background())
 			},
 			mockOrder: func(mock sqlmock.Sqlmock) {
 				rows := mock.NewRows([]string{"age"}).AddRow(10.02)
@@ -398,13 +388,11 @@ func TestSelector_Get_baseType(t *testing.T) {
 		},
 		{
 			name: "res byte",
-			queryRes: func(t *testing.T) any {
+			queryRes: func(t *testing.T) (any, error) {
 				tm := TableOf(&TestModel{}, "t1")
 				queryer := NewSelector[byte](db).Select(C("FirstName")).
 					From(tm).Where(C("Id").EQ(1))
-				result, err := queryer.Get(context.Background())
-				require.NoError(t, err)
-				return result
+				return queryer.Get(context.Background())
 			},
 			mockOrder: func(mock sqlmock.Sqlmock) {
 				rows := mock.NewRows([]string{"first_name"}).AddRow('D')
@@ -419,13 +407,11 @@ func TestSelector_Get_baseType(t *testing.T) {
 		},
 		{
 			name: "res bytes",
-			queryRes: func(t *testing.T) any {
+			queryRes: func(t *testing.T) (any, error) {
 				tm := TableOf(&TestModel{}, "t1")
 				queryer := NewSelector[[]byte](db).Select(C("FirstName")).
 					From(tm).Where(C("Id").EQ(1))
-				result, err := queryer.Get(context.Background())
-				require.NoError(t, err)
-				return result
+				return queryer.Get(context.Background())
 			},
 			mockOrder: func(mock sqlmock.Sqlmock) {
 				rows := mock.NewRows([]string{"first_name"}).AddRow([]byte("Li"))
@@ -440,13 +426,11 @@ func TestSelector_Get_baseType(t *testing.T) {
 		},
 		{
 			name: "res string",
-			queryRes: func(t *testing.T) any {
+			queryRes: func(t *testing.T) (any, error) {
 				tm := TableOf(&TestModel{}, "t1")
 				queryer := NewSelector[string](db).Select(C("FirstName")).
 					From(tm).Where(C("Id").EQ(1))
-				result, err := queryer.Get(context.Background())
-				require.NoError(t, err)
-				return result
+				return queryer.Get(context.Background())
 			},
 			mockOrder: func(mock sqlmock.Sqlmock) {
 				rows := mock.NewRows([]string{"first_name"}).AddRow("Da")
@@ -461,12 +445,10 @@ func TestSelector_Get_baseType(t *testing.T) {
 		},
 		{
 			name: "res struct ptr",
-			queryRes: func(t *testing.T) any {
+			queryRes: func(t *testing.T) (any, error) {
 				queryer := NewSelector[TestModel](db).Select(C("FirstName"), C("Age")).
 					Where(C("Id").EQ(1))
-				result, err := queryer.Get(context.Background())
-				require.NoError(t, err)
-				return result
+				return queryer.Get(context.Background())
 			},
 			mockOrder: func(mock sqlmock.Sqlmock) {
 				rows := mock.NewRows([]string{"first_name", "age"}).AddRow("Da", 18)
@@ -483,13 +465,11 @@ func TestSelector_Get_baseType(t *testing.T) {
 		},
 		{
 			name: "res sql.NullString",
-			queryRes: func(t *testing.T) any {
+			queryRes: func(t *testing.T) (any, error) {
 				tm := TableOf(&TestModel{}, "t1")
 				queryer := NewSelector[sql.NullString](db).Select(C("LastName")).
 					From(tm).Where(C("Id").EQ(1))
-				result, err := queryer.Get(context.Background())
-				require.NoError(t, err)
-				return result
+				return queryer.Get(context.Background())
 			},
 			mockOrder: func(mock sqlmock.Sqlmock) {
 				rows := mock.NewRows([]string{"last_name"}).AddRow([]byte("ming"))
@@ -501,12 +481,50 @@ func TestSelector_Get_baseType(t *testing.T) {
 				return &sql.NullString{String: "ming", Valid: true}
 			}(),
 		},
+		{
+			name: "res *int accept NULL",
+			queryRes: func(t *testing.T) (any, error) {
+				tm := TableOf(&TestModel{}, "t1")
+				queryer := NewSelector[*int](db).Select(C("Age")).
+					From(tm).Where(C("Id").EQ(1))
+				return queryer.Get(context.Background())
+			},
+			mockOrder: func(mock sqlmock.Sqlmock) {
+				rows := mock.NewRows([]string{"age"}).AddRow(nil)
+				mock.ExpectQuery("SELECT `age` FROM `test_model` AS `t1` WHERE `id`=? LIMIT ?;").
+					WithArgs(1, 1).
+					WillReturnRows(rows)
+			},
+			wantVal: func() **int {
+				return new(*int)
+			}(),
+		},
+		{
+			name: "res int accept NULL",
+			queryRes: func(t *testing.T) (any, error) {
+				tm := TableOf(&TestModel{}, "t1")
+				queryer := NewSelector[int](db).Select(C("Age")).
+					From(tm).Where(C("Id").EQ(1))
+				return queryer.Get(context.Background())
+			},
+			mockOrder: func(mock sqlmock.Sqlmock) {
+				rows := mock.NewRows([]string{"age"}).AddRow(nil)
+				mock.ExpectQuery("SELECT `age` FROM `test_model` AS `t1` WHERE `id`=? LIMIT ?;").
+					WithArgs(1, 1).
+					WillReturnRows(rows)
+			},
+			wantErr: "sql: Scan error on column index 0, name \"age\": converting NULL to int is unsupported",
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			tc.mockOrder(mock)
-			res := tc.queryRes(t)
+			res, err := tc.queryRes(t)
+			if err != nil {
+				assert.EqualError(t, err, tc.wantErr)
+				return
+			}
 			assert.Equal(t, tc.wantVal, res)
 		})
 	}

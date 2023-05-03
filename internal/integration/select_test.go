@@ -41,7 +41,6 @@ func (s *SelectTestSuite) SetupSuite() {
 	res := eorm.NewInserter[test.SimpleStruct](s.orm).Values(s.data).Exec(context.Background())
 	if res.Err() != nil {
 		s.T().Fatal(res.Err())
-		s.T()
 	}
 }
 
@@ -89,7 +88,7 @@ func (s *SelectTestSuite) TestSelectorGetBaseType() {
 	testCases := []struct {
 		name     string
 		queryRes func() (any, error)
-		wantErr  error
+		wantErr  string
 		wantRes  any
 	}{
 		{
@@ -99,7 +98,7 @@ func (s *SelectTestSuite) TestSelectorGetBaseType() {
 					Where(eorm.C("Id").EQ(9))
 				return queryer.Get(context.Background())
 			},
-			wantErr: eorm.ErrNoRows,
+			wantErr: eorm.ErrNoRows.Error(),
 		},
 		{
 			name: "res int",
@@ -205,13 +204,35 @@ func (s *SelectTestSuite) TestSelectorGetBaseType() {
 				return &res
 			}(),
 		},
+		{
+			name: "res *int accept NULL",
+			queryRes: func() (any, error) {
+				queryer := eorm.NewSelector[*int](s.orm).Select(eorm.C("Int32Ptr")).
+					From(eorm.TableOf(&test.SimpleStruct{}, "t1")).
+					Where(eorm.C("Id").EQ(1))
+				return queryer.Get(context.Background())
+			},
+			wantRes: func() **int {
+				return new(*int)
+			}(),
+		},
+		{
+			name: "res int accept NULL",
+			queryRes: func() (any, error) {
+				queryer := eorm.NewSelector[*int](s.orm).Select(eorm.C("Int32Ptr")).
+					From(eorm.TableOf(&test.SimpleStruct{}, "t1")).
+					Where(eorm.C("Id").EQ(1))
+				return queryer.Get(context.Background())
+			},
+			wantErr: "abc",
+		},
 	}
 
 	for _, tc := range testCases {
 		s.T().Run(tc.name, func(t *testing.T) {
 			res, err := tc.queryRes()
-			assert.Equal(t, tc.wantErr, err)
 			if err != nil {
+				assert.EqualError(t, err, tc.wantErr)
 				return
 			}
 			assert.Equal(t, tc.wantRes, res)
