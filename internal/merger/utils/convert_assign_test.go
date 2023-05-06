@@ -29,6 +29,7 @@ func TestConvertNullable(t *testing.T) {
 		src     any
 		dest    any
 		wantVal any
+		hasErr  bool
 	}{
 		{
 			name:    "sql.NUllbool",
@@ -194,10 +195,41 @@ func TestConvertNullable(t *testing.T) {
 				return &val
 			}(),
 		},
+		{
+			name: "使用int32接收sql.NullInt64,Valid为false",
+			src:  sql.NullInt64{Valid: false, Int64: 0},
+			dest: func() *int32 {
+				var val int32
+				return &val
+			}(),
+			hasErr: true,
+		},
+		{
+			name: "使用int16接收sql.NullInt64,valid为false",
+			src:  sql.NullInt64{Valid: false, Int64: 0},
+			dest: func() *int16 {
+				var val int16
+				return &val
+			}(),
+			hasErr: true,
+		},
+		{
+			name: "使用float32接收sql.Nullfloat64",
+			src:  sql.NullFloat64{Valid: false, Float64: 0},
+			dest: func() *float32 {
+				var val float32
+				return &val
+			}(),
+			hasErr: true,
+		},
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
 			err := ConvertAssign(tc.dest, tc.src)
+			if tc.hasErr {
+				require.NotNil(t, err)
+				return
+			}
 			require.NoError(t, err)
 			assert.Equal(t, tc.dest, tc.wantVal)
 		})

@@ -1216,17 +1216,17 @@ type TestModel struct {
 
 func TestMerger(t *testing.T) {
 	suite.Run(t, &MergerSuite{})
-	suite.Run(t, &NullAbleMergerSuite{})
+	suite.Run(t, &NullableMergerSuite{})
 }
 
-type NullAbleMergerSuite struct {
+type NullableMergerSuite struct {
 	suite.Suite
 	db01 *sql.DB
 	db02 *sql.DB
 	db03 *sql.DB
 }
 
-func (ms *NullAbleMergerSuite) SetupSuite() {
+func (ms *NullableMergerSuite) SetupSuite() {
 	t := ms.T()
 	query := "CREATE TABLE t1 (\n      id int primary key,\n      `age`  int,\n    \t`name` varchar(20)\n  );\n"
 	db01, err := sql.Open("sqlite3", "file:test01.db?cache=shared&mode=memory")
@@ -1258,13 +1258,13 @@ func (ms *NullAbleMergerSuite) SetupSuite() {
 	}
 }
 
-func (ms *NullAbleMergerSuite) TearDownTest() {
+func (ms *NullableMergerSuite) TearDownSuite() {
 	_ = ms.db01.Close()
 	_ = ms.db02.Close()
 	_ = ms.db03.Close()
 }
 
-func (ms *NullAbleMergerSuite) TestRows_Nullable() {
+func (ms *NullableMergerSuite) TestRows_Nullable() {
 	testcases := []struct {
 		name        string
 		rowsList    func() []*sql.Rows
@@ -1320,7 +1320,7 @@ func (ms *NullAbleMergerSuite) TestRows_Nullable() {
 			afterFunc: func() {
 				dbs := []*sql.DB{ms.db01, ms.db02, ms.db03}
 				for _, db := range dbs {
-					_, err := db.Exec("truncate table t1;")
+					_, err := db.Exec("DELETE FROM t1;")
 					require.NoError(ms.T(), err)
 				}
 			},
@@ -1391,6 +1391,7 @@ func (ms *NullAbleMergerSuite) TestRows_Nullable() {
 			require.True(t, rows.(*Rows).closed)
 			assert.NoError(t, rows.Err())
 			assert.Equal(t, tc.wantVal, res)
+			tc.afterFunc()
 		})
 	}
 }

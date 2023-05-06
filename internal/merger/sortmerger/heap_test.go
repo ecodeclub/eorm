@@ -395,7 +395,7 @@ func TestHeap(t *testing.T) {
 
 }
 
-func TestHeap_NullAble(t *testing.T) {
+func TestHeap_Nullable(t *testing.T) {
 	testcases := []struct {
 		name      string
 		nodes     func() []*node
@@ -507,32 +507,6 @@ func TestHeap_NullAble(t *testing.T) {
 			},
 		},
 		{
-			name: "sql.NullInt16 desc",
-			nodes: func() []*node {
-				return newTestNodes([][]any{
-					{sql.NullInt16{Int16: 5, Valid: true}},
-					{sql.NullInt16{Int16: 1, Valid: true}},
-					{sql.NullInt16{Int16: 3, Valid: true}},
-					{sql.NullInt16{Int16: 2, Valid: true}},
-					{sql.NullInt16{Int16: 10, Valid: false}},
-				})
-			},
-			wantNodes: func() []*node {
-				return newTestNodes([][]any{
-					{sql.NullInt16{Int16: 5, Valid: true}},
-					{sql.NullInt16{Int16: 3, Valid: true}},
-					{sql.NullInt16{Int16: 2, Valid: true}},
-					{sql.NullInt16{Int16: 1, Valid: true}},
-					{sql.NullInt16{Int16: 10, Valid: false}},
-				})
-			},
-			sortCols: func() sortColumns {
-				sortCols, err := newSortColumns(NewSortColumn("id", DESC))
-				require.NoError(t, err)
-				return sortCols
-			},
-		},
-		{
 			name: "sql.NullInt16 asc",
 			nodes: func() []*node {
 				return newTestNodes([][]any{
@@ -559,23 +533,23 @@ func TestHeap_NullAble(t *testing.T) {
 			},
 		},
 		{
-			name: "sql.NullInt32 desc",
+			name: "sql.NullInt16 desc",
 			nodes: func() []*node {
 				return newTestNodes([][]any{
-					{sql.NullInt32{Int32: 5, Valid: true}},
-					{sql.NullInt32{Int32: 1, Valid: true}},
-					{sql.NullInt32{Int32: 3, Valid: true}},
-					{sql.NullInt32{Int32: 2, Valid: true}},
-					{sql.NullInt32{Int32: 10, Valid: false}},
+					{sql.NullInt16{Int16: 5, Valid: true}},
+					{sql.NullInt16{Int16: 1, Valid: true}},
+					{sql.NullInt16{Int16: 3, Valid: true}},
+					{sql.NullInt16{Int16: 2, Valid: true}},
+					{sql.NullInt16{Int16: 10, Valid: false}},
 				})
 			},
 			wantNodes: func() []*node {
 				return newTestNodes([][]any{
-					{sql.NullInt32{Int32: 5, Valid: true}},
-					{sql.NullInt32{Int32: 3, Valid: true}},
-					{sql.NullInt32{Int32: 2, Valid: true}},
-					{sql.NullInt32{Int32: 1, Valid: true}},
-					{sql.NullInt32{Int32: 10, Valid: false}},
+					{sql.NullInt16{Int16: 5, Valid: true}},
+					{sql.NullInt16{Int16: 3, Valid: true}},
+					{sql.NullInt16{Int16: 2, Valid: true}},
+					{sql.NullInt16{Int16: 1, Valid: true}},
+					{sql.NullInt16{Int16: 10, Valid: false}},
 				})
 			},
 			sortCols: func() sortColumns {
@@ -611,23 +585,23 @@ func TestHeap_NullAble(t *testing.T) {
 			},
 		},
 		{
-			name: "sql.NullFloat64 desc",
+			name: "sql.NullInt32 desc",
 			nodes: func() []*node {
 				return newTestNodes([][]any{
-					{sql.NullFloat64{Float64: 5.0, Valid: true}},
-					{sql.NullFloat64{Float64: 1.0, Valid: true}},
-					{sql.NullFloat64{Float64: 3.0, Valid: true}},
-					{sql.NullFloat64{Float64: 2.0, Valid: true}},
-					{sql.NullFloat64{Float64: 10.0, Valid: false}},
+					{sql.NullInt32{Int32: 5, Valid: true}},
+					{sql.NullInt32{Int32: 1, Valid: true}},
+					{sql.NullInt32{Int32: 3, Valid: true}},
+					{sql.NullInt32{Int32: 2, Valid: true}},
+					{sql.NullInt32{Int32: 10, Valid: false}},
 				})
 			},
 			wantNodes: func() []*node {
 				return newTestNodes([][]any{
-					{sql.NullFloat64{Float64: 5.0, Valid: true}},
-					{sql.NullFloat64{Float64: 3.0, Valid: true}},
-					{sql.NullFloat64{Float64: 2.0, Valid: true}},
-					{sql.NullFloat64{Float64: 1.0, Valid: true}},
-					{sql.NullFloat64{Float64: 10.0, Valid: false}},
+					{sql.NullInt32{Int32: 5, Valid: true}},
+					{sql.NullInt32{Int32: 3, Valid: true}},
+					{sql.NullInt32{Int32: 2, Valid: true}},
+					{sql.NullInt32{Int32: 1, Valid: true}},
+					{sql.NullInt32{Int32: 10, Valid: false}},
 				})
 			},
 			sortCols: func() sortColumns {
@@ -662,6 +636,33 @@ func TestHeap_NullAble(t *testing.T) {
 				return sortCols
 			},
 		},
+		{
+			name: "sql.NullFloat64 desc",
+			nodes: func() []*node {
+				return newTestNodes([][]any{
+					{sql.NullFloat64{Float64: 5.0, Valid: true}},
+					{sql.NullFloat64{Float64: 1.0, Valid: true}},
+					{sql.NullFloat64{Float64: 3.0, Valid: true}},
+					{sql.NullFloat64{Float64: 2.0, Valid: true}},
+					{sql.NullFloat64{Float64: 10.0, Valid: false}},
+				})
+			},
+			wantNodes: func() []*node {
+				return newTestNodes([][]any{
+					{sql.NullFloat64{Float64: 5.0, Valid: true}},
+					{sql.NullFloat64{Float64: 3.0, Valid: true}},
+					{sql.NullFloat64{Float64: 2.0, Valid: true}},
+					{sql.NullFloat64{Float64: 1.0, Valid: true}},
+					{sql.NullFloat64{Float64: 10.0, Valid: false}},
+				})
+			},
+			sortCols: func() sortColumns {
+				sortCols, err := newSortColumns(NewSortColumn("id", DESC))
+				require.NoError(t, err)
+				return sortCols
+			},
+		},
+
 		{
 			name: "sql.NullTime asc",
 			nodes: func() []*node {
@@ -729,7 +730,7 @@ func TestHeap_NullAble(t *testing.T) {
 			},
 		},
 		{
-			name: "sql.NullTime asc",
+			name: "sql.NullTime desc",
 			nodes: func() []*node {
 				return newTestNodes([][]any{
 					{sql.NullTime{Time: func() time.Time {
