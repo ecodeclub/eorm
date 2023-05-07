@@ -465,6 +465,9 @@ func (s *ShardingSelector[T]) GetMulti(ctx context.Context) ([]*T, error) {
 
 	mgr := batchmerger.NewMerger()
 	rows, err := mgr.Merge(ctx, rowsSlice)
+	if err != nil {
+		return nil, err
+	}
 	var res []*T
 	for rows.Next() {
 		tp := new(T)
