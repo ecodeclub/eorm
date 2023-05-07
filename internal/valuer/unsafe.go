@@ -15,9 +15,10 @@
 package valuer
 
 import (
-	"database/sql"
 	"reflect"
 	"unsafe"
+
+	"github.com/ecodeclub/eorm/internal/rows"
 
 	"github.com/ecodeclub/eorm/internal/errs"
 	"github.com/ecodeclub/eorm/internal/model"
@@ -50,7 +51,31 @@ func (u unsafeValue) Field(name string) (reflect.Value, error) {
 	return val, nil
 }
 
-func (u unsafeValue) SetColumns(rows *sql.Rows) error {
+//func (u unsafeValue) SetColumns(rows *sql.Rows) error {
+//
+//	cs, err := rows.Columns()
+//	if err != nil {
+//		return err
+//	}
+//	if len(cs) > len(u.meta.Columns) {
+//		return errs.ErrTooManyColumns
+//	}
+//
+//	// TODO 性能优化
+//	colValues := make([]interface{}, len(cs))
+//	for i, c := range cs {
+//		cm, ok := u.meta.ColumnMap[c]
+//		if !ok {
+//			return errs.NewInvalidColumnError(c)
+//		}
+//		ptr := unsafe.Pointer(uintptr(u.addr) + cm.Offset)
+//		val := reflect.NewAt(cm.Typ, ptr)
+//		colValues[i] = val.Interface()
+//	}
+//	return rows.Scan(colValues...)
+//}
+
+func (u unsafeValue) SetColumns(rows rows.Rows) error {
 
 	cs, err := rows.Columns()
 	if err != nil {

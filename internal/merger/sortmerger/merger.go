@@ -21,11 +21,12 @@ import (
 	"reflect"
 	"sync"
 
+	"github.com/ecodeclub/eorm/internal/rows"
+
 	"github.com/ecodeclub/eorm/internal/merger/utils"
 
 	"go.uber.org/multierr"
 
-	"github.com/ecodeclub/eorm/internal/merger"
 	"github.com/ecodeclub/eorm/internal/merger/internal/errs"
 )
 
@@ -110,7 +111,7 @@ func newSortColumns(sortCols ...SortColumn) (sortColumns, error) {
 	return scs, nil
 }
 
-func (m *Merger) Merge(ctx context.Context, results []*sql.Rows) (merger.Rows, error) {
+func (m *Merger) Merge(ctx context.Context, results []*sql.Rows) (rows.Rows, error) {
 	// 检测results是否符合条件
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
@@ -130,25 +131,25 @@ func (m *Merger) Merge(ctx context.Context, results []*sql.Rows) (merger.Rows, e
 }
 
 func (m *Merger) initRows(results []*sql.Rows) (*Rows, error) {
-	rows := &Rows{
+	rs := &Rows{
 		rowsList:    results,
 		sortColumns: m.sortColumns,
 		mu:          &sync.RWMutex{},
 		columns:     m.cols,
 	}
 	h := &Heap{
-		h:           make([]*node, 0, len(rows.rowsList)),
-		sortColumns: rows.sortColumns,
+		h:           make([]*node, 0, len(rs.rowsList)),
+		sortColumns: rs.sortColumns,
 	}
-	rows.hp = h
-	for i := 0; i < len(rows.rowsList); i++ {
-		err := rows.nextRows(rows.rowsList[i], i)
+	rs.hp = h
+	for i := 0; i < len(rs.rowsList); i++ {
+		err := rs.nextRows(rs.rowsList[i], i)
 		if err != nil {
-			_ = rows.Close()
+			_ = rs.Close()
 			return nil, err
 		}
 	}
-	return rows, nil
+	return rs, nil
 }
 
 func (m *Merger) checkColumns(rows *sql.Rows) error {

@@ -6099,6 +6099,7 @@ func TestShardingSelector_Get(t *testing.T) {
 }
 
 func TestShardingSelector_GetMulti(t *testing.T) {
+	t.Parallel()
 	r := model.NewMetaRegistry()
 	_, err := r.Register(&test.OrderDetail{},
 		model.WithTableShardingAlgorithm(&hash.Hash{

@@ -136,6 +136,26 @@ func (s *ShardingSelectTestSuite) TestSardingSelectorGetMulti() {
 		wantRes []*test.OrderDetail
 	}{
 		{
+			name: "found tab eq not data",
+			s: func() *eorm.ShardingSelector[test.OrderDetail] {
+				builder := eorm.NewShardingSelector[test.OrderDetail](s.shardingDB).
+					Where(eorm.C("OrderId").EQ(500))
+				return builder
+			}(),
+			wantRes: []*test.OrderDetail{},
+		},
+		{
+			name: "found tab eq",
+			s: func() *eorm.ShardingSelector[test.OrderDetail] {
+				builder := eorm.NewShardingSelector[test.OrderDetail](s.shardingDB).
+					Where(eorm.C("OrderId").EQ(123))
+				return builder
+			}(),
+			wantRes: []*test.OrderDetail{
+				{OrderId: 123, ItemId: 10, UsingCol1: "LeBron", UsingCol2: "James"},
+			},
+		},
+		{
 			name: "found tab or",
 			s: func() *eorm.ShardingSelector[test.OrderDetail] {
 				builder := eorm.NewShardingSelector[test.OrderDetail](s.shardingDB).

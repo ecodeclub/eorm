@@ -19,6 +19,8 @@ import (
 	"database/sql"
 	"sync"
 
+	"github.com/ecodeclub/eorm/internal/merger/batchmerger"
+
 	operator "github.com/ecodeclub/eorm/internal/operator"
 
 	"github.com/gotomicro/ekit/slice"
@@ -460,16 +462,17 @@ func (s *ShardingSelector[T]) GetMulti(ctx context.Context) ([]*T, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	mgr := batchmerger.NewMerger()
+	rows, err := mgr.Merge(ctx, rowsSlice)
 	var res []*T
-	for _, rows := range rowsSlice {
-		for rows.Next() {
-			tp := new(T)
-			val := s.valCreator.NewPrimitiveValue(tp, s.meta)
-			if err = val.SetColumns(rows); err != nil {
-				return nil, err
-			}
-			res = append(res, tp)
+	for rows.Next() {
+		tp := new(T)
+		val := s.valCreator.NewPrimitiveValue(tp, s.meta)
+		if err = val.SetColumns(rows); err != nil {
+			return nil, err
 		}
+		res = append(res, tp)
 	}
 	return res, nil
 }

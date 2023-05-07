@@ -17,21 +17,14 @@ package merger
 import (
 	"context"
 	"database/sql"
+
+	"github.com/ecodeclub/eorm/internal/rows"
 )
 
 // Merger 将sql.Rows列表里的元素合并，返回一个类似sql.Rows的迭代器
 // Merger sql.Rows列表中每个sql.Rows仅支持单个结果集且每个sql.Rows中列集必须完全相同。
 type Merger interface {
-	Merge(ctx context.Context, results []*sql.Rows) (Rows, error)
-}
-
-// Rows 各方法用法及语义尽可能与sql.Rows相同
-type Rows interface {
-	Next() bool
-	Scan(dest ...any) error
-	Close() error
-	Columns() ([]string, error)
-	Err() error
+	Merge(ctx context.Context, results []*sql.Rows) (rows.Rows, error)
 }
 
 type ColumnInfo struct {
