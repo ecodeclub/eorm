@@ -227,7 +227,7 @@ func TestConvertNullable(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			err := ConvertAssign(tc.dest, tc.src)
 			if tc.hasErr {
-				require.NotNil(t, err)
+				require.Error(t, err)
 				return
 			}
 			require.NoError(t, err)
