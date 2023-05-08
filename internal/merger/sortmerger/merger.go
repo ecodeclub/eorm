@@ -191,18 +191,16 @@ func newNode(row *sql.Rows, sortCols sortColumns, index int) (*node, error) {
 	sortColumns := make([]any, sortCols.Len())
 	for _, colInfo := range colsInfo {
 		colName := colInfo.Name()
+		colType := colInfo.ScanType()
+		for colType.Kind() == reflect.Ptr {
+			colType = colType.Elem()
+		}
+		column := reflect.New(colType).Interface()
 		if sortCols.Has(colName) {
 			sortIndex := sortCols.Find(colName)
-			colType := colInfo.ScanType()
-			for colType.Kind() == reflect.Ptr {
-				colType = colType.Elem()
-			}
-			sortColumn := reflect.New(colType).Interface()
-			sortColumns[sortIndex] = sortColumn
-			columns = append(columns, sortColumn)
-		} else {
-			columns = append(columns, &[]byte{})
+			sortColumns[sortIndex] = column
 		}
+		columns = append(columns, column)
 	}
 	err = row.Scan(columns...)
 	if err != nil {
@@ -281,9 +279,9 @@ func (r *Rows) Scan(dest ...any) error {
 	if r.cur == nil {
 		return errs.ErrMergerScanNotNext
 	}
-
+	var err error
 	for i := 0; i < len(dest); i++ {
-		err := utils.ConvertAssign(dest[i], r.cur.columns[i])
+		err = utils.ConvertAssign(dest[i], r.cur.columns[i])
 		if err != nil {
 			return err
 		}

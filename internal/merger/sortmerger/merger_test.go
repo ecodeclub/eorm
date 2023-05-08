@@ -22,12 +22,12 @@ import (
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	"go.uber.org/multierr"
-
 	"github.com/ecodeclub/eorm/internal/merger/internal/errs"
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"go.uber.org/multierr"
 )
 
 var (
@@ -1216,4 +1216,188 @@ type TestModel struct {
 
 func TestMerger(t *testing.T) {
 	suite.Run(t, &MergerSuite{})
+	suite.Run(t, &NullableMergerSuite{})
+}
+
+type NullableMergerSuite struct {
+	suite.Suite
+	db01 *sql.DB
+	db02 *sql.DB
+	db03 *sql.DB
+}
+
+func (ms *NullableMergerSuite) SetupSuite() {
+	t := ms.T()
+	query := "CREATE TABLE t1 (\n      id int primary key,\n      `age`  int,\n    \t`name` varchar(20)\n  );\n"
+	db01, err := sql.Open("sqlite3", "file:test01.db?cache=shared&mode=memory")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ms.db01 = db01
+	_, err = db01.ExecContext(context.Background(), query)
+	if err != nil {
+		t.Fatal(err)
+	}
+	db02, err := sql.Open("sqlite3", "file:test02.db?cache=shared&mode=memory")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ms.db02 = db02
+	_, err = db02.ExecContext(context.Background(), query)
+	if err != nil {
+		t.Fatal(err)
+	}
+	db03, err := sql.Open("sqlite3", "file:test03.db?cache=shared&mode=memory")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ms.db03 = db03
+	_, err = db03.ExecContext(context.Background(), query)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func (ms *NullableMergerSuite) TearDownSuite() {
+	_ = ms.db01.Close()
+	_ = ms.db02.Close()
+	_ = ms.db03.Close()
+}
+
+func (ms *NullableMergerSuite) TestRows_Nullable() {
+	testcases := []struct {
+		name        string
+		rowsList    func() []*sql.Rows
+		sortColumns []SortColumn
+		wantErr     error
+		afterFunc   func()
+		wantVal     []Nullable
+	}{
+		{
+			name: "多个nullable类型排序 age asc,name desc",
+			rowsList: func() []*sql.Rows {
+				db1InsertSql := []string{
+					"insert into t1  (id,  name) values (1,  'zwl')",
+					"insert into t1  (id, age, name) values (2, 10, 'zwl')",
+					"insert into t1  (id, age, name) values (3, 20, 'zwl')",
+					"insert into t1  (id, age) values (4, 20)",
+				}
+				for _, sql := range db1InsertSql {
+					_, err := ms.db01.ExecContext(context.Background(), sql)
+					require.NoError(ms.T(), err)
+				}
+				db2InsertSql := []string{
+					"insert into t1  (id, age, name) values (5, 5, 'zwl')",
+					"insert into t1  (id, age, name) values (6, 20, 'dm')",
+				}
+				for _, sql := range db2InsertSql {
+					_, err := ms.db02.ExecContext(context.Background(), sql)
+					require.NoError(ms.T(), err)
+				}
+				db3InsertSql := []string{
+					"insert into t1  (id, name) values (7, 'xq')",
+					"insert into t1  (id, age) values (8, 5)",
+					"insert into t1  (id, age,name) values (9, 10,'xx')",
+				}
+				for _, sql := range db3InsertSql {
+					_, err := ms.db03.ExecContext(context.Background(), sql)
+					require.NoError(ms.T(), err)
+				}
+				dbs := []*sql.DB{ms.db01, ms.db02, ms.db03}
+				rowsList := make([]*sql.Rows, 0, len(dbs))
+				query := "SELECT `id`, `age`,`name` FROM `t1` order by age asc,name desc"
+				for _, db := range dbs {
+					rows, err := db.QueryContext(context.Background(), query)
+					require.NoError(ms.T(), err)
+					rowsList = append(rowsList, rows)
+				}
+				return rowsList
+			},
+			sortColumns: []SortColumn{
+				NewSortColumn("age", ASC),
+				NewSortColumn("name", DESC),
+			},
+			afterFunc: func() {
+				dbs := []*sql.DB{ms.db01, ms.db02, ms.db03}
+				for _, db := range dbs {
+					_, err := db.Exec("DELETE FROM t1;")
+					require.NoError(ms.T(), err)
+				}
+			},
+			wantVal: func() []Nullable {
+				return []Nullable{
+					{
+						Id:   sql.NullInt64{Valid: true, Int64: 1},
+						Age:  sql.NullInt64{Valid: false, Int64: 0},
+						Name: sql.NullString{Valid: true, String: "zwl"},
+					},
+					{
+						Id:   sql.NullInt64{Valid: true, Int64: 7},
+						Age:  sql.NullInt64{Valid: false, Int64: 0},
+						Name: sql.NullString{Valid: true, String: "xq"},
+					},
+					{
+						Id:   sql.NullInt64{Valid: true, Int64: 5},
+						Age:  sql.NullInt64{Valid: true, Int64: 5},
+						Name: sql.NullString{Valid: true, String: "zwl"},
+					},
+					{
+						Id:   sql.NullInt64{Valid: true, Int64: 8},
+						Age:  sql.NullInt64{Valid: true, Int64: 5},
+						Name: sql.NullString{Valid: false, String: ""},
+					},
+					{
+						Id:   sql.NullInt64{Valid: true, Int64: 2},
+						Age:  sql.NullInt64{Valid: true, Int64: 10},
+						Name: sql.NullString{Valid: true, String: "zwl"},
+					},
+					{
+						Id:   sql.NullInt64{Valid: true, Int64: 9},
+						Age:  sql.NullInt64{Valid: true, Int64: 10},
+						Name: sql.NullString{Valid: true, String: "xx"},
+					},
+					{
+						Id:   sql.NullInt64{Valid: true, Int64: 3},
+						Age:  sql.NullInt64{Valid: true, Int64: 20},
+						Name: sql.NullString{Valid: true, String: "zwl"},
+					},
+					{
+						Id:   sql.NullInt64{Valid: true, Int64: 6},
+						Age:  sql.NullInt64{Valid: true, Int64: 20},
+						Name: sql.NullString{Valid: true, String: "dm"},
+					},
+					{
+						Id:   sql.NullInt64{Valid: true, Int64: 4},
+						Age:  sql.NullInt64{Valid: true, Int64: 20},
+						Name: sql.NullString{Valid: false, String: ""},
+					},
+				}
+			}(),
+		},
+	}
+	for _, tc := range testcases {
+		ms.T().Run(tc.name, func(t *testing.T) {
+			merger, err := NewMerger(tc.sortColumns...)
+			require.NoError(t, err)
+			rows, err := merger.Merge(context.Background(), tc.rowsList())
+			require.NoError(t, err)
+			res := make([]Nullable, 0, len(tc.wantVal))
+			for rows.Next() {
+				nullT := Nullable{}
+				err := rows.Scan(&nullT.Id, &nullT.Age, &nullT.Name)
+				require.NoError(ms.T(), err)
+				res = append(res, nullT)
+			}
+			require.True(t, rows.(*Rows).closed)
+			assert.NoError(t, rows.Err())
+			assert.Equal(t, tc.wantVal, res)
+			tc.afterFunc()
+		})
+	}
+}
+
+type Nullable struct {
+	Id   sql.NullInt64
+	Age  sql.NullInt64
+	Name sql.NullString
 }

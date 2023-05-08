@@ -16,8 +16,10 @@ package sortmerger
 
 import (
 	"container/heap"
+	"database/sql"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -391,6 +393,471 @@ func TestHeap(t *testing.T) {
 		})
 	}
 
+}
+
+func TestHeap_Nullable(t *testing.T) {
+	testcases := []struct {
+		name      string
+		nodes     func() []*node
+		wantNodes func() []*node
+		sortCols  func() sortColumns
+	}{
+		{
+			name: "sql.NullInt64 asc",
+			nodes: func() []*node {
+				return newTestNodes([][]any{
+					{sql.NullInt64{Int64: 5, Valid: true}},
+					{sql.NullInt64{Int64: 1, Valid: true}},
+					{sql.NullInt64{Int64: 3, Valid: true}},
+					{sql.NullInt64{Int64: 2, Valid: true}},
+					{sql.NullInt64{Int64: 10, Valid: false}},
+				})
+			},
+			wantNodes: func() []*node {
+				return newTestNodes([][]any{
+					{sql.NullInt64{Int64: 10, Valid: false}},
+					{sql.NullInt64{Int64: 1, Valid: true}},
+					{sql.NullInt64{Int64: 2, Valid: true}},
+					{sql.NullInt64{Int64: 3, Valid: true}},
+					{sql.NullInt64{Int64: 5, Valid: true}},
+				})
+			},
+			sortCols: func() sortColumns {
+				sortCols, err := newSortColumns(NewSortColumn("id", ASC))
+				require.NoError(t, err)
+				return sortCols
+			},
+		},
+		{
+			name: "sql.NullInt64 desc",
+			nodes: func() []*node {
+				return newTestNodes([][]any{
+					{sql.NullInt64{Int64: 5, Valid: true}},
+					{sql.NullInt64{Int64: 1, Valid: true}},
+					{sql.NullInt64{Int64: 3, Valid: true}},
+					{sql.NullInt64{Int64: 2, Valid: true}},
+					{sql.NullInt64{Int64: 10, Valid: false}},
+				})
+			},
+			wantNodes: func() []*node {
+				return newTestNodes([][]any{
+					{sql.NullInt64{Int64: 5, Valid: true}},
+					{sql.NullInt64{Int64: 3, Valid: true}},
+					{sql.NullInt64{Int64: 2, Valid: true}},
+					{sql.NullInt64{Int64: 1, Valid: true}},
+					{sql.NullInt64{Int64: 10, Valid: false}},
+				})
+			},
+			sortCols: func() sortColumns {
+				sortCols, err := newSortColumns(NewSortColumn("id", DESC))
+				require.NoError(t, err)
+				return sortCols
+			},
+		},
+		{
+			name: "sql.NullString asc",
+			nodes: func() []*node {
+				return newTestNodes([][]any{
+					{sql.NullString{String: "ab", Valid: true}},
+					{sql.NullString{String: "cd", Valid: true}},
+					{sql.NullString{String: "bc", Valid: true}},
+					{sql.NullString{String: "ba", Valid: true}},
+					{sql.NullString{String: "z", Valid: false}},
+				})
+			},
+			wantNodes: func() []*node {
+				return newTestNodes([][]any{
+					{sql.NullString{String: "z", Valid: false}},
+					{sql.NullString{String: "ab", Valid: true}},
+					{sql.NullString{String: "ba", Valid: true}},
+					{sql.NullString{String: "bc", Valid: true}},
+					{sql.NullString{String: "cd", Valid: true}},
+				})
+			},
+			sortCols: func() sortColumns {
+				sortCols, err := newSortColumns(NewSortColumn("name", ASC))
+				require.NoError(t, err)
+				return sortCols
+			},
+		},
+		{
+			name: "sql.NullString desc",
+			nodes: func() []*node {
+				return newTestNodes([][]any{
+					{sql.NullString{String: "ab", Valid: true}},
+					{sql.NullString{String: "cd", Valid: true}},
+					{sql.NullString{String: "bc", Valid: true}},
+					{sql.NullString{String: "z", Valid: false}},
+					{sql.NullString{String: "ba", Valid: true}},
+				})
+			},
+			wantNodes: func() []*node {
+				return newTestNodes([][]any{
+					{sql.NullString{String: "cd", Valid: true}},
+					{sql.NullString{String: "bc", Valid: true}},
+					{sql.NullString{String: "ba", Valid: true}},
+					{sql.NullString{String: "ab", Valid: true}},
+					{sql.NullString{String: "z", Valid: false}},
+				})
+			},
+			sortCols: func() sortColumns {
+				sortCols, err := newSortColumns(NewSortColumn("name", DESC))
+				require.NoError(t, err)
+				return sortCols
+			},
+		},
+		{
+			name: "sql.NullInt16 asc",
+			nodes: func() []*node {
+				return newTestNodes([][]any{
+					{sql.NullInt16{Int16: 5, Valid: true}},
+					{sql.NullInt16{Int16: 1, Valid: true}},
+					{sql.NullInt16{Int16: 3, Valid: true}},
+					{sql.NullInt16{Int16: 2, Valid: true}},
+					{sql.NullInt16{Int16: 10, Valid: false}},
+				})
+			},
+			wantNodes: func() []*node {
+				return newTestNodes([][]any{
+					{sql.NullInt16{Int16: 10, Valid: false}},
+					{sql.NullInt16{Int16: 1, Valid: true}},
+					{sql.NullInt16{Int16: 2, Valid: true}},
+					{sql.NullInt16{Int16: 3, Valid: true}},
+					{sql.NullInt16{Int16: 5, Valid: true}},
+				})
+			},
+			sortCols: func() sortColumns {
+				sortCols, err := newSortColumns(NewSortColumn("id", ASC))
+				require.NoError(t, err)
+				return sortCols
+			},
+		},
+		{
+			name: "sql.NullInt16 desc",
+			nodes: func() []*node {
+				return newTestNodes([][]any{
+					{sql.NullInt16{Int16: 5, Valid: true}},
+					{sql.NullInt16{Int16: 1, Valid: true}},
+					{sql.NullInt16{Int16: 3, Valid: true}},
+					{sql.NullInt16{Int16: 2, Valid: true}},
+					{sql.NullInt16{Int16: 10, Valid: false}},
+				})
+			},
+			wantNodes: func() []*node {
+				return newTestNodes([][]any{
+					{sql.NullInt16{Int16: 5, Valid: true}},
+					{sql.NullInt16{Int16: 3, Valid: true}},
+					{sql.NullInt16{Int16: 2, Valid: true}},
+					{sql.NullInt16{Int16: 1, Valid: true}},
+					{sql.NullInt16{Int16: 10, Valid: false}},
+				})
+			},
+			sortCols: func() sortColumns {
+				sortCols, err := newSortColumns(NewSortColumn("id", DESC))
+				require.NoError(t, err)
+				return sortCols
+			},
+		},
+		{
+			name: "sql.NullInt32 asc",
+			nodes: func() []*node {
+				return newTestNodes([][]any{
+					{sql.NullInt32{Int32: 5, Valid: true}},
+					{sql.NullInt32{Int32: 1, Valid: true}},
+					{sql.NullInt32{Int32: 3, Valid: true}},
+					{sql.NullInt32{Int32: 2, Valid: true}},
+					{sql.NullInt32{Int32: 10, Valid: false}},
+				})
+			},
+			wantNodes: func() []*node {
+				return newTestNodes([][]any{
+					{sql.NullInt32{Int32: 10, Valid: false}},
+					{sql.NullInt32{Int32: 1, Valid: true}},
+					{sql.NullInt32{Int32: 2, Valid: true}},
+					{sql.NullInt32{Int32: 3, Valid: true}},
+					{sql.NullInt32{Int32: 5, Valid: true}},
+				})
+			},
+			sortCols: func() sortColumns {
+				sortCols, err := newSortColumns(NewSortColumn("id", ASC))
+				require.NoError(t, err)
+				return sortCols
+			},
+		},
+		{
+			name: "sql.NullInt32 desc",
+			nodes: func() []*node {
+				return newTestNodes([][]any{
+					{sql.NullInt32{Int32: 5, Valid: true}},
+					{sql.NullInt32{Int32: 1, Valid: true}},
+					{sql.NullInt32{Int32: 3, Valid: true}},
+					{sql.NullInt32{Int32: 2, Valid: true}},
+					{sql.NullInt32{Int32: 10, Valid: false}},
+				})
+			},
+			wantNodes: func() []*node {
+				return newTestNodes([][]any{
+					{sql.NullInt32{Int32: 5, Valid: true}},
+					{sql.NullInt32{Int32: 3, Valid: true}},
+					{sql.NullInt32{Int32: 2, Valid: true}},
+					{sql.NullInt32{Int32: 1, Valid: true}},
+					{sql.NullInt32{Int32: 10, Valid: false}},
+				})
+			},
+			sortCols: func() sortColumns {
+				sortCols, err := newSortColumns(NewSortColumn("id", DESC))
+				require.NoError(t, err)
+				return sortCols
+			},
+		},
+		{
+			name: "sql.NullFloat64 asc",
+			nodes: func() []*node {
+				return newTestNodes([][]any{
+					{sql.NullFloat64{Float64: 5.0, Valid: true}},
+					{sql.NullFloat64{Float64: 1.0, Valid: true}},
+					{sql.NullFloat64{Float64: 3.0, Valid: true}},
+					{sql.NullFloat64{Float64: 2.0, Valid: true}},
+					{sql.NullFloat64{Float64: 10.0, Valid: false}},
+				})
+			},
+			wantNodes: func() []*node {
+				return newTestNodes([][]any{
+					{sql.NullFloat64{Float64: 10.0, Valid: false}},
+					{sql.NullFloat64{Float64: 1.0, Valid: true}},
+					{sql.NullFloat64{Float64: 2.0, Valid: true}},
+					{sql.NullFloat64{Float64: 3.0, Valid: true}},
+					{sql.NullFloat64{Float64: 5.0, Valid: true}},
+				})
+			},
+			sortCols: func() sortColumns {
+				sortCols, err := newSortColumns(NewSortColumn("id", ASC))
+				require.NoError(t, err)
+				return sortCols
+			},
+		},
+		{
+			name: "sql.NullFloat64 desc",
+			nodes: func() []*node {
+				return newTestNodes([][]any{
+					{sql.NullFloat64{Float64: 5.0, Valid: true}},
+					{sql.NullFloat64{Float64: 1.0, Valid: true}},
+					{sql.NullFloat64{Float64: 3.0, Valid: true}},
+					{sql.NullFloat64{Float64: 2.0, Valid: true}},
+					{sql.NullFloat64{Float64: 10.0, Valid: false}},
+				})
+			},
+			wantNodes: func() []*node {
+				return newTestNodes([][]any{
+					{sql.NullFloat64{Float64: 5.0, Valid: true}},
+					{sql.NullFloat64{Float64: 3.0, Valid: true}},
+					{sql.NullFloat64{Float64: 2.0, Valid: true}},
+					{sql.NullFloat64{Float64: 1.0, Valid: true}},
+					{sql.NullFloat64{Float64: 10.0, Valid: false}},
+				})
+			},
+			sortCols: func() sortColumns {
+				sortCols, err := newSortColumns(NewSortColumn("id", DESC))
+				require.NoError(t, err)
+				return sortCols
+			},
+		},
+
+		{
+			name: "sql.NullTime asc",
+			nodes: func() []*node {
+				return newTestNodes([][]any{
+					{sql.NullTime{Time: func() time.Time {
+						time, err := time.ParseInLocation("2006-01-02 15:04:05", "2022-01-01 12:00:00", time.Local)
+						require.NoError(t, err)
+						return time
+					}(), Valid: true}},
+					{sql.NullTime{Time: func() time.Time {
+						time, err := time.ParseInLocation("2006-01-02 15:04:05", "2022-01-02 12:00:00", time.Local)
+						require.NoError(t, err)
+						return time
+					}(), Valid: true}},
+					{sql.NullTime{Time: func() time.Time {
+						time, err := time.ParseInLocation("2006-01-02 15:04:05", "2022-01-09 12:00:00", time.Local)
+						require.NoError(t, err)
+						return time
+					}(), Valid: true}},
+					{sql.NullTime{Time: func() time.Time {
+						time, err := time.ParseInLocation("2006-01-02 15:04:05", "2022-01-01 11:00:00", time.Local)
+						require.NoError(t, err)
+						return time
+					}(), Valid: true}},
+					{sql.NullTime{Time: func() time.Time {
+						time, err := time.ParseInLocation("2006-01-02 15:04:05", "2022-01-20 12:00:00", time.Local)
+						require.NoError(t, err)
+						return time
+					}(), Valid: false}},
+				})
+			},
+			wantNodes: func() []*node {
+				return newTestNodes([][]any{
+					{sql.NullTime{Time: func() time.Time {
+						time, err := time.ParseInLocation("2006-01-02 15:04:05", "2022-01-20 12:00:00", time.Local)
+						require.NoError(t, err)
+						return time
+					}(), Valid: false}},
+					{sql.NullTime{Time: func() time.Time {
+						time, err := time.ParseInLocation("2006-01-02 15:04:05", "2022-01-01 11:00:00", time.Local)
+						require.NoError(t, err)
+						return time
+					}(), Valid: true}},
+					{sql.NullTime{Time: func() time.Time {
+						time, err := time.ParseInLocation("2006-01-02 15:04:05", "2022-01-01 12:00:00", time.Local)
+						require.NoError(t, err)
+						return time
+					}(), Valid: true}},
+					{sql.NullTime{Time: func() time.Time {
+						time, err := time.ParseInLocation("2006-01-02 15:04:05", "2022-01-02 12:00:00", time.Local)
+						require.NoError(t, err)
+						return time
+					}(), Valid: true}},
+					{sql.NullTime{Time: func() time.Time {
+						time, err := time.ParseInLocation("2006-01-02 15:04:05", "2022-01-09 12:00:00", time.Local)
+						require.NoError(t, err)
+						return time
+					}(), Valid: true}},
+				})
+			},
+			sortCols: func() sortColumns {
+				sortCols, err := newSortColumns(NewSortColumn("time", ASC))
+				require.NoError(t, err)
+				return sortCols
+			},
+		},
+		{
+			name: "sql.NullTime desc",
+			nodes: func() []*node {
+				return newTestNodes([][]any{
+					{sql.NullTime{Time: func() time.Time {
+						time, err := time.ParseInLocation("2006-01-02 15:04:05", "2022-01-01 12:00:00", time.Local)
+						require.NoError(t, err)
+						return time
+					}(), Valid: true}},
+					{sql.NullTime{Time: func() time.Time {
+						time, err := time.ParseInLocation("2006-01-02 15:04:05", "2022-01-02 12:00:00", time.Local)
+						require.NoError(t, err)
+						return time
+					}(), Valid: true}},
+					{sql.NullTime{Time: func() time.Time {
+						time, err := time.ParseInLocation("2006-01-02 15:04:05", "2022-01-09 12:00:00", time.Local)
+						require.NoError(t, err)
+						return time
+					}(), Valid: true}},
+					{sql.NullTime{Time: func() time.Time {
+						time, err := time.ParseInLocation("2006-01-02 15:04:05", "2022-01-01 11:00:00", time.Local)
+						require.NoError(t, err)
+						return time
+					}(), Valid: true}},
+					{sql.NullTime{Time: func() time.Time {
+						time, err := time.ParseInLocation("2006-01-02 15:04:05", "2022-01-20 12:00:00", time.Local)
+						require.NoError(t, err)
+						return time
+					}(), Valid: false}},
+				})
+			},
+			wantNodes: func() []*node {
+				return newTestNodes([][]any{
+					{sql.NullTime{Time: func() time.Time {
+						time, err := time.ParseInLocation("2006-01-02 15:04:05", "2022-01-09 12:00:00", time.Local)
+						require.NoError(t, err)
+						return time
+					}(), Valid: true}},
+					{sql.NullTime{Time: func() time.Time {
+						time, err := time.ParseInLocation("2006-01-02 15:04:05", "2022-01-02 12:00:00", time.Local)
+						require.NoError(t, err)
+						return time
+					}(), Valid: true}},
+					{sql.NullTime{Time: func() time.Time {
+						time, err := time.ParseInLocation("2006-01-02 15:04:05", "2022-01-01 12:00:00", time.Local)
+						require.NoError(t, err)
+						return time
+					}(), Valid: true}},
+					{sql.NullTime{Time: func() time.Time {
+						time, err := time.ParseInLocation("2006-01-02 15:04:05", "2022-01-01 11:00:00", time.Local)
+						require.NoError(t, err)
+						return time
+					}(), Valid: true}},
+					{sql.NullTime{Time: func() time.Time {
+						time, err := time.ParseInLocation("2006-01-02 15:04:05", "2022-01-20 12:00:00", time.Local)
+						require.NoError(t, err)
+						return time
+					}(), Valid: false}},
+				})
+			},
+			sortCols: func() sortColumns {
+				sortCols, err := newSortColumns(NewSortColumn("time", DESC))
+				require.NoError(t, err)
+				return sortCols
+			},
+		},
+		{
+			name: "sql.NullByte asc",
+			nodes: func() []*node {
+				return newTestNodes([][]any{
+					{sql.NullByte{Byte: 'a', Valid: true}},
+					{sql.NullByte{Byte: 'c', Valid: true}},
+					{sql.NullByte{Byte: 'b', Valid: true}},
+					{sql.NullByte{Byte: 'k', Valid: true}},
+					{sql.NullByte{Byte: 'z', Valid: false}},
+				})
+			},
+			wantNodes: func() []*node {
+				return newTestNodes([][]any{
+					{sql.NullByte{Byte: 'z', Valid: false}},
+					{sql.NullByte{Byte: 'a', Valid: true}},
+					{sql.NullByte{Byte: 'b', Valid: true}},
+					{sql.NullByte{Byte: 'c', Valid: true}},
+					{sql.NullByte{Byte: 'k', Valid: true}},
+				})
+			},
+			sortCols: func() sortColumns {
+				sortCols, err := newSortColumns(NewSortColumn("byte", ASC))
+				require.NoError(t, err)
+				return sortCols
+			},
+		},
+		{
+			name: "sql.NullByte desc",
+			nodes: func() []*node {
+				return newTestNodes([][]any{
+					{sql.NullByte{Byte: 'a', Valid: true}},
+					{sql.NullByte{Byte: 'c', Valid: true}},
+					{sql.NullByte{Byte: 'b', Valid: true}},
+					{sql.NullByte{Byte: 'k', Valid: true}},
+					{sql.NullByte{Byte: 'z', Valid: false}},
+				})
+			},
+			wantNodes: func() []*node {
+				return newTestNodes([][]any{
+					{sql.NullByte{Byte: 'k', Valid: true}},
+					{sql.NullByte{Byte: 'c', Valid: true}},
+					{sql.NullByte{Byte: 'b', Valid: true}},
+					{sql.NullByte{Byte: 'a', Valid: true}},
+					{sql.NullByte{Byte: 'z', Valid: false}},
+				})
+			},
+			sortCols: func() sortColumns {
+				sortCols, err := newSortColumns(NewSortColumn("byte", DESC))
+				require.NoError(t, err)
+				return sortCols
+			},
+		},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newTestHp(tc.nodes(), tc.sortCols())
+			res := make([]*node, 0, h.Len())
+			for h.Len() > 0 {
+				res = append(res, heap.Pop(h).(*node))
+			}
+			assert.Equal(t, tc.wantNodes(), res)
+		})
+	}
 }
 
 func (ms *MergerSuite) TestCompare() {
