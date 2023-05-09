@@ -30,6 +30,7 @@ var (
 	ErrMergerAggregateHasEmptyRows       = errors.New("merger: 聚合函数计算时rowsList有一个或多个为空")
 	ErrMergerInvalidAggregateColumnIndex = errors.New("merger: ColumnInfo的index不合法")
 	ErrMergerAggregateFuncNotFound       = errors.New("merger: 聚合函数方法未找到")
+	ErrMergerNullable                    = errors.New("merger: 接收数据的类型需要为sql.Nullable")
 )
 
 func NewRepeatSortColumn(column string) error {

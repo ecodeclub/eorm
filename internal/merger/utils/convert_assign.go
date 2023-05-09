@@ -15,9 +15,21 @@
 package utils
 
 import (
-	_ "database/sql"
+	"database/sql/driver"
 	_ "unsafe"
 )
 
-//go:linkname ConvertAssign database/sql.convertAssign
-func ConvertAssign(dest, src any) error
+//go:linkname sqlConvertAssign database/sql.convertAssign
+func sqlConvertAssign(dest, src any) error
+
+func ConvertAssign(dest, src any) error {
+	srcVal, ok := src.(driver.Valuer)
+	if ok {
+		var err error
+		src, err = srcVal.Value()
+		if err != nil {
+			return err
+		}
+	}
+	return sqlConvertAssign(dest, src)
+}

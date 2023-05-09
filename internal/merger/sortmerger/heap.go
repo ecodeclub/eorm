@@ -14,7 +14,11 @@
 
 package sortmerger
 
-import "reflect"
+import (
+	"database/sql/driver"
+	"reflect"
+	"time"
+)
 
 var compareFuncMapping = map[reflect.Kind]func(any, any, Order) int{
 	reflect.Int:     compare[int],
@@ -45,8 +49,14 @@ func (h *Heap) Less(i, j int) bool {
 	for k := 0; k < h.sortColumns.Len(); k++ {
 		valueI := h.h[i].sortCols[k]
 		valueJ := h.h[j].sortCols[k]
-		kind := reflect.TypeOf(valueI).Kind()
-		cp := compareFuncMapping[kind]
+		_, ok := valueJ.(driver.Valuer)
+		var cp func(any, any, Order) int
+		if ok {
+			cp = compareNullable
+		} else {
+			kind := reflect.TypeOf(valueI).Kind()
+			cp = compareFuncMapping[kind]
+		}
 		res := cp(valueI, valueJ, h.sortColumns.Get(k).order)
 		if res == 0 {
 			continue
@@ -84,11 +94,35 @@ type node struct {
 
 func compare[T Ordered](ii any, jj any, order Order) int {
 	i, j := ii.(T), jj.(T)
-	if i < j && order || i > j && !order {
+	if i < j && order == ASC || i > j && order == DESC {
 		return -1
-	} else if i > j && order || i < j && !order {
+	} else if i > j && order == ASC || i < j && order == DESC {
 		return 1
 	} else {
 		return 0
 	}
+}
+
+func compareNullable(ii, jj any, order Order) int {
+	i := ii.(driver.Valuer)
+	j := jj.(driver.Valuer)
+	iVal, _ := i.Value()
+	jVal, _ := j.Value()
+	// 如果i,j都为空返回0
+	// 如果val返回为空永远是最小值
+	if iVal == nil && jVal == nil {
+		return 0
+	} else if iVal == nil && order == ASC || jVal == nil && order == DESC {
+		return -1
+	} else if iVal == nil && order == DESC || jVal == nil && order == ASC {
+		return 1
+	}
+
+	vali, ok := iVal.(time.Time)
+	if ok {
+		valj := jVal.(time.Time)
+		return compare[int64](vali.UnixMilli(), valj.UnixMilli(), order)
+	}
+	kind := reflect.TypeOf(iVal).Kind()
+	return compareFuncMapping[kind](iVal, jVal, order)
 }
