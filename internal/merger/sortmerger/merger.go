@@ -21,7 +21,7 @@ import (
 	"reflect"
 	"sync"
 
-	"github.com/ecodeclub/eorm/internal/rows"
+	"github.com/ecodeclub/eorm/internal/merger"
 
 	"github.com/ecodeclub/eorm/internal/merger/utils"
 
@@ -111,7 +111,7 @@ func newSortColumns(sortCols ...SortColumn) (sortColumns, error) {
 	return scs, nil
 }
 
-func (m *Merger) Merge(ctx context.Context, results []*sql.Rows) (rows.Rows, error) {
+func (m *Merger) Merge(ctx context.Context, results []*sql.Rows) (merger.Rows, error) {
 	// 检测results是否符合条件
 	if ctx.Err() != nil {
 		return nil, ctx.Err()

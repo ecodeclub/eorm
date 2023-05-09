@@ -19,7 +19,7 @@ import (
 	"database/sql"
 	"sync"
 
-	"github.com/ecodeclub/eorm/internal/rows"
+	"github.com/ecodeclub/eorm/internal/merger"
 
 	"go.uber.org/multierr"
 
@@ -34,7 +34,7 @@ func NewMerger() *Merger {
 	return &Merger{}
 }
 
-func (m *Merger) Merge(ctx context.Context, results []*sql.Rows) (rows.Rows, error) {
+func (m *Merger) Merge(ctx context.Context, results []*sql.Rows) (merger.Rows, error) {
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}

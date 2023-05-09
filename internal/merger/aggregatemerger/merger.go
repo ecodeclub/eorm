@@ -20,7 +20,7 @@ import (
 	"sync"
 	_ "unsafe"
 
-	"github.com/ecodeclub/eorm/internal/rows"
+	"github.com/ecodeclub/eorm/internal/merger"
 
 	"github.com/ecodeclub/eorm/internal/merger/utils"
 
@@ -46,7 +46,7 @@ func NewMerger(aggregators ...aggregator.Aggregator) *Merger {
 	}
 }
 
-func (m *Merger) Merge(ctx context.Context, results []*sql.Rows) (rows.Rows, error) {
+func (m *Merger) Merge(ctx context.Context, results []*sql.Rows) (merger.Rows, error) {
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
@@ -65,7 +65,7 @@ func (m *Merger) Merge(ctx context.Context, results []*sql.Rows) (rows.Rows, err
 		aggregators: m.aggregators,
 		mu:          &sync.RWMutex{},
 		//聚合函数AVG传递到各个sql.Rows时会被转化为SUM和COUNT，这是一个对外不可见的转化。
-		//所以rows.Rows的列名及顺序是由上方aggregator出现的顺序及ColumnName()的返回值决定的而不是sql.Rows。
+		//所以merger.Rows的列名及顺序是由上方aggregator出现的顺序及ColumnName()的返回值决定的而不是sql.Rows。
 		columns: m.colNames,
 	}, nil
 

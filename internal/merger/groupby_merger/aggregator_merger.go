@@ -21,8 +21,6 @@ import (
 	"sync"
 	_ "unsafe"
 
-	"github.com/ecodeclub/eorm/internal/rows"
-
 	"github.com/ecodeclub/eorm/internal/merger/utils"
 	"go.uber.org/multierr"
 
@@ -55,7 +53,7 @@ func NewAggregatorMerger(aggregators []aggregator.Aggregator, groupColumns []mer
 }
 
 // Merge 该实现会全部拿取results里面的数据，由于sql.Rows数据拿完之后会自动关闭，所以这边隐式的关闭了所有的sql.Rows
-func (a *AggregatorMerger) Merge(ctx context.Context, results []*sql.Rows) (rows.Rows, error) {
+func (a *AggregatorMerger) Merge(ctx context.Context, results []*sql.Rows) (merger.Rows, error) {
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}

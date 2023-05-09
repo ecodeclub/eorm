@@ -14,6 +14,10 @@
 
 package rows
 
+import "database/sql"
+
+var _ Rows = &sql.Rows{}
+
 // Rows 各方法用法及语义尽可能与sql.Rows相同
 type Rows interface {
 	Next() bool

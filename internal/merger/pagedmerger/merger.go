@@ -19,8 +19,6 @@ import (
 	"database/sql"
 	"sync"
 
-	"github.com/ecodeclub/eorm/internal/rows"
-
 	"github.com/ecodeclub/eorm/internal/merger"
 	"github.com/ecodeclub/eorm/internal/merger/internal/errs"
 )
@@ -43,7 +41,7 @@ func NewMerger(m merger.Merger, offset int, limit int) (*Merger, error) {
 	}, nil
 }
 
-func (m *Merger) Merge(ctx context.Context, results []*sql.Rows) (rows.Rows, error) {
+func (m *Merger) Merge(ctx context.Context, results []*sql.Rows) (merger.Rows, error) {
 	rs, err := m.m.Merge(ctx, results)
 	if err != nil {
 		return nil, err
@@ -60,7 +58,7 @@ func (m *Merger) Merge(ctx context.Context, results []*sql.Rows) (rows.Rows, err
 }
 
 // nextOffset 会把游标挪到 offset 所指定的位置。
-func (m *Merger) nextOffset(ctx context.Context, rows rows.Rows) error {
+func (m *Merger) nextOffset(ctx context.Context, rows merger.Rows) error {
 	offset := m.offset
 	for i := 0; i < offset; i++ {
 		if ctx.Err() != nil {
@@ -75,7 +73,7 @@ func (m *Merger) nextOffset(ctx context.Context, rows rows.Rows) error {
 }
 
 type Rows struct {
-	rows    rows.Rows
+	rows    merger.Rows
 	limit   int
 	cnt     int
 	lastErr error
