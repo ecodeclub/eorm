@@ -6099,6 +6099,7 @@ func TestShardingSelector_Get(t *testing.T) {
 }
 
 func TestShardingSelector_GetMulti(t *testing.T) {
+	t.Parallel()
 	r := model.NewMetaRegistry()
 	_, err := r.Register(&test.OrderDetail{},
 		model.WithTableShardingAlgorithm(&hash.Hash{
@@ -6198,6 +6199,25 @@ func TestShardingSelector_GetMulti(t *testing.T) {
 				{OrderId: 123, ItemId: 10, UsingCol1: "LeBron", UsingCol2: "James"},
 				{OrderId: 234, ItemId: 12, UsingCol1: "Kevin", UsingCol2: "Durant"},
 			},
+		},
+		{
+			name: "err merge rows diff",
+			s: func() *ShardingSelector[test.OrderDetail] {
+				b := NewShardingSelector[test.OrderDetail](shardingDB).
+					Where(C("OrderId").EQ(123).Or(C("OrderId").EQ(234)))
+				return b
+			}(),
+			mockOrder: func(mock1, mock2 sqlmock.Sqlmock) {
+				rows1 := mock1.NewRows([]string{"order_id", "ite_id", "using_col1", "using_col2"})
+				rows1.AddRow(234, 12, "Kevin", "Durant")
+				mock1.ExpectQuery("SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail_db_0`.`order_detail_tab_0` WHERE (`order_id`=?) OR (`order_id`=?);").
+					WithArgs(123, 234).WillReturnRows(rows1)
+				rows2 := mock2.NewRows([]string{"order_id", "item_id", "using_col1", "using_col2"})
+				rows2.AddRow(123, 10, "LeBron", "James")
+				mock2.ExpectQuery("SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail_db_1`.`order_detail_tab_0` WHERE (`order_id`=?) OR (`order_id`=?);").
+					WithArgs(123, 234).WillReturnRows(rows2)
+			},
+			wantErr: errors.New("merger: sql.Rows列表中的字段不同"),
 		},
 	}
 

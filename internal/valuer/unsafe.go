@@ -15,9 +15,10 @@
 package valuer
 
 import (
-	"database/sql"
 	"reflect"
 	"unsafe"
+
+	"github.com/ecodeclub/eorm/internal/rows"
 
 	"github.com/ecodeclub/eorm/internal/errs"
 	"github.com/ecodeclub/eorm/internal/model"
@@ -50,7 +51,7 @@ func (u unsafeValue) Field(name string) (reflect.Value, error) {
 	return val, nil
 }
 
-func (u unsafeValue) SetColumns(rows *sql.Rows) error {
+func (u unsafeValue) SetColumns(rows rows.Rows) error {
 
 	cs, err := rows.Columns()
 	if err != nil {

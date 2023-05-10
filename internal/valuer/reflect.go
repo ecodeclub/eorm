@@ -15,8 +15,9 @@
 package valuer
 
 import (
-	"database/sql"
 	"reflect"
+
+	"github.com/ecodeclub/eorm/internal/rows"
 
 	"github.com/ecodeclub/eorm/internal/errs"
 	"github.com/ecodeclub/eorm/internal/model"
@@ -60,7 +61,7 @@ func (r reflectValue) fieldByIndex(name string) (reflect.Value, bool) {
 	return value, true
 }
 
-func (r reflectValue) SetColumns(rows *sql.Rows) error {
+func (r reflectValue) SetColumns(rows rows.Rows) error {
 	cs, err := rows.Columns()
 	if err != nil {
 		return err

@@ -19,9 +19,10 @@ import (
 	"database/sql"
 	"sync"
 
+	"github.com/ecodeclub/eorm/internal/merger"
+
 	"go.uber.org/multierr"
 
-	"github.com/ecodeclub/eorm/internal/merger"
 	"github.com/ecodeclub/eorm/internal/merger/internal/errs"
 )
 
@@ -108,6 +109,7 @@ func (r *Rows) Next() bool {
 	return canNext
 
 }
+
 func (r *Rows) nextRows() (bool, error) {
 	row := r.rowsList[r.cnt]
 	if row.Next() {

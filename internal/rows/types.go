@@ -12,25 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package valuer
+package rows
 
-import (
-	"reflect"
+import "database/sql"
 
-	"github.com/ecodeclub/eorm/internal/rows"
+var _ Rows = &sql.Rows{}
 
-	"github.com/ecodeclub/eorm/internal/model"
-)
-
-// Value 是对结构体实例的内部抽象
-type Value interface {
-	// Field 访问结构体字段, name 是字段名
-	Field(name string) (reflect.Value, error)
-	// SetColumns 设置新值，column 是列名
-	// 要注意，val 可能存在被上层复用，从而引起篡改的问题
-	// SetColumns(rows *sql.Rows) error
-
-	SetColumns(rows rows.Rows) error
+// Rows 各方法用法及语义尽可能与sql.Rows相同
+type Rows interface {
+	Next() bool
+	Scan(dest ...any) error
+	Close() error
+	Columns() ([]string, error)
+	Err() error
 }
-
-type Creator func(val any, meta *model.TableMeta) Value

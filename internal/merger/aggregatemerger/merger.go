@@ -20,9 +20,10 @@ import (
 	"sync"
 	_ "unsafe"
 
+	"github.com/ecodeclub/eorm/internal/merger"
+
 	"github.com/ecodeclub/eorm/internal/merger/utils"
 
-	"github.com/ecodeclub/eorm/internal/merger"
 	"github.com/ecodeclub/eorm/internal/merger/aggregatemerger/aggregator"
 	"github.com/ecodeclub/eorm/internal/merger/internal/errs"
 	"go.uber.org/multierr"

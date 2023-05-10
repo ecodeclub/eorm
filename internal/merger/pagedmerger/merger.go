@@ -42,16 +42,16 @@ func NewMerger(m merger.Merger, offset int, limit int) (*Merger, error) {
 }
 
 func (m *Merger) Merge(ctx context.Context, results []*sql.Rows) (merger.Rows, error) {
-	rows, err := m.m.Merge(ctx, results)
+	rs, err := m.m.Merge(ctx, results)
 	if err != nil {
 		return nil, err
 	}
-	err = m.nextOffset(ctx, rows)
+	err = m.nextOffset(ctx, rs)
 	if err != nil {
 		return nil, err
 	}
 	return &Rows{
-		rows:  rows,
+		rows:  rs,
 		mu:    &sync.RWMutex{},
 		limit: m.limit,
 	}, nil

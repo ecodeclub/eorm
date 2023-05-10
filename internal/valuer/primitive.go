@@ -18,6 +18,8 @@ import (
 	"database/sql"
 	"reflect"
 
+	"github.com/ecodeclub/eorm/internal/rows"
+
 	"github.com/ecodeclub/eorm/internal/model"
 )
 
@@ -34,7 +36,7 @@ func (s primitiveValue) Field(name string) (reflect.Value, error) {
 }
 
 // SetColumns 设置列值， 支持基本类型，基于 reflect 与 unsafe Value 封装
-func (s primitiveValue) SetColumns(rows *sql.Rows) error {
+func (s primitiveValue) SetColumns(rows rows.Rows) error {
 	switch s.valType.Elem().Kind() {
 	case reflect.Struct:
 		if scanner, ok := s.val.(sql.Scanner); ok {
