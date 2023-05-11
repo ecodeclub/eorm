@@ -103,26 +103,14 @@ func TestShardingInsert_Build(t *testing.T) {
 			}),
 			wantQs: []sharding.Query{
 				{
-					SQL:        fmt.Sprintf("INSERT INTO %s.%s(`user_id`,`order_id`,`content`,`account`) VALUES(?,?,?,?);", "`order_db_1`", "`order_tab_1`"),
-					Args:       []any{1, int64(1), "1", 1.0},
+					SQL:        fmt.Sprintf("INSERT INTO %s.%s(`user_id`,`order_id`,`content`,`account`) VALUES(?,?,?,?);INSERT INTO %s.%s(`user_id`,`order_id`,`content`,`account`) VALUES(?,?,?,?);", "`order_db_1`", "`order_tab_0`", "`order_db_1`", "`order_tab_1`"),
+					Args:       []any{3, int64(3), "3", 3.0, 1, int64(1), "1", 1.0},
 					DB:         "order_db_1",
 					Datasource: "1.db.cluster.company.com:3306",
 				},
 				{
-					SQL:        fmt.Sprintf("INSERT INTO %s.%s(`user_id`,`order_id`,`content`,`account`) VALUES(?,?,?,?);", "`order_db_0`", "`order_tab_2`"),
-					Args:       []any{2, int64(2), "2", 2.0},
-					DB:         "order_db_0",
-					Datasource: "0.db.cluster.company.com:3306",
-				},
-				{
-					SQL:        fmt.Sprintf("INSERT INTO %s.%s(`user_id`,`order_id`,`content`,`account`) VALUES(?,?,?,?);", "`order_db_1`", "`order_tab_0`"),
-					Args:       []any{3, int64(3), "3", 3.0},
-					DB:         "order_db_1",
-					Datasource: "1.db.cluster.company.com:3306",
-				},
-				{
-					SQL:        fmt.Sprintf("INSERT INTO %s.%s(`user_id`,`order_id`,`content`,`account`) VALUES(?,?,?,?);", "`order_db_0`", "`order_tab_1`"),
-					Args:       []any{4, int64(4), "4", 4.0},
+					SQL:        fmt.Sprintf("INSERT INTO %s.%s(`user_id`,`order_id`,`content`,`account`) VALUES(?,?,?,?);INSERT INTO %s.%s(`user_id`,`order_id`,`content`,`account`) VALUES(?,?,?,?);", "`order_db_0`", "`order_tab_1`", "`order_db_0`", "`order_tab_2`"),
+					Args:       []any{4, int64(4), "4", 4.0, 2, int64(2), "2", 2.0},
 					DB:         "order_db_0",
 					Datasource: "0.db.cluster.company.com:3306",
 				},
@@ -153,12 +141,7 @@ func TestShardingInsert_Build(t *testing.T) {
 				&OrderInsert{UserId: 3, OrderId: 3, Content: "3", Account: 3.0},
 			}),
 			wantQs: []sharding.Query{
-				{
-					SQL:        fmt.Sprintf("INSERT INTO %s.%s(`user_id`,`order_id`,`content`,`account`) VALUES(?,?,?,?),(?,?,?,?);", "`order_db_1`", "`order_tab_1`"),
-					Args:       []any{1, int64(1), "1", 1.0, 7, int64(7), "7", 7.0},
-					DB:         "order_db_1",
-					Datasource: "1.db.cluster.company.com:3306",
-				},
+
 				{
 					SQL:        fmt.Sprintf("INSERT INTO %s.%s(`user_id`,`order_id`,`content`,`account`) VALUES(?,?,?,?),(?,?,?,?);", "`order_db_0`", "`order_tab_2`"),
 					Args:       []any{2, int64(2), "2", 2.0, 8, int64(8), "8", 8.0},
@@ -166,8 +149,8 @@ func TestShardingInsert_Build(t *testing.T) {
 					Datasource: "0.db.cluster.company.com:3306",
 				},
 				{
-					SQL:        fmt.Sprintf("INSERT INTO %s.%s(`user_id`,`order_id`,`content`,`account`) VALUES(?,?,?,?);", "`order_db_1`", "`order_tab_0`"),
-					Args:       []any{3, int64(3), "3", 3.0},
+					SQL:        fmt.Sprintf("INSERT INTO %s.%s(`user_id`,`order_id`,`content`,`account`) VALUES(?,?,?,?);INSERT INTO %s.%s(`user_id`,`order_id`,`content`,`account`) VALUES(?,?,?,?),(?,?,?,?);", "`order_db_1`", "`order_tab_0`", "`order_db_1`", "`order_tab_1`"),
+					Args:       []any{3, int64(3), "3", 3.0, 1, int64(1), "1", 1.0, 7, int64(7), "7", 7.0},
 					DB:         "order_db_1",
 					Datasource: "1.db.cluster.company.com:3306",
 				},
@@ -211,8 +194,6 @@ type ShardingInsertSuite struct {
 	mockDB01 *sql.DB
 	mock02   sqlmock.Sqlmock
 	mockDB02 *sql.DB
-	mock03   sqlmock.Sqlmock
-	mockDB03 *sql.DB
 }
 
 func (s *ShardingInsertSuite) SetupSuite() {
@@ -226,21 +207,17 @@ func (s *ShardingInsertSuite) SetupSuite() {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s.mockDB03, s.mock03, err = sqlmock.New()
-	if err != nil {
-		t.Fatal(err)
-	}
+
 }
 
 func (s *ShardingInsertSuite) TearDownTest() {
 	_ = s.mockDB01.Close()
 	_ = s.mockDB02.Close()
-	_ = s.mockDB03.Close()
 }
 
 func (s *ShardingInsertSuite) TestShardingInsert_Exec() {
 	r := model.NewMetaRegistry()
-	dbBase, tableBase := 3, 3
+	dbBase, tableBase := 2, 3
 	dbPattern, tablePattern, dsPattern := "order_db_%d", "order_tab_%d", "0.db.cluster.company.com:3306"
 	_, err := r.Register(&OrderInsert{},
 		model.WithTableShardingAlgorithm(&hash.Hash{
@@ -254,7 +231,6 @@ func (s *ShardingInsertSuite) TestShardingInsert_Exec() {
 	m := map[string]*masterslave.MasterSlavesDB{
 		"order_db_0": MasterSlavesMockDB(s.mockDB01),
 		"order_db_1": MasterSlavesMockDB(s.mockDB02),
-		"order_db_2": MasterSlavesMockDB(s.mockDB03),
 	}
 	clusterDB := cluster.NewClusterDB(m)
 	ds := map[string]datasource.DataSource{
@@ -278,9 +254,8 @@ func (s *ShardingInsertSuite) TestShardingInsert_Exec() {
 				&OrderInsert{UserId: 3, OrderId: 3, Content: "3", Account: 3.0},
 			}),
 			mockDb: func() {
-				s.mock02.ExpectExec(regexp.QuoteMeta("INSERT INTO `order_db_1`.`order_tab_1`(`user_id`,`order_id`,`content`,`account`) VALUES(?,?,?,?);")).WithArgs(1, int64(1), "1", 1.0).WillReturnResult(sqlmock.NewResult(1, 1))
-				s.mock03.ExpectExec(regexp.QuoteMeta("INSERT INTO `order_db_2`.`order_tab_2`(`user_id`,`order_id`,`content`,`account`) VALUES(?,?,?,?);")).WithArgs(2, int64(2), "2", 2.0).WillReturnResult(sqlmock.NewResult(1, 1))
-				s.mock01.ExpectExec(regexp.QuoteMeta("INSERT INTO `order_db_0`.`order_tab_0`(`user_id`,`order_id`,`content`,`account`) VALUES(?,?,?,?);")).WithArgs(3, int64(3), "3", 3.0).WillReturnResult(sqlmock.NewResult(1, 1))
+				s.mock02.ExpectExec(regexp.QuoteMeta("INSERT INTO `order_db_1`.`order_tab_0`(`user_id`,`order_id`,`content`,`account`) VALUES(?,?,?,?);INSERT INTO `order_db_1`.`order_tab_1`(`user_id`,`order_id`,`content`,`account`) VALUES(?,?,?,?);")).WithArgs(3, int64(3), "3", 3.0, 1, int64(1), "1", 1.0).WillReturnResult(sqlmock.NewResult(1, 2))
+				s.mock01.ExpectExec(regexp.QuoteMeta("INSERT INTO `order_db_0`.`order_tab_2`(`user_id`,`order_id`,`content`,`account`) VALUES(?,?,?,?);")).WithArgs(2, int64(2), "2", 2.0).WillReturnResult(sqlmock.NewResult(1, 1))
 			},
 			wantAffectedRows: 3,
 		},
@@ -292,9 +267,8 @@ func (s *ShardingInsertSuite) TestShardingInsert_Exec() {
 				&OrderInsert{UserId: 3, OrderId: 3, Content: "3", Account: 3.0},
 			}),
 			mockDb: func() {
-				s.mock02.ExpectExec(regexp.QuoteMeta("INSERT INTO `order_db_1`.`order_tab_1`(`user_id`,`order_id`,`content`,`account`) VALUES(?,?,?,?);")).WithArgs(1, int64(1), "1", 1.0).WillReturnError(newMockErr("db01"))
-				s.mock03.ExpectExec(regexp.QuoteMeta("INSERT INTO `order_db_2`.`order_tab_2`(`user_id`,`order_id`,`content`,`account`) VALUES(?,?,?,?);")).WithArgs(2, int64(2), "2", 2.0).WillReturnResult(sqlmock.NewResult(1, 1))
-				s.mock01.ExpectExec(regexp.QuoteMeta("INSERT INTO `order_db_0`.`order_tab_0`(`user_id`,`order_id`,`content`,`account`) VALUES(?,?,?,?);")).WithArgs(3, int64(3), "3", 3.0).WillReturnResult(sqlmock.NewResult(1, 1))
+				s.mock02.ExpectExec(regexp.QuoteMeta("INSERT INTO `order_db_1`.`order_tab_0`(`user_id`,`order_id`,`content`,`account`) VALUES(?,?,?,?);INSERT INTO `order_db_1`.`order_tab_1`(`user_id`,`order_id`,`content`,`account`) VALUES(?,?,?,?);")).WithArgs(3, int64(3), "3", 3.0, 1, int64(1), "1", 1.0).WillReturnError(newMockErr("db01"))
+				s.mock01.ExpectExec(regexp.QuoteMeta("INSERT INTO `order_db_0`.`order_tab_2`(`user_id`,`order_id`,`content`,`account`) VALUES(?,?,?,?);")).WithArgs(2, int64(2), "2", 2.0).WillReturnResult(sqlmock.NewResult(1, 1))
 			},
 			wantErr: multierr.Combine(newMockErr("db01")),
 		},
@@ -306,11 +280,10 @@ func (s *ShardingInsertSuite) TestShardingInsert_Exec() {
 				&OrderInsert{UserId: 3, OrderId: 3, Content: "3", Account: 3.0},
 			}),
 			mockDb: func() {
-				s.mock02.ExpectExec(regexp.QuoteMeta("INSERT INTO `order_db_1`.`order_tab_1`(`user_id`,`order_id`,`content`,`account`) VALUES(?,?,?,?);")).WithArgs(1, int64(1), "1", 1.0).WillReturnError(newMockErr("db"))
-				s.mock03.ExpectExec(regexp.QuoteMeta("INSERT INTO `order_db_2`.`order_tab_2`(`user_id`,`order_id`,`content`,`account`) VALUES(?,?,?,?);")).WithArgs(2, int64(2), "2", 2.0).WillReturnError(newMockErr("db"))
-				s.mock01.ExpectExec(regexp.QuoteMeta("INSERT INTO `order_db_0`.`order_tab_0`(`user_id`,`order_id`,`content`,`account`) VALUES(?,?,?,?);")).WithArgs(3, int64(3), "3", 3.0).WillReturnError(newMockErr("db"))
+				s.mock02.ExpectExec(regexp.QuoteMeta("INSERT INTO `order_db_1`.`order_tab_0`(`user_id`,`order_id`,`content`,`account`) VALUES(?,?,?,?);INSERT INTO `order_db_1`.`order_tab_1`(`user_id`,`order_id`,`content`,`account`) VALUES(?,?,?,?);")).WithArgs(3, int64(3), "3", 3.0, 1, int64(1), "1", 1.0).WillReturnError(newMockErr("db"))
+				s.mock01.ExpectExec(regexp.QuoteMeta("INSERT INTO `order_db_0`.`order_tab_2`(`user_id`,`order_id`,`content`,`account`) VALUES(?,?,?,?);")).WithArgs(2, int64(2), "2", 2.0).WillReturnError(newMockErr("db"))
 			},
-			wantErr: multierr.Combine(newMockErr("db"), newMockErr("db"), newMockErr("db")),
+			wantErr: multierr.Combine(newMockErr("db"), newMockErr("db")),
 		},
 	}
 	for _, tc := range testcases {

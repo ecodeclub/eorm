@@ -18,10 +18,11 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 	"reflect"
 	"strings"
 	"sync"
+
+	"github.com/ecodeclub/ekit/mapx"
 
 	"github.com/ecodeclub/eorm/internal/errs"
 	"github.com/ecodeclub/eorm/internal/model"
@@ -49,8 +50,11 @@ func (si *ShardingInsert[T]) Build(ctx context.Context) ([]sharding.Query, error
 	if err != nil {
 		return nil, err
 	}
-	qs := make(map[string][]*T, 64)
 
+	dsDBTabMap, err := mapx.NewTreeMap[key, []*T](compareDSDBTab)
+	if err != nil {
+		return nil, err
+	}
 	colMetaData, err := si.getColumns()
 	if err != nil {
 		return nil, err
@@ -64,30 +68,73 @@ func (si *ShardingInsert[T]) Build(ctx context.Context) ([]sharding.Query, error
 		if err != nil {
 			return nil, err
 		}
-		dstStr := fmt.Sprintf("%s,%s,%s", dst.Dsts[0].Name, dst.Dsts[0].DB, dst.Dsts[0].Table)
-		qs[dstStr] = append(qs[dstStr], value)
-
-	}
-	// 针对每一个目标表，生成一个 insert 语句
-	ansQuery := make([]sharding.Query, 0, len(qs))
-	for dstStr, values := range qs {
-		dstLi := strings.Split(dstStr, ",")
-		q, err := si.buildQuery(dstLi[0], dstLi[1], dstLi[2], colMetaData, values)
-		if err != nil {
-			return nil, err
+		val, ok := dsDBTabMap.Get(key{dst.Dsts[0]})
+		if !ok {
+			err = dsDBTabMap.Put(key{dst.Dsts[0]}, []*T{value})
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			val = append(val, value)
+			err = dsDBTabMap.Put(key{dst.Dsts[0]}, val)
+			if err != nil {
+				return nil, err
+			}
 		}
-		ansQuery = append(ansQuery, q)
+	}
+	dsDBMap, err := mapx.NewTreeMap[key, []tableValue[T]](compareDSDB)
+	if err != nil {
+		return nil, err
+	}
+	keys := dsDBTabMap.Keys()
+	// 将一个库的sql语句归类到一起
+	for _, k := range keys {
+		val, _ := dsDBTabMap.Get(k)
+		dsDBValue, ok := dsDBMap.Get(k)
+		if ok {
+			dsDBValue = append(dsDBValue, tableValue[T]{table: k.Table, values: val})
+			err = dsDBMap.Put(k, dsDBValue)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			err = dsDBMap.Put(k, []tableValue[T]{{table: k.Table, values: val}})
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	// 针对每一个目标库，生成一个 insert 语句
+	dsDBKeys := dsDBMap.Keys()
+	ansQuery := make([]sharding.Query, 0, len(dsDBKeys))
+	for _, dsDBKey := range dsDBKeys {
+		ds := dsDBKey.Name
+		db := dsDBKey.DB
+		dsDBVal, _ := dsDBMap.Get(dsDBKey)
+		for _, dsDBTabVal := range dsDBVal {
+			err = si.buildQuery(ds, db, dsDBTabVal.table, colMetaData, dsDBTabVal.values)
+			if err != nil {
+				return nil, err
+			}
+		}
+		ansQuery = append(ansQuery, sharding.Query{
+			SQL:        si.buffer.String(),
+			Args:       si.args,
+			DB:         db,
+			Datasource: ds,
+		})
 		si.buffer.Reset()
 		si.args = []any{}
 	}
 	return ansQuery, nil
 }
 
-func (si *ShardingInsert[T]) buildQuery(ds, db, table string, colMetas []*model.ColumnMeta, values []*T) (sharding.Query, error) {
-	defer bytebufferpool.Put(si.buffer)
+func (si *ShardingInsert[T]) buildQuery(ds, db, table string, colMetas []*model.ColumnMeta, values []*T) error {
+
 	var err error
 	if len(si.values) == 0 {
-		return EmptyQuery, errors.New("插入0行")
+		return errors.New("插入0行")
 	}
 	si.writeString("INSERT INTO ")
 	si.quote(db)
@@ -96,7 +143,7 @@ func (si *ShardingInsert[T]) buildQuery(ds, db, table string, colMetas []*model.
 	si.writeString("(")
 	err = si.buildColumns(colMetas)
 	if err != nil {
-		return EmptyQuery, err
+		return err
 	}
 	si.writeString(")")
 	si.writeString(" VALUES")
@@ -109,7 +156,7 @@ func (si *ShardingInsert[T]) buildQuery(ds, db, table string, colMetas []*model.
 		for j, v := range colMetas {
 			fdVal, err := refVal.Field(v.FieldName)
 			if err != nil {
-				return EmptyQuery, err
+				return err
 			}
 			si.parameter(fdVal.Interface())
 			if j != len(colMetas)-1 {
@@ -119,7 +166,7 @@ func (si *ShardingInsert[T]) buildQuery(ds, db, table string, colMetas []*model.
 		si.writeString(")")
 	}
 	si.end()
-	return sharding.Query{SQL: si.buffer.String(), Args: si.args, Datasource: ds, DB: db}, nil
+	return nil
 }
 
 // checkColumns 判断sk是否存在于meta中，如果不存在会返回报错
@@ -233,4 +280,36 @@ func (si *ShardingInsert[T]) Exec(ctx context.Context) MultiExecRes {
 	shardingRes := NewMultiExecRes(resList)
 	shardingRes.err = multierr.Combine(errList...)
 	return shardingRes
+}
+
+type key struct {
+	sharding.Dst
+}
+
+func compareDSDBTab(i, j key) int {
+	strI := strings.Join([]string{i.Name, i.DB, i.Table}, "")
+	strJ := strings.Join([]string{j.Name, j.DB, j.Table}, "")
+	if strI < strJ {
+		return -1
+	} else if strI == strJ {
+		return 0
+	}
+	return 1
+
+}
+
+func compareDSDB(i, j key) int {
+	strI := strings.Join([]string{i.Name, i.DB}, "")
+	strJ := strings.Join([]string{j.Name, j.DB}, "")
+	if strI < strJ {
+		return -1
+	} else if strI == strJ {
+		return 0
+	}
+	return 1
+}
+
+type tableValue[T any] struct {
+	table  string
+	values []*T
 }
