@@ -1,3 +1,17 @@
+// Copyright 2021 ecodeclub
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package eorm
 
 import (
@@ -45,23 +59,20 @@ func (si *ShardingInsert[T]) Build(ctx context.Context) ([]sharding.Query, error
 	if err := si.checkColumns(colMetaData, skNames); err != nil {
 		return nil, err
 	}
-	dstStrList := make([]string, 0, len(si.values))
 	for _, value := range si.values {
 		dst, err := si.findDst(ctx, value)
 		if err != nil {
 			return nil, err
 		}
 		dstStr := fmt.Sprintf("%s,%s,%s", dst.Dsts[0].Name, dst.Dsts[0].DB, dst.Dsts[0].Table)
-		if _, ok := qs[dstStr]; !ok {
-			dstStrList = append(dstStrList, dstStr)
-		}
 		qs[dstStr] = append(qs[dstStr], value)
+
 	}
 	// 针对每一个目标表，生成一个 insert 语句
 	ansQuery := make([]sharding.Query, 0, len(qs))
-	for _, dstStr := range dstStrList {
+	for dstStr, values := range qs {
 		dstLi := strings.Split(dstStr, ",")
-		q, err := si.buildQuery(dstLi[0], dstLi[1], dstLi[2], colMetaData, qs[dstStr])
+		q, err := si.buildQuery(dstLi[0], dstLi[1], dstLi[2], colMetaData, values)
 		if err != nil {
 			return nil, err
 		}
