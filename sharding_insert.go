@@ -50,11 +50,6 @@ func (si *ShardingInsert[T]) Build(ctx context.Context) ([]sharding.Query, error
 	if err != nil {
 		return nil, err
 	}
-
-	dsDBTabMap, err := mapx.NewTreeMap[key, []*T](compareDSDBTab)
-	if err != nil {
-		return nil, err
-	}
 	colMetaData, err := si.getColumns()
 	if err != nil {
 		return nil, err
@@ -63,14 +58,27 @@ func (si *ShardingInsert[T]) Build(ctx context.Context) ([]sharding.Query, error
 	if err := si.checkColumns(colMetaData, skNames); err != nil {
 		return nil, err
 	}
+	dsDBTabMap, err := mapx.NewTreeMap[key, []*T](compareDSDBTab)
+	if err != nil {
+		return nil, err
+	}
+	dsDBMap, err := mapx.NewTreeMap[key, []tableValue[T]](compareDSDB)
+	if err != nil {
+		return nil, err
+	}
 	for _, value := range si.values {
 		dst, err := si.findDst(ctx, value)
 		if err != nil {
 			return nil, err
 		}
+		// 一个value只能命中一个库表如果不满足就报错
+		if len(dst.Dsts) != 1 {
+			return nil, errs.ErrInsertFindingDst
+		}
 		val, ok := dsDBTabMap.Get(key{dst.Dsts[0]})
 		if !ok {
-			err = dsDBTabMap.Put(key{dst.Dsts[0]}, []*T{value})
+			val = []*T{value}
+			err = dsDBTabMap.Put(key{dst.Dsts[0]}, val)
 			if err != nil {
 				return nil, err
 			}
@@ -81,26 +89,33 @@ func (si *ShardingInsert[T]) Build(ctx context.Context) ([]sharding.Query, error
 				return nil, err
 			}
 		}
-	}
-	dsDBMap, err := mapx.NewTreeMap[key, []tableValue[T]](compareDSDB)
-	if err != nil {
-		return nil, err
-	}
-	keys := dsDBTabMap.Keys()
-	// 将一个库的sql语句归类到一起
-	for _, k := range keys {
-		val, _ := dsDBTabMap.Get(k)
-		dsDBValue, ok := dsDBMap.Get(k)
-		if ok {
-			dsDBValue = append(dsDBValue, tableValue[T]{table: k.Table, values: val})
-			err = dsDBMap.Put(k, dsDBValue)
+		dsDBVal, ok := dsDBMap.Get(key{dst.Dsts[0]})
+		if !ok {
+			err = dsDBMap.Put(key{dst.Dsts[0]}, []tableValue[T]{{
+				table:  dst.Dsts[0].Table,
+				values: val,
+			}})
 			if err != nil {
 				return nil, err
 			}
 		} else {
-			err = dsDBMap.Put(k, []tableValue[T]{{table: k.Table, values: val}})
-			if err != nil {
-				return nil, err
+			flag := false
+			for idx, tableVal := range dsDBVal {
+				if tableVal.table == dst.Dsts[0].Table {
+					dsDBVal[idx].values = val
+					flag = true
+					break
+				}
+			}
+			if !flag {
+				dsDBVal = append(dsDBVal, tableValue[T]{
+					table:  dst.Dsts[0].Table,
+					values: val,
+				})
+				err = dsDBMap.Put(key{dst.Dsts[0]}, dsDBVal)
+				if err != nil {
+					return nil, err
+				}
 			}
 		}
 	}
@@ -131,11 +146,7 @@ func (si *ShardingInsert[T]) Build(ctx context.Context) ([]sharding.Query, error
 }
 
 func (si *ShardingInsert[T]) buildQuery(ds, db, table string, colMetas []*model.ColumnMeta, values []*T) error {
-
 	var err error
-	if len(si.values) == 0 {
-		return errors.New("插入0行")
-	}
 	si.writeString("INSERT INTO ")
 	si.quote(db)
 	si.writeByte('.')
@@ -266,12 +277,12 @@ func (si *ShardingInsert[T]) Exec(ctx context.Context) MultiExecRes {
 	wg.Add(len(qs))
 	for idx, q := range qs {
 		go func(idx int, q Query) {
-			si.lock.Lock()
 			defer func() {
 				si.lock.Unlock()
 				wg.Done()
 			}()
 			res, err := si.db.execContext(ctx, q)
+			si.lock.Lock()
 			errList[idx] = err
 			resList[idx] = res
 		}(idx, q)
