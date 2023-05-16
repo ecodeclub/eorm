@@ -75,19 +75,11 @@ func (si *ShardingInsert[T]) Build(ctx context.Context) ([]sharding.Query, error
 		if len(dst.Dsts) != 1 {
 			return nil, errs.ErrInsertFindingDst
 		}
-		val, ok := dsDBTabMap.Get(key{dst.Dsts[0]})
-		if !ok {
-			val = []*T{value}
-			err = dsDBTabMap.Put(key{dst.Dsts[0]}, val)
-			if err != nil {
-				return nil, err
-			}
-		} else {
-			val = append(val, value)
-			err = dsDBTabMap.Put(key{dst.Dsts[0]}, val)
-			if err != nil {
-				return nil, err
-			}
+		val, _ := dsDBTabMap.Get(key{dst.Dsts[0]})
+		val = append(val, value)
+		err = dsDBTabMap.Put(key{dst.Dsts[0]}, val)
+		if err != nil {
+			return nil, err
 		}
 		dsDBVal, ok := dsDBMap.Get(key{dst.Dsts[0]})
 		if !ok {
