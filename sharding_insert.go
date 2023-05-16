@@ -120,7 +120,7 @@ func (si *ShardingInsert[T]) Build(ctx context.Context) ([]sharding.Query, error
 		db := dsDBKey.DB
 		dsDBVal, _ := dsDBMap.Get(dsDBKey)
 		for _, dsDBTabVal := range dsDBVal {
-			err = si.buildQuery(ds, db, dsDBTabVal.table, colMetaData, dsDBTabVal.values)
+			err = si.buildQuery(db, dsDBTabVal.table, colMetaData, dsDBTabVal.values)
 			if err != nil {
 				return nil, err
 			}
@@ -137,7 +137,7 @@ func (si *ShardingInsert[T]) Build(ctx context.Context) ([]sharding.Query, error
 	return ansQuery, nil
 }
 
-func (si *ShardingInsert[T]) buildQuery(ds, db, table string, colMetas []*model.ColumnMeta, values []*T) error {
+func (si *ShardingInsert[T]) buildQuery(db, table string, colMetas []*model.ColumnMeta, values []*T) error {
 	var err error
 	si.writeString("INSERT INTO ")
 	si.quote(db)
@@ -173,7 +173,7 @@ func (si *ShardingInsert[T]) buildQuery(ds, db, table string, colMetas []*model.
 }
 
 // checkColumns 判断sk是否存在于meta中，如果不存在会返回报错
-func (si *ShardingInsert[T]) checkColumns(colMetas []*model.ColumnMeta, sks []string) error {
+func (*ShardingInsert[T]) checkColumns(colMetas []*model.ColumnMeta, sks []string) error {
 	colMetasMap := make(map[string]struct{}, len(colMetas))
 	for _, colMeta := range colMetas {
 		colMetasMap[colMeta.FieldName] = struct{}{}
