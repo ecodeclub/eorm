@@ -58,11 +58,8 @@ func (si *ShardingInsert[T]) Build(ctx context.Context) ([]sharding.Query, error
 	if err := si.checkColumns(colMetaData, skNames); err != nil {
 		return nil, err
 	}
-	dsDBTabMap, err := mapx.NewTreeMap[key, []*T](compareDSDBTab)
-	if err != nil {
-		return nil, err
-	}
-	dsDBMap, err := mapx.NewTreeMap[key, []tableValue[T]](compareDSDB)
+
+	dsDBMap, err := mapx.NewTreeMap[key, *mapx.TreeMap[key, []*T]](compareDSDB)
 	if err != nil {
 		return nil, err
 	}
@@ -75,41 +72,25 @@ func (si *ShardingInsert[T]) Build(ctx context.Context) ([]sharding.Query, error
 		if len(dst.Dsts) != 1 {
 			return nil, errs.ErrInsertFindingDst
 		}
-		val, _ := dsDBTabMap.Get(key{dst.Dsts[0]})
-		val = append(val, value)
-		err = dsDBTabMap.Put(key{dst.Dsts[0]}, val)
-		if err != nil {
-			return nil, err
-		}
 		dsDBVal, ok := dsDBMap.Get(key{dst.Dsts[0]})
 		if !ok {
-			err = dsDBMap.Put(key{dst.Dsts[0]}, []tableValue[T]{{
-				table:  dst.Dsts[0].Table,
-				values: val,
-			}})
+			dsDBVal, err = mapx.NewTreeMap[key, []*T](compareDSDBTab)
+			if err != nil {
+				return nil, err
+			}
+			err = dsDBVal.Put(key{dst.Dsts[0]}, []*T{value})
 			if err != nil {
 				return nil, err
 			}
 		} else {
-			flag := false
-			for idx, tableVal := range dsDBVal {
-				if tableVal.table == dst.Dsts[0].Table {
-					dsDBVal[idx].values = val
-					flag = true
-					break
-				}
-			}
-			if !flag {
-				dsDBVal = append(dsDBVal, tableValue[T]{
-					table:  dst.Dsts[0].Table,
-					values: val,
-				})
-				err = dsDBMap.Put(key{dst.Dsts[0]}, dsDBVal)
-				if err != nil {
-					return nil, err
-				}
+			valList, _ := dsDBVal.Get(key{dst.Dsts[0]})
+			valList = append(valList, value)
+			err = dsDBVal.Put(key{dst.Dsts[0]}, valList)
+			if err != nil {
+				return nil, err
 			}
 		}
+		dsDBMap.Put(key{dst.Dsts[0]}, dsDBVal)
 	}
 
 	// 针对每一个目标库，生成一个 insert 语句
@@ -119,8 +100,9 @@ func (si *ShardingInsert[T]) Build(ctx context.Context) ([]sharding.Query, error
 		ds := dsDBKey.Name
 		db := dsDBKey.DB
 		dsDBVal, _ := dsDBMap.Get(dsDBKey)
-		for _, dsDBTabVal := range dsDBVal {
-			err = si.buildQuery(db, dsDBTabVal.table, colMetaData, dsDBTabVal.values)
+		for _, dsDBTabKey := range dsDBVal.Keys() {
+			dsDBTabVals, _ := dsDBVal.Get(dsDBTabKey)
+			err = si.buildQuery(db, dsDBTabKey.Table, colMetaData, dsDBTabVals)
 			if err != nil {
 				return nil, err
 			}
