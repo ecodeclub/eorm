@@ -90,7 +90,10 @@ func (si *ShardingInsert[T]) Build(ctx context.Context) ([]sharding.Query, error
 				return nil, err
 			}
 		}
-		dsDBMap.Put(key{dst.Dsts[0]}, dsDBVal)
+		err = dsDBMap.Put(key{dst.Dsts[0]}, dsDBVal)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// 针对每一个目标库，生成一个 insert 语句
@@ -292,9 +295,4 @@ func compareDSDB(i, j key) int {
 		return 0
 	}
 	return 1
-}
-
-type tableValue[T any] struct {
-	table  string
-	values []*T
 }
