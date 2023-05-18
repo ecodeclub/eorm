@@ -38,7 +38,8 @@ var (
 	ErrNotGenShardingQuery        = errors.New("eorm: 未生成 sharding query")
 	ErrNotCompleteDatasource      = errors.New("eorm: 未实现 DataSource 接口")
 	ErrNotCompleteTxBeginner      = errors.New("eorm: 未实现 TxBeginner 接口")
-
+	ErrInsertShardingKeyNotFound  = errors.New("eorm: insert语句中未包含sharding key")
+	ErrInsertFindingDst           = errors.New("eorm: 一行数据只能插入一个表")
 	// ErrInvalidQuery               = errors.New("eorm: 未知 query")
 
 	// ErrExcShardingAlgorithm       = errors.New("eorm: 执行 sharding algorithm 出错")
