@@ -19,7 +19,6 @@ import (
 	"database/sql"
 	"errors"
 	"reflect"
-	"strings"
 	"sync"
 
 	"github.com/ecodeclub/ekit/mapx"
@@ -59,7 +58,7 @@ func (si *ShardingInsert[T]) Build(ctx context.Context) ([]sharding.Query, error
 		return nil, err
 	}
 
-	dsDBMap, err := mapx.NewTreeMap[key, *mapx.TreeMap[key, []*T]](compareDSDB)
+	dsDBMap, err := mapx.NewTreeMap[sharding.Dst, *mapx.TreeMap[sharding.Dst, []*T]](sharding.CompareDSDB)
 	if err != nil {
 		return nil, err
 	}
@@ -72,25 +71,25 @@ func (si *ShardingInsert[T]) Build(ctx context.Context) ([]sharding.Query, error
 		if len(dst.Dsts) != 1 {
 			return nil, errs.ErrInsertFindingDst
 		}
-		dsDBVal, ok := dsDBMap.Get(key{dst.Dsts[0]})
+		dsDBVal, ok := dsDBMap.Get(dst.Dsts[0])
 		if !ok {
-			dsDBVal, err = mapx.NewTreeMap[key, []*T](compareDSDBTab)
+			dsDBVal, err = mapx.NewTreeMap[sharding.Dst, []*T](sharding.CompareDSDBTab)
 			if err != nil {
 				return nil, err
 			}
-			err = dsDBVal.Put(key{dst.Dsts[0]}, []*T{value})
+			err = dsDBVal.Put(dst.Dsts[0], []*T{value})
 			if err != nil {
 				return nil, err
 			}
 		} else {
-			valList, _ := dsDBVal.Get(key{dst.Dsts[0]})
+			valList, _ := dsDBVal.Get(dst.Dsts[0])
 			valList = append(valList, value)
-			err = dsDBVal.Put(key{dst.Dsts[0]}, valList)
+			err = dsDBVal.Put(dst.Dsts[0], valList)
 			if err != nil {
 				return nil, err
 			}
 		}
-		err = dsDBMap.Put(key{dst.Dsts[0]}, dsDBVal)
+		err = dsDBMap.Put(dst.Dsts[0], dsDBVal)
 		if err != nil {
 			return nil, err
 		}
@@ -268,31 +267,4 @@ func (si *ShardingInsert[T]) Exec(ctx context.Context) MultiExecRes {
 	shardingRes := NewMultiExecRes(resList)
 	shardingRes.err = multierr.Combine(errList...)
 	return shardingRes
-}
-
-type key struct {
-	sharding.Dst
-}
-
-func compareDSDBTab(i, j key) int {
-	strI := strings.Join([]string{i.Name, i.DB, i.Table}, "")
-	strJ := strings.Join([]string{j.Name, j.DB, j.Table}, "")
-	if strI < strJ {
-		return -1
-	} else if strI == strJ {
-		return 0
-	}
-	return 1
-
-}
-
-func compareDSDB(i, j key) int {
-	strI := strings.Join([]string{i.Name, i.DB}, "")
-	strJ := strings.Join([]string{j.Name, j.DB}, "")
-	if strI < strJ {
-		return -1
-	} else if strI == strJ {
-		return 0
-	}
-	return 1
 }

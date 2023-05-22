@@ -18,6 +18,11 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/ecodeclub/ekit/slice"
+	operator "github.com/ecodeclub/eorm/internal/operator"
+	"github.com/ecodeclub/eorm/internal/sharding"
+	"github.com/ecodeclub/eorm/internal/valuer"
+
 	"github.com/ecodeclub/eorm/internal/datasource"
 
 	"github.com/ecodeclub/eorm/internal/errs"
@@ -101,8 +106,17 @@ func (q Querier[T]) Get(ctx context.Context) (*T, error) {
 	return res.Result.(*T), nil
 }
 
-type selectorBuilder struct {
-	builder
+type builder struct {
+	core
+	// 使用 bytebufferpool 以减少内存分配
+	// 每次调用 Get 之后不要忘记再调用 Put
+	buffer *bytebufferpool.ByteBuffer
+	meta   *model.TableMeta
+	args   []interface{}
+	// aliases map[string]struct{}
+}
+
+type selectorAttribute struct {
 	columns  []Selectable
 	where    []Predicate
 	distinct bool
@@ -113,14 +127,36 @@ type selectorBuilder struct {
 	limit    int
 }
 
-type builder struct {
-	core
-	// 使用 bytebufferpool 以减少内存分配
-	// 每次调用 Get 之后不要忘记再调用 Put
-	buffer *bytebufferpool.ByteBuffer
-	meta   *model.TableMeta
-	args   []interface{}
-	// aliases map[string]struct{}
+type shardingBuilder struct {
+	builder
+}
+
+type selectorBuilder struct {
+	builder
+	selectorAttribute
+}
+
+type shardingSelectorBuilder struct {
+	shardingBuilder
+	selectorAttribute
+}
+
+type updaterAttribute struct {
+	val           valuer.Value
+	where         []Predicate
+	assigns       []Assignable
+	ignoreNilVal  bool
+	ignoreZeroVal bool
+}
+
+type updaterBuilder struct {
+	builder
+	updaterAttribute
+}
+
+type shardingUpdaterBuilder struct {
+	shardingBuilder
+	updaterAttribute
 }
 
 func (b *builder) quote(val string) {
@@ -352,4 +388,123 @@ func (b *builder) addArgs(args ...any) {
 		b.args = make([]any, 0, 8)
 	}
 	b.args = append(b.args, args...)
+}
+
+func (b *shardingBuilder) findDstByPredicate(ctx context.Context, pre Predicate) (sharding.Result, error) {
+	switch pre.op {
+	case opAnd:
+		left, err := b.findDstByPredicate(ctx, pre.left.(Predicate))
+		if err != nil {
+			return sharding.EmptyResult, err
+		}
+		right, err := b.findDstByPredicate(ctx, pre.right.(Predicate))
+		if err != nil {
+			return sharding.EmptyResult, err
+		}
+		return b.mergeAnd(left, right), nil
+	case opOr:
+		left, err := b.findDstByPredicate(ctx, pre.left.(Predicate))
+		if err != nil {
+			return sharding.EmptyResult, err
+		}
+		right, err := b.findDstByPredicate(ctx, pre.right.(Predicate))
+		if err != nil {
+			return sharding.EmptyResult, err
+		}
+		return b.mergeOR(left, right), nil
+	case opIn:
+		col := pre.left.(Column)
+		right := pre.right.(values)
+		var results []sharding.Result
+		for _, val := range right.data {
+			res, err := b.meta.ShardingAlgorithm.Sharding(ctx,
+				sharding.Request{Op: opEQ, SkValues: map[string]any{col.name: val}})
+			if err != nil {
+				return sharding.EmptyResult, err
+			}
+			results = append(results, res)
+		}
+		return b.mergeIN(results), nil
+	case opNot:
+		nPre, err := b.negatePredicate(pre.right.(Predicate))
+		if err != nil {
+			return sharding.EmptyResult, err
+		}
+		return b.findDstByPredicate(ctx, nPre)
+	case opNotIN:
+		return b.meta.ShardingAlgorithm.Sharding(ctx,
+			sharding.Request{Op: opNotIN, SkValues: map[string]any{}})
+	case opEQ, opGT, opLT, opGTEQ, opLTEQ, opNEQ:
+		col, isCol := pre.left.(Column)
+		right, isVals := pre.right.(valueExpr)
+		if !isCol || !isVals {
+			return sharding.EmptyResult, errs.ErrUnsupportedTooComplexQuery
+		}
+		return b.meta.ShardingAlgorithm.Sharding(ctx,
+			sharding.Request{Op: pre.op, SkValues: map[string]any{col.name: right.val}})
+	default:
+		return sharding.EmptyResult, errs.NewUnsupportedOperatorError(pre.op.Text)
+	}
+}
+
+func (b *shardingBuilder) negatePredicate(pre Predicate) (Predicate, error) {
+	switch pre.op {
+	case opAnd:
+		left, err := b.negatePredicate(pre.left.(Predicate))
+		if err != nil {
+			return emptyPredicate, err
+		}
+		right, err := b.negatePredicate(pre.right.(Predicate))
+		if err != nil {
+			return emptyPredicate, err
+		}
+		return Predicate{
+			left: left, op: opOr, right: right,
+		}, nil
+	case opOr:
+		left, err := b.negatePredicate(pre.left.(Predicate))
+		if err != nil {
+			return emptyPredicate, err
+		}
+		right, err := b.negatePredicate(pre.right.(Predicate))
+		if err != nil {
+			return emptyPredicate, err
+		}
+		return Predicate{
+			left: left, op: opAnd, right: right,
+		}, nil
+	default:
+		nOp, err := operator.NegateOp(pre.op)
+		if err != nil {
+			return emptyPredicate, err
+		}
+		return Predicate{left: pre.left, op: nOp, right: pre.right}, nil
+	}
+}
+
+// mergeAnd 两个分片结果的交集
+func (*shardingBuilder) mergeAnd(left, right sharding.Result) sharding.Result {
+	dsts := slice.IntersectSetFunc[sharding.Dst](left.Dsts, right.Dsts, func(src, dst sharding.Dst) bool {
+		return src.Equals(dst)
+	})
+	return sharding.Result{Dsts: dsts}
+}
+
+// mergeOR 两个分片结果的并集
+func (*shardingBuilder) mergeOR(left, right sharding.Result) sharding.Result {
+	dsts := slice.UnionSetFunc[sharding.Dst](left.Dsts, right.Dsts, func(src, dst sharding.Dst) bool {
+		return src.Equals(dst)
+	})
+	return sharding.Result{Dsts: dsts}
+}
+
+// mergeIN 多个分片结果的并集
+func (*shardingBuilder) mergeIN(vals []sharding.Result) sharding.Result {
+	var dsts []sharding.Dst
+	for _, val := range vals {
+		dsts = slice.UnionSetFunc[sharding.Dst](dsts, val.Dsts, func(src, dst sharding.Dst) bool {
+			return src.Equals(dst)
+		})
+	}
+	return sharding.Result{Dsts: dsts}
 }

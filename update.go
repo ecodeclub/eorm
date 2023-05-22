@@ -20,8 +20,6 @@ import (
 	"reflect"
 
 	"github.com/ecodeclub/eorm/internal/errs"
-	"github.com/ecodeclub/eorm/internal/valuer"
-
 	"github.com/valyala/bytebufferpool"
 )
 
@@ -29,22 +27,19 @@ var _ QueryBuilder = &Updater[any]{}
 
 // Updater is the builder responsible for building UPDATE query
 type Updater[T any] struct {
-	builder
 	Session
-	table         interface{}
-	val           valuer.Value
-	where         []Predicate
-	assigns       []Assignable
-	ignoreNilVal  bool
-	ignoreZeroVal bool
+	updaterBuilder
+	table interface{}
 }
 
 // NewUpdater 开始构建一个 UPDATE 查询
 func NewUpdater[T any](sess Session) *Updater[T] {
 	return &Updater[T]{
-		builder: builder{
-			core:   sess.getCore(),
-			buffer: bytebufferpool.Get(),
+		updaterBuilder: updaterBuilder{
+			builder: builder{
+				core:   sess.getCore(),
+				buffer: bytebufferpool.Get(),
+			},
 		},
 		Session: sess,
 	}
