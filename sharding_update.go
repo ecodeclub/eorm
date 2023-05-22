@@ -16,8 +16,11 @@ package eorm
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"sync"
+
+	"go.uber.org/multierr"
 
 	"github.com/ecodeclub/ekit/mapx"
 	"github.com/ecodeclub/eorm/internal/errs"
@@ -28,7 +31,7 @@ import (
 type ShardingUpdater[T any] struct {
 	table *T
 	lock  sync.Mutex
-	Session
+	db    Session
 	shardingUpdaterBuilder
 }
 
@@ -39,7 +42,7 @@ func NewShardingUpdater[T any](sess Session) *ShardingUpdater[T] {
 	b.buffer = bytebufferpool.Get()
 	return &ShardingUpdater[T]{
 		shardingUpdaterBuilder: b,
-		Session:                sess,
+		db:                     sess,
 	}
 }
 
@@ -273,4 +276,33 @@ func (s *ShardingUpdater[T]) SkipNilValue() *ShardingUpdater[T] {
 func (s *ShardingUpdater[T]) SkipZeroValue() *ShardingUpdater[T] {
 	s.ignoreZeroVal = true
 	return s
+}
+
+func (s *ShardingUpdater[T]) Exec(ctx context.Context) MultiExecRes {
+	qs, err := s.Build(ctx)
+	if err != nil {
+		return MultiExecRes{
+			err: err,
+		}
+	}
+	errList := make([]error, len(qs))
+	resList := make([]sql.Result, len(qs))
+	var wg sync.WaitGroup
+	wg.Add(len(qs))
+	for idx, q := range qs {
+		go func(idx int, q Query) {
+			defer func() {
+				s.lock.Unlock()
+				wg.Done()
+			}()
+			res, err := s.db.execContext(ctx, q)
+			s.lock.Lock()
+			errList[idx] = err
+			resList[idx] = res
+		}(idx, q)
+	}
+	wg.Wait()
+	shardingRes := NewMultiExecRes(resList)
+	shardingRes.err = multierr.Combine(errList...)
+	return shardingRes
 }
