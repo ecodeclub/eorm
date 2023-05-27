@@ -63,7 +63,6 @@ func (s *ShardingUpdater[T]) Where(predicates ...Predicate) *ShardingUpdater[T] 
 
 // Build returns UPDATE []sharding.Query
 func (s *ShardingUpdater[T]) Build(ctx context.Context) ([]sharding.Query, error) {
-	//t := new(T)
 	if s.table == nil {
 		s.table = new(T)
 	}
@@ -278,7 +277,7 @@ func (s *ShardingUpdater[T]) Exec(ctx context.Context) sharding.Result {
 	var wg sync.WaitGroup
 	wg.Add(len(qs))
 	for idx, q := range qs {
-		fmt.Println(q.String())
+		// fmt.Println(q.String())
 		go func(idx int, q Query) {
 			defer wg.Done()
 			res, err := s.db.execContext(ctx, q)
