@@ -44,13 +44,13 @@ func (h *ShadowHash) Broadcast(ctx context.Context) []sharding.Dst {
 	return res
 }
 
-func (h *ShadowHash) Sharding(ctx context.Context, req sharding.Request) (sharding.Result, error) {
+func (h *ShadowHash) Sharding(ctx context.Context, req sharding.Request) (sharding.Response, error) {
 	if h.ShardingKey == "" {
-		return sharding.EmptyResult, errs.ErrMissingShardingKey
+		return sharding.EmptyResp, errs.ErrMissingShardingKey
 	}
 	skVal, ok := req.SkValues[h.ShardingKey]
 	if !ok {
-		return sharding.Result{Dsts: h.Broadcast(ctx)}, nil
+		return sharding.Response{Dsts: h.Broadcast(ctx)}, nil
 	}
 	dbName := h.DBPattern.Name
 	if !h.DBPattern.NotSharding && strings.Contains(dbName, "%d") {
@@ -75,7 +75,7 @@ func (h *ShadowHash) Sharding(ctx context.Context, req sharding.Request) (shardi
 		tbName = h.Prefix + tbName
 	}
 
-	return sharding.Result{
+	return sharding.Response{
 		Dsts: []sharding.Dst{{Name: dsName, DB: dbName, Table: tbName}},
 	}, nil
 }

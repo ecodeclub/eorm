@@ -141,15 +141,6 @@ func TestUpdater_Set(t *testing.T) {
 }
 
 func TestUpdater_SetForCombination(t *testing.T) {
-	type Person struct {
-		FirstName string
-		Age       int8
-		LastName  *sql.NullString
-	}
-	type User struct {
-		Id int64 `eorm:"auto_increment,primary_key"`
-		Person
-	}
 	u := &User{
 		Id: 12,
 		Person: Person{
@@ -351,4 +342,14 @@ func ExampleUpdater_SkipZeroValue() {
 	// Output:
 	// SQL: UPDATE `test_model` SET `id`=?;
 	// Args: []interface {}{13}
+}
+
+type Person struct {
+	FirstName string
+	Age       int8
+	LastName  *sql.NullString
+}
+type User struct {
+	Id int64 `eorm:"auto_increment,primary_key"`
+	Person
 }

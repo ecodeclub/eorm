@@ -75,7 +75,7 @@ func (s *ShardingUpdater[T]) Build(ctx context.Context) ([]sharding.Query, error
 		}
 	}
 
-	shardingRes, err := s.findDst(ctx)
+	shardingRes, err := s.findDst(ctx, s.where...)
 	if err != nil {
 		return nil, err
 	}
@@ -142,7 +142,6 @@ func (s *ShardingUpdater[T]) buildQuery(db, tbl string) error {
 	var err error
 
 	s.val = s.valCreator.NewPrimitiveValue(s.table, s.meta)
-	s.args = make([]interface{}, 0, len(s.meta.Columns))
 
 	s.writeString("UPDATE ")
 	s.quote(db)
@@ -170,20 +169,6 @@ func (s *ShardingUpdater[T]) buildQuery(db, tbl string) error {
 	return nil
 }
 
-func (s *ShardingUpdater[T]) findDst(ctx context.Context) (sharding.Result, error) {
-	if len(s.where) > 0 {
-		pre := s.where[0]
-		for i := 1; i < len(s.where)-1; i++ {
-			pre = pre.And(s.where[i])
-		}
-		return s.findDstByPredicate(ctx, pre)
-	}
-	res := sharding.Result{
-		Dsts: s.meta.ShardingAlgorithm.Broadcast(ctx),
-	}
-	return res, nil
-}
-
 func (s *ShardingUpdater[T]) buildAssigns() error {
 	has := false
 	shardingKey := s.meta.ShardingAlgorithm.ShardingKeys()[0]
@@ -200,7 +185,10 @@ func (s *ShardingUpdater[T]) buildAssigns() error {
 			if !ok {
 				return errs.NewInvalidFieldError(a.name)
 			}
-			refVal, _ := s.val.Field(a.name)
+			refVal, err := s.val.Field(a.name)
+			if err != nil {
+				return err
+			}
 			s.quote(c.ColumnName)
 			_ = s.buffer.WriteByte('=')
 			s.parameter(refVal.Interface())
@@ -214,7 +202,10 @@ func (s *ShardingUpdater[T]) buildAssigns() error {
 				if !ok {
 					return errs.NewInvalidFieldError(name)
 				}
-				refVal, _ := s.val.Field(name)
+				refVal, err := s.val.Field(name)
+				if err != nil {
+					return err
+				}
 				if has {
 					s.comma()
 				}
@@ -238,7 +229,6 @@ func (s *ShardingUpdater[T]) buildAssigns() error {
 	return nil
 }
 
-// 如果不允许修改 sk， 是否就可以强制用户输入目标列，从而舍弃 buildDefaultColumns ？？
 func (s *ShardingUpdater[T]) buildDefaultColumns() error {
 	has := false
 	shardingKey := s.meta.ShardingAlgorithm.ShardingKeys()[0]
@@ -278,31 +268,27 @@ func (s *ShardingUpdater[T]) SkipZeroValue() *ShardingUpdater[T] {
 	return s
 }
 
-func (s *ShardingUpdater[T]) Exec(ctx context.Context) MultiExecRes {
+func (s *ShardingUpdater[T]) Exec(ctx context.Context) sharding.Result {
 	qs, err := s.Build(ctx)
 	if err != nil {
-		return MultiExecRes{
-			err: err,
-		}
+		return sharding.Result{}.SetErr(err)
 	}
 	errList := make([]error, len(qs))
 	resList := make([]sql.Result, len(qs))
 	var wg sync.WaitGroup
 	wg.Add(len(qs))
 	for idx, q := range qs {
+		fmt.Println(q.String())
 		go func(idx int, q Query) {
-			defer func() {
-				s.lock.Unlock()
-				wg.Done()
-			}()
+			defer wg.Done()
 			res, err := s.db.execContext(ctx, q)
 			s.lock.Lock()
 			errList[idx] = err
 			resList[idx] = res
+			s.lock.Unlock()
 		}(idx, q)
 	}
 	wg.Wait()
-	shardingRes := NewMultiExecRes(resList)
-	shardingRes.err = multierr.Combine(errList...)
-	return shardingRes
+	shardingRes := sharding.NewResult(resList)
+	return shardingRes.SetErr(multierr.Combine(errList...))
 }

@@ -21,12 +21,12 @@ import (
 	"github.com/ecodeclub/eorm/internal/query"
 )
 
-var EmptyResult = Result{}
+var EmptyResp = Response{}
 var EmptyQuery = Query{}
 
 type Algorithm interface {
 	// Sharding 返回分库分表之后目标库和目标表信息
-	Sharding(ctx context.Context, req Request) (Result, error)
+	Sharding(ctx context.Context, req Request) (Response, error)
 	// Broadcast 返回所有的目标库、目标表
 	Broadcast(ctx context.Context) []Dst
 	// ShardingKeys 返回所有的 sharding key
@@ -35,16 +35,17 @@ type Algorithm interface {
 	ShardingKeys() []string
 }
 
+// Executor sql 语句执行器
+type Executor interface {
+	Exec(ctx context.Context) Result
+}
+
 // QueryBuilder  sharding sql 构造抽象
 type QueryBuilder interface {
 	Build(ctx context.Context) ([]Query, error)
 }
 
 type Query = query.Query
-
-type Result struct {
-	Dsts []Dst
-}
 
 type Dst struct {
 	Name  string
@@ -63,4 +64,8 @@ func (r Dst) NotEquals(l Dst) bool {
 type Request struct {
 	Op       operator.Op
 	SkValues map[string]any
+}
+
+type Response struct {
+	Dsts []Dst
 }

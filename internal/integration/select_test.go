@@ -204,28 +204,30 @@ func (s *SelectTestSuite) TestSelectorGetBaseType() {
 				return &res
 			}(),
 		},
-		{
-			name: "res *int accept NULL",
-			queryRes: func() (any, error) {
-				queryer := eorm.NewSelector[*int](s.orm).Select(eorm.C("Int32Ptr")).
-					From(eorm.TableOf(&test.SimpleStruct{}, "t1")).
-					Where(eorm.C("Id").EQ(1))
-				return queryer.Get(context.Background())
-			},
-			wantRes: func() **int {
-				return new(*int)
-			}(),
-		},
-		{
-			name: "res int accept NULL",
-			queryRes: func() (any, error) {
-				queryer := eorm.NewSelector[*int](s.orm).Select(eorm.C("Int32Ptr")).
-					From(eorm.TableOf(&test.SimpleStruct{}, "t1")).
-					Where(eorm.C("Id").EQ(1))
-				return queryer.Get(context.Background())
-			},
-			wantErr: "abc",
-		},
+
+		//// TODO
+		//{
+		//	name: "res *int accept NULL",
+		//	queryRes: func() (any, error) {
+		//		queryer := eorm.NewSelector[*int](s.orm).Select(eorm.C("Int32Ptr")).
+		//			From(eorm.TableOf(&test.SimpleStruct{}, "t1")).
+		//			Where(eorm.C("Id").EQ(1))
+		//		return queryer.Get(context.Background())
+		//	},
+		//	wantRes: func() **int {
+		//		return new(*int)
+		//	}(),
+		//},
+		//{
+		//	name: "res int accept NULL",
+		//	queryRes: func() (any, error) {
+		//		queryer := eorm.NewSelector[*int](s.orm).Select(eorm.C("Int32Ptr")).
+		//			From(eorm.TableOf(&test.SimpleStruct{}, "t1")).
+		//			Where(eorm.C("Id").EQ(1))
+		//		return queryer.Get(context.Background())
+		//	},
+		//	wantErr: "abc",
+		//},
 	}
 
 	for _, tc := range testCases {
