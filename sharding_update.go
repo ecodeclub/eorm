@@ -22,7 +22,6 @@ import (
 
 	"go.uber.org/multierr"
 
-	"github.com/ecodeclub/ekit/mapx"
 	"github.com/ecodeclub/eorm/internal/errs"
 	"github.com/ecodeclub/eorm/internal/sharding"
 	"github.com/valyala/bytebufferpool"
@@ -73,71 +72,26 @@ func (s *ShardingUpdater[T]) Build(ctx context.Context) ([]sharding.Query, error
 			return nil, err
 		}
 	}
-
 	shardingRes, err := s.findDst(ctx, s.where...)
 	if err != nil {
 		return nil, err
 	}
 
-	dsDBMap, err := mapx.NewTreeMap[sharding.Dst, *mapx.TreeMap[sharding.Dst, []*T]](sharding.CompareDSDB)
-	if err != nil {
-		return nil, err
-	}
-
+	res := make([]sharding.Query, 0, len(shardingRes.Dsts))
+	defer bytebufferpool.Put(s.buffer)
 	for _, dst := range shardingRes.Dsts {
-		dsDBVal, ok := dsDBMap.Get(dst)
-		if !ok {
-			dsDBVal, err = mapx.NewTreeMap[sharding.Dst, []*T](sharding.CompareDSDBTab)
-			if err != nil {
-				return nil, err
-			}
-			err = dsDBVal.Put(dst, []*T{s.table})
-			if err != nil {
-				return nil, err
-			}
-		} else {
-			valList, _ := dsDBVal.Get(dst)
-			valList = append(valList, s.table)
-			err = dsDBVal.Put(dst, valList)
-			if err != nil {
-				return nil, err
-			}
-		}
-		err = dsDBMap.Put(dst, dsDBVal)
+		q, err := s.buildQuery(dst.DB, dst.Table, dst.Name)
 		if err != nil {
 			return nil, err
 		}
-	}
-
-	// 针对每一个目标库，生成一个 update 语句
-	dsDBKeys := dsDBMap.Keys()
-	res := make([]sharding.Query, 0, len(dsDBKeys))
-	defer bytebufferpool.Put(s.buffer)
-	for _, dsDBKey := range dsDBKeys {
-		ds := dsDBKey.Name
-		db := dsDBKey.DB
-		dsDBVal, _ := dsDBMap.Get(dsDBKey)
-		for _, dsDBTabKey := range dsDBVal.Keys() {
-			err = s.buildQuery(db, dsDBTabKey.Table)
-			if err != nil {
-				return nil, err
-			}
-		}
-		res = append(res, sharding.Query{
-			SQL:        s.buffer.String(),
-			Args:       s.args,
-			DB:         db,
-			Datasource: ds,
-		})
+		res = append(res, q)
 		s.args = nil
 		s.buffer.Reset()
 	}
-
 	return res, nil
-
 }
 
-func (s *ShardingUpdater[T]) buildQuery(db, tbl string) error {
+func (s *ShardingUpdater[T]) buildQuery(db, tbl, ds string) (sharding.Query, error) {
 	var err error
 
 	s.val = s.valCreator.NewPrimitiveValue(s.table, s.meta)
@@ -153,19 +107,19 @@ func (s *ShardingUpdater[T]) buildQuery(db, tbl string) error {
 		err = s.buildAssigns()
 	}
 	if err != nil {
-		return err
+		return sharding.EmptyQuery, err
 	}
 
 	if len(s.where) > 0 {
 		s.writeString(" WHERE ")
 		err = s.buildPredicates(s.where)
 		if err != nil {
-			return err
+			return sharding.EmptyQuery, err
 		}
 	}
 	s.end()
 
-	return nil
+	return sharding.Query{SQL: s.buffer.String(), Args: s.args, Datasource: ds, DB: db}, nil
 }
 
 func (s *ShardingUpdater[T]) buildAssigns() error {

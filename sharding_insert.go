@@ -19,6 +19,7 @@ import (
 	"database/sql"
 	"errors"
 	"reflect"
+	"strings"
 	"sync"
 
 	"github.com/ecodeclub/ekit/mapx"
@@ -56,7 +57,7 @@ func (si *ShardingInserter[T]) Build(ctx context.Context) ([]sharding.Query, err
 		return nil, err
 	}
 
-	dsDBMap, err := mapx.NewTreeMap[sharding.Dst, *mapx.TreeMap[sharding.Dst, []*T]](sharding.CompareDSDB)
+	dsDBMap, err := mapx.NewTreeMap[key, *mapx.TreeMap[key, []*T]](compareDSDB)
 	if err != nil {
 		return nil, err
 	}
@@ -69,25 +70,25 @@ func (si *ShardingInserter[T]) Build(ctx context.Context) ([]sharding.Query, err
 		if len(dst.Dsts) != 1 {
 			return nil, errs.ErrInsertFindingDst
 		}
-		dsDBVal, ok := dsDBMap.Get(dst.Dsts[0])
+		dsDBVal, ok := dsDBMap.Get(key{dst.Dsts[0]})
 		if !ok {
-			dsDBVal, err = mapx.NewTreeMap[sharding.Dst, []*T](sharding.CompareDSDBTab)
+			dsDBVal, err = mapx.NewTreeMap[key, []*T](compareDSDBTab)
 			if err != nil {
 				return nil, err
 			}
-			err = dsDBVal.Put(dst.Dsts[0], []*T{value})
+			err = dsDBVal.Put(key{dst.Dsts[0]}, []*T{value})
 			if err != nil {
 				return nil, err
 			}
 		} else {
-			valList, _ := dsDBVal.Get(dst.Dsts[0])
+			valList, _ := dsDBVal.Get(key{dst.Dsts[0]})
 			valList = append(valList, value)
-			err = dsDBVal.Put(dst.Dsts[0], valList)
+			err = dsDBVal.Put(key{dst.Dsts[0]}, valList)
 			if err != nil {
 				return nil, err
 			}
 		}
-		err = dsDBMap.Put(dst.Dsts[0], dsDBVal)
+		err = dsDBMap.Put(key{dst.Dsts[0]}, dsDBVal)
 		if err != nil {
 			return nil, err
 		}
@@ -249,17 +250,42 @@ func (si *ShardingInserter[T]) Exec(ctx context.Context) sharding.Result {
 	wg.Add(len(qs))
 	for idx, q := range qs {
 		go func(idx int, q Query) {
-			defer func() {
-				si.lock.Unlock()
-				wg.Done()
-			}()
+			defer wg.Done()
 			res, err := si.db.execContext(ctx, q)
 			si.lock.Lock()
 			errList[idx] = err
 			resList[idx] = res
+			si.lock.Unlock()
 		}(idx, q)
 	}
 	wg.Wait()
 	shardingRes := sharding.NewResult(resList)
 	return shardingRes.SetErr(multierr.Combine(errList...))
+}
+
+type key struct {
+	sharding.Dst
+}
+
+func compareDSDBTab(i, j key) int {
+	strI := strings.Join([]string{i.Name, i.DB, i.Table}, "")
+	strJ := strings.Join([]string{j.Name, j.DB, j.Table}, "")
+	if strI < strJ {
+		return -1
+	} else if strI == strJ {
+		return 0
+	}
+	return 1
+
+}
+
+func compareDSDB(i, j key) int {
+	strI := strings.Join([]string{i.Name, i.DB}, "")
+	strJ := strings.Join([]string{j.Name, j.DB}, "")
+	if strI < strJ {
+		return -1
+	} else if strI == strJ {
+		return 0
+	}
+	return 1
 }

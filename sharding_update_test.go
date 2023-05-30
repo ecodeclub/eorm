@@ -21,31 +21,33 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/ecodeclub/eorm/internal/errs"
-	"github.com/stretchr/testify/suite"
 	"go.uber.org/multierr"
 
+	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/ecodeclub/eorm/internal/datasource"
 	"github.com/ecodeclub/eorm/internal/datasource/cluster"
 	"github.com/ecodeclub/eorm/internal/datasource/masterslave"
 	"github.com/ecodeclub/eorm/internal/datasource/shardingsource"
+	"github.com/ecodeclub/eorm/internal/errs"
 	"github.com/ecodeclub/eorm/internal/model"
 	"github.com/ecodeclub/eorm/internal/sharding"
 	"github.com/ecodeclub/eorm/internal/sharding/hash"
+	_ "github.com/go-sql-driver/mysql"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 )
 
 func TestShardingUpdater_Build(t *testing.T) {
 	r := model.NewMetaRegistry()
 	dbBase, tableBase := 2, 3
+	orderDBPattern, orderTablePattern := "order_db_%d", "order_tab_%d"
 	dsPattern := "0.db.cluster.company.com:3306"
 	_, err := r.Register(&Order{},
 		model.WithTableShardingAlgorithm(&hash.Hash{
 			ShardingKey:  "UserId",
-			DBPattern:    &hash.Pattern{Name: "order_db_%d", Base: dbBase},
-			TablePattern: &hash.Pattern{Name: "order_tab_%d", Base: tableBase},
+			DBPattern:    &hash.Pattern{Name: orderDBPattern, Base: dbBase},
+			TablePattern: &hash.Pattern{Name: orderTablePattern, Base: tableBase},
 			DsPattern:    &hash.Pattern{Name: dsPattern, NotSharding: true},
 		}))
 	require.NoError(t, err)
@@ -100,21 +102,24 @@ func TestShardingUpdater_Build(t *testing.T) {
 			name: "not where",
 			builder: NewShardingUpdater[Order](shardingDB).Update(&Order{
 				Content: "1", Account: 1.0,
-			}).Set(Columns("Content", "Account")),
-			wantQs: []sharding.Query{
-				{
-					SQL:        fmt.Sprintf("UPDATE %s.%s SET `content`=?,`account`=?;UPDATE %s.%s SET `content`=?,`account`=?;UPDATE %s.%s SET `content`=?,`account`=?;", "`order_db_1`", "`order_tab_0`", "`order_db_1`", "`order_tab_1`", "`order_db_1`", "`order_tab_2`"),
-					Args:       []any{"1", 1.0, "1", 1.0, "1", 1.0},
-					DB:         "order_db_1",
-					Datasource: "0.db.cluster.company.com:3306",
-				},
-				{
-					SQL:        fmt.Sprintf("UPDATE %s.%s SET `content`=?,`account`=?;UPDATE %s.%s SET `content`=?,`account`=?;UPDATE %s.%s SET `content`=?,`account`=?;", "`order_db_0`", "`order_tab_0`", "`order_db_0`", "`order_tab_1`", "`order_db_0`", "`order_tab_2`"),
-					Args:       []any{"1", 1.0, "1", 1.0, "1", 1.0},
-					DB:         "order_db_0",
-					Datasource: "0.db.cluster.company.com:3306",
-				},
-			},
+			}).Set(C("Content"), C("Account")),
+			wantQs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "UPDATE `%s`.`%s` SET `content`=?,`account`=?;"
+				for i := 0; i < dbBase; i++ {
+					dbName := fmt.Sprintf(orderDBPattern, i)
+					for j := 0; j < tableBase; j++ {
+						tableName := fmt.Sprintf(orderTablePattern, j)
+						res = append(res, sharding.Query{
+							SQL:        fmt.Sprintf(sql, dbName, tableName),
+							Args:       []any{"1", 1.0},
+							DB:         dbName,
+							Datasource: dsPattern,
+						})
+					}
+				}
+				return res
+			}(),
 		},
 		{
 			name: "where eq ignore zero val",
@@ -171,20 +176,37 @@ func TestShardingUpdater_Build(t *testing.T) {
 				Content: "1", Account: 1.0,
 			}).Set(Columns("Content", "Account")).
 				Where(C("UserId").EQ(123).Or(C("OrderId").EQ(int64(2)))),
-			wantQs: []sharding.Query{
-				{
-					SQL:        fmt.Sprintf("UPDATE %s.%s SET `content`=?,`account`=? WHERE (`user_id`=?) OR (`order_id`=?);UPDATE %s.%s SET `content`=?,`account`=? WHERE (`user_id`=?) OR (`order_id`=?);UPDATE %s.%s SET `content`=?,`account`=? WHERE (`user_id`=?) OR (`order_id`=?);", "`order_db_1`", "`order_tab_0`", "`order_db_1`", "`order_tab_1`", "`order_db_1`", "`order_tab_2`"),
-					Args:       []any{"1", 1.0, 123, int64(2), "1", 1.0, 123, int64(2), "1", 1.0, 123, int64(2)},
-					DB:         "order_db_1",
-					Datasource: "0.db.cluster.company.com:3306",
-				},
-				{
-					SQL:        fmt.Sprintf("UPDATE %s.%s SET `content`=?,`account`=? WHERE (`user_id`=?) OR (`order_id`=?);UPDATE %s.%s SET `content`=?,`account`=? WHERE (`user_id`=?) OR (`order_id`=?);UPDATE %s.%s SET `content`=?,`account`=? WHERE (`user_id`=?) OR (`order_id`=?);", "`order_db_0`", "`order_tab_0`", "`order_db_0`", "`order_tab_1`", "`order_db_0`", "`order_tab_2`"),
-					Args:       []any{"1", 1.0, 123, int64(2), "1", 1.0, 123, int64(2), "1", 1.0, 123, int64(2)},
-					DB:         "order_db_0",
-					Datasource: "0.db.cluster.company.com:3306",
-				},
-			},
+			//wantQs: []sharding.Query{
+			//	{
+			//		SQL:        fmt.Sprintf("UPDATE %s.%s SET `content`=?,`account`=? WHERE (`user_id`=?) OR (`order_id`=?);UPDATE %s.%s SET `content`=?,`account`=? WHERE (`user_id`=?) OR (`order_id`=?);UPDATE %s.%s SET `content`=?,`account`=? WHERE (`user_id`=?) OR (`order_id`=?);", "`order_db_1`", "`order_tab_0`", "`order_db_1`", "`order_tab_1`", "`order_db_1`", "`order_tab_2`"),
+			//		Args:       []any{"1", 1.0, 123, int64(2), "1", 1.0, 123, int64(2), "1", 1.0, 123, int64(2)},
+			//		DB:         "order_db_1",
+			//		Datasource: "0.db.cluster.company.com:3306",
+			//	},
+			//	{
+			//		SQL:        fmt.Sprintf("UPDATE %s.%s SET `content`=?,`account`=? WHERE (`user_id`=?) OR (`order_id`=?);UPDATE %s.%s SET `content`=?,`account`=? WHERE (`user_id`=?) OR (`order_id`=?);UPDATE %s.%s SET `content`=?,`account`=? WHERE (`user_id`=?) OR (`order_id`=?);", "`order_db_0`", "`order_tab_0`", "`order_db_0`", "`order_tab_1`", "`order_db_0`", "`order_tab_2`"),
+			//		Args:       []any{"1", 1.0, 123, int64(2), "1", 1.0, 123, int64(2), "1", 1.0, 123, int64(2)},
+			//		DB:         "order_db_0",
+			//		Datasource: "0.db.cluster.company.com:3306",
+			//	},
+			//},
+			wantQs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "UPDATE `%s`.`%s` SET `content`=?,`account`=? WHERE (`user_id`=?) OR (`order_id`=?);"
+				for i := 0; i < dbBase; i++ {
+					dbName := fmt.Sprintf(orderDBPattern, i)
+					for j := 0; j < tableBase; j++ {
+						tableName := fmt.Sprintf(orderTablePattern, j)
+						res = append(res, sharding.Query{
+							SQL:        fmt.Sprintf(sql, dbName, tableName),
+							Args:       []any{"1", 1.0, 123, int64(2)},
+							DB:         dbName,
+							Datasource: dsPattern,
+						})
+					}
+				}
+				return res
+			}(),
 		},
 		{
 			name: "where and empty",
@@ -238,20 +260,23 @@ func TestShardingUpdater_Build(t *testing.T) {
 				Content: "1", Account: 1.0,
 			}).Set(Columns("Content", "Account")).
 				Where(C("UserId").LT(123)),
-			wantQs: []sharding.Query{
-				{
-					SQL:        fmt.Sprintf("UPDATE %s.%s SET `content`=?,`account`=? WHERE `user_id`<?;UPDATE %s.%s SET `content`=?,`account`=? WHERE `user_id`<?;UPDATE %s.%s SET `content`=?,`account`=? WHERE `user_id`<?;", "`order_db_1`", "`order_tab_0`", "`order_db_1`", "`order_tab_1`", "`order_db_1`", "`order_tab_2`"),
-					Args:       []any{"1", 1.0, 123, "1", 1.0, 123, "1", 1.0, 123},
-					DB:         "order_db_1",
-					Datasource: "0.db.cluster.company.com:3306",
-				},
-				{
-					SQL:        fmt.Sprintf("UPDATE %s.%s SET `content`=?,`account`=? WHERE `user_id`<?;UPDATE %s.%s SET `content`=?,`account`=? WHERE `user_id`<?;UPDATE %s.%s SET `content`=?,`account`=? WHERE `user_id`<?;", "`order_db_0`", "`order_tab_0`", "`order_db_0`", "`order_tab_1`", "`order_db_0`", "`order_tab_2`"),
-					Args:       []any{"1", 1.0, 123, "1", 1.0, 123, "1", 1.0, 123},
-					DB:         "order_db_0",
-					Datasource: "0.db.cluster.company.com:3306",
-				},
-			},
+			wantQs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "UPDATE `%s`.`%s` SET `content`=?,`account`=? WHERE `user_id`<?;"
+				for i := 0; i < dbBase; i++ {
+					dbName := fmt.Sprintf(orderDBPattern, i)
+					for j := 0; j < tableBase; j++ {
+						tableName := fmt.Sprintf(orderTablePattern, j)
+						res = append(res, sharding.Query{
+							SQL:        fmt.Sprintf(sql, dbName, tableName),
+							Args:       []any{"1", 1.0, 123},
+							DB:         dbName,
+							Datasource: dsPattern,
+						})
+					}
+				}
+				return res
+			}(),
 		},
 		{
 			name: "where lt eq",
@@ -259,60 +284,69 @@ func TestShardingUpdater_Build(t *testing.T) {
 				Content: "1", Account: 1.0,
 			}).Set(Columns("Content", "Account")).
 				Where(C("UserId").LTEQ(123)),
-			wantQs: []sharding.Query{
-				{
-					SQL:        fmt.Sprintf("UPDATE %s.%s SET `content`=?,`account`=? WHERE `user_id`<=?;UPDATE %s.%s SET `content`=?,`account`=? WHERE `user_id`<=?;UPDATE %s.%s SET `content`=?,`account`=? WHERE `user_id`<=?;", "`order_db_1`", "`order_tab_0`", "`order_db_1`", "`order_tab_1`", "`order_db_1`", "`order_tab_2`"),
-					Args:       []any{"1", 1.0, 123, "1", 1.0, 123, "1", 1.0, 123},
-					DB:         "order_db_1",
-					Datasource: "0.db.cluster.company.com:3306",
-				},
-				{
-					SQL:        fmt.Sprintf("UPDATE %s.%s SET `content`=?,`account`=? WHERE `user_id`<=?;UPDATE %s.%s SET `content`=?,`account`=? WHERE `user_id`<=?;UPDATE %s.%s SET `content`=?,`account`=? WHERE `user_id`<=?;", "`order_db_0`", "`order_tab_0`", "`order_db_0`", "`order_tab_1`", "`order_db_0`", "`order_tab_2`"),
-					Args:       []any{"1", 1.0, 123, "1", 1.0, 123, "1", 1.0, 123},
-					DB:         "order_db_0",
-					Datasource: "0.db.cluster.company.com:3306",
-				},
-			},
+			wantQs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "UPDATE `%s`.`%s` SET `content`=?,`account`=? WHERE `user_id`<=?;"
+				for i := 0; i < dbBase; i++ {
+					dbName := fmt.Sprintf(orderDBPattern, i)
+					for j := 0; j < tableBase; j++ {
+						tableName := fmt.Sprintf(orderTablePattern, j)
+						res = append(res, sharding.Query{
+							SQL:        fmt.Sprintf(sql, dbName, tableName),
+							Args:       []any{"1", 1.0, 123},
+							DB:         dbName,
+							Datasource: dsPattern,
+						})
+					}
+				}
+				return res
+			}(),
 		},
 		{
 			name: "where gt",
 			builder: NewShardingUpdater[Order](shardingDB).Update(&Order{
 				Content: "1", Account: 1.0,
 			}).Set(Columns("Content", "Account")).Where(C("UserId").GT(123)),
-			wantQs: []sharding.Query{
-				{
-					SQL:        fmt.Sprintf("UPDATE %s.%s SET `content`=?,`account`=? WHERE `user_id`>?;UPDATE %s.%s SET `content`=?,`account`=? WHERE `user_id`>?;UPDATE %s.%s SET `content`=?,`account`=? WHERE `user_id`>?;", "`order_db_1`", "`order_tab_0`", "`order_db_1`", "`order_tab_1`", "`order_db_1`", "`order_tab_2`"),
-					Args:       []any{"1", 1.0, 123, "1", 1.0, 123, "1", 1.0, 123},
-					DB:         "order_db_1",
-					Datasource: "0.db.cluster.company.com:3306",
-				},
-				{
-					SQL:        fmt.Sprintf("UPDATE %s.%s SET `content`=?,`account`=? WHERE `user_id`>?;UPDATE %s.%s SET `content`=?,`account`=? WHERE `user_id`>?;UPDATE %s.%s SET `content`=?,`account`=? WHERE `user_id`>?;", "`order_db_0`", "`order_tab_0`", "`order_db_0`", "`order_tab_1`", "`order_db_0`", "`order_tab_2`"),
-					Args:       []any{"1", 1.0, 123, "1", 1.0, 123, "1", 1.0, 123},
-					DB:         "order_db_0",
-					Datasource: "0.db.cluster.company.com:3306",
-				},
-			},
+			wantQs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "UPDATE `%s`.`%s` SET `content`=?,`account`=? WHERE `user_id`>?;"
+				for i := 0; i < dbBase; i++ {
+					dbName := fmt.Sprintf(orderDBPattern, i)
+					for j := 0; j < tableBase; j++ {
+						tableName := fmt.Sprintf(orderTablePattern, j)
+						res = append(res, sharding.Query{
+							SQL:        fmt.Sprintf(sql, dbName, tableName),
+							Args:       []any{"1", 1.0, 123},
+							DB:         dbName,
+							Datasource: dsPattern,
+						})
+					}
+				}
+				return res
+			}(),
 		},
 		{
 			name: "where gt eq",
 			builder: NewShardingUpdater[Order](shardingDB).Update(&Order{
 				Content: "1", Account: 1.0,
 			}).Set(Columns("Content", "Account")).Where(C("UserId").GTEQ(123)),
-			wantQs: []sharding.Query{
-				{
-					SQL:        fmt.Sprintf("UPDATE %s.%s SET `content`=?,`account`=? WHERE `user_id`>=?;UPDATE %s.%s SET `content`=?,`account`=? WHERE `user_id`>=?;UPDATE %s.%s SET `content`=?,`account`=? WHERE `user_id`>=?;", "`order_db_1`", "`order_tab_0`", "`order_db_1`", "`order_tab_1`", "`order_db_1`", "`order_tab_2`"),
-					Args:       []any{"1", 1.0, 123, "1", 1.0, 123, "1", 1.0, 123},
-					DB:         "order_db_1",
-					Datasource: "0.db.cluster.company.com:3306",
-				},
-				{
-					SQL:        fmt.Sprintf("UPDATE %s.%s SET `content`=?,`account`=? WHERE `user_id`>=?;UPDATE %s.%s SET `content`=?,`account`=? WHERE `user_id`>=?;UPDATE %s.%s SET `content`=?,`account`=? WHERE `user_id`>=?;", "`order_db_0`", "`order_tab_0`", "`order_db_0`", "`order_tab_1`", "`order_db_0`", "`order_tab_2`"),
-					Args:       []any{"1", 1.0, 123, "1", 1.0, 123, "1", 1.0, 123},
-					DB:         "order_db_0",
-					Datasource: "0.db.cluster.company.com:3306",
-				},
-			},
+			wantQs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "UPDATE `%s`.`%s` SET `content`=?,`account`=? WHERE `user_id`>=?;"
+				for i := 0; i < dbBase; i++ {
+					dbName := fmt.Sprintf(orderDBPattern, i)
+					for j := 0; j < tableBase; j++ {
+						tableName := fmt.Sprintf(orderTablePattern, j)
+						res = append(res, sharding.Query{
+							SQL:        fmt.Sprintf(sql, dbName, tableName),
+							Args:       []any{"1", 1.0, 123},
+							DB:         dbName,
+							Datasource: dsPattern,
+						})
+					}
+				}
+				return res
+			}(),
 		},
 		{
 			name: "where eq and lt or gt",
@@ -321,20 +355,23 @@ func TestShardingUpdater_Build(t *testing.T) {
 			}).Set(Columns("Content", "Account")).
 				Where(C("UserId").EQ(12).And(C("UserId").
 					LT(133)).Or(C("UserId").GT(234))),
-			wantQs: []sharding.Query{
-				{
-					SQL:        fmt.Sprintf("UPDATE %s.%s SET `content`=?,`account`=? WHERE ((`user_id`=?) AND (`user_id`<?)) OR (`user_id`>?);UPDATE %s.%s SET `content`=?,`account`=? WHERE ((`user_id`=?) AND (`user_id`<?)) OR (`user_id`>?);UPDATE %s.%s SET `content`=?,`account`=? WHERE ((`user_id`=?) AND (`user_id`<?)) OR (`user_id`>?);", "`order_db_1`", "`order_tab_0`", "`order_db_1`", "`order_tab_1`", "`order_db_1`", "`order_tab_2`"),
-					Args:       []any{"1", 1.0, 12, 133, 234, "1", 1.0, 12, 133, 234, "1", 1.0, 12, 133, 234},
-					DB:         "order_db_1",
-					Datasource: "0.db.cluster.company.com:3306",
-				},
-				{
-					SQL:        fmt.Sprintf("UPDATE %s.%s SET `content`=?,`account`=? WHERE ((`user_id`=?) AND (`user_id`<?)) OR (`user_id`>?);UPDATE %s.%s SET `content`=?,`account`=? WHERE ((`user_id`=?) AND (`user_id`<?)) OR (`user_id`>?);UPDATE %s.%s SET `content`=?,`account`=? WHERE ((`user_id`=?) AND (`user_id`<?)) OR (`user_id`>?);", "`order_db_0`", "`order_tab_0`", "`order_db_0`", "`order_tab_1`", "`order_db_0`", "`order_tab_2`"),
-					Args:       []any{"1", 1.0, 12, 133, 234, "1", 1.0, 12, 133, 234, "1", 1.0, 12, 133, 234},
-					DB:         "order_db_0",
-					Datasource: "0.db.cluster.company.com:3306",
-				},
-			},
+			wantQs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "UPDATE `%s`.`%s` SET `content`=?,`account`=? WHERE ((`user_id`=?) AND (`user_id`<?)) OR (`user_id`>?);"
+				for i := 0; i < dbBase; i++ {
+					dbName := fmt.Sprintf(orderDBPattern, i)
+					for j := 0; j < tableBase; j++ {
+						tableName := fmt.Sprintf(orderTablePattern, j)
+						res = append(res, sharding.Query{
+							SQL:        fmt.Sprintf(sql, dbName, tableName),
+							Args:       []any{"1", 1.0, 12, 133, 234},
+							DB:         dbName,
+							Datasource: dsPattern,
+						})
+					}
+				}
+				return res
+			}(),
 		},
 		{
 			name: "where in",
@@ -380,13 +417,19 @@ func TestShardingUpdater_Build(t *testing.T) {
 				Where(C("UserId").In(12, 35, 101).Or(C("UserId").EQ(531))),
 			wantQs: []sharding.Query{
 				{
-					SQL:        fmt.Sprintf("UPDATE %s.%s SET `content`=?,`account`=? WHERE (`user_id` IN (?,?,?)) OR (`user_id`=?);UPDATE %s.%s SET `content`=?,`account`=? WHERE (`user_id` IN (?,?,?)) OR (`user_id`=?);", "`order_db_1`", "`order_tab_0`", "`order_db_1`", "`order_tab_2`"),
-					Args:       []any{"1", 1.0, 12, 35, 101, 531, "1", 1.0, 12, 35, 101, 531},
+					SQL:        "UPDATE `order_db_1`.`order_tab_2` SET `content`=?,`account`=? WHERE (`user_id` IN (?,?,?)) OR (`user_id`=?);",
+					Args:       []any{"1", 1.0, 12, 35, 101, 531},
 					DB:         "order_db_1",
 					Datasource: "0.db.cluster.company.com:3306",
 				},
 				{
-					SQL:        fmt.Sprintf("UPDATE %s.%s SET `content`=?,`account`=? WHERE (`user_id` IN (?,?,?)) OR (`user_id`=?);", "`order_db_0`", "`order_tab_0`"),
+					SQL:        "UPDATE `order_db_1`.`order_tab_0` SET `content`=?,`account`=? WHERE (`user_id` IN (?,?,?)) OR (`user_id`=?);",
+					Args:       []any{"1", 1.0, 12, 35, 101, 531},
+					DB:         "order_db_1",
+					Datasource: "0.db.cluster.company.com:3306",
+				},
+				{
+					SQL:        "UPDATE `order_db_0`.`order_tab_0` SET `content`=?,`account`=? WHERE (`user_id` IN (?,?,?)) OR (`user_id`=?);",
 					Args:       []any{"1", 1.0, 12, 35, 101, 531},
 					DB:         "order_db_0",
 					Datasource: "0.db.cluster.company.com:3306",
@@ -399,20 +442,23 @@ func TestShardingUpdater_Build(t *testing.T) {
 				Update(&Order{Content: "1", Account: 1.0}).
 				Set(Columns("Content", "Account")).
 				Where(C("UserId").NotIn(12, 35, 101)),
-			wantQs: []sharding.Query{
-				{
-					SQL:        fmt.Sprintf("UPDATE %s.%s SET `content`=?,`account`=? WHERE `user_id` NOT IN (?,?,?);UPDATE %s.%s SET `content`=?,`account`=? WHERE `user_id` NOT IN (?,?,?);UPDATE %s.%s SET `content`=?,`account`=? WHERE `user_id` NOT IN (?,?,?);", "`order_db_1`", "`order_tab_0`", "`order_db_1`", "`order_tab_1`", "`order_db_1`", "`order_tab_2`"),
-					Args:       []any{"1", 1.0, 12, 35, 101, "1", 1.0, 12, 35, 101, "1", 1.0, 12, 35, 101},
-					DB:         "order_db_1",
-					Datasource: "0.db.cluster.company.com:3306",
-				},
-				{
-					SQL:        fmt.Sprintf("UPDATE %s.%s SET `content`=?,`account`=? WHERE `user_id` NOT IN (?,?,?);UPDATE %s.%s SET `content`=?,`account`=? WHERE `user_id` NOT IN (?,?,?);UPDATE %s.%s SET `content`=?,`account`=? WHERE `user_id` NOT IN (?,?,?);", "`order_db_0`", "`order_tab_0`", "`order_db_0`", "`order_tab_1`", "`order_db_0`", "`order_tab_2`"),
-					Args:       []any{"1", 1.0, 12, 35, 101, "1", 1.0, 12, 35, 101, "1", 1.0, 12, 35, 101},
-					DB:         "order_db_0",
-					Datasource: "0.db.cluster.company.com:3306",
-				},
-			},
+			wantQs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "UPDATE `%s`.`%s` SET `content`=?,`account`=? WHERE `user_id` NOT IN (?,?,?);"
+				for i := 0; i < dbBase; i++ {
+					dbName := fmt.Sprintf(orderDBPattern, i)
+					for j := 0; j < tableBase; j++ {
+						tableName := fmt.Sprintf(orderTablePattern, j)
+						res = append(res, sharding.Query{
+							SQL:        fmt.Sprintf(sql, dbName, tableName),
+							Args:       []any{"1", 1.0, 12, 35, 101},
+							DB:         dbName,
+							Datasource: dsPattern,
+						})
+					}
+				}
+				return res
+			}(),
 		},
 		{
 			name: "where not gt",
@@ -420,20 +466,23 @@ func TestShardingUpdater_Build(t *testing.T) {
 				Update(&Order{Content: "1", Account: 1.0}).
 				Set(Columns("Content", "Account")).
 				Where(Not(C("UserId").GT(101))),
-			wantQs: []sharding.Query{
-				{
-					SQL:        fmt.Sprintf("UPDATE %s.%s SET `content`=?,`account`=? WHERE NOT (`user_id`>?);UPDATE %s.%s SET `content`=?,`account`=? WHERE NOT (`user_id`>?);UPDATE %s.%s SET `content`=?,`account`=? WHERE NOT (`user_id`>?);", "`order_db_1`", "`order_tab_0`", "`order_db_1`", "`order_tab_1`", "`order_db_1`", "`order_tab_2`"),
-					Args:       []any{"1", 1.0, 101, "1", 1.0, 101, "1", 1.0, 101},
-					DB:         "order_db_1",
-					Datasource: "0.db.cluster.company.com:3306",
-				},
-				{
-					SQL:        fmt.Sprintf("UPDATE %s.%s SET `content`=?,`account`=? WHERE NOT (`user_id`>?);UPDATE %s.%s SET `content`=?,`account`=? WHERE NOT (`user_id`>?);UPDATE %s.%s SET `content`=?,`account`=? WHERE NOT (`user_id`>?);", "`order_db_0`", "`order_tab_0`", "`order_db_0`", "`order_tab_1`", "`order_db_0`", "`order_tab_2`"),
-					Args:       []any{"1", 1.0, 101, "1", 1.0, 101, "1", 1.0, 101},
-					DB:         "order_db_0",
-					Datasource: "0.db.cluster.company.com:3306",
-				},
-			},
+			wantQs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "UPDATE `%s`.`%s` SET `content`=?,`account`=? WHERE NOT (`user_id`>?);"
+				for i := 0; i < dbBase; i++ {
+					dbName := fmt.Sprintf(orderDBPattern, i)
+					for j := 0; j < tableBase; j++ {
+						tableName := fmt.Sprintf(orderTablePattern, j)
+						res = append(res, sharding.Query{
+							SQL:        fmt.Sprintf(sql, dbName, tableName),
+							Args:       []any{"1", 1.0, 101},
+							DB:         dbName,
+							Datasource: dsPattern,
+						})
+					}
+				}
+				return res
+			}(),
 		},
 		{
 			name: "where not lt",
@@ -441,20 +490,23 @@ func TestShardingUpdater_Build(t *testing.T) {
 				Update(&Order{Content: "1", Account: 1.0}).
 				Set(Columns("Content", "Account")).
 				Where(Not(C("UserId").LT(101))),
-			wantQs: []sharding.Query{
-				{
-					SQL:        fmt.Sprintf("UPDATE %s.%s SET `content`=?,`account`=? WHERE NOT (`user_id`<?);UPDATE %s.%s SET `content`=?,`account`=? WHERE NOT (`user_id`<?);UPDATE %s.%s SET `content`=?,`account`=? WHERE NOT (`user_id`<?);", "`order_db_1`", "`order_tab_0`", "`order_db_1`", "`order_tab_1`", "`order_db_1`", "`order_tab_2`"),
-					Args:       []any{"1", 1.0, 101, "1", 1.0, 101, "1", 1.0, 101},
-					DB:         "order_db_1",
-					Datasource: "0.db.cluster.company.com:3306",
-				},
-				{
-					SQL:        fmt.Sprintf("UPDATE %s.%s SET `content`=?,`account`=? WHERE NOT (`user_id`<?);UPDATE %s.%s SET `content`=?,`account`=? WHERE NOT (`user_id`<?);UPDATE %s.%s SET `content`=?,`account`=? WHERE NOT (`user_id`<?);", "`order_db_0`", "`order_tab_0`", "`order_db_0`", "`order_tab_1`", "`order_db_0`", "`order_tab_2`"),
-					Args:       []any{"1", 1.0, 101, "1", 1.0, 101, "1", 1.0, 101},
-					DB:         "order_db_0",
-					Datasource: "0.db.cluster.company.com:3306",
-				},
-			},
+			wantQs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "UPDATE `%s`.`%s` SET `content`=?,`account`=? WHERE NOT (`user_id`<?);"
+				for i := 0; i < dbBase; i++ {
+					dbName := fmt.Sprintf(orderDBPattern, i)
+					for j := 0; j < tableBase; j++ {
+						tableName := fmt.Sprintf(orderTablePattern, j)
+						res = append(res, sharding.Query{
+							SQL:        fmt.Sprintf(sql, dbName, tableName),
+							Args:       []any{"1", 1.0, 101},
+							DB:         dbName,
+							Datasource: dsPattern,
+						})
+					}
+				}
+				return res
+			}(),
 		},
 		{
 			name: "where not gt eq",
@@ -462,20 +514,23 @@ func TestShardingUpdater_Build(t *testing.T) {
 				Update(&Order{Content: "1", Account: 1.0}).
 				Set(Columns("Content", "Account")).
 				Where(Not(C("UserId").GTEQ(101))),
-			wantQs: []sharding.Query{
-				{
-					SQL:        fmt.Sprintf("UPDATE %s.%s SET `content`=?,`account`=? WHERE NOT (`user_id`>=?);UPDATE %s.%s SET `content`=?,`account`=? WHERE NOT (`user_id`>=?);UPDATE %s.%s SET `content`=?,`account`=? WHERE NOT (`user_id`>=?);", "`order_db_1`", "`order_tab_0`", "`order_db_1`", "`order_tab_1`", "`order_db_1`", "`order_tab_2`"),
-					Args:       []any{"1", 1.0, 101, "1", 1.0, 101, "1", 1.0, 101},
-					DB:         "order_db_1",
-					Datasource: "0.db.cluster.company.com:3306",
-				},
-				{
-					SQL:        fmt.Sprintf("UPDATE %s.%s SET `content`=?,`account`=? WHERE NOT (`user_id`>=?);UPDATE %s.%s SET `content`=?,`account`=? WHERE NOT (`user_id`>=?);UPDATE %s.%s SET `content`=?,`account`=? WHERE NOT (`user_id`>=?);", "`order_db_0`", "`order_tab_0`", "`order_db_0`", "`order_tab_1`", "`order_db_0`", "`order_tab_2`"),
-					Args:       []any{"1", 1.0, 101, "1", 1.0, 101, "1", 1.0, 101},
-					DB:         "order_db_0",
-					Datasource: "0.db.cluster.company.com:3306",
-				},
-			},
+			wantQs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "UPDATE `%s`.`%s` SET `content`=?,`account`=? WHERE NOT (`user_id`>=?);"
+				for i := 0; i < dbBase; i++ {
+					dbName := fmt.Sprintf(orderDBPattern, i)
+					for j := 0; j < tableBase; j++ {
+						tableName := fmt.Sprintf(orderTablePattern, j)
+						res = append(res, sharding.Query{
+							SQL:        fmt.Sprintf(sql, dbName, tableName),
+							Args:       []any{"1", 1.0, 101},
+							DB:         dbName,
+							Datasource: dsPattern,
+						})
+					}
+				}
+				return res
+			}(),
 		},
 		{
 			name: "where not lt eq",
@@ -483,20 +538,23 @@ func TestShardingUpdater_Build(t *testing.T) {
 				Update(&Order{Content: "1", Account: 1.0}).
 				Set(Columns("Content", "Account")).
 				Where(Not(C("UserId").LTEQ(101))),
-			wantQs: []sharding.Query{
-				{
-					SQL:        fmt.Sprintf("UPDATE %s.%s SET `content`=?,`account`=? WHERE NOT (`user_id`<=?);UPDATE %s.%s SET `content`=?,`account`=? WHERE NOT (`user_id`<=?);UPDATE %s.%s SET `content`=?,`account`=? WHERE NOT (`user_id`<=?);", "`order_db_1`", "`order_tab_0`", "`order_db_1`", "`order_tab_1`", "`order_db_1`", "`order_tab_2`"),
-					Args:       []any{"1", 1.0, 101, "1", 1.0, 101, "1", 1.0, 101},
-					DB:         "order_db_1",
-					Datasource: "0.db.cluster.company.com:3306",
-				},
-				{
-					SQL:        fmt.Sprintf("UPDATE %s.%s SET `content`=?,`account`=? WHERE NOT (`user_id`<=?);UPDATE %s.%s SET `content`=?,`account`=? WHERE NOT (`user_id`<=?);UPDATE %s.%s SET `content`=?,`account`=? WHERE NOT (`user_id`<=?);", "`order_db_0`", "`order_tab_0`", "`order_db_0`", "`order_tab_1`", "`order_db_0`", "`order_tab_2`"),
-					Args:       []any{"1", 1.0, 101, "1", 1.0, 101, "1", 1.0, 101},
-					DB:         "order_db_0",
-					Datasource: "0.db.cluster.company.com:3306",
-				},
-			},
+			wantQs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "UPDATE `%s`.`%s` SET `content`=?,`account`=? WHERE NOT (`user_id`<=?);"
+				for i := 0; i < dbBase; i++ {
+					dbName := fmt.Sprintf(orderDBPattern, i)
+					for j := 0; j < tableBase; j++ {
+						tableName := fmt.Sprintf(orderTablePattern, j)
+						res = append(res, sharding.Query{
+							SQL:        fmt.Sprintf(sql, dbName, tableName),
+							Args:       []any{"1", 1.0, 101},
+							DB:         dbName,
+							Datasource: dsPattern,
+						})
+					}
+				}
+				return res
+			}(),
 		},
 		{
 			name: "where not eq",
@@ -504,20 +562,23 @@ func TestShardingUpdater_Build(t *testing.T) {
 				Update(&Order{Content: "1", Account: 1.0}).
 				Set(Columns("Content", "Account")).
 				Where(Not(C("UserId").EQ(101))),
-			wantQs: []sharding.Query{
-				{
-					SQL:        fmt.Sprintf("UPDATE %s.%s SET `content`=?,`account`=? WHERE NOT (`user_id`=?);UPDATE %s.%s SET `content`=?,`account`=? WHERE NOT (`user_id`=?);UPDATE %s.%s SET `content`=?,`account`=? WHERE NOT (`user_id`=?);", "`order_db_1`", "`order_tab_0`", "`order_db_1`", "`order_tab_1`", "`order_db_1`", "`order_tab_2`"),
-					Args:       []any{"1", 1.0, 101, "1", 1.0, 101, "1", 1.0, 101},
-					DB:         "order_db_1",
-					Datasource: "0.db.cluster.company.com:3306",
-				},
-				{
-					SQL:        fmt.Sprintf("UPDATE %s.%s SET `content`=?,`account`=? WHERE NOT (`user_id`=?);UPDATE %s.%s SET `content`=?,`account`=? WHERE NOT (`user_id`=?);UPDATE %s.%s SET `content`=?,`account`=? WHERE NOT (`user_id`=?);", "`order_db_0`", "`order_tab_0`", "`order_db_0`", "`order_tab_1`", "`order_db_0`", "`order_tab_2`"),
-					Args:       []any{"1", 1.0, 101, "1", 1.0, 101, "1", 1.0, 101},
-					DB:         "order_db_0",
-					Datasource: "0.db.cluster.company.com:3306",
-				},
-			},
+			wantQs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "UPDATE `%s`.`%s` SET `content`=?,`account`=? WHERE NOT (`user_id`=?);"
+				for i := 0; i < dbBase; i++ {
+					dbName := fmt.Sprintf(orderDBPattern, i)
+					for j := 0; j < tableBase; j++ {
+						tableName := fmt.Sprintf(orderTablePattern, j)
+						res = append(res, sharding.Query{
+							SQL:        fmt.Sprintf(sql, dbName, tableName),
+							Args:       []any{"1", 1.0, 101},
+							DB:         dbName,
+							Datasource: dsPattern,
+						})
+					}
+				}
+				return res
+			}(),
 		},
 		{
 			name: "where not neq",
@@ -540,20 +601,23 @@ func TestShardingUpdater_Build(t *testing.T) {
 				Update(&Order{Content: "1", Account: 1.0}).
 				Set(Columns("Content", "Account")).
 				Where(C("UserId").GTEQ(12).And(C("UserId").LTEQ(531))),
-			wantQs: []sharding.Query{
-				{
-					SQL:        fmt.Sprintf("UPDATE %s.%s SET `content`=?,`account`=? WHERE (`user_id`>=?) AND (`user_id`<=?);UPDATE %s.%s SET `content`=?,`account`=? WHERE (`user_id`>=?) AND (`user_id`<=?);UPDATE %s.%s SET `content`=?,`account`=? WHERE (`user_id`>=?) AND (`user_id`<=?);", "`order_db_1`", "`order_tab_0`", "`order_db_1`", "`order_tab_1`", "`order_db_1`", "`order_tab_2`"),
-					Args:       []any{"1", 1.0, 12, 531, "1", 1.0, 12, 531, "1", 1.0, 12, 531},
-					DB:         "order_db_1",
-					Datasource: "0.db.cluster.company.com:3306",
-				},
-				{
-					SQL:        fmt.Sprintf("UPDATE %s.%s SET `content`=?,`account`=? WHERE (`user_id`>=?) AND (`user_id`<=?);UPDATE %s.%s SET `content`=?,`account`=? WHERE (`user_id`>=?) AND (`user_id`<=?);UPDATE %s.%s SET `content`=?,`account`=? WHERE (`user_id`>=?) AND (`user_id`<=?);", "`order_db_0`", "`order_tab_0`", "`order_db_0`", "`order_tab_1`", "`order_db_0`", "`order_tab_2`"),
-					Args:       []any{"1", 1.0, 12, 531, "1", 1.0, 12, 531, "1", 1.0, 12, 531},
-					DB:         "order_db_0",
-					Datasource: "0.db.cluster.company.com:3306",
-				},
-			},
+			wantQs: func() []sharding.Query {
+				var res []sharding.Query
+				sql := "UPDATE `%s`.`%s` SET `content`=?,`account`=? WHERE (`user_id`>=?) AND (`user_id`<=?);"
+				for i := 0; i < dbBase; i++ {
+					dbName := fmt.Sprintf(orderDBPattern, i)
+					for j := 0; j < tableBase; j++ {
+						tableName := fmt.Sprintf(orderTablePattern, j)
+						res = append(res, sharding.Query{
+							SQL:        fmt.Sprintf(sql, dbName, tableName),
+							Args:       []any{"1", 1.0, 12, 531},
+							DB:         dbName,
+							Datasource: dsPattern,
+						})
+					}
+				}
+				return res
+			}(),
 		},
 	}
 	for _, tc := range testCases {
@@ -772,18 +836,18 @@ func (s *ShardingUpdaterSuite) TestShardingUpdater_Exec() {
 			wantAffectedRows: 1,
 		},
 		{
-			name: "where or broadcast",
+			name: "where or",
 			exec: NewShardingUpdater[Order](shardingDB).Update(&Order{
 				Content: "1", Account: 1.0,
 			}).Set(Columns("Content", "Account")).
-				Where(C("UserId").EQ(123).Or(C("OrderId").EQ(int64(2)))),
+				Where(C("UserId").EQ(123).Or(C("UserId").EQ(234))),
 			mockDB: func() {
-				s.mock02.ExpectExec(regexp.QuoteMeta("UPDATE `order_db_1`.`order_tab_0` SET `content`=?,`account`=? WHERE (`user_id`=?) OR (`order_id`=?);UPDATE `order_db_1`.`order_tab_1` SET `content`=?,`account`=? WHERE (`user_id`=?) OR (`order_id`=?);UPDATE `order_db_1`.`order_tab_2` SET `content`=?,`account`=? WHERE (`user_id`=?) OR (`order_id`=?);")).
-					WithArgs("1", 1.0, 123, int64(2), "1", 1.0, 123, int64(2), "1", 1.0, 123, int64(2)).WillReturnResult(sqlmock.NewResult(1, 3))
-				s.mock01.ExpectExec(regexp.QuoteMeta("UPDATE `order_db_0`.`order_tab_0` SET `content`=?,`account`=? WHERE (`user_id`=?) OR (`order_id`=?);UPDATE `order_db_0`.`order_tab_1` SET `content`=?,`account`=? WHERE (`user_id`=?) OR (`order_id`=?);UPDATE `order_db_0`.`order_tab_2` SET `content`=?,`account`=? WHERE (`user_id`=?) OR (`order_id`=?);")).
-					WithArgs("1", 1.0, 123, int64(2), "1", 1.0, 123, int64(2), "1", 1.0, 123, int64(2)).WillReturnResult(sqlmock.NewResult(1, 3))
+				s.mock02.ExpectExec(regexp.QuoteMeta("UPDATE `order_db_1`.`order_tab_0` SET `content`=?,`account`=? WHERE (`user_id`=?) OR (`user_id`=?);")).
+					WithArgs("1", 1.0, 123, 234).WillReturnResult(sqlmock.NewResult(1, 2))
+				s.mock01.ExpectExec(regexp.QuoteMeta("UPDATE `order_db_0`.`order_tab_0` SET `content`=?,`account`=? WHERE (`user_id`=?) OR (`user_id`=?);")).
+					WithArgs("1", 1.0, 123, 234).WillReturnResult(sqlmock.NewResult(1, 2))
 			},
-			wantAffectedRows: 6,
+			wantAffectedRows: 4,
 		},
 	}
 	for _, tc := range testCases {

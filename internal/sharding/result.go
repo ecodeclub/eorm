@@ -21,22 +21,21 @@ type Result struct {
 	res []sql.Result
 }
 
-func (m Result) Err() error {
-	return m.err
+func (r Result) Err() error {
+	return r.err
 }
 
-func (m Result) SetErr(err error) Result {
-	m.err = err
-	return m
+func (r Result) SetErr(err error) Result {
+	return Result{res: r.res, err: err}
 }
 
-func (m Result) LastInsertId() (int64, error) {
-	return m.res[len(m.res)-1].LastInsertId()
+func (r Result) LastInsertId() (int64, error) {
+	return r.res[len(r.res)-1].LastInsertId()
 }
-func (m Result) RowsAffected() (int64, error) {
+func (r Result) RowsAffected() (int64, error) {
 	var sum int64
-	for _, r := range m.res {
-		n, err := r.RowsAffected()
+	for _, i := range r.res {
+		n, err := i.RowsAffected()
 		if err != nil {
 			return 0, err
 		}
