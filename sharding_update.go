@@ -17,7 +17,6 @@ package eorm
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"sync"
 
 	"go.uber.org/multierr"
@@ -173,7 +172,7 @@ func (s *ShardingUpdater[T]) buildAssigns() error {
 			}
 			has = true
 		default:
-			return fmt.Errorf("eorm: unsupported assignment %v", a)
+			return errs.ErrUnsupportedAssignment
 		}
 	}
 	if !has {

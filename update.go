@@ -16,7 +16,6 @@ package eorm
 
 import (
 	"context"
-	"fmt"
 	"reflect"
 
 	"github.com/ecodeclub/eorm/internal/errs"
@@ -131,7 +130,7 @@ func (u *Updater[T]) buildAssigns() error {
 			}
 			has = true
 		default:
-			return fmt.Errorf("eorm: unsupported assignment %v", a)
+			return errs.ErrUnsupportedAssignment
 		}
 	}
 	if !has {
