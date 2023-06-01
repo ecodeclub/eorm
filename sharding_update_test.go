@@ -663,12 +663,18 @@ func TestShardingUpdater_Build_Error(t *testing.T) {
 		wantErr error
 	}{
 		{
-			name: "not and left too complex operator",
+			name: "err update sharding key unsupported Columns",
 			builder: NewShardingUpdater[Order](shardingDB).
-				Update(&Order{Content: "1", Account: 1.0}).
-				Set(Columns("Content", "Account")).
-				Where(Not(C("Content").Like("%kfc").And(C("OrderId").EQ(101)))),
-			wantErr: errs.NewUnsupportedOperatorError(opLike.Text),
+				Update(&Order{UserId: 12, Content: "1", Account: 1.0}).
+				Set(Columns("UserId", "Content", "Account")),
+			wantErr: errs.ErrUpdateShardingKeyUnsupported,
+		},
+		{
+			name: "err update sharding key unsupported Column",
+			builder: NewShardingUpdater[Order](shardingDB).
+				Update(&Order{UserId: 12, Content: "1", Account: 1.0}).
+				Set(C("UserId"), C("Content"), C("Account")),
+			wantErr: errs.ErrUpdateShardingKeyUnsupported,
 		},
 		{
 			name: "not or left too complex operator",
@@ -695,16 +701,16 @@ func TestShardingUpdater_Build_Error(t *testing.T) {
 			wantErr: errs.NewUnsupportedOperatorError(opLike.Text),
 		},
 		{
-			name:    "invalid field err",
-			builder: NewShardingSelector[Order](shardingDB).Select(C("ccc")),
+			name: "invalid field err",
+			builder: NewShardingUpdater[Order](shardingDB).
+				Set(Columns("Content", "ccc")),
 			wantErr: errs.NewInvalidFieldError("ccc"),
 		},
 		{
 			name: "pointer only err",
-			builder: func() sharding.QueryBuilder {
-				s := NewShardingSelector[int64](shardingDB)
-				return s
-			}(),
+			builder: NewShardingUpdater[int64](shardingDB).
+				Set(Columns("Content", "Account")).
+				Where(Not(C("OrderId").EQ(101).And(C("Content").Like("%kfc")))),
 			wantErr: errs.ErrPointerOnly,
 		},
 		{
@@ -813,6 +819,14 @@ func (s *ShardingUpdaterSuite) TestShardingUpdater_Exec() {
 		wantAffectedRows int64
 		wantErr          error
 	}{
+		{
+			name: "invalid field err",
+			exec: NewShardingUpdater[Order](shardingDB).Update(&Order{
+				Content: "1", Account: 1.0,
+			}).Set(Columns("Content", "ccc")).Where(C("UserId").EQ(1)),
+			mockDB:  func() {},
+			wantErr: multierr.Combine(errs.NewInvalidFieldError("ccc")),
+		},
 		{
 			name: "update fail",
 			exec: NewShardingUpdater[Order](shardingDB).Update(&Order{
