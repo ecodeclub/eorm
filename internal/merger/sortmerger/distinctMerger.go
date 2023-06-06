@@ -56,6 +56,9 @@ func (o *DistinctMerger) Merge(ctx context.Context, results []*sql.Rows) (merger
 	return o.initRows(results)
 }
 func (o *DistinctMerger) checkColumns(rows *sql.Rows) error {
+	if rows == nil {
+		return errs.ErrMergerRowsIsNull
+	}
 	cols, err := rows.Columns()
 	if err != nil {
 		return err

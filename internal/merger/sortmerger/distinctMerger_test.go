@@ -172,7 +172,7 @@ func (ms *DistinctMergerSuite) TestOrderByMerger_Merge() {
 				}
 				return rowsList
 			},
-			wantErr: errs.ErrMergerRowsDiff,
+			wantErr: errs.ErrDistinctColsNotInCols,
 		},
 		{
 			name: "sqlRows字段不同_少一个字段",
@@ -198,7 +198,7 @@ func (ms *DistinctMergerSuite) TestOrderByMerger_Merge() {
 				}
 				return rowsList
 			},
-			wantErr: errs.ErrMergerRowsDiff,
+			wantErr: errs.ErrDistinctColsNotInCols,
 		},
 		{
 			name: "sqlRows列表为空",
