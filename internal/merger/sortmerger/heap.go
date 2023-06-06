@@ -17,28 +17,13 @@ package sortmerger
 import (
 	"database/sql/driver"
 	"reflect"
-	"time"
-)
 
-var compareFuncMapping = map[reflect.Kind]func(any, any, Order) int{
-	reflect.Int:     compare[int],
-	reflect.Int8:    compare[int8],
-	reflect.Int16:   compare[int16],
-	reflect.Int32:   compare[int32],
-	reflect.Int64:   compare[int64],
-	reflect.Uint8:   compare[uint8],
-	reflect.Uint16:  compare[uint16],
-	reflect.Uint32:  compare[uint32],
-	reflect.Uint64:  compare[uint64],
-	reflect.Float32: compare[float32],
-	reflect.Float64: compare[float64],
-	reflect.String:  compare[string],
-	reflect.Uint:    compare[uint],
-}
+	"github.com/ecodeclub/eorm/internal/merger/utils"
+)
 
 type Heap struct {
 	h           []*node
-	sortColumns sortColumns
+	sortColumns SortColumns
 }
 
 func (h *Heap) Len() int {
@@ -50,12 +35,12 @@ func (h *Heap) Less(i, j int) bool {
 		valueI := h.h[i].sortCols[k]
 		valueJ := h.h[j].sortCols[k]
 		_, ok := valueJ.(driver.Valuer)
-		var cp func(any, any, Order) int
+		var cp func(any, any, utils.Order) int
 		if ok {
-			cp = compareNullable
+			cp = utils.CompareNullable
 		} else {
 			kind := reflect.TypeOf(valueI).Kind()
-			cp = compareFuncMapping[kind]
+			cp = utils.CompareFuncMapping[kind]
 		}
 		res := cp(valueI, valueJ, h.sortColumns.Get(k).order)
 		if res == 0 {
@@ -87,42 +72,4 @@ type node struct {
 	index    int
 	sortCols []any
 	columns  []any
-}
-
-// 升序时， -1 表示 i < j, 1 表示i > j ,0 表示两者相同
-// 降序时，-1 表示 i > j, 1 表示 i < j ,0 表示两者相同
-
-func compare[T Ordered](ii any, jj any, order Order) int {
-	i, j := ii.(T), jj.(T)
-	if i < j && order == ASC || i > j && order == DESC {
-		return -1
-	} else if i > j && order == ASC || i < j && order == DESC {
-		return 1
-	} else {
-		return 0
-	}
-}
-
-func compareNullable(ii, jj any, order Order) int {
-	i := ii.(driver.Valuer)
-	j := jj.(driver.Valuer)
-	iVal, _ := i.Value()
-	jVal, _ := j.Value()
-	// 如果i,j都为空返回0
-	// 如果val返回为空永远是最小值
-	if iVal == nil && jVal == nil {
-		return 0
-	} else if iVal == nil && order == ASC || jVal == nil && order == DESC {
-		return -1
-	} else if iVal == nil && order == DESC || jVal == nil && order == ASC {
-		return 1
-	}
-
-	vali, ok := iVal.(time.Time)
-	if ok {
-		valj := jVal.(time.Time)
-		return compare[int64](vali.UnixMilli(), valj.UnixMilli(), order)
-	}
-	kind := reflect.TypeOf(iVal).Kind()
-	return compareFuncMapping[kind](iVal, jVal, order)
 }
