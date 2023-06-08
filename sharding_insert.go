@@ -31,6 +31,8 @@ import (
 	"go.uber.org/multierr"
 )
 
+var _ sharding.Executor = &ShardingInserter[any]{}
+
 type ShardingInserter[T any] struct {
 	shardingInserterBuilder
 	values []*T

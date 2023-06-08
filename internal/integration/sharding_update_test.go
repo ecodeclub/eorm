@@ -24,6 +24,7 @@ import (
 
 	"github.com/ecodeclub/eorm"
 	"github.com/ecodeclub/eorm/internal/datasource"
+	"github.com/ecodeclub/eorm/internal/datasource/masterslave"
 	"github.com/ecodeclub/eorm/internal/model"
 	operator "github.com/ecodeclub/eorm/internal/operator"
 	"github.com/ecodeclub/eorm/internal/sharding"
@@ -75,6 +76,10 @@ func (s *ShardingUpdateTestSuite) TestShardingUpdater_Exec() {
 		wantAffectedRows int64
 		wantErr          error
 		exec             sharding.Executor
+		updatedSelector  *eorm.ShardingSelector[test.OrderDetail]
+		selector         *eorm.ShardingSelector[test.OrderDetail]
+		updatedQuerySet  []*test.OrderDetail
+		querySet         []*test.OrderDetail
 	}{
 		{
 			name: "where eq",
@@ -82,6 +87,18 @@ func (s *ShardingUpdateTestSuite) TestShardingUpdater_Exec() {
 				ItemId: 111, UsingCol1: "Jack", UsingCol2: "Jerry",
 			}).Where(eorm.C("OrderId").EQ(123)),
 			wantAffectedRows: 1,
+			updatedSelector:  eorm.NewShardingSelector[test.OrderDetail](s.shardingDB).Where(eorm.C("OrderId").EQ(123)),
+			selector:         eorm.NewShardingSelector[test.OrderDetail](s.shardingDB).Where(eorm.C("OrderId").NEQ(123)),
+			updatedQuerySet: []*test.OrderDetail{
+				{OrderId: 123, ItemId: 111, UsingCol1: "Jack", UsingCol2: "Jerry"},
+			},
+			querySet: []*test.OrderDetail{
+				{8, 6, "Kobe", "Bryant"},
+				{11, 8, "James", "Harden"},
+				{234, 12, "Kevin", "Durant"},
+				{253, 8, "Stephen", "Curry"},
+				{181, 11, "Kawhi", "Leonard"},
+			},
 		},
 		{
 			name: "where or broadcast",
@@ -90,6 +107,20 @@ func (s *ShardingUpdateTestSuite) TestShardingUpdater_Exec() {
 			}).Set(eorm.Columns("ItemId", "UsingCol1", "UsingCol2")).
 				Where(eorm.C("OrderId").EQ(123).Or(eorm.C("ItemId").EQ(11))),
 			wantAffectedRows: 2,
+			updatedSelector: eorm.NewShardingSelector[test.OrderDetail](s.shardingDB).
+				Where(eorm.C("OrderId").In(123, 181)),
+			selector: eorm.NewShardingSelector[test.OrderDetail](s.shardingDB).
+				Where(eorm.C("OrderId").NotIn(123, 181)),
+			updatedQuerySet: []*test.OrderDetail{
+				{OrderId: 123, ItemId: 112, UsingCol1: "King", UsingCol2: "James"},
+				{OrderId: 181, ItemId: 112, UsingCol1: "King", UsingCol2: "James"},
+			},
+			querySet: []*test.OrderDetail{
+				{8, 6, "Kobe", "Bryant"},
+				{11, 8, "James", "Harden"},
+				{234, 12, "Kevin", "Durant"},
+				{253, 8, "Stephen", "Curry"},
+			},
 		},
 	}
 	for _, tc := range testCases {
@@ -103,6 +134,17 @@ func (s *ShardingUpdateTestSuite) TestShardingUpdater_Exec() {
 			affectRows, err := res.RowsAffected()
 			require.NoError(t, err)
 			assert.Equal(t, tc.wantAffectedRows, affectRows)
+
+			// TODO 从库测试目前有查不到数据的bug
+			ctx := masterslave.UseMaster(context.Background())
+			updatedQuerySet, err := tc.updatedSelector.GetMulti(ctx)
+			require.NoError(t, err)
+			assert.ElementsMatch(t, tc.updatedQuerySet, updatedQuerySet)
+
+			querySet, err := tc.selector.GetMulti(ctx)
+			require.NoError(t, err)
+			assert.ElementsMatch(t, tc.querySet, querySet)
+
 		})
 	}
 }

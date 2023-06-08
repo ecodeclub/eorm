@@ -176,20 +176,6 @@ func TestShardingUpdater_Build(t *testing.T) {
 				Content: "1", Account: 1.0,
 			}).Set(Columns("Content", "Account")).
 				Where(C("UserId").EQ(123).Or(C("OrderId").EQ(int64(2)))),
-			//wantQs: []sharding.Query{
-			//	{
-			//		SQL:        fmt.Sprintf("UPDATE %s.%s SET `content`=?,`account`=? WHERE (`user_id`=?) OR (`order_id`=?);UPDATE %s.%s SET `content`=?,`account`=? WHERE (`user_id`=?) OR (`order_id`=?);UPDATE %s.%s SET `content`=?,`account`=? WHERE (`user_id`=?) OR (`order_id`=?);", "`order_db_1`", "`order_tab_0`", "`order_db_1`", "`order_tab_1`", "`order_db_1`", "`order_tab_2`"),
-			//		Args:       []any{"1", 1.0, 123, int64(2), "1", 1.0, 123, int64(2), "1", 1.0, 123, int64(2)},
-			//		DB:         "order_db_1",
-			//		Datasource: "0.db.cluster.company.com:3306",
-			//	},
-			//	{
-			//		SQL:        fmt.Sprintf("UPDATE %s.%s SET `content`=?,`account`=? WHERE (`user_id`=?) OR (`order_id`=?);UPDATE %s.%s SET `content`=?,`account`=? WHERE (`user_id`=?) OR (`order_id`=?);UPDATE %s.%s SET `content`=?,`account`=? WHERE (`user_id`=?) OR (`order_id`=?);", "`order_db_0`", "`order_tab_0`", "`order_db_0`", "`order_tab_1`", "`order_db_0`", "`order_tab_2`"),
-			//		Args:       []any{"1", 1.0, 123, int64(2), "1", 1.0, 123, int64(2), "1", 1.0, 123, int64(2)},
-			//		DB:         "order_db_0",
-			//		Datasource: "0.db.cluster.company.com:3306",
-			//	},
-			//},
 			wantQs: func() []sharding.Query {
 				var res []sharding.Query
 				sql := "UPDATE `%s`.`%s` SET `content`=?,`account`=? WHERE (`user_id`=?) OR (`order_id`=?);"
@@ -667,14 +653,14 @@ func TestShardingUpdater_Build_Error(t *testing.T) {
 			builder: NewShardingUpdater[Order](shardingDB).
 				Update(&Order{UserId: 12, Content: "1", Account: 1.0}).
 				Set(Columns("UserId", "Content", "Account")),
-			wantErr: errs.ErrUpdateShardingKeyUnsupported,
+			wantErr: errs.NewErrUpdateShardingKeyUnsupported("UserId"),
 		},
 		{
 			name: "err update sharding key unsupported Column",
 			builder: NewShardingUpdater[Order](shardingDB).
 				Update(&Order{UserId: 12, Content: "1", Account: 1.0}).
 				Set(C("UserId"), C("Content"), C("Account")),
-			wantErr: errs.ErrUpdateShardingKeyUnsupported,
+			wantErr: errs.NewErrUpdateShardingKeyUnsupported("UserId"),
 		},
 		{
 			name: "not or left too complex operator",

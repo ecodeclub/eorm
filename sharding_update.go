@@ -26,6 +26,8 @@ import (
 	"github.com/valyala/bytebufferpool"
 )
 
+var _ sharding.Executor = &ShardingUpdater[any]{}
+
 type ShardingUpdater[T any] struct {
 	table *T
 	lock  sync.Mutex
@@ -131,7 +133,7 @@ func (s *ShardingUpdater[T]) buildAssigns() error {
 		switch a := assign.(type) {
 		case Column:
 			if a.name == shardingKey {
-				return errs.ErrUpdateShardingKeyUnsupported
+				return errs.NewErrUpdateShardingKeyUnsupported(a.name)
 			}
 			c, ok := s.meta.FieldMap[a.name]
 			if !ok {
@@ -148,7 +150,7 @@ func (s *ShardingUpdater[T]) buildAssigns() error {
 		case columns:
 			for _, name := range a.cs {
 				if name == shardingKey {
-					return errs.ErrUpdateShardingKeyUnsupported
+					return errs.NewErrUpdateShardingKeyUnsupported(name)
 				}
 				c, ok := s.meta.FieldMap[name]
 				if !ok {
@@ -230,7 +232,6 @@ func (s *ShardingUpdater[T]) Exec(ctx context.Context) sharding.Result {
 	var wg sync.WaitGroup
 	wg.Add(len(qs))
 	for idx, q := range qs {
-		// fmt.Println(q.String())
 		go func(idx int, q Query) {
 			defer wg.Done()
 			res, err := s.db.execContext(ctx, q)
