@@ -40,9 +40,6 @@ var (
 	ErrInsertShardingKeyNotFound  = errors.New("eorm: insert语句中未包含sharding key")
 	ErrInsertFindingDst           = errors.New("eorm: 一行数据只能插入一个表")
 	ErrUnsupportedAssignment      = errors.New("eorm: 不支持的 assignment")
-
-	// ErrInvalidQuery               = errors.New("eorm: 未知 query")
-	// ErrExcShardingAlgorithm       = errors.New("eorm: 执行 sharding algorithm 出错")
 )
 
 func NewErrUpdateShardingKeyUnsupported(field string) error {
