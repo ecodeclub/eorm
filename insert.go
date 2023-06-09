@@ -28,21 +28,21 @@ var _ QueryBuilder = &Inserter[any]{}
 // Inserter is used to construct an insert query
 // More details check Build function
 type Inserter[T any] struct {
-	builder
-	Session
-	columns  []string
-	values   []*T
-	ignorePK bool
+	inserterBuilder
+	db     Session
+	values []*T
 }
 
 // NewInserter 开始构建一个 INSERT 查询
 func NewInserter[T any](sess Session) *Inserter[T] {
 	return &Inserter[T]{
-		builder: builder{
-			core:   sess.getCore(),
-			buffer: bytebufferpool.Get(),
+		inserterBuilder: inserterBuilder{
+			builder: builder{
+				core:   sess.getCore(),
+				buffer: bytebufferpool.Get(),
+			},
 		},
-		Session: sess,
+		db: sess,
 	}
 }
 
@@ -118,7 +118,7 @@ func (i *Inserter[T]) Exec(ctx context.Context) Result {
 	if err != nil {
 		return Result{err: err}
 	}
-	return newQuerier[T](i.Session, query, i.meta, INSERT).Exec(ctx)
+	return newQuerier[T](i.db, query, i.meta, INSERT).Exec(ctx)
 }
 
 func (i *Inserter[T]) buildColumns() ([]*model.ColumnMeta, error) {

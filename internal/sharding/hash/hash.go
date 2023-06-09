@@ -115,13 +115,13 @@ func (h *Hash) onlyDataSourceBroadcast(ctx context.Context) []sharding.Dst {
 	return res
 }
 
-func (h *Hash) Sharding(ctx context.Context, req sharding.Request) (sharding.Result, error) {
+func (h *Hash) Sharding(ctx context.Context, req sharding.Request) (sharding.Response, error) {
 	if h.ShardingKey == "" {
-		return sharding.EmptyResult, errs.ErrMissingShardingKey
+		return sharding.EmptyResp, errs.ErrMissingShardingKey
 	}
 	skVal, ok := req.SkValues[h.ShardingKey]
 	if !ok {
-		return sharding.Result{Dsts: h.Broadcast(ctx)}, nil
+		return sharding.Response{Dsts: h.Broadcast(ctx)}, nil
 	}
 	switch req.Op {
 	case operator.OpEQ:
@@ -137,14 +137,14 @@ func (h *Hash) Sharding(ctx context.Context, req sharding.Request) (sharding.Res
 		if !h.DsPattern.NotSharding {
 			dsName = fmt.Sprintf(dsName, skVal.(int)%h.DsPattern.Base)
 		}
-		return sharding.Result{
+		return sharding.Response{
 			Dsts: []sharding.Dst{{Name: dsName, DB: dbName, Table: tbName}},
 		}, nil
 	case operator.OpGT, operator.OpLT, operator.OpGTEQ,
 		operator.OpLTEQ, operator.OpNEQ, operator.OpNotIN:
-		return sharding.Result{Dsts: h.Broadcast(ctx)}, nil
+		return sharding.Response{Dsts: h.Broadcast(ctx)}, nil
 	default:
-		return sharding.EmptyResult, errs.NewUnsupportedOperatorError(req.Op.Text)
+		return sharding.EmptyResp, errs.NewUnsupportedOperatorError(req.Op.Text)
 	}
 }
 

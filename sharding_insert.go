@@ -31,16 +31,16 @@ import (
 	"go.uber.org/multierr"
 )
 
-type ShardingInsert[T any] struct {
-	builder
-	columns  []string
-	values   []*T
-	ignorePK bool
-	db       Session
-	lock     sync.RWMutex
+var _ sharding.Executor = &ShardingInserter[any]{}
+
+type ShardingInserter[T any] struct {
+	shardingInserterBuilder
+	values []*T
+	db     Session
+	lock   sync.RWMutex
 }
 
-func (si *ShardingInsert[T]) Build(ctx context.Context) ([]sharding.Query, error) {
+func (si *ShardingInserter[T]) Build(ctx context.Context) ([]sharding.Query, error) {
 	defer bytebufferpool.Put(si.buffer)
 	var err error
 	if len(si.values) == 0 {
@@ -122,7 +122,7 @@ func (si *ShardingInsert[T]) Build(ctx context.Context) ([]sharding.Query, error
 	return ansQuery, nil
 }
 
-func (si *ShardingInsert[T]) buildQuery(db, table string, colMetas []*model.ColumnMeta, values []*T) error {
+func (si *ShardingInserter[T]) buildQuery(db, table string, colMetas []*model.ColumnMeta, values []*T) error {
 	var err error
 	si.writeString("INSERT INTO ")
 	si.quote(db)
@@ -158,7 +158,7 @@ func (si *ShardingInsert[T]) buildQuery(db, table string, colMetas []*model.Colu
 }
 
 // checkColumns 判断sk是否存在于meta中，如果不存在会返回报错
-func (*ShardingInsert[T]) checkColumns(colMetas []*model.ColumnMeta, sks []string) error {
+func (*ShardingInserter[T]) checkColumns(colMetas []*model.ColumnMeta, sks []string) error {
 	colMetasMap := make(map[string]struct{}, len(colMetas))
 	for _, colMeta := range colMetas {
 		colMetasMap[colMeta.FieldName] = struct{}{}
@@ -171,7 +171,7 @@ func (*ShardingInsert[T]) checkColumns(colMetas []*model.ColumnMeta, sks []strin
 	return nil
 }
 
-func (si *ShardingInsert[T]) findDst(ctx context.Context, val *T) (sharding.Result, error) {
+func (si *ShardingInserter[T]) findDst(ctx context.Context, val *T) (sharding.Response, error) {
 	sks := si.meta.ShardingAlgorithm.ShardingKeys()
 	skValues := make(map[string]any)
 	for _, sk := range sks {
@@ -184,7 +184,7 @@ func (si *ShardingInsert[T]) findDst(ctx context.Context, val *T) (sharding.Resu
 	})
 }
 
-func (si *ShardingInsert[T]) getColumns() ([]*model.ColumnMeta, error) {
+func (si *ShardingInserter[T]) getColumns() ([]*model.ColumnMeta, error) {
 	cs := make([]*model.ColumnMeta, 0, len(si.columns))
 	if len(si.columns) != 0 {
 		for _, c := range si.columns {
@@ -205,7 +205,7 @@ func (si *ShardingInsert[T]) getColumns() ([]*model.ColumnMeta, error) {
 	return cs, nil
 }
 
-func (si *ShardingInsert[T]) buildColumns(colMetas []*model.ColumnMeta) error {
+func (si *ShardingInserter[T]) buildColumns(colMetas []*model.ColumnMeta) error {
 	for idx, colMeta := range colMetas {
 		si.quote(colMeta.ColumnName)
 		if idx != len(colMetas)-1 {
@@ -215,38 +215,36 @@ func (si *ShardingInsert[T]) buildColumns(colMetas []*model.ColumnMeta) error {
 	return nil
 }
 
-func (si *ShardingInsert[T]) Values(values []*T) *ShardingInsert[T] {
+func (si *ShardingInserter[T]) Values(values []*T) *ShardingInserter[T] {
 	si.values = values
 	return si
 }
 
-func (si *ShardingInsert[T]) Columns(cols []string) *ShardingInsert[T] {
+func (si *ShardingInserter[T]) Columns(cols []string) *ShardingInserter[T] {
 	si.columns = cols
 	return si
 }
 
-func (si *ShardingInsert[T]) IgnorePK() *ShardingInsert[T] {
+func (si *ShardingInserter[T]) IgnorePK() *ShardingInserter[T] {
 	si.ignorePK = true
 	return si
 }
 
-func NewShardingInsert[T any](db Session) *ShardingInsert[T] {
-	return &ShardingInsert[T]{
-		db: db,
-		builder: builder{
-			core:   db.getCore(),
-			buffer: bytebufferpool.Get(),
-		},
-		columns: []string{},
+func NewShardingInsert[T any](db Session) *ShardingInserter[T] {
+	b := shardingInserterBuilder{}
+	b.core = db.getCore()
+	b.buffer = bytebufferpool.Get()
+	b.columns = []string{}
+	return &ShardingInserter[T]{
+		db:                      db,
+		shardingInserterBuilder: b,
 	}
 }
 
-func (si *ShardingInsert[T]) Exec(ctx context.Context) MultiExecRes {
+func (si *ShardingInserter[T]) Exec(ctx context.Context) sharding.Result {
 	qs, err := si.Build(ctx)
 	if err != nil {
-		return MultiExecRes{
-			err: err,
-		}
+		return sharding.Result{}.SetErr(err)
 	}
 	errList := make([]error, len(qs))
 	resList := make([]sql.Result, len(qs))
@@ -254,20 +252,17 @@ func (si *ShardingInsert[T]) Exec(ctx context.Context) MultiExecRes {
 	wg.Add(len(qs))
 	for idx, q := range qs {
 		go func(idx int, q Query) {
-			defer func() {
-				si.lock.Unlock()
-				wg.Done()
-			}()
+			defer wg.Done()
 			res, err := si.db.execContext(ctx, q)
 			si.lock.Lock()
 			errList[idx] = err
 			resList[idx] = res
+			si.lock.Unlock()
 		}(idx, q)
 	}
 	wg.Wait()
-	shardingRes := NewMultiExecRes(resList)
-	shardingRes.err = multierr.Combine(errList...)
-	return shardingRes
+	shardingRes := sharding.NewResult(resList)
+	return shardingRes.SetErr(multierr.Combine(errList...))
 }
 
 type key struct {

@@ -241,7 +241,7 @@ func (s *ShardingInsertSuite) TestShardingInsert_Exec() {
 	require.NoError(s.T(), err)
 	testcases := []struct {
 		name             string
-		si               *ShardingInsert[OrderInsert]
+		si               *ShardingInserter[OrderInsert]
 		mockDb           func()
 		wantErr          error
 		wantAffectedRows int64

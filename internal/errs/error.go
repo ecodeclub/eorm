@@ -36,14 +36,15 @@ var (
 	ErrNotFoundTargetDataSource   = errors.New("eorm: 未发现目标 data source")
 	ErrNotFoundTargetDB           = errors.New("eorm: 未发现目标 DB")
 	ErrNotGenShardingQuery        = errors.New("eorm: 未生成 sharding query")
-	ErrNotCompleteDatasource      = errors.New("eorm: 未实现 DataSource 接口")
 	ErrNotCompleteTxBeginner      = errors.New("eorm: 未实现 TxBeginner 接口")
 	ErrInsertShardingKeyNotFound  = errors.New("eorm: insert语句中未包含sharding key")
 	ErrInsertFindingDst           = errors.New("eorm: 一行数据只能插入一个表")
-	// ErrInvalidQuery               = errors.New("eorm: 未知 query")
-
-	// ErrExcShardingAlgorithm       = errors.New("eorm: 执行 sharding algorithm 出错")
+	ErrUnsupportedAssignment      = errors.New("eorm: 不支持的 assignment")
 )
+
+func NewErrUpdateShardingKeyUnsupported(field string) error {
+	return fmt.Errorf("eorm: ShardingKey `%s` 不支持更新", field)
+}
 
 func NewFieldConflictError(field string) error {
 	return fmt.Errorf("eorm: `%s`列冲突", field)

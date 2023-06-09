@@ -101,18 +101,6 @@ func (q Querier[T]) Get(ctx context.Context) (*T, error) {
 	return res.Result.(*T), nil
 }
 
-type selectorBuilder struct {
-	builder
-	columns  []Selectable
-	where    []Predicate
-	distinct bool
-	having   []Predicate
-	groupBy  []string
-	orderBy  []OrderBy
-	offset   int
-	limit    int
-}
-
 type builder struct {
 	core
 	// 使用 bytebufferpool 以减少内存分配

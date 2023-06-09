@@ -204,6 +204,7 @@ func (s *SelectTestSuite) TestSelectorGetBaseType() {
 				return &res
 			}(),
 		},
+		// TODO 测试出问题
 		{
 			name: "res *int accept NULL",
 			queryRes: func() (any, error) {

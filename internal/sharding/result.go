@@ -12,26 +12,30 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package eorm
+package sharding
 
 import "database/sql"
 
-type MultiExecRes struct {
+type Result struct {
 	err error
 	res []sql.Result
 }
 
-func (m MultiExecRes) Err() error {
-	return m.err
+func (r Result) Err() error {
+	return r.err
 }
 
-func (m MultiExecRes) LastInsertId() (int64, error) {
-	return m.res[len(m.res)-1].LastInsertId()
+func (r Result) SetErr(err error) Result {
+	return Result{res: r.res, err: err}
 }
-func (m MultiExecRes) RowsAffected() (int64, error) {
+
+func (r Result) LastInsertId() (int64, error) {
+	return r.res[len(r.res)-1].LastInsertId()
+}
+func (r Result) RowsAffected() (int64, error) {
 	var sum int64
-	for _, r := range m.res {
-		n, err := r.RowsAffected()
+	for _, i := range r.res {
+		n, err := i.RowsAffected()
 		if err != nil {
 			return 0, err
 		}
@@ -40,6 +44,6 @@ func (m MultiExecRes) RowsAffected() (int64, error) {
 	return sum, nil
 }
 
-func NewMultiExecRes(res []sql.Result) MultiExecRes {
-	return MultiExecRes{res: res}
+func NewResult(res []sql.Result) Result {
+	return Result{res: res}
 }
