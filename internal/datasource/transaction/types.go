@@ -50,7 +50,6 @@ func GetCtxTypeKey(ctx context.Context) any {
 
 type TxFacade struct {
 	factory   TxFactory
-	ctx       Context
 	beginners map[string]datasource.TxBeginner
 }
 
