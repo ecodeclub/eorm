@@ -19,7 +19,7 @@ import (
 	"database/sql"
 	"fmt"
 
-	slaves2 "github.com/ecodeclub/eorm/internal/datasource/masterslave/slaves"
+	"github.com/ecodeclub/eorm/internal/datasource/masterslave/slaves"
 	"go.uber.org/multierr"
 
 	"github.com/ecodeclub/eorm/internal/datasource"
@@ -31,7 +31,7 @@ var _ datasource.DataSource = &MasterSlavesDB{}
 
 type MasterSlavesDB struct {
 	master *sql.DB
-	slaves slaves2.Slaves
+	slaves slaves.Slaves
 }
 
 type key string
@@ -90,7 +90,7 @@ func (m *MasterSlavesDB) Close() error {
 
 type MasterSlavesDBOption func(db *MasterSlavesDB)
 
-func MasterSlavesWithSlaves(s slaves2.Slaves) MasterSlavesDBOption {
+func MasterSlavesWithSlaves(s slaves.Slaves) MasterSlavesDBOption {
 	return func(db *MasterSlavesDB) {
 		db.slaves = s
 	}
