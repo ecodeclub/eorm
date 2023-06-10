@@ -25,14 +25,16 @@ func (r Result) Err() error {
 	return r.err
 }
 
-func (r Result) SetErr(err error) Result {
-	return Result{res: r.res, err: err}
-}
-
 func (r Result) LastInsertId() (int64, error) {
+	if r.err != nil {
+		return 0, r.err
+	}
 	return r.res[len(r.res)-1].LastInsertId()
 }
 func (r Result) RowsAffected() (int64, error) {
+	if r.err != nil {
+		return 0, r.err
+	}
 	var sum int64
 	for _, i := range r.res {
 		n, err := i.RowsAffected()
@@ -44,6 +46,6 @@ func (r Result) RowsAffected() (int64, error) {
 	return sum, nil
 }
 
-func NewResult(res []sql.Result) Result {
-	return Result{res: res}
+func NewResult(res []sql.Result, err error) Result {
+	return Result{res: res, err: err}
 }

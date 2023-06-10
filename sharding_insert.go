@@ -19,7 +19,6 @@ import (
 	"database/sql"
 	"errors"
 	"reflect"
-	"strings"
 	"sync"
 
 	"github.com/ecodeclub/ekit/mapx"
@@ -59,7 +58,9 @@ func (si *ShardingInserter[T]) Build(ctx context.Context) ([]sharding.Query, err
 		return nil, err
 	}
 
-	dsDBMap, err := mapx.NewTreeMap[key, *mapx.TreeMap[key, []*T]](compareDSDB)
+	// ds-db => 目标表
+	//dsDBMap, err := mapx.NewTreeMap[key, *mapx.TreeMap[key, []*T]](compareDSDB)
+	dsDBTabMap, err := mapx.NewMultiTreeMap[sharding.Dst, *T](sharding.CompareDSDBTab)
 	if err != nil {
 		return nil, err
 	}
@@ -72,49 +73,27 @@ func (si *ShardingInserter[T]) Build(ctx context.Context) ([]sharding.Query, err
 		if len(dst.Dsts) != 1 {
 			return nil, errs.ErrInsertFindingDst
 		}
-		dsDBVal, ok := dsDBMap.Get(key{dst.Dsts[0]})
-		if !ok {
-			dsDBVal, err = mapx.NewTreeMap[key, []*T](compareDSDBTab)
-			if err != nil {
-				return nil, err
-			}
-			err = dsDBVal.Put(key{dst.Dsts[0]}, []*T{value})
-			if err != nil {
-				return nil, err
-			}
-		} else {
-			valList, _ := dsDBVal.Get(key{dst.Dsts[0]})
-			valList = append(valList, value)
-			err = dsDBVal.Put(key{dst.Dsts[0]}, valList)
-			if err != nil {
-				return nil, err
-			}
-		}
-		err = dsDBMap.Put(key{dst.Dsts[0]}, dsDBVal)
+		err = dsDBTabMap.Put(dst.Dsts[0], value)
 		if err != nil {
 			return nil, err
 		}
 	}
 
 	// 针对每一个目标库，生成一个 insert 语句
-	dsDBKeys := dsDBMap.Keys()
-	ansQuery := make([]sharding.Query, 0, len(dsDBKeys))
-	for _, dsDBKey := range dsDBKeys {
-		ds := dsDBKey.Name
-		db := dsDBKey.DB
-		dsDBVal, _ := dsDBMap.Get(dsDBKey)
-		for _, dsDBTabKey := range dsDBVal.Keys() {
-			dsDBTabVals, _ := dsDBVal.Get(dsDBTabKey)
-			err = si.buildQuery(db, dsDBTabKey.Table, colMetaData, dsDBTabVals)
-			if err != nil {
-				return nil, err
-			}
+	//dsDBKeys := dsDBMap.Keys()
+	dsts := dsDBTabMap.Keys()
+	ansQuery := make([]sharding.Query, 0, len(dsts))
+	for _, dst := range dsts {
+		vals, _ := dsDBTabMap.Get(dst)
+		err = si.buildQuery(dst.DB, dst.Table, colMetaData, vals)
+		if err != nil {
+			return nil, err
 		}
 		ansQuery = append(ansQuery, sharding.Query{
 			SQL:        si.buffer.String(),
 			Args:       si.args,
-			DB:         db,
-			Datasource: ds,
+			DB:         dst.DB,
+			Datasource: dst.Name,
 		})
 		si.buffer.Reset()
 		si.args = []any{}
@@ -244,7 +223,7 @@ func NewShardingInsert[T any](db Session) *ShardingInserter[T] {
 func (si *ShardingInserter[T]) Exec(ctx context.Context) sharding.Result {
 	qs, err := si.Build(ctx)
 	if err != nil {
-		return sharding.Result{}.SetErr(err)
+		return sharding.NewResult(nil, err)
 	}
 	errList := make([]error, len(qs))
 	resList := make([]sql.Result, len(qs))
@@ -253,41 +232,14 @@ func (si *ShardingInserter[T]) Exec(ctx context.Context) sharding.Result {
 	for idx, q := range qs {
 		go func(idx int, q Query) {
 			defer wg.Done()
-			res, err := si.db.execContext(ctx, q)
+			res, er := si.db.execContext(ctx, q)
 			si.lock.Lock()
-			errList[idx] = err
+			errList[idx] = er
 			resList[idx] = res
 			si.lock.Unlock()
 		}(idx, q)
 	}
 	wg.Wait()
-	shardingRes := sharding.NewResult(resList)
-	return shardingRes.SetErr(multierr.Combine(errList...))
-}
-
-type key struct {
-	sharding.Dst
-}
-
-func compareDSDBTab(i, j key) int {
-	strI := strings.Join([]string{i.Name, i.DB, i.Table}, "")
-	strJ := strings.Join([]string{j.Name, j.DB, j.Table}, "")
-	if strI < strJ {
-		return -1
-	} else if strI == strJ {
-		return 0
-	}
-	return 1
-
-}
-
-func compareDSDB(i, j key) int {
-	strI := strings.Join([]string{i.Name, i.DB}, "")
-	strJ := strings.Join([]string{j.Name, j.DB}, "")
-	if strI < strJ {
-		return -1
-	} else if strI == strJ {
-		return 0
-	}
-	return 1
+	shardingRes := sharding.NewResult(resList, multierr.Combine(errList...))
+	return shardingRes
 }

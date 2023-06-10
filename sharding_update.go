@@ -225,7 +225,7 @@ func (s *ShardingUpdater[T]) SkipZeroValue() *ShardingUpdater[T] {
 func (s *ShardingUpdater[T]) Exec(ctx context.Context) sharding.Result {
 	qs, err := s.Build(ctx)
 	if err != nil {
-		return sharding.Result{}.SetErr(err)
+		return sharding.NewResult(nil, err)
 	}
 	errList := make([]error, len(qs))
 	resList := make([]sql.Result, len(qs))
@@ -242,6 +242,6 @@ func (s *ShardingUpdater[T]) Exec(ctx context.Context) sharding.Result {
 		}(idx, q)
 	}
 	wg.Wait()
-	shardingRes := sharding.NewResult(resList)
-	return shardingRes.SetErr(multierr.Combine(errList...))
+	shardingRes := sharding.NewResult(resList, multierr.Combine(errList...))
+	return shardingRes
 }

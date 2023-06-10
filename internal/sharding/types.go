@@ -48,6 +48,7 @@ type QueryBuilder interface {
 type Query = query.Query
 
 type Dst struct {
+	// Name 数据源的逻辑名字
 	Name  string
 	DB    string
 	Table string
