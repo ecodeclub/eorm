@@ -19,6 +19,8 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/ecodeclub/eorm/internal/datasource/transaction"
+
 	"github.com/ecodeclub/eorm/internal/datasource"
 	"go.uber.org/multierr"
 
@@ -48,8 +50,17 @@ func (s *ShardingDataSource) Exec(ctx context.Context, query datasource.Query) (
 	return ds.Exec(ctx, query)
 }
 
-func (*ShardingDataSource) BeginTx(_ context.Context, _ *sql.TxOptions) (datasource.Tx, error) {
-	panic("`BeginTx` must be completed")
+func (s *ShardingDataSource) BeginTx(ctx context.Context, opts *sql.TxOptions) (datasource.Tx, error) {
+	beginners := map[string]datasource.TxBeginner{}
+	for name, ds := range s.sources {
+		beginners[name] = ds.(datasource.TxBeginner)
+	}
+	facade, err := transaction.NewTxFacade(ctx, beginners)
+	if err != nil {
+		return nil, err
+	}
+
+	return facade.BeginTx(ctx, opts)
 }
 
 func NewShardingDataSource(m map[string]datasource.DataSource) datasource.DataSource {

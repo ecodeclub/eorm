@@ -19,6 +19,8 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/ecodeclub/eorm/internal/datasource/transaction"
+
 	"github.com/ecodeclub/eorm/internal/datasource"
 	"github.com/ecodeclub/eorm/internal/datasource/masterslave"
 	"github.com/ecodeclub/eorm/internal/errs"
@@ -58,6 +60,19 @@ func (c *clusterDB) Close() error {
 		}
 	}
 	return err
+}
+
+func (c *clusterDB) BeginTx(ctx context.Context, opts *sql.TxOptions) (datasource.Tx, error) {
+	beginners := map[string]datasource.TxBeginner{}
+	for name, db := range c.masterSlavesDBs {
+		beginners[name] = db
+	}
+	facade, err := transaction.NewTxFacade(ctx, beginners)
+	if err != nil {
+		return nil, err
+	}
+
+	return facade.BeginTx(ctx, opts)
 }
 
 func NewClusterDB(ms map[string]*masterslave.MasterSlavesDB) datasource.DataSource {
