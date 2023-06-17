@@ -31,6 +31,7 @@ import (
 
 type DistinctMerger struct {
 	sortCols        SortColumns
+	hasOrderBy      bool
 	distinctColumns []merger.ColumnInfo
 	cols            []string
 }
@@ -63,15 +64,15 @@ func (o *DistinctMerger) Merge(ctx context.Context, results []*sql.Rows) (merger
 	if len(results) == 0 {
 		return nil, errs.ErrMergerEmptyRows
 	}
+
 	for i := 0; i < len(results); i++ {
 		err := o.checkColumns(results[i])
 		if err != nil {
 			return nil, err
 		}
-
-		if ctx.Err() != nil {
-			return nil, ctx.Err()
-		}
+	}
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
 	}
 	return o.initRows(results)
 }
@@ -92,7 +93,12 @@ func (o *DistinctMerger) checkColumns(rows *sql.Rows) error {
 			return errs.ErrDistinctColsNotInCols
 		}
 	}
-	o.cols, err = checkColumns(rows, cols, o.sortCols)
+	if !o.hasOrderBy {
+		o.cols = cols
+	} else {
+		o.cols, err = checkColumns(rows, cols, o.sortCols)
+	}
+
 	return err
 }
 func (o *DistinctMerger) initRows(results []*sql.Rows) (*DistinctRows, error) {
@@ -104,7 +110,7 @@ func (o *DistinctMerger) initRows(results []*sql.Rows) (*DistinctRows, error) {
 	if err != nil {
 		return nil, err
 	}
-	_, err = initMapAndHeap(results, t, o.sortCols, h)
+	_, err = initMapAndHeap(results, t, o.sortCols, h, o.hasOrderBy)
 	if err != nil {
 		return nil, err
 	}
@@ -116,6 +122,7 @@ func (o *DistinctMerger) initRows(results []*sql.Rows) (*DistinctRows, error) {
 		treeMap:      t,
 		mu:           &sync.RWMutex{},
 		columns:      o.cols,
+		hasOrderBy:   o.hasOrderBy,
 	}, nil
 }
 
@@ -130,6 +137,7 @@ type DistinctRows struct {
 	closed       bool
 	lastErr      error
 	columns      []string
+	hasOrderBy   bool
 }
 
 func (o *DistinctRows) Next() bool {
@@ -149,7 +157,7 @@ func (o *DistinctRows) Next() bool {
 	_, _ = o.treeMap.Delete(val)
 	// 当一个排序列的数据取完就取下一个排序列的全部数据
 	if len(o.treeMap.Keys()) == 0 {
-		_, err := balance(o.rowsList, o.treeMap, o.sortCols, o.hp)
+		_, err := balance(o.rowsList, o.treeMap, o.sortCols, o.hp, o.hasOrderBy)
 		if err != nil {
 			o.lastErr = err
 			o.mu.Unlock()
@@ -163,12 +171,12 @@ func (o *DistinctRows) Next() bool {
 }
 
 // 保证至少有一个排序列相同的所有数据全部拿出。第一个返回值表示results还有没有值
-func initMapAndHeap(results []*sql.Rows, t *mapx.TreeMap[key, struct{}], sortCols SortColumns, h *Heap) (bool, error) {
+func initMapAndHeap(results []*sql.Rows, t *mapx.TreeMap[key, struct{}], sortCols SortColumns, h *Heap, hasOrderBy bool) (bool, error) {
 	var flag bool
 	for i := 0; i < len(results); i++ {
 		if results[i].Next() {
 			flag = true
-			n, err := newNode(results[i], sortCols, i)
+			n, err := newDistinctNode(results[i], sortCols, i, hasOrderBy)
 			if err != nil {
 				return false, err
 			}
@@ -182,11 +190,24 @@ func initMapAndHeap(results []*sql.Rows, t *mapx.TreeMap[key, struct{}], sortCol
 	if !flag {
 		return false, nil
 	}
-	return balance(results, t, sortCols, h)
+	return balance(results, t, sortCols, h, hasOrderBy)
+}
+
+func newDistinctNode(rows *sql.Rows, sortCols SortColumns, index int, hasOrderBy bool) (*node, error) {
+
+	n, err := newNode(rows, sortCols, index)
+	if err != nil {
+		return nil, err
+	}
+	if !hasOrderBy {
+		n.sortCols = []any{1}
+	}
+	return n, nil
+
 }
 
 // 从heap中取出一个排序列的所有行，保存进treemap中
-func balance(results []*sql.Rows, t *mapx.TreeMap[key, struct{}], sortCols SortColumns, h *Heap) (bool, error) {
+func balance(results []*sql.Rows, t *mapx.TreeMap[key, struct{}], sortCols SortColumns, h *Heap, hasOrderBy bool) (bool, error) {
 	var sortCol []any
 	if h.Len() == 0 {
 		return false, nil
@@ -208,7 +229,7 @@ func balance(results []*sql.Rows, t *mapx.TreeMap[key, struct{}], sortCols SortC
 			// 将后续元素加入heap
 			r := results[val.index]
 			if r.Next() {
-				n, err := newNode(r, sortCols, val.index)
+				n, err := newDistinctNode(r, sortCols, val.index, hasOrderBy)
 				if err != nil {
 					return false, err
 				}
@@ -276,7 +297,19 @@ func (o *DistinctRows) Err() error {
 	return o.lastErr
 }
 
-func NewDistinctMerger(sortCols SortColumns, distinctCols []merger.ColumnInfo) (*DistinctMerger, error) {
+func NewDistinctMerger(distinctCols []merger.ColumnInfo, sortColList ...SortColumns) (*DistinctMerger, error) {
+	var sortCols SortColumns
+	if len(sortColList) == 0 {
+		sortCols, _ = newSortColumns(NewSortColumn("VirtualColumn", utils.DESC))
+		return &DistinctMerger{
+			sortCols:        sortCols,
+			distinctColumns: distinctCols,
+		}, nil
+	} else if len(sortColList) > 1 {
+		return nil, errs.ErrDistinctMultiSortCols
+	} else if len(sortColList) == 1 {
+		sortCols = sortColList[0]
+	}
 	// 检查sortCols必须全在distinctCols
 	distinctMap := make(map[string]struct{})
 	for _, col := range distinctCols {
@@ -296,5 +329,6 @@ func NewDistinctMerger(sortCols SortColumns, distinctCols []merger.ColumnInfo) (
 	return &DistinctMerger{
 		sortCols:        sortCols,
 		distinctColumns: distinctCols,
+		hasOrderBy:      true,
 	}, nil
 }

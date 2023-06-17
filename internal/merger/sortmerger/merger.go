@@ -251,7 +251,9 @@ func newNode(row *sql.Rows, sortCols SortColumns, index int) (*node, error) {
 		return nil, err
 	}
 	for i := 0; i < len(sortColumns); i++ {
-		sortColumns[i] = reflect.ValueOf(sortColumns[i]).Elem().Interface()
+		if sortColumns[i] != nil {
+			sortColumns[i] = reflect.ValueOf(sortColumns[i]).Elem().Interface()
+		}
 	}
 	for i := 0; i < len(columns); i++ {
 		columns[i] = reflect.ValueOf(columns[i]).Elem().Interface()
