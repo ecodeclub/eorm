@@ -167,12 +167,12 @@ func (o *DistinctRows) Next() bool {
 	}
 	o.mu.Unlock()
 	return true
-
 }
 
-// 保证至少有一个排序列相同的所有数据全部拿出。第一个返回值表示results还有没有值
+// 初始化堆和map，保证至少有一个排序列相同的所有数据全部拿出。第一个返回值表示results还有没有值
 func initMapAndHeap(results []*sql.Rows, t *mapx.TreeMap[key, struct{}], sortCols SortColumns, h *Heap, hasOrderBy bool) (bool, error) {
 	var flag bool
+	// 初始化将所有sql.Rows的第一个元素塞进heap中
 	for i := 0; i < len(results); i++ {
 		if results[i].Next() {
 			flag = true
@@ -181,20 +181,19 @@ func initMapAndHeap(results []*sql.Rows, t *mapx.TreeMap[key, struct{}], sortCol
 				return false, err
 			}
 			heap.Push(h, n)
-		} else {
-			if results[i].Err() != nil {
-				return false, results[i].Err()
-			}
+		} else if results[i].Err() != nil {
+			return false, results[i].Err()
 		}
 	}
+	// 如果四个results里面的元素均为空表示没有已经没有数据了
 	if !flag {
 		return false, nil
 	}
+
 	return balance(results, t, sortCols, h, hasOrderBy)
 }
 
 func newDistinctNode(rows *sql.Rows, sortCols SortColumns, index int, hasOrderBy bool) (*node, error) {
-
 	n, err := newNode(rows, sortCols, index)
 	if err != nil {
 		return nil, err
@@ -203,7 +202,6 @@ func newDistinctNode(rows *sql.Rows, sortCols SortColumns, index int, hasOrderBy
 		n.sortCols = []any{1}
 	}
 	return n, nil
-
 }
 
 // 从heap中取出一个排序列的所有行，保存进treemap中
@@ -238,6 +236,7 @@ func balance(results []*sql.Rows, t *mapx.TreeMap[key, struct{}], sortCols SortC
 				return false, r.Err()
 			}
 		} else {
+			// 如果排序列不相同将 拿出来的元素，重新塞进heap中
 			heap.Push(h, val)
 			return true, nil
 		}
