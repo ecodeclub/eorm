@@ -27,14 +27,3 @@ func CompareDSDBTab(i, j Dst) int {
 	return 1
 
 }
-
-func CompareDSDB(i, j Dst) int {
-	strI := strings.Join([]string{i.Name, i.DB}, "")
-	strJ := strings.Join([]string{j.Name, j.DB}, "")
-	if strI < strJ {
-		return -1
-	} else if strI == strJ {
-		return 0
-	}
-	return 1
-}

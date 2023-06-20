@@ -4,7 +4,7 @@ go 1.18
 
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.0
-	github.com/ecodeclub/ekit v0.0.4-0.20230511055406-b4540a020e0c
+	github.com/ecodeclub/ekit v0.0.4-0.20230530053225-e671c5fdd2d1
 	github.com/go-sql-driver/mysql v1.6.0
 	github.com/gotomicro/ekit v0.0.0-20230224040531-869798da3c4d
 	github.com/mattn/go-sqlite3 v1.14.15

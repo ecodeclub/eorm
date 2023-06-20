@@ -38,6 +38,7 @@ type SelectTestSuite struct {
 func (s *SelectTestSuite) SetupSuite() {
 	s.Suite.SetupSuite()
 	s.data = test.NewSimpleStruct(1)
+	s.data.Int32Ptr = nil
 	res := eorm.NewInserter[test.SimpleStruct](s.orm).Values(s.data).Exec(context.Background())
 	if res.Err() != nil {
 		s.T().Fatal(res.Err())
@@ -45,7 +46,7 @@ func (s *SelectTestSuite) SetupSuite() {
 }
 
 func (s *SelectTestSuite) TearDownSuite() {
-	res := eorm.RawQuery[any](s.orm, "DELETE FROM `simple_struct`").Exec(context.Background())
+	res := eorm.RawQuery[any](s.orm, "TRUNCATE TABLE `simple_struct`").Exec(context.Background())
 	if res.Err() != nil {
 		s.T().Fatal(res.Err())
 	}
@@ -204,7 +205,6 @@ func (s *SelectTestSuite) TestSelectorGetBaseType() {
 				return &res
 			}(),
 		},
-		// TODO 测试出问题
 		{
 			name: "res *int accept NULL",
 			queryRes: func() (any, error) {
@@ -220,12 +220,12 @@ func (s *SelectTestSuite) TestSelectorGetBaseType() {
 		{
 			name: "res int accept NULL",
 			queryRes: func() (any, error) {
-				queryer := eorm.NewSelector[*int](s.orm).Select(eorm.C("Int32Ptr")).
+				queryer := eorm.NewSelector[int](s.orm).Select(eorm.C("Int32Ptr")).
 					From(eorm.TableOf(&test.SimpleStruct{}, "t1")).
 					Where(eorm.C("Id").EQ(1))
 				return queryer.Get(context.Background())
 			},
-			wantErr: "abc",
+			wantErr: "sql: Scan error on column index 0, name \"int32_ptr\": converting NULL to int is unsupported",
 		},
 	}
 

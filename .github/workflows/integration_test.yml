@@ -31,4 +31,4 @@ jobs:
           go-version: 1.18
 
       - name: Test
-        run: sh ./script/integrate_test.sh
+        run: sudo sh ./script/integrate_test.sh
