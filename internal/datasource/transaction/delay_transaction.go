@@ -21,14 +21,13 @@ import (
 	"sync"
 
 	"github.com/ecodeclub/eorm/internal/datasource"
-	"github.com/ecodeclub/eorm/internal/errs"
 	"go.uber.org/multierr"
 )
 
 type DelayTxFactory struct{}
 
-func (_ DelayTxFactory) TxOf(ctx Context, beginners map[string]datasource.TxBeginner) (datasource.Tx, error) {
-	return NewDelayTx(ctx, beginners), nil
+func (_ DelayTxFactory) TxOf(ctx Context, finder datasource.Finder) (datasource.Tx, error) {
+	return NewDelayTx(ctx, finder), nil
 }
 
 type DelayTx struct {
@@ -36,6 +35,15 @@ type DelayTx struct {
 	lock      sync.RWMutex
 	txs       map[string]datasource.Tx
 	beginners map[string]datasource.TxBeginner
+	finder    datasource.Finder
+}
+
+func (t *DelayTx) findTgt(ctx context.Context, query datasource.Query) (datasource.TxBeginner, error) {
+	db, ok := t.beginners[query.DB]
+	if !ok {
+		return t.finder.FindTgt(ctx, query)
+	}
+	return db, nil
 }
 
 func (t *DelayTx) Query(ctx context.Context, query datasource.Query) (*sql.Rows, error) {
@@ -51,11 +59,14 @@ func (t *DelayTx) Query(ctx context.Context, query datasource.Query) (*sql.Rows,
 	if tx, ok = t.txs[query.DB]; ok {
 		return tx.Query(ctx, query)
 	}
-	db, ok := t.beginners[query.DB]
-	if !ok {
-		return nil, errs.ErrNotFoundTargetDB
+	//fmt.Println(query.DB)
+	//fmt.Println(t.beginners)
+	var err error
+	db, err := t.findTgt(ctx, query)
+	if err != nil {
+		return nil, err
 	}
-	tx, err := db.BeginTx(t.ctx.TxCtx, t.ctx.Opts)
+	tx, err = db.BeginTx(t.ctx.TxCtx, t.ctx.Opts)
 	if err != nil {
 		return nil, err
 	}
@@ -76,11 +87,12 @@ func (t *DelayTx) Exec(ctx context.Context, query datasource.Query) (sql.Result,
 	if tx, ok = t.txs[query.DB]; ok {
 		return tx.Exec(ctx, query)
 	}
-	db, ok := t.beginners[query.DB]
-	if !ok {
-		return nil, errs.ErrNotFoundTargetDB
+	var err error
+	db, err := t.findTgt(ctx, query)
+	if err != nil {
+		return nil, err
 	}
-	tx, err := db.BeginTx(t.ctx.TxCtx, t.ctx.Opts)
+	tx, err = db.BeginTx(t.ctx.TxCtx, t.ctx.Opts)
 	if err != nil {
 		return nil, err
 	}
@@ -110,6 +122,10 @@ func (t *DelayTx) Rollback() error {
 	return err
 }
 
-func NewDelayTx(ctx Context, beginners map[string]datasource.TxBeginner) *DelayTx {
-	return &DelayTx{ctx: ctx, beginners: beginners}
+func NewDelayTx(ctx Context, finder datasource.Finder) *DelayTx {
+	return &DelayTx{
+		ctx:    ctx,
+		finder: finder,
+		txs:    make(map[string]datasource.Tx, 8),
+	}
 }

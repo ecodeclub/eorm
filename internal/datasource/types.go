@@ -30,6 +30,10 @@ type TxBeginner interface {
 	BeginTx(ctx context.Context, opts *sql.TxOptions) (Tx, error)
 }
 
+type Finder interface {
+	FindTgt(ctx context.Context, query Query) (TxBeginner, error)
+}
+
 type Tx interface {
 	Executor
 	Commit() error

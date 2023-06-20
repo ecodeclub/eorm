@@ -27,7 +27,9 @@ import (
 	"go.uber.org/multierr"
 )
 
+var _ datasource.TxBeginner = &clusterDB{}
 var _ datasource.DataSource = &clusterDB{}
+var _ datasource.Finder = &clusterDB{}
 
 // clusterDB 以 DB 名称作为索引目标数据库
 type clusterDB struct {
@@ -62,12 +64,16 @@ func (c *clusterDB) Close() error {
 	return err
 }
 
-func (c *clusterDB) BeginTx(ctx context.Context, opts *sql.TxOptions) (datasource.Tx, error) {
-	beginners := map[string]datasource.TxBeginner{}
-	for name, db := range c.masterSlavesDBs {
-		beginners[name] = db
+func (c *clusterDB) FindTgt(ctx context.Context, query datasource.Query) (datasource.TxBeginner, error) {
+	db, ok := c.masterSlavesDBs[query.DB]
+	if !ok {
+		return nil, errs.NewErrNotFoundTargetDataSource(query.DB)
 	}
-	facade, err := transaction.NewTxFacade(ctx, beginners)
+	return db, nil
+}
+
+func (c *clusterDB) BeginTx(ctx context.Context, opts *sql.TxOptions) (datasource.Tx, error) {
+	facade, err := transaction.NewTxFacade(ctx, c)
 	if err != nil {
 		return nil, err
 	}

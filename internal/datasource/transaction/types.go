@@ -29,7 +29,7 @@ const (
 )
 
 type TxFactory interface {
-	TxOf(ctx Context, b map[string]datasource.TxBeginner) (datasource.Tx, error)
+	TxOf(ctx Context, finder datasource.Finder) (datasource.Tx, error)
 }
 
 type Context struct {
@@ -49,13 +49,13 @@ func GetCtxTypeKey(ctx context.Context) any {
 }
 
 type TxFacade struct {
-	factory   TxFactory
-	beginners map[string]datasource.TxBeginner
+	factory TxFactory
+	finder  datasource.Finder
 }
 
-func NewTxFacade(ctx context.Context, beginners map[string]datasource.TxBeginner) (TxFacade, error) {
+func NewTxFacade(ctx context.Context, finder datasource.Finder) (TxFacade, error) {
 	res := TxFacade{
-		beginners: beginners,
+		finder: finder,
 	}
 	switch GetCtxTypeKey(ctx).(string) {
 	case Delay:
@@ -75,6 +75,5 @@ func (t *TxFacade) BeginTx(ctx context.Context, opts *sql.TxOptions) (datasource
 		Opts:   opts,
 		TxName: GetCtxTypeKey(ctx).(string),
 	}
-
-	return t.factory.TxOf(dsCtx, t.beginners)
+	return t.factory.TxOf(dsCtx, t.finder)
 }

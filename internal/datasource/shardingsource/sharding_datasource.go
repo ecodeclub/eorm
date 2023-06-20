@@ -29,6 +29,7 @@ import (
 
 var _ datasource.TxBeginner = &ShardingDataSource{}
 var _ datasource.DataSource = &ShardingDataSource{}
+var _ datasource.Finder = &ShardingDataSource{}
 
 type ShardingDataSource struct {
 	sources map[string]datasource.DataSource
@@ -50,16 +51,23 @@ func (s *ShardingDataSource) Exec(ctx context.Context, query datasource.Query) (
 	return ds.Exec(ctx, query)
 }
 
-func (s *ShardingDataSource) BeginTx(ctx context.Context, opts *sql.TxOptions) (datasource.Tx, error) {
-	beginners := map[string]datasource.TxBeginner{}
-	for name, ds := range s.sources {
-		beginners[name] = ds.(datasource.TxBeginner)
+func (s *ShardingDataSource) FindTgt(ctx context.Context, query datasource.Query) (datasource.TxBeginner, error) {
+	ds, ok := s.sources[query.Datasource]
+	if !ok {
+		return nil, errs.NewErrNotFoundTargetDataSource(query.Datasource)
 	}
-	facade, err := transaction.NewTxFacade(ctx, beginners)
+	f, ok := ds.(datasource.Finder)
+	if !ok {
+		return nil, errs.NewErrNotCompleteFinder(query.Datasource)
+	}
+	return f.FindTgt(ctx, query)
+}
+
+func (s *ShardingDataSource) BeginTx(ctx context.Context, opts *sql.TxOptions) (datasource.Tx, error) {
+	facade, err := transaction.NewTxFacade(ctx, s)
 	if err != nil {
 		return nil, err
 	}
-
 	return facade.BeginTx(ctx, opts)
 }
 

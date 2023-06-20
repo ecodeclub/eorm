@@ -42,6 +42,14 @@ var (
 	ErrUnsupportedAssignment      = errors.New("eorm: 不支持的 assignment")
 )
 
+func NewErrNotCompleteFinder(name string) error {
+	return fmt.Errorf("eorm: %s 未实现 Finder 接口", name)
+}
+
+func NewErrNotFoundTargetDataSource(name string) error {
+	return fmt.Errorf("eorm: 未发现目标 data dource %s", name)
+}
+
 func NewErrUpdateShardingKeyUnsupported(field string) error {
 	return fmt.Errorf("eorm: ShardingKey `%s` 不支持更新", field)
 }

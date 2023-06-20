@@ -20,21 +20,24 @@ import (
 	"sync"
 
 	"github.com/ecodeclub/eorm/internal/datasource"
-	"github.com/ecodeclub/eorm/internal/errs"
 )
 
 type BinMultiTxFactory struct{}
 
-func (_ BinMultiTxFactory) TxOf(ctx Context, beginners map[string]datasource.TxBeginner) (datasource.Tx, error) {
-	return NewBinMultiTx(ctx, beginners), nil
+func (_ BinMultiTxFactory) TxOf(ctx Context, finder datasource.Finder) (datasource.Tx, error) {
+	return NewBinMultiTx(ctx, finder), nil
 }
 
 type BinMultiTx struct {
-	DB        string
-	ctx       Context
-	lock      sync.RWMutex
-	tx        datasource.Tx
-	beginners map[string]datasource.TxBeginner
+	DB     string
+	ctx    Context
+	lock   sync.RWMutex
+	tx     datasource.Tx
+	finder datasource.Finder
+}
+
+func (t *BinMultiTx) findTgt(ctx context.Context, query datasource.Query) (datasource.TxBeginner, error) {
+	return t.finder.FindTgt(ctx, query)
 }
 
 func (t *BinMultiTx) Query(ctx context.Context, query datasource.Query) (*sql.Rows, error) {
@@ -49,9 +52,10 @@ func (t *BinMultiTx) Query(ctx context.Context, query datasource.Query) (*sql.Ro
 	if t.DB != "" && t.tx != nil {
 		return t.tx.Query(ctx, query)
 	}
-	db, ok := t.beginners[query.DB]
-	if !ok {
-		return nil, errs.ErrNotFoundTargetDB
+	var err error
+	db, err := t.findTgt(ctx, query)
+	if err != nil {
+		return nil, err
 	}
 	tx, err := db.BeginTx(t.ctx.TxCtx, t.ctx.Opts)
 	if err != nil {
@@ -75,9 +79,10 @@ func (t *BinMultiTx) Exec(ctx context.Context, query datasource.Query) (sql.Resu
 	if t.DB != "" && t.tx != nil {
 		return t.tx.Exec(ctx, query)
 	}
-	db, ok := t.beginners[query.DB]
-	if !ok {
-		return nil, errs.ErrNotFoundTargetDB
+	var err error
+	db, err := t.findTgt(ctx, query)
+	if err != nil {
+		return nil, err
 	}
 	tx, err := db.BeginTx(t.ctx.TxCtx, t.ctx.Opts)
 	if err != nil {
@@ -102,6 +107,9 @@ func (t *BinMultiTx) Rollback() error {
 	return nil
 }
 
-func NewBinMultiTx(ctx Context, beginners map[string]datasource.TxBeginner) *BinMultiTx {
-	return &BinMultiTx{ctx: ctx, beginners: beginners}
+func NewBinMultiTx(ctx Context, finder datasource.Finder) *BinMultiTx {
+	return &BinMultiTx{
+		ctx:    ctx,
+		finder: finder,
+	}
 }
