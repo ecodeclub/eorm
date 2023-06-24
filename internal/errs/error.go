@@ -33,8 +33,6 @@ var (
 	ErrOnlyResultOneQuery         = errors.New("eorm: 只能生成一个 SQL")
 	ErrUnsupportedTooComplexQuery = errors.New("eorm: 暂未支持太复杂的查询")
 	ErrSlaveNotFound              = errors.New("eorm: slave不存在")
-	ErrNotFoundTargetDataSource   = errors.New("eorm: 未发现目标 data source")
-	ErrNotFoundTargetDB           = errors.New("eorm: 未发现目标 DB")
 	ErrNotGenShardingQuery        = errors.New("eorm: 未生成 sharding query")
 	ErrNotCompleteTxBeginner      = errors.New("eorm: 未实现 TxBeginner 接口")
 	ErrInsertShardingKeyNotFound  = errors.New("eorm: insert语句中未包含sharding key")
@@ -42,12 +40,20 @@ var (
 	ErrUnsupportedAssignment      = errors.New("eorm: 不支持的 assignment")
 )
 
+func NewErrDBNotEqual(oldDB, tgtDB string) error {
+	return fmt.Errorf("eorm:禁止跨库操作： %s 不等于 %s ", oldDB, tgtDB)
+}
+
 func NewErrNotCompleteFinder(name string) error {
 	return fmt.Errorf("eorm: %s 未实现 Finder 接口", name)
 }
 
 func NewErrNotFoundTargetDataSource(name string) error {
 	return fmt.Errorf("eorm: 未发现目标 data dource %s", name)
+}
+
+func NewErrNotFoundTargetDB(name string) error {
+	return fmt.Errorf("eorm: 未发现目标 DB %s", name)
 }
 
 func NewErrUpdateShardingKeyUnsupported(field string) error {

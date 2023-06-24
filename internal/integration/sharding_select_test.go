@@ -28,7 +28,6 @@ import (
 	"github.com/ecodeclub/eorm/internal/model"
 	operator "github.com/ecodeclub/eorm/internal/operator"
 	"github.com/ecodeclub/eorm/internal/sharding"
-	"github.com/ecodeclub/eorm/internal/sharding/hash"
 	"github.com/ecodeclub/eorm/internal/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -604,32 +603,8 @@ func (s *ShardingSelectTestSuite) TearDownSuite() {
 }
 
 func TestMySQL8ShardingSelect(t *testing.T) {
-	m := []*masterSalvesDriver{
-		{
-			masterdsn: "root:root@tcp(localhost:13307)/order_detail_db_0",
-			slavedsns: []string{"root:root@tcp(localhost:13308)/order_detail_db_0"},
-		},
-		{
-			masterdsn: "root:root@tcp(localhost:13307)/order_detail_db_1",
-			slavedsns: []string{"root:root@tcp(localhost:13308)/order_detail_db_1"},
-		},
-	}
-	clusterDr := &clusterDriver{msDrivers: m}
 	suite.Run(t, &ShardingSelectTestSuite{
-		ShardingSuite: ShardingSuite{
-			driver: "mysql",
-			algorithm: &hash.Hash{
-				ShardingKey:  "OrderId",
-				DBPattern:    &hash.Pattern{Name: "order_detail_db_%d", Base: 2},
-				TablePattern: &hash.Pattern{Name: "order_detail_tab_%d", Base: 3},
-				DsPattern:    &hash.Pattern{Name: "root:root@tcp(localhost:13307).0", NotSharding: true},
-			},
-			DBPattern: "order_detail_db_%d",
-			DsPattern: "root:root@tcp(localhost:13307).%d",
-			clusters: &clusterDrivers{
-				clDrivers: []*clusterDriver{clusterDr},
-			},
-		},
+		ShardingSuite: newDefaultShardingSuite(),
 		data: []*test.OrderDetail{
 			{8, 6, "Kobe", "Bryant"},
 			{11, 8, "James", "Harden"},

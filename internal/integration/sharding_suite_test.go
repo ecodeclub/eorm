@@ -21,9 +21,6 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"fmt"
-	"log"
-	"time"
-
 	"github.com/ecodeclub/eorm"
 	"github.com/ecodeclub/eorm/internal/datasource"
 	"github.com/ecodeclub/eorm/internal/datasource/cluster"
@@ -37,6 +34,8 @@ import (
 	"github.com/ecodeclub/eorm/internal/test"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"log"
+	"time"
 )
 
 type ShardingSuite struct {
@@ -51,6 +50,7 @@ type ShardingSuite struct {
 	DBPattern    string
 	DsPattern    string
 	TablePattern string
+	ShardingKey  string
 }
 
 func newDefaultShardingSuite() ShardingSuite {
@@ -69,13 +69,7 @@ func newDefaultShardingSuite() ShardingSuite {
 	dsPattern := "root:root@tcp(localhost:13307).%d"
 	tablePattern := "order_detail_tab_%d"
 	return ShardingSuite{
-		driver: "mysql",
-		algorithm: &hash.Hash{
-			ShardingKey:  "OrderId",
-			DBPattern:    &hash.Pattern{Name: dbPattern, Base: 2},
-			TablePattern: &hash.Pattern{Name: tablePattern, Base: 3},
-			DsPattern:    &hash.Pattern{Name: "root:root@tcp(localhost:13307).0", NotSharding: true},
-		},
+		driver:       "mysql",
 		DBPattern:    dbPattern,
 		DsPattern:    dsPattern,
 		TablePattern: tablePattern,
@@ -154,6 +148,14 @@ func (s *ShardingSuite) initDB(r model.MetaRegistry) (*eorm.DB, error) {
 func (s *ShardingSuite) SetupSuite() {
 	t := s.T()
 	r := model.NewMetaRegistry()
+	sk := "OrderId"
+	s.algorithm = &hash.Hash{
+		ShardingKey:  sk,
+		DBPattern:    &hash.Pattern{Name: s.DBPattern, Base: 2},
+		TablePattern: &hash.Pattern{Name: s.TablePattern, Base: 3},
+		DsPattern:    &hash.Pattern{Name: "root:root@tcp(localhost:13307).0", NotSharding: true},
+	}
+	s.ShardingKey = sk
 	_, err := r.Register(&test.OrderDetail{},
 		model.WithTableShardingAlgorithm(s.algorithm))
 	db, err := s.initDB(r)

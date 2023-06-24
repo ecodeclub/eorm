@@ -18,7 +18,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-
 	"github.com/ecodeclub/eorm/internal/datasource/transaction"
 
 	"github.com/ecodeclub/eorm/internal/datasource"
@@ -36,31 +35,39 @@ type ShardingDataSource struct {
 }
 
 func (s *ShardingDataSource) Query(ctx context.Context, query datasource.Query) (*sql.Rows, error) {
-	ds, ok := s.sources[query.Datasource]
-	if !ok {
-		return nil, errs.ErrNotFoundTargetDataSource
+	ds, err := s.findTgt(query)
+	if err != nil {
+		return nil, err
 	}
 	return ds.Query(ctx, query)
 }
 
 func (s *ShardingDataSource) Exec(ctx context.Context, query datasource.Query) (sql.Result, error) {
-	ds, ok := s.sources[query.Datasource]
-	if !ok {
-		return nil, errs.ErrNotFoundTargetDataSource
+	ds, err := s.findTgt(query)
+	if err != nil {
+		return nil, err
 	}
 	return ds.Exec(ctx, query)
 }
 
 func (s *ShardingDataSource) FindTgt(ctx context.Context, query datasource.Query) (datasource.TxBeginner, error) {
-	ds, ok := s.sources[query.Datasource]
-	if !ok {
-		return nil, errs.NewErrNotFoundTargetDataSource(query.Datasource)
+	ds, err := s.findTgt(query)
+	if err != nil {
+		return nil, err
 	}
 	f, ok := ds.(datasource.Finder)
 	if !ok {
 		return nil, errs.NewErrNotCompleteFinder(query.Datasource)
 	}
 	return f.FindTgt(ctx, query)
+}
+
+func (s *ShardingDataSource) findTgt(query datasource.Query) (datasource.DataSource, error) {
+	ds, ok := s.sources[query.Datasource]
+	if !ok {
+		return nil, errs.NewErrNotFoundTargetDataSource(query.Datasource)
+	}
+	return ds, nil
 }
 
 func (s *ShardingDataSource) BeginTx(ctx context.Context, opts *sql.TxOptions) (datasource.Tx, error) {

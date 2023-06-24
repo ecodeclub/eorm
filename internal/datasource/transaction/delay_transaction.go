@@ -105,7 +105,7 @@ func (t *DelayTx) Commit() error {
 	for name, tx := range t.txs {
 		if er := tx.Commit(); er != nil {
 			err = multierr.Combine(
-				err, fmt.Errorf("masterslave DB name [%s] error: %w", name, er))
+				err, fmt.Errorf("masterslave DB name [%s] Commit error: %w", name, er))
 		}
 	}
 	return err
@@ -116,7 +116,7 @@ func (t *DelayTx) Rollback() error {
 	for name, tx := range t.txs {
 		if er := tx.Rollback(); er != nil {
 			err = multierr.Combine(
-				err, fmt.Errorf("masterslave DB name [%s] error: %w", name, er))
+				err, fmt.Errorf("masterslave DB name [%s] Rollback error: %w", name, er))
 		}
 	}
 	return err

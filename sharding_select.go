@@ -308,12 +308,14 @@ func (s *ShardingSelector[T]) GetMulti(ctx context.Context) ([]*T, error) {
 	for _, query := range qs {
 		q := query
 		eg.Go(func() error {
-			s.lock.Lock()
-			defer s.lock.Unlock()
+			//s.lock.Lock()
+			//defer s.lock.Unlock()
 			// TODO 利用 ctx 传递 DB name
 			rows, err := s.db.queryContext(ctx, q)
 			if err == nil {
+				s.lock.Lock()
 				rowsSlice = append(rowsSlice, rows)
+				s.lock.Unlock()
 			}
 			return err
 		})

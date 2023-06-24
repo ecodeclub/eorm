@@ -20,7 +20,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"github.com/ecodeclub/eorm/session"
 	"testing"
 	"time"
 
@@ -90,8 +89,8 @@ func (s *ShardingDelayTxTestSuite) TestShardingInsert_Commit_Or_Rollback() {
 		wantAffected int64
 		values       []*test.OrderDetail
 		querySet     []*test.OrderDetail
-		tx           *session.Tx
-		afterFunc    func(t *testing.T, tx *session.Tx, values []*test.OrderDetail)
+		tx           *eorm.Tx
+		afterFunc    func(t *testing.T, tx *eorm.Tx, values []*test.OrderDetail)
 	}{
 		{
 			name:         "select insert commit",
@@ -107,25 +106,20 @@ func (s *ShardingDelayTxTestSuite) TestShardingInsert_Commit_Or_Rollback() {
 				{OrderId: 253, ItemId: 8, UsingCol1: "Stephen", UsingCol2: "Curry"},
 				{OrderId: 181, ItemId: 11, UsingCol1: "Kawhi", UsingCol2: "Leonard"},
 			},
-			tx: func() *session.Tx {
-				fmt.Println(0000000000)
+			tx: func() *eorm.Tx {
 				tx, er := s.shardingDB.BeginTx(
 					transaction.UsingTxType(context.Background(), transaction.Delay), &sql.TxOptions{})
 				require.NoError(t, er)
-				fmt.Println(000011111)
 				return tx
 			}(),
-			afterFunc: func(t *testing.T, tx *session.Tx, values []*test.OrderDetail) {
-				fmt.Println(555555555)
+			afterFunc: func(t *testing.T, tx *eorm.Tx, values []*test.OrderDetail) {
 				err := tx.Commit()
 				require.NoError(t, err)
 
 				queryVal := s.findTgt(t, values)
 				assert.ElementsMatch(t, values, queryVal)
-				fmt.Println(66666666666666)
 			},
 		},
-
 		{
 			name:         "select insert rollback",
 			wantAffected: 2,
@@ -140,14 +134,13 @@ func (s *ShardingDelayTxTestSuite) TestShardingInsert_Commit_Or_Rollback() {
 				{OrderId: 253, ItemId: 8, UsingCol1: "Stephen", UsingCol2: "Curry"},
 				{OrderId: 181, ItemId: 11, UsingCol1: "Kawhi", UsingCol2: "Leonard"},
 			},
-			tx: func() *session.Tx {
+			tx: func() *eorm.Tx {
 				tx, er := s.shardingDB.BeginTx(
 					transaction.UsingTxType(context.Background(), transaction.Delay), &sql.TxOptions{})
 				require.NoError(t, er)
 				return tx
 			}(),
-			afterFunc: func(t *testing.T, tx *session.Tx, values []*test.OrderDetail) {
-				fmt.Println(7777777)
+			afterFunc: func(t *testing.T, tx *eorm.Tx, values []*test.OrderDetail) {
 				var wantOds []*test.OrderDetail
 				err := tx.Rollback()
 				require.NoError(t, err)
@@ -158,25 +151,23 @@ func (s *ShardingDelayTxTestSuite) TestShardingInsert_Commit_Or_Rollback() {
 				}
 
 				assert.ElementsMatch(t, wantOds, queryVal)
-				fmt.Println(88888)
 			},
 		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			//fmt.Println(00000)
 			tx := tc.tx
-			//fmt.Println(11111111)
+			err := tx.Rollback()
+			require.NoError(t, err)
+			fmt.Println(1111)
 			querySet, err := eorm.NewShardingSelector[test.OrderDetail](tx).
 				Where(eorm.C("OrderId").NEQ(123)).
 				GetMulti(masterslave.UseMaster(context.Background()))
-			//fmt.Println(2222222222)
+			fmt.Println(2222)
 			require.NoError(t, err)
 			assert.ElementsMatch(t, tc.querySet, querySet)
-			//fmt.Println(33333333)
 			//res := eorm.NewShardingInsert[test.OrderDetail](tx).
 			//	Values(tc.values).Exec(context.Background())
-			//fmt.Println(444444444444)
 			//affected, err := res.RowsAffected()
 			//require.NoError(t, err)
 			//assert.Equal(t, tc.wantAffected, affected)
@@ -190,7 +181,7 @@ func (s *ShardingDelayTxTestSuite) findTgt(t *testing.T, values []*test.OrderDet
 	pre := eorm.C(s.ShardingKey).EQ(od.OrderId)
 	for i := 1; i < len(values); i++ {
 		od = values[i]
-		pre = pre.And(eorm.C(s.ShardingKey).EQ(od.OrderId))
+		pre = pre.Or(eorm.C(s.ShardingKey).EQ(od.OrderId))
 	}
 	querySet, err := eorm.NewShardingSelector[test.OrderDetail](s.shardingDB).
 		Where(pre).GetMulti(masterslave.UseMaster(context.Background()))

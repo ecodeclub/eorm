@@ -17,6 +17,7 @@ package transaction
 import (
 	"context"
 	"database/sql"
+	"github.com/ecodeclub/eorm/internal/errs"
 	"sync"
 
 	"github.com/ecodeclub/eorm/internal/datasource"
@@ -43,13 +44,18 @@ func (t *BinMultiTx) findTgt(ctx context.Context, query datasource.Query) (datas
 func (t *BinMultiTx) Query(ctx context.Context, query datasource.Query) (*sql.Rows, error) {
 	t.lock.RLock()
 	if t.DB != "" && t.tx != nil {
+		if t.DB != query.DB {
+			return nil, errs.NewErrDBNotEqual(t.DB, query.DB)
+		}
 		return t.tx.Query(ctx, query)
 	}
 	t.lock.RUnlock()
-
 	t.lock.Lock()
 	defer t.lock.Unlock()
 	if t.DB != "" && t.tx != nil {
+		if t.DB != query.DB {
+			return nil, errs.NewErrDBNotEqual(t.DB, query.DB)
+		}
 		return t.tx.Query(ctx, query)
 	}
 	var err error
@@ -70,6 +76,9 @@ func (t *BinMultiTx) Exec(ctx context.Context, query datasource.Query) (sql.Resu
 	// 防止 GetMulti 的查询重复创建多个事务
 	t.lock.RLock()
 	if t.DB != "" && t.tx != nil {
+		if t.DB != query.DB {
+			return nil, errs.NewErrDBNotEqual(t.DB, query.DB)
+		}
 		return t.tx.Exec(ctx, query)
 	}
 	t.lock.RUnlock()
@@ -77,6 +86,9 @@ func (t *BinMultiTx) Exec(ctx context.Context, query datasource.Query) (sql.Resu
 	t.lock.Lock()
 	defer t.lock.Unlock()
 	if t.DB != "" && t.tx != nil {
+		if t.DB != query.DB {
+			return nil, errs.NewErrDBNotEqual(t.DB, query.DB)
+		}
 		return t.tx.Exec(ctx, query)
 	}
 	var err error
