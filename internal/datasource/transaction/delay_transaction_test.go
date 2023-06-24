@@ -18,6 +18,10 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"regexp"
+	"strings"
+	"testing"
+
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/ecodeclub/eorm"
 	"github.com/ecodeclub/eorm/internal/datasource"
@@ -32,9 +36,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/multierr"
-	"regexp"
-	"strings"
-	"testing"
 )
 
 type TestDelayTxTestSuite struct {

@@ -18,6 +18,10 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"regexp"
+	"strings"
+	"testing"
+
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/ecodeclub/eorm"
 	"github.com/ecodeclub/eorm/internal/datasource/masterslave"
@@ -27,9 +31,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"regexp"
-	"strings"
-	"testing"
 )
 
 type TestBinMultiTxTestSuite struct {

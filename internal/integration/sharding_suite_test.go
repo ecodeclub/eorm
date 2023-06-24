@@ -21,6 +21,9 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"fmt"
+	"log"
+	"time"
+
 	"github.com/ecodeclub/eorm"
 	"github.com/ecodeclub/eorm/internal/datasource"
 	"github.com/ecodeclub/eorm/internal/datasource/cluster"
@@ -34,8 +37,6 @@ import (
 	"github.com/ecodeclub/eorm/internal/test"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"log"
-	"time"
 )
 
 type ShardingSuite struct {

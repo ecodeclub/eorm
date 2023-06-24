@@ -18,6 +18,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"testing"
+
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/ecodeclub/eorm"
 	"github.com/ecodeclub/eorm/internal/datasource"
@@ -32,7 +34,6 @@ import (
 	"github.com/ecodeclub/eorm/internal/test"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"testing"
 )
 
 type ShardingTransactionSuite struct {
