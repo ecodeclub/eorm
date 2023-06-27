@@ -48,44 +48,24 @@ func (t *DelayTx) findTgt(ctx context.Context, query datasource.Query) (datasour
 
 func (t *DelayTx) Query(ctx context.Context, query datasource.Query) (*sql.Rows, error) {
 	// 防止 GetMulti 的查询重复创建多个事务
-	t.lock.RLock()
-	tx, ok := t.txs[query.DB]
-	t.lock.RUnlock()
-	if ok {
-		return tx.Query(ctx, query)
-	}
-	t.lock.Lock()
-	defer t.lock.Unlock()
-	if tx, ok = t.txs[query.DB]; ok {
-		return tx.Query(ctx, query)
-	}
-	//fmt.Println(query.DB)
-	//fmt.Println(t.beginners)
-	var err error
-	db, err := t.findTgt(ctx, query)
+	tx, err := t.findOrBeginTx(ctx, query)
 	if err != nil {
 		return nil, err
 	}
-	tx, err = db.BeginTx(t.ctx.TxCtx, t.ctx.Opts)
-	if err != nil {
-		return nil, err
-	}
-	t.txs[query.DB] = tx
 	return tx.Query(ctx, query)
 }
 
-func (t *DelayTx) Exec(ctx context.Context, query datasource.Query) (sql.Result, error) {
-	// 防止 GetMulti 的查询重复创建多个事务
+func (t *DelayTx) findOrBeginTx(ctx context.Context, query datasource.Query) (datasource.Tx, error) {
 	t.lock.RLock()
 	tx, ok := t.txs[query.DB]
 	t.lock.RUnlock()
 	if ok {
-		return tx.Exec(ctx, query)
+		return tx, nil
 	}
 	t.lock.Lock()
 	defer t.lock.Unlock()
 	if tx, ok = t.txs[query.DB]; ok {
-		return tx.Exec(ctx, query)
+		return tx, nil
 	}
 	var err error
 	db, err := t.findTgt(ctx, query)
@@ -97,6 +77,14 @@ func (t *DelayTx) Exec(ctx context.Context, query datasource.Query) (sql.Result,
 		return nil, err
 	}
 	t.txs[query.DB] = tx
+	return tx, nil
+}
+
+func (t *DelayTx) Exec(ctx context.Context, query datasource.Query) (sql.Result, error) {
+	tx, err := t.findOrBeginTx(ctx, query)
+	if err != nil {
+		return nil, err
+	}
 	return tx.Exec(ctx, query)
 }
 
