@@ -36,23 +36,6 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-//import (
-//	"context"
-//	"fmt"
-//	"testing"
-//	"time"
-//
-//	"github.com/ecodeclub/eorm/internal/datasource/masterslave"
-//	operator "github.com/ecodeclub/eorm/internal/operator"
-//
-//	"github.com/ecodeclub/eorm"
-//	"github.com/ecodeclub/eorm/internal/datasource"
-//	"github.com/ecodeclub/eorm/internal/sharding"
-//	"github.com/ecodeclub/eorm/internal/test"
-//	"github.com/stretchr/testify/require"
-//	"github.com/stretchr/testify/suite"
-//)
-
 type ShardingDelayTxTestSuite struct {
 	ShardingSuite
 	data []*test.OrderDetail
@@ -89,7 +72,7 @@ func (s *ShardingDelayTxTestSuite) TestShardingInsert_Commit_Or_Rollback() {
 		wantAffected int64
 		values       []*test.OrderDetail
 		querySet     []*test.OrderDetail
-		tx           *eorm.Tx
+		txFunc       func(t *testing.T) *eorm.Tx
 		afterFunc    func(t *testing.T, tx *eorm.Tx, values []*test.OrderDetail)
 	}{
 		{
@@ -106,12 +89,12 @@ func (s *ShardingDelayTxTestSuite) TestShardingInsert_Commit_Or_Rollback() {
 				{OrderId: 253, ItemId: 8, UsingCol1: "Stephen", UsingCol2: "Curry"},
 				{OrderId: 181, ItemId: 11, UsingCol1: "Kawhi", UsingCol2: "Leonard"},
 			},
-			tx: func() *eorm.Tx {
+			txFunc: func(t *testing.T) *eorm.Tx {
 				tx, er := s.shardingDB.BeginTx(
 					transaction.UsingTxType(context.Background(), transaction.Delay), &sql.TxOptions{})
 				require.NoError(t, er)
 				return tx
-			}(),
+			},
 			afterFunc: func(t *testing.T, tx *eorm.Tx, values []*test.OrderDetail) {
 				err := tx.Commit()
 				require.NoError(t, err)
@@ -134,12 +117,12 @@ func (s *ShardingDelayTxTestSuite) TestShardingInsert_Commit_Or_Rollback() {
 				{OrderId: 253, ItemId: 8, UsingCol1: "Stephen", UsingCol2: "Curry"},
 				{OrderId: 181, ItemId: 11, UsingCol1: "Kawhi", UsingCol2: "Leonard"},
 			},
-			tx: func() *eorm.Tx {
+			txFunc: func(t *testing.T) *eorm.Tx {
 				tx, er := s.shardingDB.BeginTx(
 					transaction.UsingTxType(context.Background(), transaction.Delay), &sql.TxOptions{})
 				require.NoError(t, er)
 				return tx
-			}(),
+			},
 			afterFunc: func(t *testing.T, tx *eorm.Tx, values []*test.OrderDetail) {
 				var wantOds []*test.OrderDetail
 				err := tx.Rollback()
@@ -156,22 +139,23 @@ func (s *ShardingDelayTxTestSuite) TestShardingInsert_Commit_Or_Rollback() {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			tx := tc.tx
-			err := tx.Rollback()
-			require.NoError(t, err)
-			fmt.Println(1111)
+			tx := tc.txFunc(t)
+			defer tx.Commit()
+			//err := txFunc.Rollback()
+			//require.NoError(t, err)
+			//fmt.Println(1111)
 			querySet, err := eorm.NewShardingSelector[test.OrderDetail](tx).
 				Where(eorm.C("OrderId").NEQ(123)).
 				GetMulti(masterslave.UseMaster(context.Background()))
-			fmt.Println(2222)
+			//fmt.Println(2222)
 			require.NoError(t, err)
 			assert.ElementsMatch(t, tc.querySet, querySet)
-			//res := eorm.NewShardingInsert[test.OrderDetail](tx).
+			//res := eorm.NewShardingInsert[test.OrderDetail](txFunc).
 			//	Values(tc.values).Exec(context.Background())
 			//affected, err := res.RowsAffected()
 			//require.NoError(t, err)
 			//assert.Equal(t, tc.wantAffected, affected)
-			//tc.afterFunc(t, tx, tc.values)
+			//tc.afterFunc(t, txFunc, tc.values)
 		})
 	}
 }
@@ -205,7 +189,7 @@ func (s *ShardingDelayTxTestSuite) findTgt(t *testing.T, values []*test.OrderDet
 //		selectorBuilder *eorm.ShardingSelector[test.OrderDetail]
 //		updatedQuerySet []*test.OrderDetail
 //		querySet        []*test.OrderDetail
-//		tx              *eorm.Tx
+//		txFunc              *eorm.Tx
 //	}{
 //		{
 //			name: "select update",
@@ -226,16 +210,16 @@ func (s *ShardingDelayTxTestSuite) findTgt(t *testing.T, values []*test.OrderDet
 //				{OrderId: 253, ItemId: 8, UsingCol1: "Stephen", UsingCol2: "Curry"},
 //			},
 //		},
-//		tx: func() *eorm.Tx {
-//			tx, er := s.shardingDB.BeginTx(transaction.UsingTxType(context.Background()), &sql.TxOptions{})
+//		txFunc: func() *eorm.Tx {
+//			txFunc, er := s.shardingDB.BeginTx(transaction.UsingTxType(context.Background()), &sql.TxOptions{})
 //			require.NoError(t, er)
 //		}(),
 //	}
 //	for _, tc := range testCases {
 //		t.Run(tc.name, func(t *testing.T) {
-//			tx := tc.tx
+//			txFunc := tc.txFunc
 //
-//			rows, queryErr := tx.queryContext(context.Background(), datasource.Query(tc.query))
+//			rows, queryErr := txFunc.queryContext(context.Background(), datasource.Query(tc.query))
 //
 //			res := tc.exec.Exec(context.Background())
 //			require.Equal(t, tc.wantErr, res.Err())
