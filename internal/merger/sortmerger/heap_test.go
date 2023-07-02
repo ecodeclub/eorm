@@ -21,11 +21,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ecodeclub/eorm/internal/merger/utils"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func newTestHp(nodes []*node, columns sortColumns) *Heap {
+func newTestHp(nodes []*node, columns SortColumns) *Heap {
 	h := &Heap{
 		sortColumns: columns,
 	}
@@ -51,7 +53,7 @@ func TestHeap(t *testing.T) {
 		name      string
 		nodes     func() []*node
 		wantNodes func() []*node
-		sortCols  func() sortColumns
+		sortCols  func() SortColumns
 	}{
 		{
 			name: "单个列升序",
@@ -73,8 +75,8 @@ func TestHeap(t *testing.T) {
 					{6},
 				})
 			},
-			sortCols: func() sortColumns {
-				sortCols, err := newSortColumns(NewSortColumn("id", ASC))
+			sortCols: func() SortColumns {
+				sortCols, err := newSortColumns(NewSortColumn("id", utils.ASC))
 				require.NoError(t, err)
 				return sortCols
 			},
@@ -99,8 +101,8 @@ func TestHeap(t *testing.T) {
 					{0},
 				})
 			},
-			sortCols: func() sortColumns {
-				sortCols, err := newSortColumns(NewSortColumn("id", DESC))
+			sortCols: func() SortColumns {
+				sortCols, err := newSortColumns(NewSortColumn("id", utils.DESC))
 				require.NoError(t, err)
 				return sortCols
 			},
@@ -145,8 +147,8 @@ func TestHeap(t *testing.T) {
 					{5, "a", 1},
 				})
 			},
-			sortCols: func() sortColumns {
-				sortCols, err := newSortColumns(NewSortColumn("id", ASC), NewSortColumn("name", DESC), NewSortColumn("age", ASC))
+			sortCols: func() SortColumns {
+				sortCols, err := newSortColumns(NewSortColumn("id", utils.ASC), NewSortColumn("name", utils.DESC), NewSortColumn("age", utils.ASC))
 				require.NoError(t, err)
 				return sortCols
 			},
@@ -191,8 +193,8 @@ func TestHeap(t *testing.T) {
 					{1, "e", 1},
 				})
 			},
-			sortCols: func() sortColumns {
-				sortCols, err := newSortColumns(NewSortColumn("id", DESC), NewSortColumn("name", ASC), NewSortColumn("age", DESC))
+			sortCols: func() SortColumns {
+				sortCols, err := newSortColumns(NewSortColumn("id", utils.DESC), NewSortColumn("name", utils.ASC), NewSortColumn("age", utils.DESC))
 				require.NoError(t, err)
 				return sortCols
 			},
@@ -237,8 +239,8 @@ func TestHeap(t *testing.T) {
 					{5, "e", 1},
 				})
 			},
-			sortCols: func() sortColumns {
-				sortCols, err := newSortColumns(NewSortColumn("id", ASC), NewSortColumn("name", ASC), NewSortColumn("age", DESC))
+			sortCols: func() SortColumns {
+				sortCols, err := newSortColumns(NewSortColumn("id", utils.ASC), NewSortColumn("name", utils.ASC), NewSortColumn("age", utils.DESC))
 				require.NoError(t, err)
 				return sortCols
 			},
@@ -283,8 +285,8 @@ func TestHeap(t *testing.T) {
 					{1, "a", 1},
 				})
 			},
-			sortCols: func() sortColumns {
-				sortCols, err := newSortColumns(NewSortColumn("id", DESC), NewSortColumn("name", DESC), NewSortColumn("age", ASC))
+			sortCols: func() SortColumns {
+				sortCols, err := newSortColumns(NewSortColumn("id", utils.DESC), NewSortColumn("name", utils.DESC), NewSortColumn("age", utils.ASC))
 				require.NoError(t, err)
 				return sortCols
 			},
@@ -329,8 +331,8 @@ func TestHeap(t *testing.T) {
 					{1, "a", 1},
 				})
 			},
-			sortCols: func() sortColumns {
-				sortCols, err := newSortColumns(NewSortColumn("id", DESC), NewSortColumn("name", DESC), NewSortColumn("age", DESC))
+			sortCols: func() SortColumns {
+				sortCols, err := newSortColumns(NewSortColumn("id", utils.DESC), NewSortColumn("name", utils.DESC), NewSortColumn("age", utils.DESC))
 				require.NoError(t, err)
 				return sortCols
 			},
@@ -375,8 +377,8 @@ func TestHeap(t *testing.T) {
 					{5, "e", 3},
 				})
 			},
-			sortCols: func() sortColumns {
-				sortCols, err := newSortColumns(NewSortColumn("id", ASC), NewSortColumn("name", ASC), NewSortColumn("age", ASC))
+			sortCols: func() SortColumns {
+				sortCols, err := newSortColumns(NewSortColumn("id", utils.ASC), NewSortColumn("name", utils.ASC), NewSortColumn("age", utils.ASC))
 				require.NoError(t, err)
 				return sortCols
 			},
@@ -400,10 +402,10 @@ func TestHeap_Nullable(t *testing.T) {
 		name      string
 		nodes     func() []*node
 		wantNodes func() []*node
-		sortCols  func() sortColumns
+		sortCols  func() SortColumns
 	}{
 		{
-			name: "sql.NullInt64 asc",
+			name: "sql.NullInt64 utils.ASC",
 			nodes: func() []*node {
 				return newTestNodes([][]any{
 					{sql.NullInt64{Int64: 5, Valid: true}},
@@ -422,14 +424,14 @@ func TestHeap_Nullable(t *testing.T) {
 					{sql.NullInt64{Int64: 5, Valid: true}},
 				})
 			},
-			sortCols: func() sortColumns {
-				sortCols, err := newSortColumns(NewSortColumn("id", ASC))
+			sortCols: func() SortColumns {
+				sortCols, err := newSortColumns(NewSortColumn("id", utils.ASC))
 				require.NoError(t, err)
 				return sortCols
 			},
 		},
 		{
-			name: "sql.NullInt64 desc",
+			name: "sql.NullInt64 utils.DESC",
 			nodes: func() []*node {
 				return newTestNodes([][]any{
 					{sql.NullInt64{Int64: 5, Valid: true}},
@@ -448,14 +450,14 @@ func TestHeap_Nullable(t *testing.T) {
 					{sql.NullInt64{Int64: 10, Valid: false}},
 				})
 			},
-			sortCols: func() sortColumns {
-				sortCols, err := newSortColumns(NewSortColumn("id", DESC))
+			sortCols: func() SortColumns {
+				sortCols, err := newSortColumns(NewSortColumn("id", utils.DESC))
 				require.NoError(t, err)
 				return sortCols
 			},
 		},
 		{
-			name: "sql.NullString asc",
+			name: "sql.NullString utils.ASC",
 			nodes: func() []*node {
 				return newTestNodes([][]any{
 					{sql.NullString{String: "ab", Valid: true}},
@@ -474,14 +476,14 @@ func TestHeap_Nullable(t *testing.T) {
 					{sql.NullString{String: "cd", Valid: true}},
 				})
 			},
-			sortCols: func() sortColumns {
-				sortCols, err := newSortColumns(NewSortColumn("name", ASC))
+			sortCols: func() SortColumns {
+				sortCols, err := newSortColumns(NewSortColumn("name", utils.ASC))
 				require.NoError(t, err)
 				return sortCols
 			},
 		},
 		{
-			name: "sql.NullString desc",
+			name: "sql.NullString utils.DESC",
 			nodes: func() []*node {
 				return newTestNodes([][]any{
 					{sql.NullString{String: "ab", Valid: true}},
@@ -500,14 +502,14 @@ func TestHeap_Nullable(t *testing.T) {
 					{sql.NullString{String: "z", Valid: false}},
 				})
 			},
-			sortCols: func() sortColumns {
-				sortCols, err := newSortColumns(NewSortColumn("name", DESC))
+			sortCols: func() SortColumns {
+				sortCols, err := newSortColumns(NewSortColumn("name", utils.DESC))
 				require.NoError(t, err)
 				return sortCols
 			},
 		},
 		{
-			name: "sql.NullInt16 asc",
+			name: "sql.NullInt16 utils.ASC",
 			nodes: func() []*node {
 				return newTestNodes([][]any{
 					{sql.NullInt16{Int16: 5, Valid: true}},
@@ -526,14 +528,14 @@ func TestHeap_Nullable(t *testing.T) {
 					{sql.NullInt16{Int16: 5, Valid: true}},
 				})
 			},
-			sortCols: func() sortColumns {
-				sortCols, err := newSortColumns(NewSortColumn("id", ASC))
+			sortCols: func() SortColumns {
+				sortCols, err := newSortColumns(NewSortColumn("id", utils.ASC))
 				require.NoError(t, err)
 				return sortCols
 			},
 		},
 		{
-			name: "sql.NullInt16 desc",
+			name: "sql.NullInt16 utils.DESC",
 			nodes: func() []*node {
 				return newTestNodes([][]any{
 					{sql.NullInt16{Int16: 5, Valid: true}},
@@ -552,14 +554,14 @@ func TestHeap_Nullable(t *testing.T) {
 					{sql.NullInt16{Int16: 10, Valid: false}},
 				})
 			},
-			sortCols: func() sortColumns {
-				sortCols, err := newSortColumns(NewSortColumn("id", DESC))
+			sortCols: func() SortColumns {
+				sortCols, err := newSortColumns(NewSortColumn("id", utils.DESC))
 				require.NoError(t, err)
 				return sortCols
 			},
 		},
 		{
-			name: "sql.NullInt32 asc",
+			name: "sql.NullInt32 utils.ASC",
 			nodes: func() []*node {
 				return newTestNodes([][]any{
 					{sql.NullInt32{Int32: 5, Valid: true}},
@@ -578,14 +580,14 @@ func TestHeap_Nullable(t *testing.T) {
 					{sql.NullInt32{Int32: 5, Valid: true}},
 				})
 			},
-			sortCols: func() sortColumns {
-				sortCols, err := newSortColumns(NewSortColumn("id", ASC))
+			sortCols: func() SortColumns {
+				sortCols, err := newSortColumns(NewSortColumn("id", utils.ASC))
 				require.NoError(t, err)
 				return sortCols
 			},
 		},
 		{
-			name: "sql.NullInt32 desc",
+			name: "sql.NullInt32 utils.DESC",
 			nodes: func() []*node {
 				return newTestNodes([][]any{
 					{sql.NullInt32{Int32: 5, Valid: true}},
@@ -604,14 +606,14 @@ func TestHeap_Nullable(t *testing.T) {
 					{sql.NullInt32{Int32: 10, Valid: false}},
 				})
 			},
-			sortCols: func() sortColumns {
-				sortCols, err := newSortColumns(NewSortColumn("id", DESC))
+			sortCols: func() SortColumns {
+				sortCols, err := newSortColumns(NewSortColumn("id", utils.DESC))
 				require.NoError(t, err)
 				return sortCols
 			},
 		},
 		{
-			name: "sql.NullFloat64 asc",
+			name: "sql.NullFloat64 utils.ASC",
 			nodes: func() []*node {
 				return newTestNodes([][]any{
 					{sql.NullFloat64{Float64: 5.0, Valid: true}},
@@ -630,14 +632,14 @@ func TestHeap_Nullable(t *testing.T) {
 					{sql.NullFloat64{Float64: 5.0, Valid: true}},
 				})
 			},
-			sortCols: func() sortColumns {
-				sortCols, err := newSortColumns(NewSortColumn("id", ASC))
+			sortCols: func() SortColumns {
+				sortCols, err := newSortColumns(NewSortColumn("id", utils.ASC))
 				require.NoError(t, err)
 				return sortCols
 			},
 		},
 		{
-			name: "sql.NullFloat64 desc",
+			name: "sql.NullFloat64 utils.DESC",
 			nodes: func() []*node {
 				return newTestNodes([][]any{
 					{sql.NullFloat64{Float64: 5.0, Valid: true}},
@@ -656,15 +658,15 @@ func TestHeap_Nullable(t *testing.T) {
 					{sql.NullFloat64{Float64: 10.0, Valid: false}},
 				})
 			},
-			sortCols: func() sortColumns {
-				sortCols, err := newSortColumns(NewSortColumn("id", DESC))
+			sortCols: func() SortColumns {
+				sortCols, err := newSortColumns(NewSortColumn("id", utils.DESC))
 				require.NoError(t, err)
 				return sortCols
 			},
 		},
 
 		{
-			name: "sql.NullTime asc",
+			name: "sql.NullTime utils.ASC",
 			nodes: func() []*node {
 				return newTestNodes([][]any{
 					{sql.NullTime{Time: func() time.Time {
@@ -723,14 +725,14 @@ func TestHeap_Nullable(t *testing.T) {
 					}(), Valid: true}},
 				})
 			},
-			sortCols: func() sortColumns {
-				sortCols, err := newSortColumns(NewSortColumn("time", ASC))
+			sortCols: func() SortColumns {
+				sortCols, err := newSortColumns(NewSortColumn("time", utils.ASC))
 				require.NoError(t, err)
 				return sortCols
 			},
 		},
 		{
-			name: "sql.NullTime desc",
+			name: "sql.NullTime utils.DESC",
 			nodes: func() []*node {
 				return newTestNodes([][]any{
 					{sql.NullTime{Time: func() time.Time {
@@ -789,14 +791,14 @@ func TestHeap_Nullable(t *testing.T) {
 					}(), Valid: false}},
 				})
 			},
-			sortCols: func() sortColumns {
-				sortCols, err := newSortColumns(NewSortColumn("time", DESC))
+			sortCols: func() SortColumns {
+				sortCols, err := newSortColumns(NewSortColumn("time", utils.DESC))
 				require.NoError(t, err)
 				return sortCols
 			},
 		},
 		{
-			name: "sql.NullByte asc",
+			name: "sql.NullByte utils.ASC",
 			nodes: func() []*node {
 				return newTestNodes([][]any{
 					{sql.NullByte{Byte: 'a', Valid: true}},
@@ -815,14 +817,14 @@ func TestHeap_Nullable(t *testing.T) {
 					{sql.NullByte{Byte: 'k', Valid: true}},
 				})
 			},
-			sortCols: func() sortColumns {
-				sortCols, err := newSortColumns(NewSortColumn("byte", ASC))
+			sortCols: func() SortColumns {
+				sortCols, err := newSortColumns(NewSortColumn("byte", utils.ASC))
 				require.NoError(t, err)
 				return sortCols
 			},
 		},
 		{
-			name: "sql.NullByte desc",
+			name: "sql.NullByte utils.DESC",
 			nodes: func() []*node {
 				return newTestNodes([][]any{
 					{sql.NullByte{Byte: 'a', Valid: true}},
@@ -841,8 +843,8 @@ func TestHeap_Nullable(t *testing.T) {
 					{sql.NullByte{Byte: 'z', Valid: false}},
 				})
 			},
-			sortCols: func() sortColumns {
-				sortCols, err := newSortColumns(NewSortColumn("byte", DESC))
+			sortCols: func() SortColumns {
+				sortCols, err := newSortColumns(NewSortColumn("byte", utils.DESC))
 				require.NoError(t, err)
 				return sortCols
 			},
@@ -864,372 +866,372 @@ func (ms *MergerSuite) TestCompare() {
 	testcases := []struct {
 		name    string
 		values  []any
-		order   Order
+		order   utils.Order
 		wantVal int
 		kind    reflect.Kind
 	}{
 		{
-			name:    "int8 ASC 1,2",
+			name:    "int8 utils.ASC 1,2",
 			values:  []any{int8(1), int8(2)},
-			order:   ASC,
+			order:   utils.ASC,
 			wantVal: -1,
 			kind:    reflect.Int8,
 		},
 		{
-			name:    "int8 DESC 1,2",
+			name:    "int8 utils.DESC 1,2",
 			values:  []any{int8(1), int8(2)},
-			order:   DESC,
+			order:   utils.DESC,
 			wantVal: 1,
 			kind:    reflect.Int8,
 		},
 		{
-			name:    "int8 ASC 2,1",
+			name:    "int8 utils.ASC 2,1",
 			values:  []any{int8(2), int8(1)},
-			order:   ASC,
+			order:   utils.ASC,
 			wantVal: 1,
 			kind:    reflect.Int8,
 		},
 		{
-			name:    "int8 DESC 2,1",
+			name:    "int8 utils.DESC 2,1",
 			values:  []any{int8(2), int8(1)},
-			order:   DESC,
+			order:   utils.DESC,
 			wantVal: -1,
 			kind:    reflect.Int8,
 		},
 		{
 			name:    "int8 equal",
 			values:  []any{int8(2), int8(2)},
-			order:   DESC,
+			order:   utils.DESC,
 			wantVal: 0,
 			kind:    reflect.Int8,
 		},
 		{
-			name:    "int16 ASC 1,2",
+			name:    "int16 utils.ASC 1,2",
 			values:  []any{int16(1), int16(2)},
-			order:   ASC,
+			order:   utils.ASC,
 			wantVal: -1,
 			kind:    reflect.Int16,
 		},
 		{
-			name:    "int16 DESC 1,2",
+			name:    "int16 utils.DESC 1,2",
 			values:  []any{int16(1), int16(2)},
-			order:   DESC,
+			order:   utils.DESC,
 			wantVal: 1,
 			kind:    reflect.Int16,
 		},
 		{
-			name:    "int16 ASC 2,1",
+			name:    "int16 utils.ASC 2,1",
 			values:  []any{int16(2), int16(1)},
-			order:   ASC,
+			order:   utils.ASC,
 			wantVal: 1,
 			kind:    reflect.Int16,
 		},
 		{
-			name:    "int16 DESC 2,1",
+			name:    "int16 utils.DESC 2,1",
 			values:  []any{int16(2), int16(1)},
-			order:   DESC,
+			order:   utils.DESC,
 			wantVal: -1,
 			kind:    reflect.Int16,
 		},
 		{
 			name:    "int16 equa",
 			values:  []any{int16(2), int16(2)},
-			order:   DESC,
+			order:   utils.DESC,
 			wantVal: 0,
 			kind:    reflect.Int16,
 		},
 		{
-			name:    "int32 ASC 1,2",
+			name:    "int32 utils.ASC 1,2",
 			values:  []any{int32(1), int32(2)},
-			order:   ASC,
+			order:   utils.ASC,
 			wantVal: -1,
 			kind:    reflect.Int32,
 		},
 		{
-			name:    "int32 DESC 1,2",
+			name:    "int32 utils.DESC 1,2",
 			values:  []any{int32(1), int32(2)},
-			order:   DESC,
+			order:   utils.DESC,
 			wantVal: 1,
 			kind:    reflect.Int32,
 		},
 		{
-			name:    "int32 ASC 2,1",
+			name:    "int32 utils.ASC 2,1",
 			values:  []any{int32(2), int32(1)},
-			order:   ASC,
+			order:   utils.ASC,
 			wantVal: 1,
 			kind:    reflect.Int32,
 		},
 		{
-			name:    "int32 DESC 2,1",
+			name:    "int32 utils.DESC 2,1",
 			values:  []any{int32(2), int32(1)},
-			order:   DESC,
+			order:   utils.DESC,
 			wantVal: -1,
 			kind:    reflect.Int32,
 		},
 		{
 			name:    "int32 equal",
 			values:  []any{int32(2), int32(2)},
-			order:   DESC,
+			order:   utils.DESC,
 			wantVal: 0,
 			kind:    reflect.Int32,
 		},
 		{
-			name:    "int64 ASC 1,2",
+			name:    "int64 utils.ASC 1,2",
 			values:  []any{int64(1), int64(02)},
-			order:   ASC,
+			order:   utils.ASC,
 			wantVal: -1,
 			kind:    reflect.Int64,
 		},
 		{
-			name:    "int64 DESC 1,2",
+			name:    "int64 utils.DESC 1,2",
 			values:  []any{int64(1), int64(2)},
-			order:   DESC,
+			order:   utils.DESC,
 			wantVal: 1,
 			kind:    reflect.Int64,
 		},
 		{
-			name:    "int64 ASC 2,1",
+			name:    "int64 utils.ASC 2,1",
 			values:  []any{int64(2), int64(1)},
-			order:   ASC,
+			order:   utils.ASC,
 			wantVal: 1,
 			kind:    reflect.Int64,
 		},
 		{
-			name:    "int64 DESC 2,1",
+			name:    "int64 utils.DESC 2,1",
 			values:  []any{int64(2), int64(1)},
-			order:   DESC,
+			order:   utils.DESC,
 			wantVal: -1,
 			kind:    reflect.Int64,
 		},
 		{
 			name:    "int64 equal",
 			values:  []any{int64(2), int64(2)},
-			order:   DESC,
+			order:   utils.DESC,
 			wantVal: 0,
 			kind:    reflect.Int64,
 		},
 		{
-			name:    "uint8 ASC 1,2",
+			name:    "uint8 utils.ASC 1,2",
 			values:  []any{uint8(1), uint8(2)},
-			order:   ASC,
+			order:   utils.ASC,
 			wantVal: -1,
 			kind:    reflect.Uint8,
 		},
 		{
-			name:    "uint8 DESC 1,2",
+			name:    "uint8 utils.DESC 1,2",
 			values:  []any{uint8(1), uint8(2)},
-			order:   DESC,
+			order:   utils.DESC,
 			wantVal: 1,
 			kind:    reflect.Uint8,
 		},
 		{
-			name:    "uint8 ASC 2,1",
+			name:    "uint8 utils.ASC 2,1",
 			values:  []any{uint8(2), uint8(1)},
-			order:   ASC,
+			order:   utils.ASC,
 			wantVal: 1,
 			kind:    reflect.Uint8,
 		},
 		{
-			name:    "uint8 DESC 2,1",
+			name:    "uint8 utils.DESC 2,1",
 			values:  []any{uint8(2), uint8(1)},
-			order:   DESC,
+			order:   utils.DESC,
 			wantVal: -1,
 			kind:    reflect.Uint8,
 		},
 		{
 			name:    "uint8 equal",
 			values:  []any{uint8(2), uint8(2)},
-			order:   DESC,
+			order:   utils.DESC,
 			wantVal: 0,
 			kind:    reflect.Uint8,
 		},
 
 		{
-			name:    "uint16 ASC 1,2",
+			name:    "uint16 utils.ASC 1,2",
 			values:  []any{uint16(1), uint16(2)},
-			order:   ASC,
+			order:   utils.ASC,
 			wantVal: -1,
 			kind:    reflect.Uint16,
 		},
 		{
-			name:    "uint16 DESC 1,2",
+			name:    "uint16 utils.DESC 1,2",
 			values:  []any{uint16(1), uint16(2)},
-			order:   DESC,
+			order:   utils.DESC,
 			wantVal: 1,
 			kind:    reflect.Uint16,
 		},
 		{
-			name:    "uint16 ASC 2,1",
+			name:    "uint16 utils.ASC 2,1",
 			values:  []any{uint16(2), uint16(1)},
-			order:   ASC,
+			order:   utils.ASC,
 			wantVal: 1,
 			kind:    reflect.Uint16,
 		},
 		{
-			name:    "uint16 DESC 2,1",
+			name:    "uint16 utils.DESC 2,1",
 			values:  []any{uint16(2), uint16(1)},
-			order:   DESC,
+			order:   utils.DESC,
 			wantVal: -1,
 			kind:    reflect.Uint16,
 		},
 		{
 			name:    "uint16 equal",
 			values:  []any{uint16(2), uint16(2)},
-			order:   DESC,
+			order:   utils.DESC,
 			wantVal: 0,
 			kind:    reflect.Uint16,
 		},
 		{
-			name:    "uint32 ASC 1,2",
+			name:    "uint32 utils.ASC 1,2",
 			values:  []any{uint32(1), uint32(2)},
-			order:   ASC,
+			order:   utils.ASC,
 			wantVal: -1,
 			kind:    reflect.Uint32,
 		},
 		{
-			name:    "uint32 DESC 1,2",
+			name:    "uint32 utils.DESC 1,2",
 			values:  []any{uint32(1), uint32(2)},
-			order:   DESC,
+			order:   utils.DESC,
 			wantVal: 1,
 			kind:    reflect.Uint32,
 		},
 		{
-			name:    "uint32 ASC 2,1",
+			name:    "uint32 utils.ASC 2,1",
 			values:  []any{uint32(2), uint32(1)},
-			order:   ASC,
+			order:   utils.ASC,
 			wantVal: 1,
 			kind:    reflect.Uint32,
 		},
 		{
-			name:    "uint32 DESC 2,1",
+			name:    "uint32 utils.DESC 2,1",
 			values:  []any{uint32(2), uint32(1)},
-			order:   DESC,
+			order:   utils.DESC,
 			wantVal: -1,
 			kind:    reflect.Uint32,
 		},
 		{
 			name:    "uint32 equal",
 			values:  []any{uint32(2), uint32(2)},
-			order:   DESC,
+			order:   utils.DESC,
 			wantVal: 0,
 			kind:    reflect.Uint32,
 		},
 		{
-			name:    "uint64 ASC 1,2",
+			name:    "uint64 utils.ASC 1,2",
 			values:  []any{uint64(1), uint64(2)},
-			order:   ASC,
+			order:   utils.ASC,
 			wantVal: -1,
 			kind:    reflect.Uint64,
 		},
 		{
-			name:    "uint64 DESC 1,2",
+			name:    "uint64 utils.DESC 1,2",
 			values:  []any{uint64(1), uint64(2)},
-			order:   DESC,
+			order:   utils.DESC,
 			wantVal: 1,
 			kind:    reflect.Uint64,
 		},
 		{
-			name:    "uint64 ASC 2,1",
+			name:    "uint64 utils.ASC 2,1",
 			values:  []any{uint64(2), uint64(1)},
-			order:   ASC,
+			order:   utils.ASC,
 			wantVal: 1,
 			kind:    reflect.Uint64,
 		},
 		{
-			name:    "uint64 DESC 2,1",
+			name:    "uint64 utils.DESC 2,1",
 			values:  []any{uint64(2), uint64(1)},
-			order:   DESC,
+			order:   utils.DESC,
 			wantVal: -1,
 			kind:    reflect.Uint64,
 		},
 		{
 			name:    "uint64 equal",
 			values:  []any{uint64(2), uint64(2)},
-			order:   DESC,
+			order:   utils.DESC,
 			wantVal: 0,
 			kind:    reflect.Uint64,
 		},
 		{
-			name:    "float32 ASC 1,2",
+			name:    "float32 utils.ASC 1,2",
 			values:  []any{float32(1.1), float32(2.1)},
-			order:   ASC,
+			order:   utils.ASC,
 			wantVal: -1,
 			kind:    reflect.Float32,
 		},
 		{
-			name:    "float32 DESC 1,2",
+			name:    "float32 utils.DESC 1,2",
 			values:  []any{float32(1.1), float32(2.1)},
-			order:   DESC,
+			order:   utils.DESC,
 			wantVal: 1,
 			kind:    reflect.Float32,
 		},
 		{
-			name:    "float32 ASC 2,1",
+			name:    "float32 utils.ASC 2,1",
 			values:  []any{float32(2), float32(1)},
-			order:   ASC,
+			order:   utils.ASC,
 			wantVal: 1,
 			kind:    reflect.Float32,
 		},
 		{
-			name:    "float32 DESC 2,1",
+			name:    "float32 utils.DESC 2,1",
 			values:  []any{float32(2.1), float32(1.1)},
-			order:   DESC,
+			order:   utils.DESC,
 			wantVal: -1,
 			kind:    reflect.Float32,
 		},
 		{
 			name:    "float32 equal",
 			values:  []any{float32(2.1), float32(2.1)},
-			order:   DESC,
+			order:   utils.DESC,
 			wantVal: 0,
 			kind:    reflect.Float32,
 		},
 		{
-			name:    "float64 ASC 1,2",
+			name:    "float64 utils.ASC 1,2",
 			values:  []any{float64(1.1), float64(2.1)},
-			order:   ASC,
+			order:   utils.ASC,
 			wantVal: -1,
 			kind:    reflect.Float64,
 		},
 		{
-			name:    "float64 DESC 1,2",
+			name:    "float64 utils.DESC 1,2",
 			values:  []any{float64(1), float64(2)},
-			order:   DESC,
+			order:   utils.DESC,
 			wantVal: 1,
 			kind:    reflect.Float64,
 		},
 		{
-			name:    "float64 ASC 2,1",
+			name:    "float64 utils.ASC 2,1",
 			values:  []any{float64(2), float64(1)},
-			order:   ASC,
+			order:   utils.ASC,
 			wantVal: 1,
 			kind:    reflect.Float64,
 		},
 		{
-			name:    "float64 DESC 2,1",
+			name:    "float64 utils.DESC 2,1",
 			values:  []any{float64(2.1), float64(1.1)},
-			order:   DESC,
+			order:   utils.DESC,
 			wantVal: -1,
 			kind:    reflect.Float64,
 		},
 		{
 			name:    "float64 equal",
 			values:  []any{float64(2.1), float64(2.1)},
-			order:   DESC,
+			order:   utils.DESC,
 			wantVal: 0,
 			kind:    reflect.Float64,
 		},
 		{
 			name:    "string equal",
 			values:  []any{"x", "x"},
-			order:   DESC,
+			order:   utils.DESC,
 			wantVal: 0,
 			kind:    reflect.String,
 		},
 	}
 	for _, tc := range testcases {
 		ms.T().Run(tc.name, func(t *testing.T) {
-			cmp, ok := compareFuncMapping[tc.kind]
+			cmp, ok := utils.CompareFuncMapping[tc.kind]
 			require.True(t, ok)
 			val := cmp(tc.values[0], tc.values[1], tc.order)
 			assert.Equal(t, tc.wantVal, val)

@@ -21,22 +21,13 @@ import (
 	"reflect"
 	"sync"
 
+	"go.uber.org/multierr"
+
 	"github.com/ecodeclub/eorm/internal/merger"
 
 	"github.com/ecodeclub/eorm/internal/merger/utils"
 
-	"go.uber.org/multierr"
-
 	"github.com/ecodeclub/eorm/internal/merger/internal/errs"
-)
-
-type Order bool
-
-const (
-	// ASC 升序排序
-	ASC Order = true
-	// DESC 降序排序
-	DESC Order = false
 )
 
 type Ordered interface {
@@ -45,41 +36,44 @@ type Ordered interface {
 
 type SortColumn struct {
 	name  string
-	order Order
+	order utils.Order
 }
 
-func NewSortColumn(colName string, order Order) SortColumn {
+func NewSortColumn(colName string, order utils.Order) SortColumn {
 	return SortColumn{
 		name:  colName,
 		order: order,
 	}
 }
 
-type sortColumns struct {
+type SortColumns struct {
 	columns []SortColumn
 	colMap  map[string]int
 }
 
-func (s sortColumns) Has(name string) bool {
+func (s SortColumns) Has(name string) bool {
 	_, ok := s.colMap[name]
 	return ok
 }
 
-func (s sortColumns) Find(name string) int {
+func (s SortColumns) Find(name string) int {
 	return s.colMap[name]
 }
 
-func (s sortColumns) Get(index int) SortColumn {
+func (s SortColumns) Get(index int) SortColumn {
 	return s.columns[index]
 }
 
-func (s sortColumns) Len() int {
+func (s SortColumns) Len() int {
 	return len(s.columns)
+}
+func (s SortColumns) Cols() []SortColumn {
+	return s.columns
 }
 
 // Merger  如果有GroupBy子句，会导致排序是给每个分组排的，那么该实现无法运作正常
 type Merger struct {
-	sortColumns
+	SortColumns
 	cols []string
 }
 
@@ -89,22 +83,22 @@ func NewMerger(sortCols ...SortColumn) (*Merger, error) {
 		return nil, err
 	}
 	return &Merger{
-		sortColumns: scs,
+		SortColumns: scs,
 	}, nil
 }
 
-func newSortColumns(sortCols ...SortColumn) (sortColumns, error) {
+func newSortColumns(sortCols ...SortColumn) (SortColumns, error) {
 	if len(sortCols) == 0 {
-		return sortColumns{}, errs.ErrEmptySortColumns
+		return SortColumns{}, errs.ErrEmptySortColumns
 	}
 	sortMap := make(map[string]int, len(sortCols))
 	for idx, sortCol := range sortCols {
 		if _, ok := sortMap[sortCol.name]; ok {
-			return sortColumns{}, errs.NewRepeatSortColumn(sortCol.name)
+			return SortColumns{}, errs.NewRepeatSortColumn(sortCol.name)
 		}
 		sortMap[sortCol.name] = idx
 	}
-	scs := sortColumns{
+	scs := SortColumns{
 		columns: sortCols,
 		colMap:  sortMap,
 	}
@@ -120,9 +114,11 @@ func (m *Merger) Merge(ctx context.Context, results []*sql.Rows) (merger.Rows, e
 		return nil, errs.ErrMergerEmptyRows
 	}
 	for i := 0; i < len(results); i++ {
-		if err := m.checkColumns(results[i]); err != nil {
+		val, err := checkColumns(results[i], m.cols, m.SortColumns)
+		if err != nil {
 			return nil, err
 		}
+		m.cols = val
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
 		}
@@ -133,7 +129,7 @@ func (m *Merger) Merge(ctx context.Context, results []*sql.Rows) (merger.Rows, e
 func (m *Merger) initRows(results []*sql.Rows) (*Rows, error) {
 	rs := &Rows{
 		rowsList:    results,
-		sortColumns: m.sortColumns,
+		sortColumns: m.SortColumns,
 		mu:          &sync.RWMutex{},
 		columns:     m.cols,
 	}
@@ -152,77 +148,40 @@ func (m *Merger) initRows(results []*sql.Rows) (*Rows, error) {
 	return rs, nil
 }
 
-func (m *Merger) checkColumns(rows *sql.Rows) error {
+func checkColumns(rows *sql.Rows, columns []string, sortCols SortColumns) ([]string, error) {
 	if rows == nil {
-		return errs.ErrMergerRowsIsNull
+		return nil, errs.ErrMergerRowsIsNull
 	}
 	cols, err := rows.Columns()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	colMap := make(map[string]struct{}, len(cols))
-	if len(m.cols) == 0 {
-		m.cols = cols
+	if len(columns) == 0 {
+		columns = cols
 	}
-	if len(m.cols) != len(cols) {
-		return errs.ErrMergerRowsDiff
+	if len(columns) != len(cols) {
+		return nil, errs.ErrMergerRowsDiff
 	}
 	for idx, colName := range cols {
-		if m.cols[idx] != colName {
-			return errs.ErrMergerRowsDiff
+		if columns[idx] != colName {
+			return nil, errs.ErrMergerRowsDiff
 		}
 		colMap[colName] = struct{}{}
 	}
 
-	for _, sortColumn := range m.sortColumns.columns {
+	for _, sortColumn := range sortCols.columns {
 		_, ok := colMap[sortColumn.name]
 		if !ok {
-			return errs.NewInvalidSortColumn(sortColumn.name)
+			return nil, errs.NewInvalidSortColumn(sortColumn.name)
 		}
 	}
-	return nil
-}
-
-func newNode(row *sql.Rows, sortCols sortColumns, index int) (*node, error) {
-	colsInfo, err := row.ColumnTypes()
-	if err != nil {
-		return nil, err
-	}
-	columns := make([]any, 0, len(colsInfo))
-	sortColumns := make([]any, sortCols.Len())
-	for _, colInfo := range colsInfo {
-		colName := colInfo.Name()
-		colType := colInfo.ScanType()
-		for colType.Kind() == reflect.Ptr {
-			colType = colType.Elem()
-		}
-		column := reflect.New(colType).Interface()
-		if sortCols.Has(colName) {
-			sortIndex := sortCols.Find(colName)
-			sortColumns[sortIndex] = column
-		}
-		columns = append(columns, column)
-	}
-	err = row.Scan(columns...)
-	if err != nil {
-		return nil, err
-	}
-	for i := 0; i < len(sortColumns); i++ {
-		sortColumns[i] = reflect.ValueOf(sortColumns[i]).Elem().Interface()
-	}
-	for i := 0; i < len(columns); i++ {
-		columns[i] = reflect.ValueOf(columns[i]).Elem().Interface()
-	}
-	return &node{
-		sortCols: sortColumns,
-		columns:  columns,
-		index:    index,
-	}, nil
+	return columns, nil
 }
 
 type Rows struct {
 	rowsList    []*sql.Rows
-	sortColumns sortColumns
+	sortColumns SortColumns
 	hp          *Heap
 	cur         *node
 	mu          *sync.RWMutex
@@ -266,6 +225,44 @@ func (r *Rows) nextRows(row *sql.Rows, index int) error {
 		return row.Err()
 	}
 	return nil
+}
+func newNode(row *sql.Rows, sortCols SortColumns, index int) (*node, error) {
+	colsInfo, err := row.ColumnTypes()
+	if err != nil {
+		return nil, err
+	}
+	columns := make([]any, 0, len(colsInfo))
+	sortColumns := make([]any, sortCols.Len())
+	for _, colInfo := range colsInfo {
+		colName := colInfo.Name()
+		colType := colInfo.ScanType()
+		for colType.Kind() == reflect.Ptr {
+			colType = colType.Elem()
+		}
+		column := reflect.New(colType).Interface()
+		if sortCols.Has(colName) {
+			sortIndex := sortCols.Find(colName)
+			sortColumns[sortIndex] = column
+		}
+		columns = append(columns, column)
+	}
+	err = row.Scan(columns...)
+	if err != nil {
+		return nil, err
+	}
+	for i := 0; i < len(sortColumns); i++ {
+		if sortColumns[i] != nil {
+			sortColumns[i] = reflect.ValueOf(sortColumns[i]).Elem().Interface()
+		}
+	}
+	for i := 0; i < len(columns); i++ {
+		columns[i] = reflect.ValueOf(columns[i]).Elem().Interface()
+	}
+	return &node{
+		sortCols: sortColumns,
+		columns:  columns,
+		index:    index,
+	}, nil
 }
 
 func (r *Rows) Scan(dest ...any) error {
