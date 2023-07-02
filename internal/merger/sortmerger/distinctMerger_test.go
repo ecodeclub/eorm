@@ -99,13 +99,13 @@ func TestMerger_NewMerge(t *testing.T) {
 				colMap:  map[string]int{},
 			},
 			distinctCols: []merger.ColumnInfo{},
-			wantErr:      nil,
+			wantErr:      errs.ErrDistinctColsIsNull,
 		},
 	}
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			m, err := NewDistinctMerger(tc.distinctCols, tc.sortCols)
+			m, err := NewDistinctMerger(tc.distinctCols, &tc.sortCols)
 			assert.Equal(t, tc.wantErr, err)
 			if err != nil {
 				return
@@ -172,7 +172,7 @@ func (ms *DistinctMergerSuite) TestOrderByMerger_Merge() {
 			merger: func() (*DistinctMerger, error) {
 				sortcols, err := newSortColumns(NewSortColumn("id", utils.ASC))
 				require.NoError(ms.T(), err)
-				return NewDistinctMerger([]merger.ColumnInfo{merger.NewColumnInfo(0, "id"), merger.NewColumnInfo(2, "name"), merger.NewColumnInfo(3, "address")}, sortcols)
+				return NewDistinctMerger([]merger.ColumnInfo{merger.NewColumnInfo(0, "id"), merger.NewColumnInfo(2, "name"), merger.NewColumnInfo(3, "address")}, &sortcols)
 			},
 			ctx: func() (context.Context, context.CancelFunc) {
 				return context.WithCancel(context.Background())
@@ -197,7 +197,7 @@ func (ms *DistinctMergerSuite) TestOrderByMerger_Merge() {
 			merger: func() (*DistinctMerger, error) {
 				sortcols, err := newSortColumns(NewSortColumn("id", utils.ASC))
 				require.NoError(ms.T(), err)
-				return NewDistinctMerger([]merger.ColumnInfo{merger.NewColumnInfo(0, "id"), merger.NewColumnInfo(2, "name"), merger.NewColumnInfo(3, "address")}, sortcols)
+				return NewDistinctMerger([]merger.ColumnInfo{merger.NewColumnInfo(0, "id"), merger.NewColumnInfo(2, "name"), merger.NewColumnInfo(3, "address")}, &sortcols)
 
 			},
 			ctx: func() (context.Context, context.CancelFunc) {
@@ -226,7 +226,7 @@ func (ms *DistinctMergerSuite) TestOrderByMerger_Merge() {
 			merger: func() (*DistinctMerger, error) {
 				sortcols, err := newSortColumns(NewSortColumn("id", utils.ASC))
 				require.NoError(ms.T(), err)
-				return NewDistinctMerger([]merger.ColumnInfo{merger.NewColumnInfo(0, "id"), merger.NewColumnInfo(2, "name"), merger.NewColumnInfo(3, "address")}, sortcols)
+				return NewDistinctMerger([]merger.ColumnInfo{merger.NewColumnInfo(0, "id"), merger.NewColumnInfo(2, "name"), merger.NewColumnInfo(3, "address")}, &sortcols)
 
 			},
 			sqlRows: func() []*sql.Rows {
@@ -239,7 +239,7 @@ func (ms *DistinctMergerSuite) TestOrderByMerger_Merge() {
 			merger: func() (*DistinctMerger, error) {
 				sortcols, err := newSortColumns(NewSortColumn("id", utils.ASC))
 				require.NoError(ms.T(), err)
-				return NewDistinctMerger([]merger.ColumnInfo{merger.NewColumnInfo(0, "id"), merger.NewColumnInfo(2, "name"), merger.NewColumnInfo(3, "address")}, sortcols)
+				return NewDistinctMerger([]merger.ColumnInfo{merger.NewColumnInfo(0, "id"), merger.NewColumnInfo(2, "name"), merger.NewColumnInfo(3, "address")}, &sortcols)
 			},
 			ctx: func() (context.Context, context.CancelFunc) {
 				return context.WithCancel(context.Background())
@@ -254,7 +254,7 @@ func (ms *DistinctMergerSuite) TestOrderByMerger_Merge() {
 			merger: func() (*DistinctMerger, error) {
 				sortcols, err := newSortColumns(NewSortColumn("id", utils.ASC))
 				require.NoError(ms.T(), err)
-				return NewDistinctMerger([]merger.ColumnInfo{merger.NewColumnInfo(0, "id"), merger.NewColumnInfo(2, "name"), merger.NewColumnInfo(3, "address")}, sortcols)
+				return NewDistinctMerger([]merger.ColumnInfo{merger.NewColumnInfo(0, "id"), merger.NewColumnInfo(2, "name"), merger.NewColumnInfo(3, "address")}, &sortcols)
 			},
 			ctx: func() (context.Context, context.CancelFunc) {
 				return context.WithCancel(context.Background())
@@ -279,7 +279,7 @@ func (ms *DistinctMergerSuite) TestOrderByMerger_Merge() {
 			merger: func() (*DistinctMerger, error) {
 				sortcols, err := newSortColumns(NewSortColumn("id", utils.ASC))
 				require.NoError(ms.T(), err)
-				return NewDistinctMerger([]merger.ColumnInfo{merger.NewColumnInfo(0, "id"), merger.NewColumnInfo(1, "name"), merger.NewColumnInfo(2, "address")}, sortcols)
+				return NewDistinctMerger([]merger.ColumnInfo{merger.NewColumnInfo(0, "id"), merger.NewColumnInfo(1, "name"), merger.NewColumnInfo(2, "address")}, &sortcols)
 			},
 			ctx: func() (context.Context, context.CancelFunc) {
 				return context.WithCancel(context.Background())
@@ -453,7 +453,7 @@ func (ms *DistinctMergerSuite) TestOrderByRows_NextAndScan() {
 			},
 		},
 		{
-			name: "多个排序列，Order by id anme,distinct id name address",
+			name: "多个排序列，Order by id name,distinct id name address",
 			sortColumns: func() SortColumns {
 				cols, err := newSortColumns(NewSortColumn("id", utils.ASC), NewSortColumn("name", utils.DESC))
 				require.NoError(ms.T(), err)
@@ -590,7 +590,7 @@ func (ms *DistinctMergerSuite) TestOrderByRows_NextAndScan() {
 	}
 	for _, tc := range testcases {
 		ms.T().Run(tc.name, func(t *testing.T) {
-			m, err := NewDistinctMerger(tc.distinctColumns, tc.sortColumns)
+			m, err := NewDistinctMerger(tc.distinctColumns, &tc.sortColumns)
 			require.NoError(t, err)
 			rows, err := m.Merge(context.Background(), tc.sqlRows())
 			require.NoError(t, err)
@@ -656,7 +656,7 @@ func (ms *DistinctMergerSuite) TestOrderByRows_NotHaveOrderBy() {
 	}
 	for _, tc := range testcases {
 		ms.T().Run(tc.name, func(t *testing.T) {
-			m, err := NewDistinctMerger(tc.distinctColumns)
+			m, err := NewDistinctMerger(tc.distinctColumns, nil)
 			require.NoError(t, err)
 			rows, err := m.Merge(context.Background(), tc.sqlRows())
 			require.NoError(t, err)
@@ -718,7 +718,7 @@ func (ms *DistinctMergerSuite) TestOrderByRows_NextAndErr() {
 	}
 	for _, tc := range testcases {
 		ms.T().Run(tc.name, func(t *testing.T) {
-			merger, err := NewDistinctMerger(tc.distinctColumns, tc.sortColumns)
+			merger, err := NewDistinctMerger(tc.distinctColumns, &tc.sortColumns)
 			require.NoError(t, err)
 			rows, err := merger.Merge(context.Background(), tc.rowsList())
 			require.NoError(t, err)
@@ -747,7 +747,7 @@ func (ms *DistinctMergerSuite) TestOrderByRows_Columns() {
 		{
 			Index: 2, Name: "address",
 		},
-	}, sortCols)
+	}, &sortCols)
 	require.NoError(ms.T(), err)
 	dbs := []*sql.DB{ms.mockDB01, ms.mockDB02, ms.mockDB03}
 	rowsList := make([]*sql.Rows, 0, len(dbs))
@@ -786,7 +786,7 @@ func (ms *DistinctMergerSuite) TestOrderByRows_Close() {
 		{
 			Index: 0, Name: "id",
 		},
-	}, sortCols)
+	}, &sortCols)
 	require.NoError(ms.T(), err)
 	dbs := []*sql.DB{ms.mockDB01, ms.mockDB02, ms.mockDB03}
 	rowsList := make([]*sql.Rows, 0, len(dbs))
@@ -849,7 +849,7 @@ func (ms *DistinctMergerSuite) TestOrderByRows_Scan() {
 			{
 				Index: 2, Name: "address",
 			},
-		}, sortCols)
+		}, &sortCols)
 		require.NoError(t, err)
 		rows, err := merger.Merge(context.Background(), rowsList)
 		require.NoError(t, err)
@@ -876,7 +876,7 @@ func (ms *DistinctMergerSuite) TestOrderByRows_Scan() {
 			{
 				Index: 2, Name: "address",
 			},
-		}, sortCols)
+		}, &sortCols)
 		require.NoError(t, err)
 		rows, err := merger.Merge(context.Background(), rowsList)
 		require.NoError(t, err)
@@ -1036,7 +1036,7 @@ func (ms *NullableOrderByMergerSuite) TestRows_Nullable() {
 		ms.T().Run(tc.name, func(t *testing.T) {
 			sortCols, err := newSortColumns(tc.sortColumns...)
 			require.NoError(t, err)
-			merger, err := NewDistinctMerger(tc.DistinctCols, sortCols)
+			merger, err := NewDistinctMerger(tc.DistinctCols, &sortCols)
 			require.NoError(t, err)
 			rows, err := merger.Merge(context.Background(), tc.rowsList())
 			require.NoError(t, err)

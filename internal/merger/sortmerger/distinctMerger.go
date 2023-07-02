@@ -110,7 +110,7 @@ func (o *DistinctMerger) initRows(results []*sql.Rows) (*DistinctRows, error) {
 	if err != nil {
 		return nil, err
 	}
-	_, err = initMapAndHeap(results, t, o.sortCols, h, o.hasOrderBy)
+	err = o.initMapAndHeap(results, t, h)
 	if err != nil {
 		return nil, err
 	}
@@ -142,13 +142,12 @@ type DistinctRows struct {
 
 func (o *DistinctRows) Next() bool {
 	o.mu.Lock()
+	defer o.mu.Unlock()
 	if o.closed {
-		o.mu.Unlock()
 		return false
 	}
 	if o.hp.Len() == 0 && len(o.treeMap.Keys()) == 0 || o.lastErr != nil {
-		o.mu.Unlock()
-		_ = o.Close()
+		_ = o.closeRows()
 		return false
 	}
 	val := o.treeMap.Keys()[0]
@@ -160,37 +159,33 @@ func (o *DistinctRows) Next() bool {
 		_, err := balance(o.rowsList, o.treeMap, o.sortCols, o.hp, o.hasOrderBy)
 		if err != nil {
 			o.lastErr = err
-			o.mu.Unlock()
-			_ = o.Close()
+			_ = o.closeRows()
 			return false
 		}
 	}
-	o.mu.Unlock()
 	return true
 }
 
 // 初始化堆和map，保证至少有一个排序列相同的所有数据全部拿出。第一个返回值表示results还有没有值
-func initMapAndHeap(results []*sql.Rows, t *mapx.TreeMap[key, struct{}], sortCols SortColumns, h *Heap, hasOrderBy bool) (bool, error) {
-	var flag bool
+func (o *DistinctMerger) initMapAndHeap(results []*sql.Rows, t *mapx.TreeMap[key, struct{}], h *Heap) error {
+
 	// 初始化将所有sql.Rows的第一个元素塞进heap中
 	for i := 0; i < len(results); i++ {
 		if results[i].Next() {
-			flag = true
-			n, err := newDistinctNode(results[i], sortCols, i, hasOrderBy)
+
+			n, err := newDistinctNode(results[i], o.sortCols, i, o.hasOrderBy)
 			if err != nil {
-				return false, err
+				return err
 			}
 			heap.Push(h, n)
 		} else if results[i].Err() != nil {
-			return false, results[i].Err()
+			return results[i].Err()
 		}
 	}
 	// 如果四个results里面的元素均为空表示没有已经没有数据了
-	if !flag {
-		return false, nil
-	}
 
-	return balance(results, t, sortCols, h, hasOrderBy)
+	_, err := balance(results, t, o.sortCols, h, o.hasOrderBy)
+	return err
 }
 
 func newDistinctNode(rows *sql.Rows, sortCols SortColumns, index int, hasOrderBy bool) (*node, error) {
@@ -281,6 +276,19 @@ func (o *DistinctRows) Close() error {
 	return multierr.Combine(errorList...)
 }
 
+func (o *DistinctRows) closeRows() error {
+	o.closed = true
+	errorList := make([]error, 0, len(o.rowsList))
+	for i := 0; i < len(o.rowsList); i++ {
+		row := o.rowsList[i]
+		err := row.Close()
+		if err != nil {
+			errorList = append(errorList, err)
+		}
+	}
+	return multierr.Combine(errorList...)
+}
+
 func (o *DistinctRows) Columns() ([]string, error) {
 	o.mu.RLock()
 	defer o.mu.RUnlock()
@@ -296,19 +304,19 @@ func (o *DistinctRows) Err() error {
 	return o.lastErr
 }
 
-func NewDistinctMerger(distinctCols []merger.ColumnInfo, sortColList ...SortColumns) (*DistinctMerger, error) {
+func NewDistinctMerger(distinctCols []merger.ColumnInfo, sortColList *SortColumns) (*DistinctMerger, error) {
 	var sortCols SortColumns
-	if len(sortColList) == 0 {
-		sortCols, _ = newSortColumns(NewSortColumn("VirtualColumn", utils.DESC))
+	if sortColList == nil {
+		sortCols, _ = newSortColumns(NewSortColumn("TABLE", utils.DESC))
 		return &DistinctMerger{
 			sortCols:        sortCols,
 			distinctColumns: distinctCols,
 		}, nil
-	} else if len(sortColList) > 1 {
-		return nil, errs.ErrDistinctMultiSortCols
-	} else if len(sortColList) == 1 {
-		sortCols = sortColList[0]
 	}
+	if len(distinctCols) == 0 {
+		return nil, errs.ErrDistinctColsIsNull
+	}
+	sortCols = *sortColList
 	// 检查sortCols必须全在distinctCols
 	distinctMap := make(map[string]struct{})
 	for _, col := range distinctCols {
