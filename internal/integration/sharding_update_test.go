@@ -69,7 +69,7 @@ func (s *ShardingUpdateTestSuite) TestShardingUpdater_Exec() {
 	_, err := r.Register(&test.OrderDetail{},
 		model.WithTableShardingAlgorithm(s.algorithm))
 	require.NoError(t, err)
-	eorm.DBOptionWithMetaRegistry(r)(s.shardingDB)
+	eorm.DBWithMetaRegistry(r)(s.shardingDB)
 	testCases := []struct {
 		name             string
 		wantAffectedRows int64
@@ -124,7 +124,6 @@ func (s *ShardingUpdateTestSuite) TestShardingUpdater_Exec() {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			fmt.Println(22222)
 			res := tc.exec.Exec(context.Background())
 			require.Equal(t, tc.wantErr, res.Err())
 			if res.Err() != nil {

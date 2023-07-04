@@ -31,7 +31,8 @@ var _ datasource.DataSource = &DB{}
 
 // DB represents a database
 type DB struct {
-	db *sql.DB
+	db              *sql.DB
+	multiStatements bool
 }
 
 func (db *DB) Query(ctx context.Context, query datasource.Query) (*sql.Rows, error) {
@@ -42,12 +43,22 @@ func (db *DB) Exec(ctx context.Context, query datasource.Query) (sql.Result, err
 	return db.db.ExecContext(ctx, query.SQL, query.Args...)
 }
 
-func OpenDB(driver string, dsn string) (*DB, error) {
+func OpenDB(driver string, dsn string, opts ...Option) (*DB, error) {
+	res := &DB{}
+	for _, o := range opts {
+		o(res)
+	}
+
+	if res.multiStatements {
+		dsn = dsn + "?multiStatements=true"
+	}
+
 	db, err := sql.Open(driver, dsn)
 	if err != nil {
 		return nil, err
 	}
-	return &DB{db: db}, nil
+	res.db = db
+	return res, nil
 }
 
 func NewDB(db *sql.DB) *DB {
@@ -76,4 +87,14 @@ func (db *DB) Wait() error {
 
 func (db *DB) Close() error {
 	return db.db.Close()
+}
+
+type Option func(db *DB)
+
+// DBWithMultiStatements 在创建连接时 加入参数 multiStatements=true，允许多条语句查询
+// 当然 multi statements 可能会增加sql注入的风险，故该操作只允许一次性业务操作，连接使用完成后需要关闭连接
+func DBWithMultiStatements(m bool) Option {
+	return func(db *DB) {
+		db.multiStatements = m
+	}
 }

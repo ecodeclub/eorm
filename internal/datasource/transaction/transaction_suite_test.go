@@ -137,7 +137,7 @@ func (s *ShardingTransactionSuite) initMock(t *testing.T) {
 	_, err = r.Register(&test.OrderDetail{},
 		model.WithTableShardingAlgorithm(s.algorithm))
 	require.NoError(t, err)
-	db, err := eorm.OpenDS("mysql", s.DataSource, eorm.DBOptionWithMetaRegistry(r))
+	db, err := eorm.OpenDS("mysql", s.DataSource, eorm.DBWithMetaRegistry(r))
 	require.NoError(t, err)
 	s.shardingDB = db
 }
@@ -161,8 +161,9 @@ func (s *ShardingTransactionSuite) findTgt(t *testing.T, values []*test.OrderDet
 		od = values[i]
 		pre = pre.Or(eorm.C(s.shardingKey).EQ(od.OrderId))
 	}
+	// TODO GetMultiV2 待将 table 维度改成 db 维度
 	querySet, err := eorm.NewShardingSelector[test.OrderDetail](s.shardingDB).
-		Where(pre).GetMulti(masterslave.UseMaster(context.Background()))
+		Where(pre).GetMultiV2(masterslave.UseMaster(context.Background()))
 	require.NoError(t, err)
 	return querySet
 }

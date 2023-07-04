@@ -57,12 +57,12 @@ type ShardingSuite struct {
 func newDefaultShardingSuite() ShardingSuite {
 	m := []*masterSalvesDriver{
 		{
-			masterdsn: "root:root@tcp(localhost:13307)/order_detail_db_0",
-			slavedsns: []string{"root:root@tcp(localhost:13308)/order_detail_db_0"},
+			masterdsn: "root:root@tcp(localhost:13307)/order_detail_db_0?multiStatements=true&interpolateParams=true",
+			slavedsns: []string{"root:root@tcp(localhost:13308)/order_detail_db_0?multiStatements=true&interpolateParams=true"},
 		},
 		{
-			masterdsn: "root:root@tcp(localhost:13307)/order_detail_db_1",
-			slavedsns: []string{"root:root@tcp(localhost:13308)/order_detail_db_1"},
+			masterdsn: "root:root@tcp(localhost:13307)/order_detail_db_1?multiStatements=true&interpolateParams=true",
+			slavedsns: []string{"root:root@tcp(localhost:13308)/order_detail_db_1?multiStatements=true&interpolateParams=true"},
 		},
 	}
 	clusterDr := &clusterDriver{msDrivers: m}
@@ -143,7 +143,7 @@ func (s *ShardingSuite) initDB(r model.MetaRegistry) (*eorm.DB, error) {
 	}
 	s.dataSources = sourceMap
 	dataSource := shardingsource.NewShardingDataSource(sourceMap)
-	return eorm.OpenDS(s.driver, dataSource, eorm.DBOptionWithMetaRegistry(r))
+	return eorm.OpenDS(s.driver, dataSource, eorm.DBWithMetaRegistry(r))
 }
 
 func (s *ShardingSuite) SetupSuite() {

@@ -69,7 +69,7 @@ func (s *ShardingSelectTestSuite) TestSardingSelectorGet() {
 	_, err := r.Register(&test.OrderDetail{},
 		model.WithTableShardingAlgorithm(s.algorithm))
 	require.NoError(t, err)
-	eorm.DBOptionWithMetaRegistry(r)(s.shardingDB)
+	eorm.DBWithMetaRegistry(r)(s.shardingDB)
 
 	testCases := []struct {
 		name    string
@@ -126,7 +126,7 @@ func (s *ShardingSelectTestSuite) TestSardingSelectorGetMulti() {
 	_, err := r.Register(&test.OrderDetail{},
 		model.WithTableShardingAlgorithm(s.algorithm))
 	require.NoError(t, err)
-	eorm.DBOptionWithMetaRegistry(r)(s.shardingDB)
+	eorm.DBWithMetaRegistry(r)(s.shardingDB)
 
 	testCases := []struct {
 		name    string

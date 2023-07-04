@@ -33,11 +33,11 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-type TestBinMultiTxTestSuite struct {
+type TestSingleTxTestSuite struct {
 	ShardingTransactionSuite
 }
 
-func (s *TestBinMultiTxTestSuite) TestExecute_Commit_Or_Rollback() {
+func (s *TestSingleTxTestSuite) TestExecute_Commit_Or_Rollback() {
 	t := s.T()
 	testCases := []struct {
 		name         string
@@ -75,7 +75,7 @@ func (s *TestBinMultiTxTestSuite) TestExecute_Commit_Or_Rollback() {
 			},
 			tx: func() *eorm.Tx {
 				tx, er := s.shardingDB.BeginTx(
-					transaction.UsingTxType(context.Background(), transaction.BinMulti), &sql.TxOptions{})
+					transaction.UsingTxType(context.Background(), transaction.Single), &sql.TxOptions{})
 				require.NoError(t, er)
 				return tx
 			}(),
@@ -117,7 +117,7 @@ func (s *TestBinMultiTxTestSuite) TestExecute_Commit_Or_Rollback() {
 			},
 			tx: func() *eorm.Tx {
 				tx, er := s.shardingDB.BeginTx(
-					transaction.UsingTxType(context.Background(), transaction.BinMulti), &sql.TxOptions{})
+					transaction.UsingTxType(context.Background(), transaction.Single), &sql.TxOptions{})
 				require.NoError(t, er)
 				return tx
 			}(),
@@ -167,7 +167,7 @@ func (s *TestBinMultiTxTestSuite) TestExecute_Commit_Or_Rollback() {
 			},
 			tx: func() *eorm.Tx {
 				tx, er := s.shardingDB.BeginTx(
-					transaction.UsingTxType(context.Background(), transaction.BinMulti), &sql.TxOptions{})
+					transaction.UsingTxType(context.Background(), transaction.Single), &sql.TxOptions{})
 				require.NoError(t, er)
 				return tx
 			}(),
@@ -185,19 +185,11 @@ func (s *TestBinMultiTxTestSuite) TestExecute_Commit_Or_Rollback() {
 
 				row1 := s.mockMaster.NewRows([]string{"order_id", "item_id", "using_col1", "using_col2"})
 				row2 := s.mockMaster.NewRows([]string{"order_id", "item_id", "using_col1", "using_col2"})
-				s.mockMaster.ExpectQuery(regexp.QuoteMeta("SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail_db_0`.`order_detail_tab_0` WHERE (`order_id`=?) OR (`order_id`=?);")).
-					WithArgs(288, 33).WillReturnRows(row1)
-				s.mockMaster.ExpectQuery(regexp.QuoteMeta("SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail_db_0`.`order_detail_tab_1` WHERE (`order_id`=?) OR (`order_id`=?);")).
-					WithArgs(288, 33).WillReturnRows(row1)
-				s.mockMaster.ExpectQuery(regexp.QuoteMeta("SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail_db_0`.`order_detail_tab_2` WHERE (`order_id`=?) OR (`order_id`=?);")).
-					WithArgs(288, 33).WillReturnRows(row1)
+				s.mockMaster.ExpectQuery(regexp.QuoteMeta("SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail_db_0`.`order_detail_tab_0` WHERE (`order_id`=?) OR (`order_id`=?);SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail_db_0`.`order_detail_tab_1` WHERE (`order_id`=?) OR (`order_id`=?);SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail_db_0`.`order_detail_tab_2` WHERE (`order_id`=?) OR (`order_id`=?);")).
+					WithArgs(288, 33, 288, 33, 288, 33).WillReturnRows(row1)
 
-				s.mockMaster2.ExpectQuery(regexp.QuoteMeta("SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail_db_1`.`order_detail_tab_0` WHERE (`order_id`=?) OR (`order_id`=?);")).
-					WithArgs(288, 33).WillReturnRows(row2)
-				s.mockMaster2.ExpectQuery(regexp.QuoteMeta("SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail_db_1`.`order_detail_tab_1` WHERE (`order_id`=?) OR (`order_id`=?);")).
-					WithArgs(288, 33).WillReturnRows(row2)
-				s.mockMaster2.ExpectQuery(regexp.QuoteMeta("SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail_db_1`.`order_detail_tab_2` WHERE (`order_id`=?) OR (`order_id`=?);")).
-					WithArgs(288, 33).WillReturnRows(row2)
+				s.mockMaster2.ExpectQuery(regexp.QuoteMeta("SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail_db_1`.`order_detail_tab_0` WHERE (`order_id`=?) OR (`order_id`=?);SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail_db_1`.`order_detail_tab_1` WHERE (`order_id`=?) OR (`order_id`=?);SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail_db_1`.`order_detail_tab_2` WHERE (`order_id`=?) OR (`order_id`=?);")).
+					WithArgs(288, 33, 288, 33, 288, 33).WillReturnRows(row2)
 
 				queryVal := s.findTgt(t, values)
 				var wantOds []*test.OrderDetail
@@ -229,7 +221,7 @@ func (s *TestBinMultiTxTestSuite) TestExecute_Commit_Or_Rollback() {
 			},
 			tx: func() *eorm.Tx {
 				tx, er := s.shardingDB.BeginTx(
-					transaction.UsingTxType(context.Background(), transaction.BinMulti), &sql.TxOptions{})
+					transaction.UsingTxType(context.Background(), transaction.Single), &sql.TxOptions{})
 				require.NoError(t, er)
 				return tx
 			}(),
@@ -272,7 +264,7 @@ func (s *TestBinMultiTxTestSuite) TestExecute_Commit_Or_Rollback() {
 			},
 			tx: func() *eorm.Tx {
 				tx, er := s.shardingDB.BeginTx(
-					transaction.UsingTxType(context.Background(), transaction.BinMulti), &sql.TxOptions{})
+					transaction.UsingTxType(context.Background(), transaction.Single), &sql.TxOptions{})
 				require.NoError(t, er)
 				return tx
 			}(),
@@ -316,8 +308,8 @@ func (s *TestBinMultiTxTestSuite) TestExecute_Commit_Or_Rollback() {
 	}
 }
 
-func TestBinMultiTransactionSuite(t *testing.T) {
-	suite.Run(t, &TestBinMultiTxTestSuite{
+func TestSingleTransactionSuite(t *testing.T) {
+	suite.Run(t, &TestSingleTxTestSuite{
 		ShardingTransactionSuite: newShardingTransactionSuite(),
 	})
 }

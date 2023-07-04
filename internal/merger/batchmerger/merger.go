@@ -112,22 +112,48 @@ func (r *Rows) Next() bool {
 
 func (r *Rows) nextRows() (bool, error) {
 	row := r.rowsList[r.cnt]
+
 	if row.Next() {
 		return true, nil
 	}
+
+	//if row.NextResultSet() {
+	//	if row.Next() {
+	//		return true, nil
+	//	}
+	//}
+
+	for row.NextResultSet() {
+		if row.Next() {
+			return true, nil
+		}
+	}
+
 	if row.Err() != nil {
 		return false, row.Err()
 	}
+
 	for {
 		r.cnt++
 		if r.cnt >= len(r.rowsList) {
+			if row.NextResultSet() {
+				if row.Next() {
+					return true, nil
+				}
+			}
 			break
 		}
 		row = r.rowsList[r.cnt]
+
 		if row.Next() {
 			return true, nil
 		} else if row.Err() != nil {
 			return false, row.Err()
+		}
+		for row.NextResultSet() {
+			if row.Next() {
+				return true, nil
+			}
 		}
 	}
 	return false, nil

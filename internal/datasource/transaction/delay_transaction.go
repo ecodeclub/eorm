@@ -31,28 +31,14 @@ func (_ DelayTxFactory) TxOf(ctx Context, finder datasource.Finder) (datasource.
 }
 
 type DelayTx struct {
-	ctx       Context
-	lock      sync.RWMutex
-	txs       map[string]datasource.Tx
-	beginners map[string]datasource.TxBeginner
-	finder    datasource.Finder
+	ctx    Context
+	lock   sync.RWMutex
+	txs    map[string]datasource.Tx
+	finder datasource.Finder
 }
 
 func (t *DelayTx) findTgt(ctx context.Context, query datasource.Query) (datasource.TxBeginner, error) {
-	db, ok := t.beginners[query.DB]
-	if !ok {
-		return t.finder.FindTgt(ctx, query)
-	}
-	return db, nil
-}
-
-func (t *DelayTx) Query(ctx context.Context, query datasource.Query) (*sql.Rows, error) {
-	// 防止 GetMulti 的查询重复创建多个事务
-	tx, err := t.findOrBeginTx(ctx, query)
-	if err != nil {
-		return nil, err
-	}
-	return tx.Query(ctx, query)
+	return t.finder.FindTgt(ctx, query)
 }
 
 func (t *DelayTx) findOrBeginTx(ctx context.Context, query datasource.Query) (datasource.Tx, error) {
@@ -76,8 +62,18 @@ func (t *DelayTx) findOrBeginTx(ctx context.Context, query datasource.Query) (da
 	if err != nil {
 		return nil, err
 	}
+	//fmt.Println(tx)
 	t.txs[query.DB] = tx
 	return tx, nil
+}
+
+func (t *DelayTx) Query(ctx context.Context, query datasource.Query) (*sql.Rows, error) {
+	// 防止 GetMulti 的查询重复创建多个事务
+	tx, err := t.findOrBeginTx(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	return tx.Query(ctx, query)
 }
 
 func (t *DelayTx) Exec(ctx context.Context, query datasource.Query) (sql.Result, error) {

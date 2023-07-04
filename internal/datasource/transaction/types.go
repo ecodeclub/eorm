@@ -17,15 +17,15 @@ package transaction
 import (
 	"context"
 	"database/sql"
-	"errors"
+	"github.com/ecodeclub/eorm/internal/errs"
 
 	"github.com/ecodeclub/eorm/internal/datasource"
 )
 
 // 为了方便管理不同类型的 分布式 Tx，所以这里引入 TxType 常量来支持创建不同的 分布式Tx类型 以便提高后续引入 XA 方案的扩展性。
 const (
-	Delay    = "delay"
-	BinMulti = "binMulti"
+	Delay  = "delay"
+	Single = "single"
 )
 
 type TxFactory interface {
@@ -61,11 +61,11 @@ func NewTxFacade(ctx context.Context, finder datasource.Finder) (TxFacade, error
 	case Delay:
 		res.factory = DelayTxFactory{}
 		return res, nil
-	case BinMulti:
-		res.factory = BinMultiTxFactory{}
+	case Single:
+		res.factory = SingleTxFactory{}
 		return res, nil
 	default:
-		return TxFacade{}, errors.New("不支持的分布式事务类型")
+		return TxFacade{}, errs.ErrUnsupportedDistributedTransaction
 	}
 }
 
