@@ -148,15 +148,12 @@ func (s *ShardingDelayTxTestSuite) TestShardingInsert_Commit_Or_Rollback() {
 				GetMultiV2(masterslave.UseMaster(context.Background()))
 			require.NoError(t, err)
 			assert.ElementsMatch(t, tc.querySet, querySet)
-			for _, q := range querySet {
-				fmt.Println(*q)
-			}
-			res := eorm.NewShardingInsert[test.OrderDetail](txFunc).
+			res := eorm.NewShardingInsert[test.OrderDetail](tx).
 				Values(tc.values).Exec(context.Background())
 			affected, err := res.RowsAffected()
 			require.NoError(t, err)
 			assert.Equal(t, tc.wantAffected, affected)
-			tc.afterFunc(t, txFunc, tc.values)
+			tc.afterFunc(t, tx, tc.values)
 		})
 	}
 }

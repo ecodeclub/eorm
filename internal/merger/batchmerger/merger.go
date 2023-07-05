@@ -117,12 +117,6 @@ func (r *Rows) nextRows() (bool, error) {
 		return true, nil
 	}
 
-	//if row.NextResultSet() {
-	//	if row.Next() {
-	//		return true, nil
-	//	}
-	//}
-
 	for row.NextResultSet() {
 		if row.Next() {
 			return true, nil
@@ -136,11 +130,6 @@ func (r *Rows) nextRows() (bool, error) {
 	for {
 		r.cnt++
 		if r.cnt >= len(r.rowsList) {
-			if row.NextResultSet() {
-				if row.Next() {
-					return true, nil
-				}
-			}
 			break
 		}
 		row = r.rowsList[r.cnt]
