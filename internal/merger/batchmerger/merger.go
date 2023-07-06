@@ -139,6 +139,7 @@ func (r *Rows) nextRows() (bool, error) {
 		} else if row.Err() != nil {
 			return false, row.Err()
 		}
+
 		for row.NextResultSet() {
 			if row.Next() {
 				return true, nil
