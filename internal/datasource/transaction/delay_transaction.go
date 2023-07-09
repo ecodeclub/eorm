@@ -26,7 +26,7 @@ import (
 
 type DelayTxFactory struct{}
 
-func (_ DelayTxFactory) TxOf(ctx Context, finder datasource.Finder) (datasource.Tx, error) {
+func (DelayTxFactory) TxOf(ctx Context, finder datasource.Finder) (datasource.Tx, error) {
 	return NewDelayTx(ctx, finder), nil
 }
 
@@ -62,7 +62,6 @@ func (t *DelayTx) findOrBeginTx(ctx context.Context, query datasource.Query) (da
 	if err != nil {
 		return nil, err
 	}
-	//fmt.Println(tx)
 	t.txs[query.DB] = tx
 	return tx, nil
 }

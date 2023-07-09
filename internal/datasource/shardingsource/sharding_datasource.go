@@ -36,7 +36,7 @@ type ShardingDataSource struct {
 }
 
 func (s *ShardingDataSource) Query(ctx context.Context, query datasource.Query) (*sql.Rows, error) {
-	ds, err := s.findTgt(query)
+	ds, err := s.getTgt(query)
 	if err != nil {
 		return nil, err
 	}
@@ -44,7 +44,7 @@ func (s *ShardingDataSource) Query(ctx context.Context, query datasource.Query) 
 }
 
 func (s *ShardingDataSource) Exec(ctx context.Context, query datasource.Query) (sql.Result, error) {
-	ds, err := s.findTgt(query)
+	ds, err := s.getTgt(query)
 	if err != nil {
 		return nil, err
 	}
@@ -52,7 +52,7 @@ func (s *ShardingDataSource) Exec(ctx context.Context, query datasource.Query) (
 }
 
 func (s *ShardingDataSource) FindTgt(ctx context.Context, query datasource.Query) (datasource.TxBeginner, error) {
-	ds, err := s.findTgt(query)
+	ds, err := s.getTgt(query)
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +63,7 @@ func (s *ShardingDataSource) FindTgt(ctx context.Context, query datasource.Query
 	return f.FindTgt(ctx, query)
 }
 
-func (s *ShardingDataSource) findTgt(query datasource.Query) (datasource.DataSource, error) {
+func (s *ShardingDataSource) getTgt(query datasource.Query) (datasource.DataSource, error) {
 	ds, ok := s.sources[query.Datasource]
 	if !ok {
 		return nil, errs.NewErrNotFoundTargetDataSource(query.Datasource)

@@ -38,7 +38,7 @@ type clusterDB struct {
 }
 
 func (c *clusterDB) Query(ctx context.Context, query datasource.Query) (*sql.Rows, error) {
-	ms, err := c.findTgt(query)
+	ms, err := c.getTgt(query)
 	if err != nil {
 		return nil, err
 	}
@@ -64,15 +64,15 @@ func (c *clusterDB) Close() error {
 	return err
 }
 
-func (c *clusterDB) FindTgt(ctx context.Context, query datasource.Query) (datasource.TxBeginner, error) {
-	db, err := c.findTgt(query)
+func (c *clusterDB) FindTgt(_ context.Context, query datasource.Query) (datasource.TxBeginner, error) {
+	db, err := c.getTgt(query)
 	if err != nil {
 		return nil, err
 	}
 	return db, nil
 }
 
-func (c *clusterDB) findTgt(query datasource.Query) (*masterslave.MasterSlavesDB, error) {
+func (c *clusterDB) getTgt(query datasource.Query) (*masterslave.MasterSlavesDB, error) {
 	db, ok := c.masterSlavesDBs[query.DB]
 	if !ok {
 		return nil, errs.NewErrNotFoundTargetDB(query.DB)

@@ -135,7 +135,7 @@ func (s *TestSingleTxTestSuite) TestExecute_Commit_Or_Rollback() {
 			},
 		},
 		{
-			name:         "use multi db err",
+			name:         "insert use multi db err",
 			wantAffected: 2,
 			shardingVal:  234,
 			wantErr:      errs.NewErrDBNotEqual("order_detail_db_0", "order_detail_db_1"),
@@ -183,13 +183,82 @@ func (s *TestSingleTxTestSuite) TestExecute_Commit_Or_Rollback() {
 				s.mockMaster.MatchExpectationsInOrder(false)
 				s.mockMaster2.MatchExpectationsInOrder(false)
 
+				//row1 := s.mockMaster.NewRows([]string{"order_id", "item_id", "using_col1", "using_col2"})
+				//row2 := s.mockMaster.NewRows([]string{"order_id", "item_id", "using_col1", "using_col2"})
+				//s.mockMaster.ExpectQuery(regexp.QuoteMeta("SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail_db_0`.`order_detail_tab_0` WHERE (`order_id`=?) OR (`order_id`=?);SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail_db_0`.`order_detail_tab_1` WHERE (`order_id`=?) OR (`order_id`=?);SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail_db_0`.`order_detail_tab_2` WHERE (`order_id`=?) OR (`order_id`=?);")).
+				//	WithArgs(288, 33, 288, 33, 288, 33).WillReturnRows(row1)
+				//
+				//s.mockMaster2.ExpectQuery(regexp.QuoteMeta("SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail_db_1`.`order_detail_tab_0` WHERE (`order_id`=?) OR (`order_id`=?);SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail_db_1`.`order_detail_tab_1` WHERE (`order_id`=?) OR (`order_id`=?);SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail_db_1`.`order_detail_tab_2` WHERE (`order_id`=?) OR (`order_id`=?);")).
+				//	WithArgs(288, 33, 288, 33, 288, 33).WillReturnRows(row2)
+
 				row1 := s.mockMaster.NewRows([]string{"order_id", "item_id", "using_col1", "using_col2"})
 				row2 := s.mockMaster.NewRows([]string{"order_id", "item_id", "using_col1", "using_col2"})
-				s.mockMaster.ExpectQuery(regexp.QuoteMeta("SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail_db_0`.`order_detail_tab_0` WHERE (`order_id`=?) OR (`order_id`=?);SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail_db_0`.`order_detail_tab_1` WHERE (`order_id`=?) OR (`order_id`=?);SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail_db_0`.`order_detail_tab_2` WHERE (`order_id`=?) OR (`order_id`=?);")).
-					WithArgs(288, 33, 288, 33, 288, 33).WillReturnRows(row1)
+				s.mockMaster.ExpectQuery(regexp.QuoteMeta("SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail_db_0`.`order_detail_tab_0` WHERE (`order_id`=?) OR (`order_id`=?);")).
+					WithArgs(288, 33).WillReturnRows(row1)
 
-				s.mockMaster2.ExpectQuery(regexp.QuoteMeta("SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail_db_1`.`order_detail_tab_0` WHERE (`order_id`=?) OR (`order_id`=?);SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail_db_1`.`order_detail_tab_1` WHERE (`order_id`=?) OR (`order_id`=?);SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail_db_1`.`order_detail_tab_2` WHERE (`order_id`=?) OR (`order_id`=?);")).
-					WithArgs(288, 33, 288, 33, 288, 33).WillReturnRows(row2)
+				s.mockMaster2.ExpectQuery(regexp.QuoteMeta("SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail_db_1`.`order_detail_tab_0` WHERE (`order_id`=?) OR (`order_id`=?);")).
+					WithArgs(288, 33).WillReturnRows(row2)
+
+				queryVal := s.findTgt(t, values)
+				var wantOds []*test.OrderDetail
+				assert.ElementsMatch(t, wantOds, queryVal)
+			},
+		},
+		{
+			name:         "select and insert use multi db err",
+			wantAffected: 2,
+			shardingVal:  234,
+			wantErr:      errs.NewErrDBNotEqual("order_detail_db_0", "order_detail_db_1"),
+			values: []*test.OrderDetail{
+				{OrderId: 33, ItemId: 100, UsingCol1: "Nikolai", UsingCol2: "Jokic"},
+			},
+			querySet: []*test.OrderDetail{
+				{OrderId: 234, ItemId: 12, UsingCol1: "Kevin", UsingCol2: "Durant"},
+			},
+			mockOrder: func(mock1, mock2 sqlmock.Sqlmock) {
+				mock1.MatchExpectationsInOrder(false)
+				mock1.ExpectBegin()
+
+				mock1.ExpectQuery(regexp.QuoteMeta("SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail_db_0`.`order_detail_tab_0` WHERE `order_id`=?;")).
+					WithArgs(234).
+					WillReturnRows(mock1.NewRows([]string{"order_id", "item_id", "using_col1", "using_col2"}).AddRow(234, 12, "Kevin", "Durant"))
+
+				mock1.ExpectExec(regexp.QuoteMeta("INSERT INTO `order_detail_db_1`.`order_detail_tab_0`(`order_id`,`item_id`,`using_col1`,`using_col2`) VALUES(?,?,?,?);")).
+					WithArgs(33, 100, "Nikolai", "Jokic").WillReturnResult(sqlmock.NewResult(1, 1))
+
+				mock1.ExpectCommit()
+			},
+			tx: func() *eorm.Tx {
+				tx, er := s.shardingDB.BeginTx(
+					transaction.UsingTxType(context.Background(), transaction.Single), &sql.TxOptions{})
+				require.NoError(t, er)
+				return tx
+			}(),
+			afterFunc: func(t *testing.T, tx *eorm.Tx, values []*test.OrderDetail) {
+				err := tx.Commit()
+				newErr := errors.New("commit fail")
+				errSlice := strings.Split(err.Error(), "; ")
+				wantErrSlice := []string{
+					newMockCommitErr("order_detail_db_0", newErr).Error(),
+					newMockCommitErr("order_detail_db_1", newErr).Error()}
+				assert.ElementsMatch(t, wantErrSlice, errSlice)
+
+				s.mockMaster.MatchExpectationsInOrder(false)
+				s.mockMaster2.MatchExpectationsInOrder(false)
+
+				row1 := s.mockMaster.NewRows([]string{"order_id", "item_id", "using_col1", "using_col2"})
+				row2 := s.mockMaster.NewRows([]string{"order_id", "item_id", "using_col1", "using_col2"})
+				//s.mockMaster.ExpectQuery(regexp.QuoteMeta("SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail_db_0`.`order_detail_tab_0` WHERE (`order_id`=?) OR (`order_id`=?);SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail_db_0`.`order_detail_tab_1` WHERE (`order_id`=?) OR (`order_id`=?);SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail_db_0`.`order_detail_tab_2` WHERE (`order_id`=?) OR (`order_id`=?);")).
+				//	WithArgs(288, 33, 288, 33, 288, 33).WillReturnRows(row1)
+				//
+				//s.mockMaster2.ExpectQuery(regexp.QuoteMeta("SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail_db_1`.`order_detail_tab_0` WHERE (`order_id`=?) OR (`order_id`=?);SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail_db_1`.`order_detail_tab_1` WHERE (`order_id`=?) OR (`order_id`=?);SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail_db_1`.`order_detail_tab_2` WHERE (`order_id`=?) OR (`order_id`=?);")).
+				//	WithArgs(288, 33, 288, 33, 288, 33).WillReturnRows(row2)
+
+				s.mockMaster.ExpectQuery(regexp.QuoteMeta("SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail_db_0`.`order_detail_tab_0` WHERE `order_id`=?;")).
+					WithArgs(33).WillReturnRows(row1)
+
+				s.mockMaster2.ExpectQuery(regexp.QuoteMeta("SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail_db_1`.`order_detail_tab_0` WHERE `order_id`=?;")).
+					WithArgs(33).WillReturnRows(row2)
 
 				queryVal := s.findTgt(t, values)
 				var wantOds []*test.OrderDetail

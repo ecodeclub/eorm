@@ -18,15 +18,16 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"regexp"
+	"strings"
+	"testing"
+
 	"github.com/ecodeclub/eorm/internal/datasource"
 	"github.com/ecodeclub/eorm/internal/datasource/cluster"
 	"github.com/ecodeclub/eorm/internal/datasource/shardingsource"
 	"github.com/ecodeclub/eorm/internal/errs"
 	"github.com/ecodeclub/eorm/internal/model"
 	"go.uber.org/multierr"
-	"regexp"
-	"strings"
-	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/ecodeclub/eorm"
@@ -66,6 +67,7 @@ func (s *TestDelayTxTestSuite) TestExecute_Commit_Or_Rollback() {
 			},
 			mockOrder: func(mock1, mock2 sqlmock.Sqlmock) {
 				mock2.ExpectBegin().WillReturnError(errors.New("begin err"))
+				mock1.ExpectBegin().WillReturnError(errors.New("begin err"))
 			},
 			txFunc: func() (*eorm.Tx, error) {
 				return s.shardingDB.BeginTx(transaction.UsingTxType(context.Background(), transaction.Delay), &sql.TxOptions{})

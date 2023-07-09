@@ -364,11 +364,6 @@ func (s *ShardingSelector[T]) GetMultiV2(ctx context.Context) ([]*T, error) {
 			dbMap[q.DB] = q
 			continue
 		}
-		//q.SQL = q.SQL + old.SQL
-		//q.Args = append(q.Args, old.Args...)
-		//dbMap[q.DB] = q
-		//dsMap[q.Datasource] = dbMap
-
 		old.SQL = old.SQL + q.SQL
 		old.Args = append(old.Args, q.Args...)
 		dbMap[q.DB] = old

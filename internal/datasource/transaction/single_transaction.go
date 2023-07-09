@@ -26,7 +26,7 @@ import (
 
 type SingleTxFactory struct{}
 
-func (_ SingleTxFactory) TxOf(ctx Context, finder datasource.Finder) (datasource.Tx, error) {
+func (SingleTxFactory) TxOf(ctx Context, finder datasource.Finder) (datasource.Tx, error) {
 	return NewSingleTx(ctx, finder), nil
 }
 
