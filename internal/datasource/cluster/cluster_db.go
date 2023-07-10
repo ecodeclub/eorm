@@ -19,13 +19,17 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/ecodeclub/eorm/internal/datasource/transaction"
+
 	"github.com/ecodeclub/eorm/internal/datasource"
 	"github.com/ecodeclub/eorm/internal/datasource/masterslave"
 	"github.com/ecodeclub/eorm/internal/errs"
 	"go.uber.org/multierr"
 )
 
+var _ datasource.TxBeginner = &clusterDB{}
 var _ datasource.DataSource = &clusterDB{}
+var _ datasource.Finder = &clusterDB{}
 
 // clusterDB 以 DB 名称作为索引目标数据库
 type clusterDB struct {
@@ -34,9 +38,9 @@ type clusterDB struct {
 }
 
 func (c *clusterDB) Query(ctx context.Context, query datasource.Query) (*sql.Rows, error) {
-	ms, ok := c.masterSlavesDBs[query.DB]
-	if !ok {
-		return nil, errs.ErrNotFoundTargetDB
+	ms, err := c.getTgt(query)
+	if err != nil {
+		return nil, err
 	}
 	return ms.Query(ctx, query)
 }
@@ -44,7 +48,7 @@ func (c *clusterDB) Query(ctx context.Context, query datasource.Query) (*sql.Row
 func (c *clusterDB) Exec(ctx context.Context, query datasource.Query) (sql.Result, error) {
 	ms, ok := c.masterSlavesDBs[query.DB]
 	if !ok {
-		return nil, errs.ErrNotFoundTargetDB
+		return nil, errs.NewErrNotFoundTargetDB(query.DB)
 	}
 	return ms.Exec(ctx, query)
 }
@@ -58,6 +62,31 @@ func (c *clusterDB) Close() error {
 		}
 	}
 	return err
+}
+
+func (c *clusterDB) FindTgt(_ context.Context, query datasource.Query) (datasource.TxBeginner, error) {
+	db, err := c.getTgt(query)
+	if err != nil {
+		return nil, err
+	}
+	return db, nil
+}
+
+func (c *clusterDB) getTgt(query datasource.Query) (*masterslave.MasterSlavesDB, error) {
+	db, ok := c.masterSlavesDBs[query.DB]
+	if !ok {
+		return nil, errs.NewErrNotFoundTargetDB(query.DB)
+	}
+	return db, nil
+}
+
+func (c *clusterDB) BeginTx(ctx context.Context, opts *sql.TxOptions) (datasource.Tx, error) {
+	facade, err := transaction.NewTxFacade(ctx, c)
+	if err != nil {
+		return nil, err
+	}
+
+	return facade.BeginTx(ctx, opts)
 }
 
 func NewClusterDB(ms map[string]*masterslave.MasterSlavesDB) datasource.DataSource {

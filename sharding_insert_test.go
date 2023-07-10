@@ -71,7 +71,7 @@ func TestShardingInsert_Build(t *testing.T) {
 		"1.db.cluster.company.com:3306": clusterDB,
 	}
 	shardingDB, err := OpenDS("sqlite3",
-		shardingsource.NewShardingDataSource(ds), DBOptionWithMetaRegistry(r))
+		shardingsource.NewShardingDataSource(ds), DBWithMetaRegistry(r))
 	require.NoError(t, err)
 	testCases := []struct {
 		name    string
@@ -255,7 +255,7 @@ func (s *ShardingInsertSuite) TestShardingInsert_Exec() {
 		"0.db.cluster.company.com:3306": clusterDB,
 	}
 	shardingDB, err := OpenDS("mysql",
-		shardingsource.NewShardingDataSource(ds), DBOptionWithMetaRegistry(r))
+		shardingsource.NewShardingDataSource(ds), DBWithMetaRegistry(r))
 	require.NoError(s.T(), err)
 	testcases := []struct {
 		name             string

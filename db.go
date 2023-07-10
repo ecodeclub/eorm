@@ -50,7 +50,7 @@ func DBWithMiddlewares(ms ...Middleware) DBOption {
 	}
 }
 
-func DBOptionWithMetaRegistry(r model.MetaRegistry) DBOption {
+func DBWithMetaRegistry(r model.MetaRegistry) DBOption {
 	return func(db *DB) {
 		db.metaRegistry = r
 	}

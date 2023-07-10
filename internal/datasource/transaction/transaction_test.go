@@ -12,12 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package transaction
+package transaction_test
 
 import (
 	"context"
 	"database/sql"
 	"testing"
+
+	"github.com/ecodeclub/eorm/internal/datasource/transaction"
 
 	"github.com/stretchr/testify/suite"
 
@@ -96,7 +98,7 @@ func (db *testMockDB) BeginTx(ctx context.Context, opts *sql.TxOptions) (datasou
 	if err != nil {
 		return nil, err
 	}
-	return NewTx(tx, db), nil
+	return transaction.NewTx(tx, db), nil
 }
 
 func (db *testMockDB) Close() error {
@@ -146,7 +148,7 @@ func (s *TransactionSuite) TestDBQuery() {
 	//s.mock.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows([]string{"mark"}).AddRow("value"))
 	testCases := []struct {
 		name     string
-		tx       *Tx
+		tx       *transaction.Tx
 		query    datasource.Query
 		mockRows *sqlmock.Rows
 		wantResp []string
@@ -157,14 +159,14 @@ func (s *TransactionSuite) TestDBQuery() {
 			query: datasource.Query{
 				SQL: "SELECT `first_name` FROM `test_model`",
 			},
-			tx: func() *Tx {
+			tx: func() *transaction.Tx {
 				s.mock1.ExpectBegin()
 				s.mock1.ExpectQuery("SELECT *").WillReturnRows(
 					sqlmock.NewRows([]string{"first_name"}).AddRow("value"))
 				s.mock1.ExpectCommit()
 				tx, err := s.mockDB1.BeginTx(context.Background(), &sql.TxOptions{})
 				assert.Nil(s.T(), err)
-				return NewTx(tx, NewMockDB(s.mockDB1))
+				return transaction.NewTx(tx, NewMockDB(s.mockDB1))
 			}(),
 			wantResp: []string{"value"},
 		},
@@ -202,7 +204,7 @@ func (s *TransactionSuite) TestDBExec() {
 		rowsAffected int64
 		wantErr      error
 		isCommit     bool
-		tx           *Tx
+		tx           *transaction.Tx
 		query        datasource.Query
 	}{
 		{
@@ -210,14 +212,14 @@ func (s *TransactionSuite) TestDBExec() {
 			query: datasource.Query{
 				SQL: "INSERT INTO `test_model`(`id`,`first_name`,`age`,`last_name`) VALUES(1,2,3,4)",
 			},
-			tx: func() *Tx {
+			tx: func() *transaction.Tx {
 				s.mock1.ExpectBegin()
 				s.mock1.ExpectExec("^INSERT INTO (.+)").
 					WillReturnResult(sqlmock.NewResult(2, 1))
 				s.mock1.ExpectRollback()
 				tx, err := s.mockDB1.BeginTx(context.Background(), &sql.TxOptions{})
 				assert.Nil(s.T(), err)
-				return NewTx(tx, NewMockDB(s.mockDB1))
+				return transaction.NewTx(tx, NewMockDB(s.mockDB1))
 			}(),
 			lastInsertId: int64(2),
 			rowsAffected: int64(1),
@@ -227,14 +229,14 @@ func (s *TransactionSuite) TestDBExec() {
 			query: datasource.Query{
 				SQL: "INSERT INTO `test_model`(`id`,`first_name`,`age`,`last_name`) VALUES(1,2,3,4)",
 			},
-			tx: func() *Tx {
+			tx: func() *transaction.Tx {
 				s.mock2.ExpectBegin()
 				s.mock2.ExpectExec("^INSERT INTO (.+)").
 					WillReturnResult(sqlmock.NewResult(2, 1))
 				s.mock2.ExpectCommit()
 				tx, err := s.mockDB2.BeginTx(context.Background(), &sql.TxOptions{})
 				assert.Nil(s.T(), err)
-				return NewTx(tx, NewMockDB(s.mockDB2))
+				return transaction.NewTx(tx, NewMockDB(s.mockDB2))
 			}(),
 			isCommit:     true,
 			lastInsertId: int64(2),
@@ -245,14 +247,14 @@ func (s *TransactionSuite) TestDBExec() {
 			query: datasource.Query{
 				SQL: "INSERT INTO `test_model`(`id`,`first_name`,`age`,`last_name`) VALUES(1,2,3,4) (1,2,3,4)",
 			},
-			tx: func() *Tx {
+			tx: func() *transaction.Tx {
 				s.mock3.ExpectBegin()
 				s.mock3.ExpectExec("^INSERT INTO (.+)").
 					WillReturnResult(sqlmock.NewResult(4, 2))
 				s.mock3.ExpectCommit()
 				tx, err := s.mockDB3.BeginTx(context.Background(), &sql.TxOptions{})
 				assert.Nil(s.T(), err)
-				return NewTx(tx, NewMockDB(s.mockDB3))
+				return transaction.NewTx(tx, NewMockDB(s.mockDB3))
 			}(),
 			isCommit:     true,
 			lastInsertId: int64(4),
@@ -300,7 +302,7 @@ func (m *mockDB) BeginTx(ctx context.Context, opts *sql.TxOptions) (datasource.T
 	if err != nil {
 		return nil, err
 	}
-	return NewTx(tx, m), nil
+	return transaction.NewTx(tx, m), nil
 }
 
 func (m *mockDB) Close() error {

@@ -73,10 +73,10 @@ func TestShardingUpdater_Build(t *testing.T) {
 		"0.db.cluster.company.com:3306": clusterDB,
 	}
 	shardingDB, err := OpenDS("sqlite3",
-		shardingsource.NewShardingDataSource(ds), DBOptionWithMetaRegistry(r))
+		shardingsource.NewShardingDataSource(ds), DBWithMetaRegistry(r))
 	require.NoError(t, err)
 	shardingDB2, err := OpenDS("sqlite3",
-		shardingsource.NewShardingDataSource(ds), DBOptionWithMetaRegistry(r2))
+		shardingsource.NewShardingDataSource(ds), DBWithMetaRegistry(r2))
 	require.NoError(t, err)
 	testCases := []struct {
 		name    string
@@ -640,7 +640,7 @@ func TestShardingUpdater_Build_Error(t *testing.T) {
 		"0.db.cluster.company.com:3306": clusterDB,
 	}
 	shardingDB, err := OpenDS("sqlite3",
-		shardingsource.NewShardingDataSource(ds), DBOptionWithMetaRegistry(r))
+		shardingsource.NewShardingDataSource(ds), DBWithMetaRegistry(r))
 	require.NoError(t, err)
 	testCases := []struct {
 		name    string
@@ -725,7 +725,7 @@ func TestShardingUpdater_Build_Error(t *testing.T) {
 					shardingsource.NewShardingDataSource(map[string]datasource.DataSource{
 						"0.db.cluster.company.com:3306": MasterSlavesMemoryDB(),
 					}),
-					DBOptionWithMetaRegistry(reg))
+					DBWithMetaRegistry(reg))
 				require.NoError(t, err)
 				s := NewShardingUpdater[Order](db).
 					Update(&Order{Content: "1", Account: 1.0}).
@@ -796,7 +796,7 @@ func (s *ShardingUpdaterSuite) TestShardingUpdater_Exec() {
 		"0.db.cluster.company.com:3306": clusterDB,
 	}
 	shardingDB, err := OpenDS("sqlite3",
-		shardingsource.NewShardingDataSource(ds), DBOptionWithMetaRegistry(r))
+		shardingsource.NewShardingDataSource(ds), DBWithMetaRegistry(r))
 	require.NoError(t, err)
 	testCases := []struct {
 		name             string
@@ -887,7 +887,7 @@ func ExampleShardingUpdater_SkipNilValue() {
 		"0.db.cluster.company.com:3306": clusterDB,
 	}
 	shardingDB, _ := OpenDS("sqlite3",
-		shardingsource.NewShardingDataSource(ds), DBOptionWithMetaRegistry(r))
+		shardingsource.NewShardingDataSource(ds), DBWithMetaRegistry(r))
 	query, _ := NewShardingUpdater[OrderDetail](shardingDB).Update(&OrderDetail{
 		UsingCol1: "Jack", ItemId: 11,
 	}).SkipNilValue().Where(C("OrderId").EQ(1)).Build(context.Background())
@@ -915,7 +915,7 @@ func ExampleShardingUpdater_SkipZeroValue() {
 		"0.db.cluster.company.com:3306": clusterDB,
 	}
 	shardingDB, _ := OpenDS("sqlite3",
-		shardingsource.NewShardingDataSource(ds), DBOptionWithMetaRegistry(r))
+		shardingsource.NewShardingDataSource(ds), DBWithMetaRegistry(r))
 	query, _ := NewShardingUpdater[OrderDetail](shardingDB).Update(&OrderDetail{
 		UsingCol1: "Jack",
 	}).SkipZeroValue().Where(C("OrderId").EQ(1)).Build(context.Background())

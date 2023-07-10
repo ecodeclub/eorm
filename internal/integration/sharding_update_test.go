@@ -18,17 +18,12 @@ package integration
 
 import (
 	"context"
-	"fmt"
 	"testing"
-	"time"
 
 	"github.com/ecodeclub/eorm"
-	"github.com/ecodeclub/eorm/internal/datasource"
 	"github.com/ecodeclub/eorm/internal/datasource/masterslave"
 	"github.com/ecodeclub/eorm/internal/model"
-	operator "github.com/ecodeclub/eorm/internal/operator"
 	"github.com/ecodeclub/eorm/internal/sharding"
-	"github.com/ecodeclub/eorm/internal/sharding/hash"
 	"github.com/ecodeclub/eorm/internal/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -36,32 +31,7 @@ import (
 )
 
 type ShardingUpdateTestSuite struct {
-	ShardingSuite
-	data []*test.OrderDetail
-}
-
-func (s *ShardingUpdateTestSuite) SetupSuite() {
-	t := s.T()
-	s.ShardingSuite.SetupSuite()
-	for _, item := range s.data {
-		shardingRes, err := s.algorithm.Sharding(
-			context.Background(), sharding.Request{Op: operator.OpEQ, SkValues: map[string]any{"OrderId": item.OrderId}})
-		require.NoError(t, err)
-		require.NotNil(t, shardingRes.Dsts)
-		for _, dst := range shardingRes.Dsts {
-			tbl := fmt.Sprintf("`%s`.`%s`", dst.DB, dst.Table)
-			sql := fmt.Sprintf("INSERT INTO %s (`order_id`,`item_id`,`using_col1`,`using_col2`) VALUES(?,?,?,?);", tbl)
-			args := []any{item.OrderId, item.ItemId, item.UsingCol1, item.UsingCol2}
-			source, ok := s.dataSources[dst.Name]
-			require.True(t, ok)
-			_, err := source.Exec(context.Background(), datasource.Query{SQL: sql, Args: args, DB: dst.DB})
-			if err != nil {
-				t.Fatal(err)
-			}
-		}
-	}
-	// 防止主从延迟
-	time.Sleep(1)
+	ShardingSelectUpdateInsertSuite
 }
 
 func (s *ShardingUpdateTestSuite) TestShardingUpdater_Exec() {
@@ -70,7 +40,7 @@ func (s *ShardingUpdateTestSuite) TestShardingUpdater_Exec() {
 	_, err := r.Register(&test.OrderDetail{},
 		model.WithTableShardingAlgorithm(s.algorithm))
 	require.NoError(t, err)
-	eorm.DBOptionWithMetaRegistry(r)(s.shardingDB)
+	eorm.DBWithMetaRegistry(r)(s.shardingDB)
 	testCases := []struct {
 		name             string
 		wantAffectedRows int64
@@ -149,60 +119,8 @@ func (s *ShardingUpdateTestSuite) TestShardingUpdater_Exec() {
 	}
 }
 
-func (s *ShardingUpdateTestSuite) TearDownSuite() {
-	t := s.T()
-	for _, item := range s.data {
-		shardingRes, err := s.algorithm.Sharding(
-			context.Background(), sharding.Request{Op: operator.OpEQ, SkValues: map[string]any{"OrderId": item.OrderId}})
-		require.NoError(t, err)
-		require.NotNil(t, shardingRes.Dsts)
-		for _, dst := range shardingRes.Dsts {
-			tbl := fmt.Sprintf("`%s`.`%s`", dst.DB, dst.Table)
-			sql := fmt.Sprintf("DELETE FROM %s", tbl)
-			source, ok := s.dataSources[dst.Name]
-			require.True(t, ok)
-			_, err := source.Exec(context.Background(), datasource.Query{SQL: sql, DB: dst.DB})
-			if err != nil {
-				t.Fatal(err)
-			}
-		}
-	}
-}
-
 func TestMySQL8ShardingUpdate(t *testing.T) {
-	m := []*masterSalvesDriver{
-		{
-			masterdsn: "root:root@tcp(localhost:13307)/order_detail_db_0",
-			slavedsns: []string{"root:root@tcp(localhost:13308)/order_detail_db_0"},
-		},
-		{
-			masterdsn: "root:root@tcp(localhost:13307)/order_detail_db_1",
-			slavedsns: []string{"root:root@tcp(localhost:13308)/order_detail_db_1"},
-		},
-	}
-	clusterDr := &clusterDriver{msDrivers: m}
 	suite.Run(t, &ShardingUpdateTestSuite{
-		ShardingSuite: ShardingSuite{
-			driver: "mysql",
-			algorithm: &hash.Hash{
-				ShardingKey:  "OrderId",
-				DBPattern:    &hash.Pattern{Name: "order_detail_db_%d", Base: 2},
-				TablePattern: &hash.Pattern{Name: "order_detail_tab_%d", Base: 3},
-				DsPattern:    &hash.Pattern{Name: "root:root@tcp(localhost:13307).0", NotSharding: true},
-			},
-			DBPattern: "order_detail_db_%d",
-			DsPattern: "root:root@tcp(localhost:13307).%d",
-			clusters: &clusterDrivers{
-				clDrivers: []*clusterDriver{clusterDr},
-			},
-		},
-		data: []*test.OrderDetail{
-			{8, 6, "Kobe", "Bryant"},
-			{11, 8, "James", "Harden"},
-			{123, 10, "LeBron", "James"},
-			{234, 12, "Kevin", "Durant"},
-			{253, 8, "Stephen", "Curry"},
-			{181, 11, "Kawhi", "Leonard"},
-		},
+		ShardingSelectUpdateInsertSuite: newShardingSelectUpdateInsertSuite(),
 	})
 }

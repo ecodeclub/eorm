@@ -19,6 +19,8 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/ecodeclub/eorm/internal/datasource/transaction"
+
 	"github.com/ecodeclub/eorm/internal/datasource"
 	"go.uber.org/multierr"
 
@@ -27,29 +29,54 @@ import (
 
 var _ datasource.TxBeginner = &ShardingDataSource{}
 var _ datasource.DataSource = &ShardingDataSource{}
+var _ datasource.Finder = &ShardingDataSource{}
 
 type ShardingDataSource struct {
 	sources map[string]datasource.DataSource
 }
 
 func (s *ShardingDataSource) Query(ctx context.Context, query datasource.Query) (*sql.Rows, error) {
-	ds, ok := s.sources[query.Datasource]
-	if !ok {
-		return nil, errs.ErrNotFoundTargetDataSource
+	ds, err := s.getTgt(query)
+	if err != nil {
+		return nil, err
 	}
 	return ds.Query(ctx, query)
 }
 
 func (s *ShardingDataSource) Exec(ctx context.Context, query datasource.Query) (sql.Result, error) {
-	ds, ok := s.sources[query.Datasource]
-	if !ok {
-		return nil, errs.ErrNotFoundTargetDataSource
+	ds, err := s.getTgt(query)
+	if err != nil {
+		return nil, err
 	}
 	return ds.Exec(ctx, query)
 }
 
-func (*ShardingDataSource) BeginTx(_ context.Context, _ *sql.TxOptions) (datasource.Tx, error) {
-	panic("`BeginTx` must be completed")
+func (s *ShardingDataSource) FindTgt(ctx context.Context, query datasource.Query) (datasource.TxBeginner, error) {
+	ds, err := s.getTgt(query)
+	if err != nil {
+		return nil, err
+	}
+	f, ok := ds.(datasource.Finder)
+	if !ok {
+		return nil, errs.NewErrNotCompleteFinder(query.Datasource)
+	}
+	return f.FindTgt(ctx, query)
+}
+
+func (s *ShardingDataSource) getTgt(query datasource.Query) (datasource.DataSource, error) {
+	ds, ok := s.sources[query.Datasource]
+	if !ok {
+		return nil, errs.NewErrNotFoundTargetDataSource(query.Datasource)
+	}
+	return ds, nil
+}
+
+func (s *ShardingDataSource) BeginTx(ctx context.Context, opts *sql.TxOptions) (datasource.Tx, error) {
+	facade, err := transaction.NewTxFacade(ctx, s)
+	if err != nil {
+		return nil, err
+	}
+	return facade.BeginTx(ctx, opts)
 }
 
 func NewShardingDataSource(m map[string]datasource.DataSource) datasource.DataSource {

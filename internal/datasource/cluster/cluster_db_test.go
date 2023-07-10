@@ -128,7 +128,7 @@ func (c *ClusterSuite) TestClusterDbQuery() {
 				masterSlaves := map[string]*masterslave.MasterSlavesDB{"order_db_0": db}
 				return masterSlaves
 			}(),
-			wantErr: errs.ErrNotFoundTargetDB,
+			wantErr: errs.NewErrNotFoundTargetDB("order_db_1"),
 		},
 		{
 			name:   "select default use slave",
@@ -219,7 +219,7 @@ func (c *ClusterSuite) TestClusterDbExec() {
 				masterSlaves := map[string]*masterslave.MasterSlavesDB{"order_db_0": db}
 				return masterSlaves
 			}(),
-			wantErr: errs.ErrNotFoundTargetDB,
+			wantErr: errs.NewErrNotFoundTargetDB("order_db_1"),
 		},
 		{
 			name:   "null slave",

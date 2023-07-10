@@ -22,8 +22,6 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/ecodeclub/eorm/internal/datasource"
-	"github.com/ecodeclub/eorm/internal/datasource/cluster"
-	"github.com/ecodeclub/eorm/internal/datasource/masterslave"
 	"github.com/ecodeclub/eorm/internal/datasource/single"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -182,25 +180,25 @@ func TestTx_ExecContext(t *testing.T) {
 		wantErr        error
 		isCommit       bool
 	}{
-		{
-			name: "source err",
-			mockOrder: func(mock sqlmock.Sqlmock) {
-				mock.ExpectBegin()
-				mock.ExpectExec("DELETE FROM `test_model` WHERE `id`=").WithArgs(1).WillReturnResult(sqlmock.NewResult(10, 20))
-				mock.ExpectCommit()
-			},
-			sourceFunc: func(db *sql.DB, t *testing.T) datasource.DataSource {
-				clusterDB := cluster.NewClusterDB(map[string]*masterslave.MasterSlavesDB{
-					"db0": masterslave.NewMasterSlavesDB(db),
-				})
-				return clusterDB
-			},
-			query: Query{
-				SQL:  "DELETE FROM `test_model` WHERE `id`=",
-				Args: []any{1},
-			},
-			wantBeginTxErr: errors.New("eorm: 未实现 TxBeginner 接口"),
-		},
+		//{
+		//	name: "source err",
+		//	mockOrder: func(mock sqlmock.Sqlmock) {
+		//		mock.ExpectBegin()
+		//		mock.ExpectExec("DELETE FROM `test_model` WHERE `id`=").WithArgs(1).WillReturnResult(sqlmock.NewResult(10, 20))
+		//		mock.ExpectCommit()
+		//	},
+		//	sourceFunc: func(db *sql.DB, t *testing.T) datasource.DataSource {
+		//		clusterDB := cluster.NewClusterDB(map[string]*masterslave.MasterSlavesDB{
+		//			"db0": masterslave.NewMasterSlavesDB(db),
+		//		})
+		//		return clusterDB
+		//	},
+		//	query: Query{
+		//		SQL:  "DELETE FROM `test_model` WHERE `id`=",
+		//		Args: []any{1},
+		//	},
+		//	wantBeginTxErr: errors.New("eorm: 未实现 TxBeginner 接口"),
+		//},
 		{
 			name: "commit err",
 			mockOrder: func(mock sqlmock.Sqlmock) {

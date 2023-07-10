@@ -180,7 +180,7 @@ func (c *ShardingDataSourceSuite) TestClusterDbQuery() {
 				DB:         "db_0",
 				Datasource: "2.db.cluster.company.com:3306",
 			},
-			wantErr: errs.ErrNotFoundTargetDataSource,
+			wantErr: errs.NewErrNotFoundTargetDataSource("2.db.cluster.company.com:3306"),
 		},
 		{
 			name:   "cluster0 select default use slave",
@@ -280,7 +280,7 @@ func (c *ShardingDataSourceSuite) TestClusterDbExec() {
 				DB:         "db_0",
 				Datasource: "2.db.cluster.company.com:3306",
 			},
-			wantErr: errs.ErrNotFoundTargetDataSource,
+			wantErr: errs.NewErrNotFoundTargetDataSource("2.db.cluster.company.com:3306"),
 		},
 		{
 			name:   "cluster0 exec",
