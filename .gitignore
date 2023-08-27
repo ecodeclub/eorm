@@ -17,3 +17,4 @@
 .idea
 *.iml
 fuzz
+go.work

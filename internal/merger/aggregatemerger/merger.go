@@ -17,8 +17,11 @@ package aggregatemerger
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"sync"
 	_ "unsafe"
+
+	"github.com/ecodeclub/ekit/sqlx"
 
 	"github.com/ecodeclub/eorm/internal/merger"
 
@@ -54,9 +57,8 @@ func (m *Merger) Merge(ctx context.Context, results []*sql.Rows) (merger.Rows, e
 		return nil, errs.ErrMergerEmptyRows
 	}
 	for _, res := range results {
-		err := m.checkColumns(res)
-		if err != nil {
-			return nil, err
+		if res == nil {
+			return nil, errs.ErrMergerRowsIsNull
 		}
 	}
 
@@ -69,12 +71,6 @@ func (m *Merger) Merge(ctx context.Context, results []*sql.Rows) (merger.Rows, e
 		columns: m.colNames,
 	}, nil
 
-}
-func (m *Merger) checkColumns(rows *sql.Rows) error {
-	if rows == nil {
-		return errs.ErrMergerRowsIsNull
-	}
-	return nil
 }
 
 type Rows struct {
@@ -149,23 +145,18 @@ func (r *Rows) getSqlRowsData() ([][]any, error) {
 	}
 	return rowsData, nil
 }
-func (r *Rows) getSqlRowData(row *sql.Rows) ([]any, error) {
-
+func (*Rows) getSqlRowData(row *sql.Rows) ([]any, error) {
 	var colsData []any
 	var err error
-	if row.Next() {
-		colsData, err = utils.Scan(row)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		// sql.Rows迭代过程中发生报错，返回报错
-		if row.Err() != nil {
-			return nil, row.Err()
-		}
+	scanner, err := sqlx.NewSQLRowsScanner(row)
+	if err != nil {
+		return nil, err
+	}
+	colsData, err = scanner.Scan()
+	if errors.Is(err, sqlx.ErrNoMoreRows) {
 		return nil, errs.ErrMergerAggregateHasEmptyRows
 	}
-	return colsData, nil
+	return colsData, err
 }
 
 func (r *Rows) Scan(dest ...any) error {
