@@ -21,6 +21,10 @@ import (
 	"sync"
 	_ "unsafe"
 
+	"github.com/ecodeclub/ekit/slice"
+
+	"github.com/ecodeclub/ekit/sqlx"
+
 	"github.com/ecodeclub/eorm/internal/merger/utils"
 	"go.uber.org/multierr"
 
@@ -61,11 +65,8 @@ func (a *AggregatorMerger) Merge(ctx context.Context, results []*sql.Rows) (merg
 		return nil, errs.ErrMergerEmptyRows
 	}
 
-	for _, res := range results {
-		err := a.checkColumns(res)
-		if err != nil {
-			return nil, err
-		}
+	if slice.Contains[*sql.Rows](results, nil) {
+		return nil, errs.ErrMergerRowsIsNull
 	}
 	dataMap, dataIndex, err := a.getCols(results)
 	if err != nil {
@@ -82,13 +83,6 @@ func (a *AggregatorMerger) Merge(ctx context.Context, results []*sql.Rows) (merg
 		cur:          -1,
 		cols:         a.columnsName,
 	}, nil
-
-}
-func (a *AggregatorMerger) checkColumns(rows *sql.Rows) error {
-	if rows == nil {
-		return errs.ErrMergerRowsIsNull
-	}
-	return nil
 }
 
 func (a *AggregatorMerger) getCols(rowsList []*sql.Rows) (*mapx.TreeMap[Key, [][]any], []Key, error) {
@@ -98,7 +92,11 @@ func (a *AggregatorMerger) getCols(rowsList []*sql.Rows) (*mapx.TreeMap[Key, [][
 	}
 	keys := make([]Key, 0, 16)
 	for _, res := range rowsList {
-		colsData, err := a.getCol(res)
+		scanner, err := sqlx.NewSQLRowsScanner(res)
+		if err != nil {
+			return nil, nil, err
+		}
+		colsData, err := scanner.ScanAll()
 		if err != nil {
 			return nil, nil, err
 		}
@@ -108,7 +106,6 @@ func (a *AggregatorMerger) getCols(rowsList []*sql.Rows) (*mapx.TreeMap[Key, [][
 				key.columnValues = append(key.columnValues, colData[groupByCol.Index])
 			}
 			val, ok := treeMap.Get(key)
-
 			if ok {
 				val = append(val, colData)
 				err = treeMap.Set(key, val)
@@ -125,23 +122,6 @@ func (a *AggregatorMerger) getCols(rowsList []*sql.Rows) (*mapx.TreeMap[Key, [][
 		}
 	}
 	return treeMap, keys, nil
-}
-
-func (a *AggregatorMerger) getCol(row *sql.Rows) ([][]any, error) {
-	ans := make([][]any, 0, 16)
-	for row.Next() {
-		colsData, err := utils.Scan(row)
-		if err != nil {
-			return nil, err
-		}
-		ans = append(ans, colsData)
-	}
-	if row.Err() != nil {
-		return nil, row.Err()
-	}
-
-	return ans, nil
-
 }
 
 type AggregatorRows struct {
