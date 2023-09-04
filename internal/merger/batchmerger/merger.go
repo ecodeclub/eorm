@@ -19,7 +19,7 @@ import (
 	"database/sql"
 	"sync"
 
-	"github.com/ecodeclub/eorm/internal/merger"
+	"github.com/ecodeclub/eorm/internal/rows"
 
 	"go.uber.org/multierr"
 
@@ -34,7 +34,7 @@ func NewMerger() *Merger {
 	return &Merger{}
 }
 
-func (m *Merger) Merge(ctx context.Context, results []*sql.Rows) (merger.Rows, error) {
+func (m *Merger) Merge(ctx context.Context, results []rows.Rows) (rows.Rows, error) {
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
@@ -55,7 +55,7 @@ func (m *Merger) Merge(ctx context.Context, results []*sql.Rows) (merger.Rows, e
 }
 
 // checkColumns 检查sql.Rows列表中sql.Rows的列集是否相同,并且sql.Rows不能为nil
-func (m *Merger) checkColumns(rows *sql.Rows) error {
+func (m *Merger) checkColumns(rows rows.Rows) error {
 	if rows == nil {
 		return errs.ErrMergerRowsIsNull
 	}
@@ -79,12 +79,20 @@ func (m *Merger) checkColumns(rows *sql.Rows) error {
 }
 
 type Rows struct {
-	rowsList []*sql.Rows
+	rowsList []rows.Rows
 	cnt      int
 	mu       *sync.RWMutex
 	columns  []string
 	closed   bool
 	lastErr  error
+}
+
+func (r *Rows) ColumnTypes() ([]*sql.ColumnType, error) {
+	return r.rowsList[0].ColumnTypes()
+}
+
+func (*Rows) NextResultSet() bool {
+	return false
 }
 
 func (r *Rows) Next() bool {

@@ -21,9 +21,7 @@ import (
 	"reflect"
 	"sync"
 
-	"github.com/ecodeclub/eorm/internal/merger"
-
-	"github.com/ecodeclub/eorm/internal/merger/utils"
+	"github.com/ecodeclub/eorm/internal/rows"
 
 	"go.uber.org/multierr"
 
@@ -111,7 +109,7 @@ func newSortColumns(sortCols ...SortColumn) (sortColumns, error) {
 	return scs, nil
 }
 
-func (m *Merger) Merge(ctx context.Context, results []*sql.Rows) (merger.Rows, error) {
+func (m *Merger) Merge(ctx context.Context, results []rows.Rows) (rows.Rows, error) {
 	// 检测results是否符合条件
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
@@ -130,7 +128,7 @@ func (m *Merger) Merge(ctx context.Context, results []*sql.Rows) (merger.Rows, e
 	return m.initRows(results)
 }
 
-func (m *Merger) initRows(results []*sql.Rows) (*Rows, error) {
+func (m *Merger) initRows(results []rows.Rows) (*Rows, error) {
 	rs := &Rows{
 		rowsList:    results,
 		sortColumns: m.sortColumns,
@@ -152,7 +150,7 @@ func (m *Merger) initRows(results []*sql.Rows) (*Rows, error) {
 	return rs, nil
 }
 
-func (m *Merger) checkColumns(rows *sql.Rows) error {
+func (m *Merger) checkColumns(rows rows.Rows) error {
 	if rows == nil {
 		return errs.ErrMergerRowsIsNull
 	}
@@ -183,7 +181,7 @@ func (m *Merger) checkColumns(rows *sql.Rows) error {
 	return nil
 }
 
-func newNode(row *sql.Rows, sortCols sortColumns, index int) (*node, error) {
+func newNode(row rows.Rows, sortCols sortColumns, index int) (*node, error) {
 	colsInfo, err := row.ColumnTypes()
 	if err != nil {
 		return nil, err
@@ -221,7 +219,7 @@ func newNode(row *sql.Rows, sortCols sortColumns, index int) (*node, error) {
 }
 
 type Rows struct {
-	rowsList    []*sql.Rows
+	rowsList    []rows.Rows
 	sortColumns sortColumns
 	hp          *Heap
 	cur         *node
@@ -229,6 +227,14 @@ type Rows struct {
 	lastErr     error
 	closed      bool
 	columns     []string
+}
+
+func (r *Rows) ColumnTypes() ([]*sql.ColumnType, error) {
+	return r.rowsList[0].ColumnTypes()
+}
+
+func (*Rows) NextResultSet() bool {
+	return false
 }
 
 func (r *Rows) Next() bool {
@@ -255,7 +261,7 @@ func (r *Rows) Next() bool {
 	return true
 }
 
-func (r *Rows) nextRows(row *sql.Rows, index int) error {
+func (r *Rows) nextRows(row rows.Rows, index int) error {
 	if row.Next() {
 		n, err := newNode(row, r.sortColumns, index)
 		if err != nil {
@@ -282,7 +288,7 @@ func (r *Rows) Scan(dest ...any) error {
 	}
 	var err error
 	for i := 0; i < len(dest); i++ {
-		err = utils.ConvertAssign(dest[i], r.cur.columns[i])
+		err = rows.ConvertAssign(dest[i], r.cur.columns[i])
 		if err != nil {
 			return err
 		}

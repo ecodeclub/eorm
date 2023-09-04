@@ -112,3 +112,7 @@ func NewInvalidDSNError(dsn string) error {
 func NewFailedToGetSlavesFromDNS(err error) error {
 	return fmt.Errorf("eorm: 从DNS中解析从库失败 %w", err)
 }
+
+func NewErrScanWrongDestinationArguments(expect int, actual int) error {
+	return fmt.Errorf("eorm: Scan 方法收到过多或者过少的参数，预期 %d，实际 %d", expect, actual)
+}

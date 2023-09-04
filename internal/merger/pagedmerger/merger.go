@@ -19,6 +19,8 @@ import (
 	"database/sql"
 	"sync"
 
+	"github.com/ecodeclub/eorm/internal/rows"
+
 	"github.com/ecodeclub/eorm/internal/merger"
 	"github.com/ecodeclub/eorm/internal/merger/internal/errs"
 )
@@ -41,7 +43,7 @@ func NewMerger(m merger.Merger, offset int, limit int) (*Merger, error) {
 	}, nil
 }
 
-func (m *Merger) Merge(ctx context.Context, results []*sql.Rows) (merger.Rows, error) {
+func (m *Merger) Merge(ctx context.Context, results []rows.Rows) (rows.Rows, error) {
 	rs, err := m.m.Merge(ctx, results)
 	if err != nil {
 		return nil, err
@@ -58,7 +60,7 @@ func (m *Merger) Merge(ctx context.Context, results []*sql.Rows) (merger.Rows, e
 }
 
 // nextOffset 会把游标挪到 offset 所指定的位置。
-func (m *Merger) nextOffset(ctx context.Context, rows merger.Rows) error {
+func (m *Merger) nextOffset(ctx context.Context, rows rows.Rows) error {
 	offset := m.offset
 	for i := 0; i < offset; i++ {
 		if ctx.Err() != nil {
@@ -73,12 +75,16 @@ func (m *Merger) nextOffset(ctx context.Context, rows merger.Rows) error {
 }
 
 type Rows struct {
-	rows    merger.Rows
+	rows    rows.Rows
 	limit   int
 	cnt     int
 	lastErr error
 	closed  bool
 	mu      *sync.RWMutex
+}
+
+func (*Rows) NextResultSet() bool {
+	return false
 }
 
 func (r *Rows) Next() bool {
@@ -137,6 +143,9 @@ func (r *Rows) Close() error {
 	return r.rows.Close()
 }
 
+func (r *Rows) ColumnTypes() ([]*sql.ColumnType, error) {
+	return r.rows.ColumnTypes()
+}
 func (r *Rows) Columns() ([]string, error) {
 	return r.rows.Columns()
 }

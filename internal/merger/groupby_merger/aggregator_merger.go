@@ -21,11 +21,12 @@ import (
 	"sync"
 	_ "unsafe"
 
+	"github.com/ecodeclub/eorm/internal/rows"
+
 	"github.com/ecodeclub/ekit/slice"
 
 	"github.com/ecodeclub/ekit/sqlx"
 
-	"github.com/ecodeclub/eorm/internal/merger/utils"
 	"go.uber.org/multierr"
 
 	"github.com/ecodeclub/eorm/internal/merger"
@@ -57,7 +58,7 @@ func NewAggregatorMerger(aggregators []aggregator.Aggregator, groupColumns []mer
 }
 
 // Merge 该实现会全部拿取results里面的数据，由于sql.Rows数据拿完之后会自动关闭，所以这边隐式的关闭了所有的sql.Rows
-func (a *AggregatorMerger) Merge(ctx context.Context, results []*sql.Rows) (merger.Rows, error) {
+func (a *AggregatorMerger) Merge(ctx context.Context, results []rows.Rows) (rows.Rows, error) {
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
@@ -65,7 +66,7 @@ func (a *AggregatorMerger) Merge(ctx context.Context, results []*sql.Rows) (merg
 		return nil, errs.ErrMergerEmptyRows
 	}
 
-	if slice.Contains[*sql.Rows](results, nil) {
+	if slice.Contains[rows.Rows](results, nil) {
 		return nil, errs.ErrMergerRowsIsNull
 	}
 	dataMap, dataIndex, err := a.getCols(results)
@@ -85,7 +86,7 @@ func (a *AggregatorMerger) Merge(ctx context.Context, results []*sql.Rows) (merg
 	}, nil
 }
 
-func (a *AggregatorMerger) getCols(rowsList []*sql.Rows) (*mapx.TreeMap[Key, [][]any], []Key, error) {
+func (a *AggregatorMerger) getCols(rowsList []rows.Rows) (*mapx.TreeMap[Key, [][]any], []Key, error) {
 	treeMap, err := mapx.NewTreeMap[Key, [][]any](compareKey)
 	if err != nil {
 		return nil, nil, err
@@ -125,7 +126,7 @@ func (a *AggregatorMerger) getCols(rowsList []*sql.Rows) (*mapx.TreeMap[Key, [][
 }
 
 type AggregatorRows struct {
-	rowsList     []*sql.Rows
+	rowsList     []rows.Rows
 	aggregators  []aggregator.Aggregator
 	groupColumns []merger.ColumnInfo
 	dataMap      *mapx.TreeMap[Key, [][]any]
@@ -136,6 +137,14 @@ type AggregatorRows struct {
 	closed       bool
 	lastErr      error
 	cols         []string
+}
+
+func (a *AggregatorRows) ColumnTypes() ([]*sql.ColumnType, error) {
+	return a.rowsList[0].ColumnTypes()
+}
+
+func (*AggregatorRows) NextResultSet() bool {
+	return false
 }
 
 // Next 返回列的顺序先分组信息然后是聚合函数信息
@@ -184,7 +193,7 @@ func (a *AggregatorRows) Scan(dest ...any) error {
 		return errs.ErrMergerScanNotNext
 	}
 	for i := 0; i < len(dest); i++ {
-		err := utils.ConvertAssign(dest[i], a.curData[i])
+		err := rows.ConvertAssign(dest[i], a.curData[i])
 		if err != nil {
 			return err
 		}

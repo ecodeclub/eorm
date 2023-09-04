@@ -1,10 +1,10 @@
 module github.com/ecodeclub/eorm
 
-go 1.18
+go 1.20
 
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.0
-	github.com/ecodeclub/ekit v0.0.4-0.20230530053225-e671c5fdd2d1
+	github.com/ecodeclub/ekit v0.0.4-0.20230904153403-e76aae064994
 	github.com/go-sql-driver/mysql v1.6.0
 	github.com/gotomicro/ekit v0.0.0-20230224040531-869798da3c4d
 	github.com/mattn/go-sqlite3 v1.14.15

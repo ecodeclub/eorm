@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/ecodeclub/eorm/internal/rows"
+
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/ecodeclub/eorm/internal/merger"
 	"github.com/ecodeclub/eorm/internal/merger/internal/errs"
@@ -132,7 +134,7 @@ func (ms *MergerSuite) TestMerger_Merge() {
 	testcases := []struct {
 		name        string
 		getMerger   func() (merger.Merger, error)
-		GetRowsList func() []*sql.Rows
+		GetRowsList func() []rows.Rows
 		wantErr     error
 		ctx         func() (context.Context, context.CancelFunc)
 		limit       int
@@ -143,8 +145,8 @@ func (ms *MergerSuite) TestMerger_Merge() {
 			getMerger: func() (merger.Merger, error) {
 				return sortmerger.NewMerger(sortmerger.NewSortColumn("id", sortmerger.ASC))
 			},
-			GetRowsList: func() []*sql.Rows {
-				return []*sql.Rows{}
+			GetRowsList: func() []rows.Rows {
+				return []rows.Rows{}
 			},
 			wantErr: errs.ErrMergerEmptyRows,
 			ctx: func() (context.Context, context.CancelFunc) {
@@ -158,14 +160,14 @@ func (ms *MergerSuite) TestMerger_Merge() {
 			getMerger: func() (merger.Merger, error) {
 				return sortmerger.NewMerger(sortmerger.NewSortColumn("id", sortmerger.ASC))
 			},
-			GetRowsList: func() []*sql.Rows {
+			GetRowsList: func() []rows.Rows {
 				cols := []string{"id", "name", "address"}
 				query := "SELECT * FROM `t1`"
 				ms.mock01.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(1, "abex", "cn").AddRow(2, "bruce", "cn").RowError(1, offsetMockErr))
 				ms.mock02.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(3, "alex", "cn").AddRow(4, "x", "cn"))
 				ms.mock03.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(5, "a", "cn").AddRow(7, "b", "cn"))
 				dbs := []*sql.DB{ms.mockDB01, ms.mockDB02, ms.mockDB03}
-				rowsList := make([]*sql.Rows, 0, len(dbs))
+				rowsList := make([]rows.Rows, 0, len(dbs))
 				for _, db := range dbs {
 					row, err := db.QueryContext(context.Background(), query)
 					require.NoError(ms.T(), err)
@@ -185,14 +187,14 @@ func (ms *MergerSuite) TestMerger_Merge() {
 			getMerger: func() (merger.Merger, error) {
 				return sortmerger.NewMerger(sortmerger.NewSortColumn("id", sortmerger.ASC))
 			},
-			GetRowsList: func() []*sql.Rows {
+			GetRowsList: func() []rows.Rows {
 				cols := []string{"id", "name", "address"}
 				query := "SELECT * FROM `t1`"
 				ms.mock01.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(1, "abex", "cn").AddRow(2, "bruce", "cn"))
 				ms.mock02.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(3, "alex", "cn").AddRow(4, "x", "cn"))
 				ms.mock03.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(5, "a", "cn").AddRow(7, "b", "cn"))
 				dbs := []*sql.DB{ms.mockDB01, ms.mockDB02, ms.mockDB03}
-				rowsList := make([]*sql.Rows, 0, len(dbs))
+				rowsList := make([]rows.Rows, 0, len(dbs))
 				for _, db := range dbs {
 					row, err := db.QueryContext(context.Background(), query)
 					require.NoError(ms.T(), err)
@@ -211,14 +213,14 @@ func (ms *MergerSuite) TestMerger_Merge() {
 			getMerger: func() (merger.Merger, error) {
 				return sortmerger.NewMerger(sortmerger.NewSortColumn("id", sortmerger.ASC))
 			},
-			GetRowsList: func() []*sql.Rows {
+			GetRowsList: func() []rows.Rows {
 				cols := []string{"id", "name", "address"}
 				query := "SELECT * FROM `t1`"
 				ms.mock01.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(1, "abex", "cn").AddRow(2, "bruce", "cn"))
 				ms.mock02.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(3, "alex", "cn").AddRow(4, "x", "cn"))
 				ms.mock03.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(5, "a", "cn").AddRow(7, "b", "cn"))
 				dbs := []*sql.DB{ms.mockDB01, ms.mockDB02, ms.mockDB03}
-				rowsList := make([]*sql.Rows, 0, len(dbs))
+				rowsList := make([]rows.Rows, 0, len(dbs))
 				for _, db := range dbs {
 					row, err := db.QueryContext(context.Background(), query)
 					require.NoError(ms.T(), err)
@@ -258,7 +260,7 @@ func (ms *MergerSuite) TestMerger_NextAndScan() {
 	testcases := []struct {
 		name        string
 		getMerger   func() (merger.Merger, error)
-		GetRowsList func() []*sql.Rows
+		GetRowsList func() []rows.Rows
 		wantVal     []TestModel
 		limit       int
 		offset      int
@@ -268,14 +270,14 @@ func (ms *MergerSuite) TestMerger_NextAndScan() {
 			getMerger: func() (merger.Merger, error) {
 				return sortmerger.NewMerger(sortmerger.NewSortColumn("id", sortmerger.ASC))
 			},
-			GetRowsList: func() []*sql.Rows {
+			GetRowsList: func() []rows.Rows {
 				cols := []string{"id", "name", "address"}
 				query := "SELECT * FROM `t1`"
 				ms.mock01.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(1, "abex", "cn").AddRow(5, "bruce", "cn"))
 				ms.mock02.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(3, "alex", "cn").AddRow(4, "x", "cn"))
 				ms.mock03.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(2, "a", "cn").AddRow(7, "b", "cn"))
 				dbs := []*sql.DB{ms.mockDB01, ms.mockDB02, ms.mockDB03}
-				rowsList := make([]*sql.Rows, 0, len(dbs))
+				rowsList := make([]rows.Rows, 0, len(dbs))
 				for _, db := range dbs {
 					row, err := db.QueryContext(context.Background(), query)
 					require.NoError(ms.T(), err)
@@ -318,14 +320,14 @@ func (ms *MergerSuite) TestMerger_NextAndScan() {
 			getMerger: func() (merger.Merger, error) {
 				return sortmerger.NewMerger(sortmerger.NewSortColumn("id", sortmerger.ASC))
 			},
-			GetRowsList: func() []*sql.Rows {
+			GetRowsList: func() []rows.Rows {
 				cols := []string{"id", "name", "address"}
 				query := "SELECT * FROM `t1`"
 				ms.mock01.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(1, "abex", "cn").AddRow(5, "bruce", "cn"))
 				ms.mock02.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(3, "alex", "cn").AddRow(4, "x", "cn"))
 				ms.mock03.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(2, "a", "cn").AddRow(7, "b", "cn"))
 				dbs := []*sql.DB{ms.mockDB01, ms.mockDB02, ms.mockDB03}
-				rowsList := make([]*sql.Rows, 0, len(dbs))
+				rowsList := make([]rows.Rows, 0, len(dbs))
 				for _, db := range dbs {
 					row, err := db.QueryContext(context.Background(), query)
 					require.NoError(ms.T(), err)
@@ -353,14 +355,14 @@ func (ms *MergerSuite) TestMerger_NextAndScan() {
 			getMerger: func() (merger.Merger, error) {
 				return sortmerger.NewMerger(sortmerger.NewSortColumn("id", sortmerger.ASC))
 			},
-			GetRowsList: func() []*sql.Rows {
+			GetRowsList: func() []rows.Rows {
 				cols := []string{"id", "name", "address"}
 				query := "SELECT * FROM `t1`"
 				ms.mock01.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(1, "abex", "cn").AddRow(5, "bruce", "cn"))
 				ms.mock02.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(3, "alex", "cn").AddRow(4, "x", "cn"))
 				ms.mock03.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(2, "a", "cn").AddRow(7, "b", "cn"))
 				dbs := []*sql.DB{ms.mockDB01, ms.mockDB02, ms.mockDB03}
-				rowsList := make([]*sql.Rows, 0, len(dbs))
+				rowsList := make([]rows.Rows, 0, len(dbs))
 				for _, db := range dbs {
 					row, err := db.QueryContext(context.Background(), query)
 					require.NoError(ms.T(), err)
@@ -377,14 +379,14 @@ func (ms *MergerSuite) TestMerger_NextAndScan() {
 			getMerger: func() (merger.Merger, error) {
 				return sortmerger.NewMerger(sortmerger.NewSortColumn("id", sortmerger.ASC))
 			},
-			GetRowsList: func() []*sql.Rows {
+			GetRowsList: func() []rows.Rows {
 				cols := []string{"id", "name", "address"}
 				query := "SELECT * FROM `t1`"
 				ms.mock01.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(1, "abex", "cn").AddRow(5, "bruce", "cn"))
 				ms.mock02.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(3, "alex", "cn").AddRow(4, "x", "cn"))
 				ms.mock03.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(2, "a", "cn").AddRow(7, "b", "cn"))
 				dbs := []*sql.DB{ms.mockDB01, ms.mockDB02, ms.mockDB03}
-				rowsList := make([]*sql.Rows, 0, len(dbs))
+				rowsList := make([]rows.Rows, 0, len(dbs))
 				for _, db := range dbs {
 					row, err := db.QueryContext(context.Background(), query)
 					require.NoError(ms.T(), err)
@@ -454,7 +456,7 @@ func (ms *MergerSuite) TestRows_NextAndErr() {
 	testcases := []struct {
 		name        string
 		getMerger   func() (merger.Merger, error)
-		GetRowsList func() []*sql.Rows
+		GetRowsList func() []rows.Rows
 		wantErr     error
 		limit       int
 		offset      int
@@ -464,14 +466,14 @@ func (ms *MergerSuite) TestRows_NextAndErr() {
 			getMerger: func() (merger.Merger, error) {
 				return sortmerger.NewMerger(sortmerger.NewSortColumn("id", sortmerger.ASC))
 			},
-			GetRowsList: func() []*sql.Rows {
+			GetRowsList: func() []rows.Rows {
 				cols := []string{"id", "name", "address"}
 				query := "SELECT * FROM `t1`"
 				ms.mock01.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(1, "abex", "cn").AddRow(5, "bruce", "cn"))
 				ms.mock02.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(3, "alex", "cn").AddRow(4, "x", "cn"))
 				ms.mock03.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(2, "a", "cn").AddRow(7, "b", "cn").RowError(1, limitMockErr))
 				dbs := []*sql.DB{ms.mockDB01, ms.mockDB02, ms.mockDB03}
-				rowsList := make([]*sql.Rows, 0, len(dbs))
+				rowsList := make([]rows.Rows, 0, len(dbs))
 				for _, db := range dbs {
 					row, err := db.QueryContext(context.Background(), query)
 					require.NoError(ms.T(), err)
@@ -507,7 +509,7 @@ func (ms *MergerSuite) TestRows_ScanAndErr() {
 		ms.mock01.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(1).AddRow(5))
 		r, err := ms.mockDB01.QueryContext(context.Background(), query)
 		require.NoError(t, err)
-		rowsList := []*sql.Rows{r}
+		rowsList := []rows.Rows{r}
 		merger, err := sortmerger.NewMerger(sortmerger.NewSortColumn("id", sortmerger.ASC))
 		require.NoError(t, err)
 		limitMerger, err := NewMerger(merger, 0, 1)
@@ -524,7 +526,7 @@ func (ms *MergerSuite) TestRows_ScanAndErr() {
 		ms.mock01.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(1).AddRow(2).RowError(1, limitMockErr))
 		r, err := ms.mockDB01.QueryContext(context.Background(), query)
 		require.NoError(t, err)
-		rowsList := []*sql.Rows{r}
+		rowsList := []rows.Rows{r}
 		merger, err := sortmerger.NewMerger(sortmerger.NewSortColumn("id", sortmerger.ASC))
 		require.NoError(t, err)
 		limitMerger, err := NewMerger(merger, 0, 1)
@@ -550,7 +552,7 @@ func (ms *MergerSuite) TestRows_Close() {
 	limitMerger, err := NewMerger(merger, 1, 6)
 	require.NoError(ms.T(), err)
 	dbs := []*sql.DB{ms.mockDB01, ms.mockDB02, ms.mockDB03}
-	rowsList := make([]*sql.Rows, 0, len(dbs))
+	rowsList := make([]rows.Rows, 0, len(dbs))
 	for _, db := range dbs {
 		row, err := db.QueryContext(context.Background(), query)
 		require.NoError(ms.T(), err)
@@ -601,7 +603,7 @@ func (ms *MergerSuite) TestRows_Columns() {
 	limitMerger, err := NewMerger(merger, 0, 10)
 	require.NoError(ms.T(), err)
 	dbs := []*sql.DB{ms.mockDB01, ms.mockDB02, ms.mockDB03}
-	rowsList := make([]*sql.Rows, 0, len(dbs))
+	rowsList := make([]rows.Rows, 0, len(dbs))
 	for _, db := range dbs {
 		row, err := db.QueryContext(context.Background(), query)
 		require.NoError(ms.T(), err)
@@ -622,4 +624,8 @@ type TestModel struct {
 	Id      int
 	Name    string
 	Address string
+}
+
+func TestRows_NextResultSet(t *testing.T) {
+	assert.False(t, (&Rows{}).NextResultSet())
 }

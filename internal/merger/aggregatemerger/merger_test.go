@@ -21,12 +21,14 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/ecodeclub/eorm/internal/rows"
+	_ "github.com/mattn/go-sqlite3"
+
 	"github.com/ecodeclub/eorm/internal/merger"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/ecodeclub/eorm/internal/merger/aggregatemerger/aggregator"
 	"github.com/ecodeclub/eorm/internal/merger/internal/errs"
-	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -34,8 +36,8 @@ import (
 )
 
 var (
-	nextMockErr   error = errors.New("rows: MockNextErr")
-	aggregatorErr error = errors.New("aggregator: MockAggregatorErr")
+	nextMockErr   = errors.New("rows: MockNextErr")
+	aggregatorErr = errors.New("aggregator: MockAggregatorErr")
 )
 
 func newCloseMockErr(dbName string) error {
@@ -109,7 +111,7 @@ func TestMerger(t *testing.T) {
 func (ms *MergerSuite) TestRows_NextAndScan() {
 	testcases := []struct {
 		name        string
-		sqlRows     func() []*sql.Rows
+		sqlRows     func() []rows.Rows
 		wantVal     []any
 		aggregators func() []aggregator.Aggregator
 		gotVal      []any
@@ -117,7 +119,7 @@ func (ms *MergerSuite) TestRows_NextAndScan() {
 	}{
 		{
 			name: "sqlite的ColumnType 使用了多级指针",
-			sqlRows: func() []*sql.Rows {
+			sqlRows: func() []rows.Rows {
 				query1 := "insert into `t1` values (1,10),(2,20),(3,30)"
 				_, err := ms.db05.ExecContext(context.Background(), query1)
 				require.NoError(ms.T(), err)
@@ -127,7 +129,7 @@ func (ms *MergerSuite) TestRows_NextAndScan() {
 				ms.mock02.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(20))
 				ms.mock03.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(30))
 				dbs := []*sql.DB{ms.mockDB01, ms.mockDB02, ms.mockDB03, ms.db05}
-				rowsList := make([]*sql.Rows, 0, len(dbs))
+				rowsList := make([]rows.Rows, 0, len(dbs))
 				for _, db := range dbs {
 					row, err := db.QueryContext(context.Background(), query)
 					require.NoError(ms.T(), err)
@@ -149,14 +151,14 @@ func (ms *MergerSuite) TestRows_NextAndScan() {
 		},
 		{
 			name: "SUM(id)",
-			sqlRows: func() []*sql.Rows {
+			sqlRows: func() []rows.Rows {
 				cols := []string{"SUM(id)"}
 				query := "SELECT SUM(`id`) FROM `t1`"
 				ms.mock01.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(10))
 				ms.mock02.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(20))
 				ms.mock03.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(30))
 				dbs := []*sql.DB{ms.mockDB01, ms.mockDB02, ms.mockDB03}
-				rowsList := make([]*sql.Rows, 0, len(dbs))
+				rowsList := make([]rows.Rows, 0, len(dbs))
 				for _, db := range dbs {
 					row, err := db.QueryContext(context.Background(), query)
 					require.NoError(ms.T(), err)
@@ -179,14 +181,14 @@ func (ms *MergerSuite) TestRows_NextAndScan() {
 
 		{
 			name: "MAX(id)",
-			sqlRows: func() []*sql.Rows {
+			sqlRows: func() []rows.Rows {
 				cols := []string{"MAX(id)"}
 				query := "SELECT MAX(`id`) FROM `t1`"
 				ms.mock01.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(10))
 				ms.mock02.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(20))
 				ms.mock03.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(30))
 				dbs := []*sql.DB{ms.mockDB01, ms.mockDB02, ms.mockDB03}
-				rowsList := make([]*sql.Rows, 0, len(dbs))
+				rowsList := make([]rows.Rows, 0, len(dbs))
 				for _, db := range dbs {
 					row, err := db.QueryContext(context.Background(), query)
 					require.NoError(ms.T(), err)
@@ -208,14 +210,14 @@ func (ms *MergerSuite) TestRows_NextAndScan() {
 		},
 		{
 			name: "MIN(id)",
-			sqlRows: func() []*sql.Rows {
+			sqlRows: func() []rows.Rows {
 				cols := []string{"MIN(id)"}
 				query := "SELECT MIN(`id`) FROM `t1`"
 				ms.mock01.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(10))
 				ms.mock02.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(20))
 				ms.mock03.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(30))
 				dbs := []*sql.DB{ms.mockDB01, ms.mockDB02, ms.mockDB03}
-				rowsList := make([]*sql.Rows, 0, len(dbs))
+				rowsList := make([]rows.Rows, 0, len(dbs))
 				for _, db := range dbs {
 					row, err := db.QueryContext(context.Background(), query)
 					require.NoError(ms.T(), err)
@@ -237,14 +239,14 @@ func (ms *MergerSuite) TestRows_NextAndScan() {
 		},
 		{
 			name: "COUNT(id)",
-			sqlRows: func() []*sql.Rows {
+			sqlRows: func() []rows.Rows {
 				cols := []string{"COUNT(id)"}
 				query := "SELECT COUNT(`id`) FROM `t1`"
 				ms.mock01.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(10))
 				ms.mock02.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(20))
 				ms.mock03.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(10))
 				dbs := []*sql.DB{ms.mockDB01, ms.mockDB02, ms.mockDB03}
-				rowsList := make([]*sql.Rows, 0, len(dbs))
+				rowsList := make([]rows.Rows, 0, len(dbs))
 				for _, db := range dbs {
 					row, err := db.QueryContext(context.Background(), query)
 					require.NoError(ms.T(), err)
@@ -266,14 +268,14 @@ func (ms *MergerSuite) TestRows_NextAndScan() {
 		},
 		{
 			name: "AVG(grade)",
-			sqlRows: func() []*sql.Rows {
+			sqlRows: func() []rows.Rows {
 				cols := []string{"SUM(grade)", "COUNT(grade)"}
 				query := "SELECT SUM(`grade`),COUNT(`grade`) FROM `t1`"
 				ms.mock01.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(2000, 10))
 				ms.mock02.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(2000, 20))
 				ms.mock03.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(2000, 10))
 				dbs := []*sql.DB{ms.mockDB01, ms.mockDB02, ms.mockDB03}
-				rowsList := make([]*sql.Rows, 0, len(dbs))
+				rowsList := make([]rows.Rows, 0, len(dbs))
 				for _, db := range dbs {
 					row, err := db.QueryContext(context.Background(), query)
 					require.NoError(ms.T(), err)
@@ -300,14 +302,14 @@ func (ms *MergerSuite) TestRows_NextAndScan() {
 		// 1.每种聚合函数出现一次
 		{
 			name: "COUNT(id),MAX(id),MIN(id),SUM(id),AVG(grade)",
-			sqlRows: func() []*sql.Rows {
+			sqlRows: func() []rows.Rows {
 				cols := []string{"COUNT(id)", "MAX(id)", "MIN(id)", "SUM(id)", "SUM(grade)", "COUNT(grade)"}
 				query := "SELECT COUNT(`id`),MAX(`id`),MIN(`id`),SUM(`id`),SUM(`grade`),COUNT(`student`) FROM `t1`"
 				ms.mock01.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(10, 20, 1, 100, 2000, 20))
 				ms.mock02.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(20, 30, 0, 200, 800, 10))
 				ms.mock03.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(10, 40, 2, 300, 1800, 20))
 				dbs := []*sql.DB{ms.mockDB01, ms.mockDB02, ms.mockDB03}
-				rowsList := make([]*sql.Rows, 0, len(dbs))
+				rowsList := make([]rows.Rows, 0, len(dbs))
 				for _, db := range dbs {
 					row, err := db.QueryContext(context.Background(), query)
 					require.NoError(ms.T(), err)
@@ -337,14 +339,14 @@ func (ms *MergerSuite) TestRows_NextAndScan() {
 		// 两个avg会包含sum列在前，和sum列在后的状态。并且有完全相同的列出现
 		{
 			name: "AVG(grade),SUM(grade),AVG(grade),MIN(id),MIN(userid),MAX(id),COUNT(id)",
-			sqlRows: func() []*sql.Rows {
+			sqlRows: func() []rows.Rows {
 				cols := []string{"SUM(grade)", "COUNT(grade)", "SUM(grade)", "COUNT(grade)", "SUM(grade)", "MIN(id)", "MIN(userid)", "MAX(id)", "COUNT(id)"}
 				query := "SELECT SUM(`grade`),COUNT(`grade`),SUM(`grade`),COUNT(`grade`),SUM(`grade`),MIN(`id`),MIN(`userid`),MAX(`id`),COUNT(`id`) FROM `t1`"
 				ms.mock01.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(2000, 20, 2000, 20, 2000, 10, 20, 200, 200))
 				ms.mock02.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(1000, 10, 1000, 10, 1000, 20, 30, 300, 300))
 				ms.mock03.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(800, 10, 800, 10, 800, 5, 6, 100, 200))
 				dbs := []*sql.DB{ms.mockDB01, ms.mockDB02, ms.mockDB03}
-				rowsList := make([]*sql.Rows, 0, len(dbs))
+				rowsList := make([]rows.Rows, 0, len(dbs))
 				for _, db := range dbs {
 					row, err := db.QueryContext(context.Background(), query)
 					require.NoError(ms.T(), err)
@@ -378,7 +380,7 @@ func (ms *MergerSuite) TestRows_NextAndScan() {
 		// 1. Rows 列表中有一个Rows返回行数为空，在前面会返回错误
 		{
 			name: "RowsList有一个Rows为空，在前面",
-			sqlRows: func() []*sql.Rows {
+			sqlRows: func() []rows.Rows {
 				cols := []string{"SUM(id)"}
 				query := "SELECT SUM(`id`) FROM `t1`"
 				ms.mock01.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(10))
@@ -386,7 +388,7 @@ func (ms *MergerSuite) TestRows_NextAndScan() {
 				ms.mock03.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(30))
 				ms.mock04.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols))
 				dbs := []*sql.DB{ms.mockDB04, ms.mockDB01, ms.mockDB02, ms.mockDB03}
-				rowsList := make([]*sql.Rows, 0, len(dbs))
+				rowsList := make([]rows.Rows, 0, len(dbs))
 				for _, db := range dbs {
 					row, err := db.QueryContext(context.Background(), query)
 					require.NoError(ms.T(), err)
@@ -410,7 +412,7 @@ func (ms *MergerSuite) TestRows_NextAndScan() {
 		// 2. Rows 列表中有一个Rows返回行数为空，在中间会返回错误
 		{
 			name: "RowsList有一个Rows为空，在中间",
-			sqlRows: func() []*sql.Rows {
+			sqlRows: func() []rows.Rows {
 				cols := []string{"SUM(id)"}
 				query := "SELECT SUM(`id`) FROM `t1`"
 				ms.mock01.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(10))
@@ -418,7 +420,7 @@ func (ms *MergerSuite) TestRows_NextAndScan() {
 				ms.mock03.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(30))
 				ms.mock04.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols))
 				dbs := []*sql.DB{ms.mockDB01, ms.mockDB04, ms.mockDB02, ms.mockDB03}
-				rowsList := make([]*sql.Rows, 0, len(dbs))
+				rowsList := make([]rows.Rows, 0, len(dbs))
 				for _, db := range dbs {
 					row, err := db.QueryContext(context.Background(), query)
 					require.NoError(ms.T(), err)
@@ -442,7 +444,7 @@ func (ms *MergerSuite) TestRows_NextAndScan() {
 		// 3. Rows 列表中有一个Rows返回行数为空，在后面会返回错误
 		{
 			name: "RowsList有一个Rows为空，在最后",
-			sqlRows: func() []*sql.Rows {
+			sqlRows: func() []rows.Rows {
 				cols := []string{"SUM(id)"}
 				query := "SELECT SUM(`id`) FROM `t1`"
 				ms.mock01.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(10))
@@ -450,7 +452,7 @@ func (ms *MergerSuite) TestRows_NextAndScan() {
 				ms.mock03.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(30))
 				ms.mock04.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols))
 				dbs := []*sql.DB{ms.mockDB01, ms.mockDB02, ms.mockDB03, ms.mockDB04}
-				rowsList := make([]*sql.Rows, 0, len(dbs))
+				rowsList := make([]rows.Rows, 0, len(dbs))
 				for _, db := range dbs {
 					row, err := db.QueryContext(context.Background(), query)
 					require.NoError(ms.T(), err)
@@ -474,7 +476,7 @@ func (ms *MergerSuite) TestRows_NextAndScan() {
 		// 4. Rows 列表中全部Rows返回的行数为空，不会返回错误
 		{
 			name: "RowsList全部为空",
-			sqlRows: func() []*sql.Rows {
+			sqlRows: func() []rows.Rows {
 				cols := []string{"SUM(id)"}
 				query := "SELECT SUM(`id`) FROM `t1`"
 				ms.mock01.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols))
@@ -482,7 +484,7 @@ func (ms *MergerSuite) TestRows_NextAndScan() {
 				ms.mock03.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols))
 				ms.mock04.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols))
 				dbs := []*sql.DB{ms.mockDB01, ms.mockDB02, ms.mockDB03, ms.mockDB04}
-				rowsList := make([]*sql.Rows, 0, len(dbs))
+				rowsList := make([]rows.Rows, 0, len(dbs))
 				for _, db := range dbs {
 					row, err := db.QueryContext(context.Background(), query)
 					require.NoError(ms.T(), err)
@@ -523,13 +525,13 @@ func (ms *MergerSuite) TestRows_NextAndScan() {
 func (ms *MergerSuite) TestRows_NextAndErr() {
 	testcases := []struct {
 		name        string
-		rowsList    func() []*sql.Rows
+		rowsList    func() []rows.Rows
 		wantErr     error
 		aggregators []aggregator.Aggregator
 	}{
 		{
 			name: "sqlRows列表中有一个返回error",
-			rowsList: func() []*sql.Rows {
+			rowsList: func() []rows.Rows {
 				cols := []string{"COUNT(id)"}
 				query := "SELECT COUNT(`id`) FROM `t1`"
 				ms.mock01.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(1))
@@ -537,7 +539,7 @@ func (ms *MergerSuite) TestRows_NextAndErr() {
 				ms.mock03.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(4).RowError(0, nextMockErr))
 				ms.mock04.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(5))
 				dbs := []*sql.DB{ms.mockDB01, ms.mockDB02, ms.mockDB03, ms.mockDB04}
-				rowsList := make([]*sql.Rows, 0, len(dbs))
+				rowsList := make([]rows.Rows, 0, len(dbs))
 				for _, db := range dbs {
 					row, err := db.QueryContext(context.Background(), query)
 					require.NoError(ms.T(), err)
@@ -554,7 +556,7 @@ func (ms *MergerSuite) TestRows_NextAndErr() {
 		},
 		{
 			name: "有一个aggregator返回error",
-			rowsList: func() []*sql.Rows {
+			rowsList: func() []rows.Rows {
 				cols := []string{"COUNT(id)"}
 				query := "SELECT COUNT(`id`) FROM `t1`"
 				ms.mock01.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(1))
@@ -562,7 +564,7 @@ func (ms *MergerSuite) TestRows_NextAndErr() {
 				ms.mock03.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(4))
 				ms.mock04.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(5))
 				dbs := []*sql.DB{ms.mockDB01, ms.mockDB02, ms.mockDB03, ms.mockDB04}
-				rowsList := make([]*sql.Rows, 0, len(dbs))
+				rowsList := make([]rows.Rows, 0, len(dbs))
 				for _, db := range dbs {
 					row, err := db.QueryContext(context.Background(), query)
 					require.NoError(ms.T(), err)
@@ -601,7 +603,7 @@ func (ms *MergerSuite) TestRows_Close() {
 	ms.mock03.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(3).CloseError(newCloseMockErr("db03")))
 	merger := NewMerger(aggregator.NewSum(merger.NewColumnInfo(0, "SUM(id)")))
 	dbs := []*sql.DB{ms.mockDB01, ms.mockDB02, ms.mockDB03}
-	rowsList := make([]*sql.Rows, 0, len(dbs))
+	rowsList := make([]rows.Rows, 0, len(dbs))
 	for _, db := range dbs {
 		row, err := db.QueryContext(context.Background(), query)
 		require.NoError(ms.T(), err)
@@ -656,7 +658,7 @@ func (ms *MergerSuite) TestRows_Columns() {
 	}
 	merger := NewMerger(aggregators...)
 	dbs := []*sql.DB{ms.mockDB01, ms.mockDB02, ms.mockDB03}
-	rowsList := make([]*sql.Rows, 0, len(dbs))
+	rowsList := make([]rows.Rows, 0, len(dbs))
 	for _, db := range dbs {
 		row, err := db.QueryContext(context.Background(), query)
 		require.NoError(ms.T(), err)
@@ -688,7 +690,7 @@ func (ms *MergerSuite) TestMerger_Merge() {
 		merger  func() *Merger
 		ctx     func() (context.Context, context.CancelFunc)
 		wantErr error
-		sqlRows func() []*sql.Rows
+		sqlRows func() []rows.Rows
 	}{
 		{
 			name: "超时",
@@ -700,10 +702,10 @@ func (ms *MergerSuite) TestMerger_Merge() {
 				return ctx, cancel
 			},
 			wantErr: context.DeadlineExceeded,
-			sqlRows: func() []*sql.Rows {
+			sqlRows: func() []rows.Rows {
 				query := "SELECT  SUM(`id`) FROM `t1`;"
 				cols := []string{"SUM(id)"}
-				res := make([]*sql.Rows, 0, 1)
+				res := make([]rows.Rows, 0, 1)
 				ms.mock01.ExpectQuery("SELECT *").WillReturnRows(sqlmock.NewRows(cols).AddRow(1))
 				rows, _ := ms.mockDB01.QueryContext(context.Background(), query)
 				res = append(res, rows)
@@ -720,8 +722,8 @@ func (ms *MergerSuite) TestMerger_Merge() {
 				return ctx, cancel
 			},
 			wantErr: errs.ErrMergerEmptyRows,
-			sqlRows: func() []*sql.Rows {
-				return []*sql.Rows{}
+			sqlRows: func() []rows.Rows {
+				return []rows.Rows{}
 			},
 		},
 		{
@@ -734,8 +736,8 @@ func (ms *MergerSuite) TestMerger_Merge() {
 				return ctx, cancel
 			},
 			wantErr: errs.ErrMergerRowsIsNull,
-			sqlRows: func() []*sql.Rows {
-				return []*sql.Rows{nil}
+			sqlRows: func() []rows.Rows {
+				return []rows.Rows{nil}
 			},
 		},
 	}
@@ -763,6 +765,10 @@ func (m *mockAggregate) Aggregate(cols [][]any) (any, error) {
 	return nil, aggregatorErr
 }
 
-func (m *mockAggregate) ColumnName() string {
+func (*mockAggregate) ColumnName() string {
 	return "mockAggregate"
+}
+
+func TestRows_NextResultSet(t *testing.T) {
+	assert.False(t, (&Rows{}).NextResultSet())
 }

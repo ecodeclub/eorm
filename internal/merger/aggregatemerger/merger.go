@@ -21,11 +21,9 @@ import (
 	"sync"
 	_ "unsafe"
 
+	"github.com/ecodeclub/eorm/internal/rows"
+
 	"github.com/ecodeclub/ekit/sqlx"
-
-	"github.com/ecodeclub/eorm/internal/merger"
-
-	"github.com/ecodeclub/eorm/internal/merger/utils"
 
 	"github.com/ecodeclub/eorm/internal/merger/aggregatemerger/aggregator"
 	"github.com/ecodeclub/eorm/internal/merger/internal/errs"
@@ -49,7 +47,7 @@ func NewMerger(aggregators ...aggregator.Aggregator) *Merger {
 	}
 }
 
-func (m *Merger) Merge(ctx context.Context, results []*sql.Rows) (merger.Rows, error) {
+func (m *Merger) Merge(ctx context.Context, results []rows.Rows) (rows.Rows, error) {
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
@@ -74,7 +72,7 @@ func (m *Merger) Merge(ctx context.Context, results []*sql.Rows) (merger.Rows, e
 }
 
 type Rows struct {
-	rowsList    []*sql.Rows
+	rowsList    []rows.Rows
 	aggregators []aggregator.Aggregator
 	closed      bool
 	mu          *sync.RWMutex
@@ -82,6 +80,14 @@ type Rows struct {
 	cur         []any
 	columns     []string
 	nextCalled  bool
+}
+
+func (r *Rows) ColumnTypes() ([]*sql.ColumnType, error) {
+	return r.rowsList[0].ColumnTypes()
+}
+
+func (*Rows) NextResultSet() bool {
+	return false
 }
 
 func (r *Rows) Next() bool {
@@ -145,7 +151,7 @@ func (r *Rows) getSqlRowsData() ([][]any, error) {
 	}
 	return rowsData, nil
 }
-func (*Rows) getSqlRowData(row *sql.Rows) ([]any, error) {
+func (*Rows) getSqlRowData(row rows.Rows) ([]any, error) {
 	var colsData []any
 	var err error
 	scanner, err := sqlx.NewSQLRowsScanner(row)
@@ -173,7 +179,7 @@ func (r *Rows) Scan(dest ...any) error {
 		return errs.ErrMergerScanNotNext
 	}
 	for i := 0; i < len(dest); i++ {
-		err := utils.ConvertAssign(dest[i], r.cur[i])
+		err := rows.ConvertAssign(dest[i], r.cur[i])
 		if err != nil {
 			return err
 		}
