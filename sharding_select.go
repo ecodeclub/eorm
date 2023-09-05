@@ -16,8 +16,9 @@ package eorm
 
 import (
 	"context"
-	"database/sql"
 	"sync"
+
+	"github.com/ecodeclub/eorm/internal/rows"
 
 	"github.com/ecodeclub/eorm/internal/merger/batchmerger"
 
@@ -304,7 +305,7 @@ func (s *ShardingSelector[T]) GetMulti(ctx context.Context) ([]*T, error) {
 		return nil, err
 	}
 
-	var rowsSlice []*sql.Rows
+	var rowsSlice []rows.Rows
 	var eg errgroup.Group
 	for _, query := range qs {
 		q := query
@@ -312,10 +313,10 @@ func (s *ShardingSelector[T]) GetMulti(ctx context.Context) ([]*T, error) {
 			//s.lock.Lock()
 			//defer s.lock.Unlock()
 			// TODO 利用 ctx 传递 DB name
-			rows, err := s.db.queryContext(ctx, q)
+			rs, err := s.db.queryContext(ctx, q)
 			if err == nil {
 				s.lock.Lock()
-				rowsSlice = append(rowsSlice, rows)
+				rowsSlice = append(rowsSlice, rs)
 				s.lock.Unlock()
 			}
 			return err
@@ -375,7 +376,7 @@ func (s *ShardingSelector[T]) GetMultiV2(ctx context.Context) ([]*T, error) {
 		}
 	}
 
-	var rowsSlice []*sql.Rows
+	var rowsSlice []rows.Rows
 	var eg errgroup.Group
 	for _, query := range sdQs {
 		q := query
@@ -384,10 +385,10 @@ func (s *ShardingSelector[T]) GetMultiV2(ctx context.Context) ([]*T, error) {
 			//s.lock.Lock()
 			//defer s.lock.Unlock()
 			// TODO 利用 ctx 传递 DB name
-			rows, err := s.db.queryContext(ctx, q)
+			rs, err := s.db.queryContext(ctx, q)
 			if err == nil {
 				s.lock.Lock()
-				rowsSlice = append(rowsSlice, rows)
+				rowsSlice = append(rowsSlice, rs)
 				s.lock.Unlock()
 			}
 			return err
@@ -399,15 +400,15 @@ func (s *ShardingSelector[T]) GetMultiV2(ctx context.Context) ([]*T, error) {
 	}
 
 	mgr := batchmerger.NewMerger()
-	rows, err := mgr.Merge(ctx, rowsSlice)
+	rs, err := mgr.Merge(ctx, rowsSlice)
 	if err != nil {
 		return nil, err
 	}
 	var res []*T
-	for rows.Next() {
+	for rs.Next() {
 		tp := new(T)
 		val := s.valCreator.NewPrimitiveValue(tp, s.meta)
-		if err = val.SetColumns(rows); err != nil {
+		if err = val.SetColumns(rs); err != nil {
 			return nil, err
 		}
 		res = append(res, tp)

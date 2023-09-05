@@ -12,7 +12,7 @@
 
 ### Go 版本
 
-请使用 Go 1.18 以上版本。
+请使用 Go 1.20 以上版本。
 
 ### SQL 2003 标准
 理论上来说，我们计划支持 [SQL 2003 standard](https://ronsavage.github.io/SQL/sql-2003-2.bnf.html#query%20specification). 不过据我们所知，并不是所有的数据库都支持全部的 SQL 2003 标准，所以用户还是需要进一步检查目标数据库的语法。

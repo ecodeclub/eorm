@@ -16,7 +16,6 @@ package merger
 
 import (
 	"context"
-	"database/sql"
 
 	"github.com/ecodeclub/eorm/internal/rows"
 )
@@ -24,7 +23,7 @@ import (
 // Merger 将sql.Rows列表里的元素合并，返回一个类似sql.Rows的迭代器
 // Merger sql.Rows列表中每个sql.Rows仅支持单个结果集且每个sql.Rows中列集必须完全相同。
 type Merger interface {
-	Merge(ctx context.Context, results []*sql.Rows) (Rows, error)
+	Merge(ctx context.Context, results []rows.Rows) (rows.Rows, error)
 }
 
 type ColumnInfo struct {
@@ -38,5 +37,3 @@ func NewColumnInfo(index int, name string) ColumnInfo {
 		Name:  name,
 	}
 }
-
-type Rows = rows.Rows

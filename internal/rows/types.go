@@ -14,15 +14,9 @@
 
 package rows
 
-import "database/sql"
-
-var _ Rows = &sql.Rows{}
+import (
+	"github.com/ecodeclub/ekit/sqlx"
+)
 
 // Rows 各方法用法及语义尽可能与sql.Rows相同
-type Rows interface {
-	Next() bool
-	Scan(dest ...any) error
-	Close() error
-	Columns() ([]string, error)
-	Err() error
-}
+type Rows = sqlx.Rows
