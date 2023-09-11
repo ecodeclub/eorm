@@ -66,13 +66,13 @@ func (s *ShardingDelayTxTestSuite) TestDoubleShardingSelect() {
 			defer tx.Commit()
 			querySet, err := eorm.NewShardingSelector[test.OrderDetail](tx).
 				Where(eorm.C("OrderId").NEQ(123)).
-				GetMultiV2(masterslave.UseMaster(context.Background()))
+				GetMulti(masterslave.UseMaster(context.Background()))
 			require.NoError(t, err)
 			assert.ElementsMatch(t, tc.querySet, querySet)
 
 			querySet, err = eorm.NewShardingSelector[test.OrderDetail](tx).
 				Where(eorm.C("OrderId").NEQ(123)).
-				GetMultiV2(masterslave.UseMaster(context.Background()))
+				GetMulti(masterslave.UseMaster(context.Background()))
 			require.NoError(t, err)
 			assert.ElementsMatch(t, tc.querySet, querySet)
 		})
@@ -228,7 +228,7 @@ func (s *ShardingDelayTxTestSuite) TestShardingSelectUpdateInsert_Commit_Or_Roll
 			tx := tc.txFunc(t)
 			querySet, err := eorm.NewShardingSelector[test.OrderDetail](tx).
 				Where(eorm.C("OrderId").NEQ(123)).
-				GetMultiV2(masterslave.UseMaster(context.Background()))
+				GetMulti(masterslave.UseMaster(context.Background()))
 			require.NoError(t, err)
 			assert.ElementsMatch(t, tc.querySet, querySet)
 

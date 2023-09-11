@@ -17,7 +17,7 @@ package test
 import (
 	"testing"
 
-	"github.com/gotomicro/ekit"
+	"github.com/ecodeclub/ekit"
 	"github.com/stretchr/testify/assert"
 )
 

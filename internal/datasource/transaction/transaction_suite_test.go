@@ -161,9 +161,8 @@ func (s *ShardingTransactionSuite) findTgt(t *testing.T, values []*test.OrderDet
 		od = values[i]
 		pre = pre.Or(eorm.C(s.shardingKey).EQ(od.OrderId))
 	}
-	// TODO GetMultiV2 待将 table 维度改成 db 维度
 	querySet, err := eorm.NewShardingSelector[test.OrderDetail](s.shardingDB).
-		Where(pre).GetMultiV2(masterslave.UseMaster(context.Background()))
+		Where(pre).GetMulti(masterslave.UseMaster(context.Background()))
 	require.NoError(t, err)
 	return querySet
 }

@@ -29,10 +29,10 @@ import (
 
 	"go.uber.org/multierr"
 
+	"github.com/ecodeclub/ekit/mapx"
 	"github.com/ecodeclub/eorm/internal/merger"
 	"github.com/ecodeclub/eorm/internal/merger/aggregatemerger/aggregator"
 	"github.com/ecodeclub/eorm/internal/merger/internal/errs"
-	"github.com/gotomicro/ekit/mapx"
 )
 
 type AggregatorMerger struct {
@@ -109,7 +109,7 @@ func (a *AggregatorMerger) getCols(rowsList []rows.Rows) (*mapx.TreeMap[Key, [][
 			val, ok := treeMap.Get(key)
 			if ok {
 				val = append(val, colData)
-				err = treeMap.Set(key, val)
+				err = treeMap.Put(key, val)
 				if err != nil {
 					return nil, nil, err
 				}

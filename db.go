@@ -39,7 +39,7 @@ type DBOption func(db *DB)
 
 // DB represents a database
 type DB struct {
-	core
+	baseSession
 	ds datasource.DataSource
 }
 
@@ -62,14 +62,6 @@ func UseReflection() DBOption {
 	}
 }
 
-func (db *DB) queryContext(ctx context.Context, q datasource.Query) (*sql.Rows, error) {
-	return db.ds.Query(ctx, q)
-}
-
-func (db *DB) execContext(ctx context.Context, q datasource.Query) (sql.Result, error) {
-	return db.ds.Exec(ctx, q)
-}
-
 // Open 创建一个 ORM 实例
 // 注意该实例是一个无状态的对象，你应该尽可能复用它
 func Open(driver string, dsn string, opts ...DBOption) (*DB, error) {
@@ -86,12 +78,15 @@ func OpenDS(driver string, ds datasource.DataSource, opts ...DBOption) (*DB, err
 		return nil, err
 	}
 	orm := &DB{
-		core: core{
-			metaRegistry: model.NewMetaRegistry(),
-			dialect:      dl,
-			// 可以设为默认，因为原本这里也有默认
-			valCreator: valuer.PrimitiveCreator{
-				Creator: valuer.NewUnsafeValue,
+		baseSession: baseSession{
+			executor: ds,
+			core: core{
+				metaRegistry: model.NewMetaRegistry(),
+				dialect:      dl,
+				// 可以设为默认，因为原本这里也有默认
+				valCreator: valuer.PrimitiveCreator{
+					Creator: valuer.NewUnsafeValue,
+				},
 			},
 		},
 		ds: ds,
@@ -111,13 +106,12 @@ func (db *DB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Tx{tx: tx, core: db.getCore()}, nil
+	return &Tx{tx: tx, baseSession: baseSession{
+		executor: tx,
+		core:     db.core,
+	}}, nil
 }
 
 func (db *DB) Close() error {
 	return db.ds.Close()
-}
-
-func (db *DB) getCore() core {
-	return db.core
 }

@@ -21,7 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/gotomicro/ekit"
+	"github.com/ecodeclub/ekit"
 )
 
 // SimpleStruct 包含所有 eorm 支持的类型
