@@ -18,7 +18,8 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/ecodeclub/eorm/internal/datasource"
+	"github.com/ecodeclub/ekit/list"
+	"github.com/ecodeclub/eorm/internal/rows"
 )
 
 // Executor sql 语句执行器
@@ -34,6 +35,7 @@ type QueryBuilder interface {
 // Session 代表一个抽象的概念，即会话
 type Session interface {
 	getCore() core
-	queryContext(ctx context.Context, query datasource.Query) (*sql.Rows, error)
-	execContext(ctx context.Context, query datasource.Query) (sql.Result, error)
+	queryMulti(ctx context.Context, qs []Query) (list.List[rows.Rows], error)
+	queryContext(ctx context.Context, query Query) (rows.Rows, error)
+	execContext(ctx context.Context, query Query) (sql.Result, error)
 }

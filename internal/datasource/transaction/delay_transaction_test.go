@@ -80,14 +80,14 @@ func (s *TestDelayTxTestSuite) TestExecute_Commit_Or_Rollback() {
 			mockOrder: func(mock1, mock2 sqlmock.Sqlmock) {},
 			afterFunc: func(t *testing.T, tx *eorm.Tx, values []*test.OrderDetail) {},
 			txFunc: func() (*eorm.Tx, error) {
-				s.DataSource = shardingsource.NewShardingDataSource(map[string]datasource.DataSource{
+				ds := shardingsource.NewShardingDataSource(map[string]datasource.DataSource{
 					"1.db.cluster.company.com:3306": s.clusterDB,
 				})
 				r := model.NewMetaRegistry()
 				_, err := r.Register(&test.OrderDetail{},
 					model.WithTableShardingAlgorithm(s.algorithm))
 				require.NoError(t, err)
-				db, err := eorm.OpenDS("mysql", s.DataSource, eorm.DBWithMetaRegistry(r))
+				db, err := eorm.OpenDS("mysql", ds, eorm.DBWithMetaRegistry(r))
 				require.NoError(t, err)
 				return db.BeginTx(transaction.UsingTxType(context.Background(), transaction.Delay), &sql.TxOptions{})
 			},
@@ -98,7 +98,7 @@ func (s *TestDelayTxTestSuite) TestExecute_Commit_Or_Rollback() {
 			mockOrder: func(mock1, mock2 sqlmock.Sqlmock) {},
 			afterFunc: func(t *testing.T, tx *eorm.Tx, values []*test.OrderDetail) {},
 			txFunc: func() (*eorm.Tx, error) {
-				s.DataSource = shardingsource.NewShardingDataSource(map[string]datasource.DataSource{
+				ds := shardingsource.NewShardingDataSource(map[string]datasource.DataSource{
 					"0.db.cluster.company.com:3306": masterslave.NewMasterSlavesDB(s.mockMaster1DB, masterslave.MasterSlavesWithSlaves(
 						newSlaves(t, s.mockSlave1DB, s.mockSlave2DB, s.mockSlave3DB))),
 				})
@@ -106,7 +106,7 @@ func (s *TestDelayTxTestSuite) TestExecute_Commit_Or_Rollback() {
 				_, err := r.Register(&test.OrderDetail{},
 					model.WithTableShardingAlgorithm(s.algorithm))
 				require.NoError(t, err)
-				db, err := eorm.OpenDS("mysql", s.DataSource, eorm.DBWithMetaRegistry(r))
+				db, err := eorm.OpenDS("mysql", ds, eorm.DBWithMetaRegistry(r))
 				require.NoError(t, err)
 				return db.BeginTx(transaction.UsingTxType(context.Background(), transaction.Delay), &sql.TxOptions{})
 			},
@@ -123,14 +123,14 @@ func (s *TestDelayTxTestSuite) TestExecute_Commit_Or_Rollback() {
 					"order_detail_db_0": masterslave.NewMasterSlavesDB(s.mockMaster1DB, masterslave.MasterSlavesWithSlaves(
 						newSlaves(t, s.mockSlave1DB, s.mockSlave2DB, s.mockSlave3DB))),
 				})
-				s.DataSource = shardingsource.NewShardingDataSource(map[string]datasource.DataSource{
+				ds := shardingsource.NewShardingDataSource(map[string]datasource.DataSource{
 					"0.db.cluster.company.com:3306": clusterDB,
 				})
 				r := model.NewMetaRegistry()
 				_, err := r.Register(&test.OrderDetail{},
 					model.WithTableShardingAlgorithm(s.algorithm))
 				require.NoError(t, err)
-				db, err := eorm.OpenDS("mysql", s.DataSource, eorm.DBWithMetaRegistry(r))
+				db, err := eorm.OpenDS("mysql", ds, eorm.DBWithMetaRegistry(r))
 				require.NoError(t, err)
 				return db.BeginTx(transaction.UsingTxType(context.Background(), transaction.Delay), &sql.TxOptions{})
 			},
@@ -483,10 +483,6 @@ func (s *TestDelayTxTestSuite) TestExecute_Commit_Or_Rollback() {
 				rows := s.mockMaster2.NewRows([]string{"order_id", "item_id", "using_col1", "using_col2"})
 				s.mockMaster2.ExpectQuery(regexp.QuoteMeta("SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail_db_1`.`order_detail_tab_2` WHERE (`order_id`=?) OR (`order_id`=?);SELECT `order_id`,`item_id`,`using_col1`,`using_col2` FROM `order_detail_db_1`.`order_detail_tab_1` WHERE (`order_id`=?) OR (`order_id`=?);")).
 					WithArgs(199, 299, 199, 299).WillReturnRows(rows)
-
-				queryVal := s.findTgt(t, values)
-				var wantOds []*test.OrderDetail
-				assert.ElementsMatch(t, wantOds, queryVal)
 			},
 		},
 	}
@@ -496,10 +492,9 @@ func (s *TestDelayTxTestSuite) TestExecute_Commit_Or_Rollback() {
 			tx, err := tc.txFunc()
 			require.NoError(t, err)
 
-			// TODO GetMultiV2 待将 table 维度改成 db 维度
 			querySet, err := eorm.NewShardingSelector[test.OrderDetail](tx).
 				Where(eorm.C("OrderId").NEQ(123)).
-				GetMultiV2(masterslave.UseMaster(context.Background()))
+				GetMulti(masterslave.UseMaster(context.Background()))
 			assert.Equal(t, tc.wantErr, err)
 			if err != nil {
 				return

@@ -18,15 +18,12 @@ import (
 	"context"
 	"sync"
 
-	"github.com/ecodeclub/eorm/internal/rows"
-
 	"github.com/ecodeclub/eorm/internal/merger/batchmerger"
 
 	"github.com/ecodeclub/eorm/internal/sharding"
 
 	"github.com/ecodeclub/eorm/internal/errs"
 	"github.com/valyala/bytebufferpool"
-	"golang.org/x/sync/errgroup"
 )
 
 type ShardingSelector[T any] struct {
@@ -305,110 +302,21 @@ func (s *ShardingSelector[T]) GetMulti(ctx context.Context) ([]*T, error) {
 		return nil, err
 	}
 
-	var rowsSlice []rows.Rows
-	var eg errgroup.Group
-	for _, query := range qs {
-		q := query
-		eg.Go(func() error {
-			//s.lock.Lock()
-			//defer s.lock.Unlock()
-			// TODO 利用 ctx 传递 DB name
-			rs, err := s.db.queryContext(ctx, q)
-			if err == nil {
-				s.lock.Lock()
-				rowsSlice = append(rowsSlice, rs)
-				s.lock.Unlock()
-			}
-			return err
-		})
-	}
-	err = eg.Wait()
-	if err != nil {
-		return nil, err
-	}
-
 	mgr := batchmerger.NewMerger()
-	rows, err := mgr.Merge(ctx, rowsSlice)
+	rowsList, err := s.db.queryMulti(ctx, qs)
 	if err != nil {
 		return nil, err
 	}
+	rows, err := mgr.Merge(ctx, rowsList.AsSlice())
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
 	var res []*T
 	for rows.Next() {
 		tp := new(T)
 		val := s.valCreator.NewPrimitiveValue(tp, s.meta)
 		if err = val.SetColumns(rows); err != nil {
-			return nil, err
-		}
-		res = append(res, tp)
-	}
-	return res, nil
-}
-
-func (s *ShardingSelector[T]) GetMultiV2(ctx context.Context) ([]*T, error) {
-	qs, err := s.Build(ctx)
-	if err != nil {
-		return nil, err
-	}
-	var sdQs []sharding.Query
-	dsMap := make(map[string]map[string]sharding.Query, 8)
-	for _, q := range qs {
-		dbMap, ok := dsMap[q.Datasource]
-		if !ok {
-			dsMap[q.Datasource] = map[string]sharding.Query{q.DB: q}
-			continue
-		}
-		old, ok := dbMap[q.DB]
-		if !ok {
-			if dbMap == nil {
-				dbMap = make(map[string]sharding.Query, 8)
-			}
-			dbMap[q.DB] = q
-			continue
-		}
-		old.SQL = old.SQL + q.SQL
-		old.Args = append(old.Args, q.Args...)
-		dbMap[q.DB] = old
-		dsMap[q.Datasource] = dbMap
-	}
-	for _, dbMap := range dsMap {
-		for _, q := range dbMap {
-			sdQs = append(sdQs, q)
-		}
-	}
-
-	var rowsSlice []rows.Rows
-	var eg errgroup.Group
-	for _, query := range sdQs {
-		q := query
-		//fmt.Println(q.String())
-		eg.Go(func() error {
-			//s.lock.Lock()
-			//defer s.lock.Unlock()
-			// TODO 利用 ctx 传递 DB name
-			rs, err := s.db.queryContext(ctx, q)
-			if err == nil {
-				s.lock.Lock()
-				rowsSlice = append(rowsSlice, rs)
-				s.lock.Unlock()
-			}
-			return err
-		})
-	}
-	err = eg.Wait()
-	if err != nil {
-		return nil, err
-	}
-
-	mgr := batchmerger.NewMerger()
-	rs, err := mgr.Merge(ctx, rowsSlice)
-	if err != nil {
-		return nil, err
-	}
-	var res []*T
-	for rs.Next() {
-		tp := new(T)
-		val := s.valCreator.NewPrimitiveValue(tp, s.meta)
-		if err = val.SetColumns(rs); err != nil {
 			return nil, err
 		}
 		res = append(res, tp)

@@ -61,13 +61,13 @@ func (s *ShardingSingleTxTestSuite) TestDoubleShardingSelect() {
 			defer tx.Commit()
 			querySet, err := eorm.NewShardingSelector[test.OrderDetail](tx).
 				Where(eorm.C("OrderId").EQ(123)).
-				GetMultiV2(masterslave.UseMaster(context.Background()))
+				GetMulti(masterslave.UseMaster(context.Background()))
 			require.NoError(t, err)
 			assert.ElementsMatch(t, tc.querySet, querySet)
 
 			querySet, err = eorm.NewShardingSelector[test.OrderDetail](tx).
 				Where(eorm.C("OrderId").EQ(123)).
-				GetMultiV2(masterslave.UseMaster(context.Background()))
+				GetMulti(masterslave.UseMaster(context.Background()))
 			require.NoError(t, err)
 			assert.ElementsMatch(t, tc.querySet, querySet)
 		})
@@ -137,7 +137,7 @@ func (s *ShardingSingleTxTestSuite) TestShardingSelectInsert_Commit_Or_Rollback(
 			tx := tc.txFunc(t)
 			querySet, err := eorm.NewShardingSelector[test.OrderDetail](tx).
 				Where(eorm.C("OrderId").EQ(123)).
-				GetMultiV2(masterslave.UseMaster(context.Background()))
+				GetMulti(masterslave.UseMaster(context.Background()))
 			require.NoError(t, err)
 			assert.ElementsMatch(t, tc.querySet, querySet)
 			res := eorm.NewShardingInsert[test.OrderDetail](tx).
@@ -220,7 +220,7 @@ func (s *ShardingSingleTxTestSuite) TestShardingSelectUpdate_Commit_Or_Rollback(
 			tx := tc.txFunc(t)
 			querySet, err := eorm.NewShardingSelector[test.OrderDetail](tx).
 				Where(eorm.C("OrderId").EQ(123)).
-				GetMultiV2(masterslave.UseMaster(context.Background()))
+				GetMulti(masterslave.UseMaster(context.Background()))
 			require.NoError(t, err)
 			assert.ElementsMatch(t, tc.querySet, querySet)
 			res := eorm.NewShardingUpdater[test.OrderDetail](tx).Update(tc.target).

@@ -15,6 +15,7 @@
 package rows
 
 import (
+	"database/sql"
 	"database/sql/driver"
 	_ "unsafe"
 )
@@ -29,6 +30,15 @@ func ConvertAssign(dest, src any) error {
 		src, err = srcVal.Value()
 		if err != nil {
 			return err
+		}
+	}
+	// 预处理一下 sqlConvertAssign 不支持的转换，遇到一个加一个
+	switch sv := src.(type) {
+	case sql.RawBytes:
+		switch dv := dest.(type) {
+		case *string:
+			*dv = string(sv)
+			return nil
 		}
 	}
 	return sqlConvertAssign(dest, src)
